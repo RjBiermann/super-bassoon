@@ -1,6 +1,8 @@
 package com.rjbiermann.giffyviewer.feature.feed
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -59,6 +61,7 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.rjbiermann.giffyviewer.core.model.Gif
+import com.rjbiermann.giffyviewer.core.ui.GiffyColors
 
 /**
  * M3 (m3.material.io): Scaffold + small TopAppBar + FilterChip feed tabs +
@@ -198,6 +201,9 @@ internal fun QuickBlockSheet(
     gif: Gif,
     onDismiss: () -> Unit,
     viewModel: FeedViewModel,
+    showSpeed: Boolean = false,
+    currentSpeed: Float = 1f,
+    onSpeedChange: (Float) -> Unit = {},
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.padding(bottom = 24.dp)) {
@@ -206,6 +212,35 @@ internal fun QuickBlockSheet(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
+            if (showSpeed) {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    listOf(0.5f, 1f, 1.25f, 1.5f, 2f).forEach { speed ->
+                        Text(
+                            text = "$speed×",
+                            color =
+                                if (speed == currentSpeed) {
+                                    GiffyColors.Lime
+                                } else {
+                                    Color.White
+                                },
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier =
+                                Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        onSpeedChange(speed)
+                                    }.padding(horizontal = 12.dp, vertical = 6.dp),
+                        )
+                    }
+                }
+            }
             val favState by viewModel
                 .creatorState(gif.userName)
                 .collectAsState(initial = null)

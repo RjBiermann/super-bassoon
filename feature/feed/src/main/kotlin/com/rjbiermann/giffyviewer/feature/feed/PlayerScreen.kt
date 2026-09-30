@@ -4,10 +4,13 @@ package com.rjbiermann.giffyviewer.feature.feed
 
 import android.app.Activity
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -23,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -32,6 +36,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Fullscreen
@@ -63,6 +68,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -70,6 +76,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -77,6 +84,8 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import androidx.paging.compose.collectAsLazyPagingItems
@@ -89,6 +98,7 @@ import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.ui.GiffyColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -125,8 +135,14 @@ fun PlayerScreen(
     val muted by settings.muted.collectAsStateWithLifecycle(false)
     val likedIds by viewModel.likedIds.collectAsStateWithLifecycle(emptySet())
     val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle(false)
+    val autoSwipe by settings.autoSwipe.collectAsStateWithLifecycle(false)
     val muteScope = rememberCoroutineScope()
     val player = remember { playerFactory.create(context) }
+
+    // playback speed: session-only — resets when the player is released (PLAN §9)
+    var speed by remember { mutableFloatStateOf(1f) }
+    // playback failure overlay (PLAN §9): Retry re-resolves, Skip advances
+    var playError by remember { mutableStateOf(false) }
 
     var fullscreen by remember { mutableStateOf(false) }
     var controlsVisible by remember { mutableStateOf(true) }
@@ -172,8 +188,45 @@ fun PlayerScreen(
     }
     // mute applies to the single active player instance (PLAN §9)
     LaunchedEffect(muted) { player.volume = if (muted) 0f else 1f }
+    // error surface + end-of-media: one listener on the shared player
+    val pagerScope = rememberCoroutineScope()
+    DisposableEffect(player, autoSwipe, dataSaver) {
+        val listener =
+            object : Player.Listener {
+                override fun onPlayerError(error: PlaybackException) {
+                    playError = true
+                }
+
+                override fun onPlaybackStateChanged(state: Int) {
+                    if (state == Player.STATE_ENDED && autoSwipe && !dataSaver) {
+                        val next = pagerState.currentPage + 1
+                        if (next < items.itemCount) {
+                            // instant when the system reduced-motion scale is 0
+                            val reduced =
+                                android.provider.Settings.Global.getFloat(
+                                    context.contentResolver,
+                                    android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+                                    1f,
+                                ) == 0f
+                            pagerScope.launch {
+                                if (reduced) pagerState.scrollToPage(next) else pagerState.animateScrollToPage(next)
+                            }
+                        } else {
+                            // end of loaded pool: retry asks paging for the next
+                            // page; advance will happen on the next ended event
+                            // (ponytail: no queue-when-arrived)
+                            items.retry()
+                        }
+                    }
+                }
+            }
+        player.addListener(listener)
+        onDispose { player.removeListener(listener) }
+    }
     // likes are refreshed per use (PLAN §5)
     LaunchedEffect(Unit) { viewModel.syncLikes() }
+    // errors belong to the current item; a swipe resets the overlay
+    LaunchedEffect(pagerState.currentPage) { playError = false }
     // position + play-state ticker drives progress bar / play button
     LaunchedEffect(scrubbing) {
         while (true) {
@@ -240,6 +293,14 @@ fun PlayerScreen(
                     onToggleMute = { on -> muteScope.launch { settings.setMuted(on) } },
                     onShare = { shareGif(context, gif) },
                     onOverflow = { sheetFor = gif },
+                    autoSwipeOn = autoSwipe && !dataSaver,
+                    onToggleAutoSwipe = { muteScope.launch { settings.setAutoSwipe(!autoSwipe) } },
+                    playError = playError && page == pagerState.currentPage,
+                    onRetry = {
+                        playError = false
+                        player.playGif(gif, dataSaver)
+                    },
+                    onSkip = { playError = false },
                 )
             }
         }
@@ -251,6 +312,12 @@ fun PlayerScreen(
             gif = sheetGif,
             onDismiss = { sheetFor = null },
             viewModel = viewModel,
+            showSpeed = true,
+            currentSpeed = speed,
+            onSpeedChange = { newSpeed ->
+                speed = newSpeed
+                player.setPlaybackSpeed(newSpeed)
+            },
         )
     }
 }
@@ -284,7 +351,13 @@ private fun PlayerPage(
     onToggleMute: (Boolean) -> Unit,
     onShare: () -> Unit,
     onOverflow: () -> Unit,
+    autoSwipeOn: Boolean,
+    onToggleAutoSwipe: () -> Unit,
+    playError: Boolean,
+    onRetry: () -> Unit,
+    onSkip: () -> Unit,
 ) {
+    var popAt by remember { mutableStateOf<Offset?>(null) }
     if (active) {
         // resume: pull the stored position once per gif before starting playback
         LaunchedEffect(gif.id, dataSaver) {
@@ -368,18 +441,34 @@ private fun PlayerPage(
                         }
                     }
                 }
-                // single tap: reveal UI when hidden, pause/play when shown (PLAN §9).
-                // Non-consuming (no detectTapGestures) — it would eat the down
-                // event and starve the VerticalPager's drag gesture.
+                // single tap: reveal UI when hidden, pause/play when shown;
+                // double tap: like/unlike + heart pop (PLAN §9). Non-consuming
+                // (no detectTapGestures) — it would eat the down event and
+                // starve the VerticalPager's drag gesture.
                 .pointerInput(controlsVisible) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
                         val up =
                             waitForUpOrCancellation()
                                 ?: return@awaitEachGesture
-                        if ((up.position - down.position).getDistance() <
+                        if ((up.position - down.position).getDistance() >=
                             viewConfiguration.touchSlop
                         ) {
+                            return@awaitEachGesture
+                        }
+                        val secondDown =
+                            withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis.toLong()) {
+                                awaitFirstDown(requireUnconsumed = false)
+                            }
+                        val secondUp = secondDown?.let { waitForUpOrCancellation() }
+                        if (secondDown != null &&
+                            secondUp != null &&
+                            (secondUp.position - secondDown.position).getDistance() <
+                            viewConfiguration.touchSlop
+                        ) {
+                            onToggleLike()
+                            popAt = down.position
+                        } else {
                             if (controlsVisible) {
                                 if (player.isPlaying) player.pause() else player.playOrRestart()
                             } else {
@@ -477,15 +566,80 @@ private fun PlayerPage(
                 hasAudio = gif.hasAudio,
                 liked = liked,
                 muted = muted,
+                autoSwipeOn = autoSwipeOn,
                 onToggleLike = onToggleLike,
                 onToggleMute = { onToggleMute(!muted) },
                 onShare = onShare,
                 onOverflow = onOverflow,
+                onToggleAutoSwipe = onToggleAutoSwipe,
                 modifier =
                     Modifier
                         .windowInsetsPadding(WindowInsets.navigationBars)
                         .padding(end = 24.dp, bottom = 96.dp),
             )
+        }
+        popAt?.let { popPos ->
+            val pop = remember(popPos) { Animatable(0.6f) }
+            LaunchedEffect(popPos) {
+                pop.animateTo(1.5f, tween(120))
+                pop.animateTo(1f, tween(180))
+                popAt = null
+            }
+            Icon(
+                imageVector = Icons.Filled.Favorite,
+                contentDescription = null,
+                tint = GiffyColors.Lime,
+                modifier =
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .offset {
+                            IntOffset(
+                                (popPos.x - 24.dp.roundToPx()).roundToInt(),
+                                (popPos.y - 24.dp.roundToPx()).roundToInt(),
+                            )
+                        }.graphicsLayer {
+                            scaleX = pop.value
+                            scaleY = pop.value
+                            alpha = 1f - (pop.value - 1f) / 0.5f
+                        },
+            )
+        }
+        if (playError && active) {
+            Column(
+                modifier =
+                    Modifier
+                        .align(Alignment.Center)
+                        .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                        .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text("Playback failed", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Retry",
+                        color = GiffyColors.Lime,
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier =
+                            Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .border(1.dp, GiffyColors.Lime, RoundedCornerShape(8.dp))
+                                .clickable(onClick = onRetry)
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                    Text(
+                        text = "Skip",
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier =
+                            Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                .clickable(onClick = onSkip)
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+            }
         }
         PlayerControls(
             visible = controlsVisible && active,
@@ -624,10 +778,12 @@ private fun ActionRail(
     hasAudio: Boolean,
     liked: Boolean,
     muted: Boolean,
+    autoSwipeOn: Boolean,
     onToggleLike: () -> Unit,
     onToggleMute: () -> Unit,
     onShare: () -> Unit,
     onOverflow: () -> Unit,
+    onToggleAutoSwipe: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -657,6 +813,13 @@ private fun ActionRail(
         }
         IconButton(onClick = onOverflow) {
             Icon(Icons.Filled.MoreVert, contentDescription = "more actions", tint = Color.White)
+        }
+        IconButton(onClick = onToggleAutoSwipe) {
+            Icon(
+                imageVector = Icons.Filled.FastForward,
+                contentDescription = if (autoSwipeOn) "auto-swipe on" else "auto-swipe off",
+                tint = if (autoSwipeOn) GiffyColors.Lime else Color.White,
+            )
         }
     }
 }

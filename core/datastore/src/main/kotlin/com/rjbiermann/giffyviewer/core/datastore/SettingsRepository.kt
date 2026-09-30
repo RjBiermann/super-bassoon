@@ -26,6 +26,7 @@ class SettingsRepository
             val AMOLED = booleanPreferencesKey("amoled")
             val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
             val MUTED = booleanPreferencesKey("muted")
+            val AUTO_SWIPE = booleanPreferencesKey("auto_swipe")
         }
 
         /** True once the user attested 18+. Emits false until then; survives restarts. */
@@ -68,6 +69,13 @@ class SettingsRepository
 
         suspend fun setMuted(enabled: Boolean) {
             dataStore.edit { it[Keys.MUTED] = enabled }
+        }
+
+        /** Auto-advance to the next video on natural end (PLAN §9); data-saver forces off. */
+        val autoSwipe: Flow<Boolean> = dataStore.data.map { it[Keys.AUTO_SWIPE] ?: false }
+
+        suspend fun setAutoSwipe(enabled: Boolean) {
+            dataStore.edit { it[Keys.AUTO_SWIPE] = enabled }
         }
 
         suspend fun setDynamicColor(enabled: Boolean) {
