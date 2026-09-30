@@ -18,7 +18,7 @@ You are building **Giffy Viewer**, an unofficial Android client for upstream.com
 
 ## 1. Project Structure
 
-Multi-module Gradle, Kotlin 2.x, version catalog (`libs.versions.toml`), ktlint + detekt wired to fail build on violations.
+Multi-module Gradle, Kotlin 2.x, version catalog (`libs.versions.toml`), ktlint + detekt wired to fail build on violations. LeakCanary wired `debugImplementation` only in both app modules (debug-build memory-leak watchdog; never ships in release, fully local, no phone-home).
 
 :core:model        — pure domain models + UiState types
 :core:network      — Retrofit/OkHttp, rate limiter, DTOs, ContentFilter choke point
@@ -259,7 +259,7 @@ Feed identity extends to cache keys: sort/range changes produce distinct page st
 
 ## 10. Build Phases (order fixed — do not reorder)
 
-1. **Skeleton:** modules, version catalog, ktlint+detekt wired
+1. **Skeleton:** modules, version catalog, ktlint+detekt wired, LeakCanary debug-only
 2. **Network + anonymous browsing — VALIDATE LIVE FIRST.** All other phases depend on endpoint reality. If endpoints drifted, adapt paths only.
 3. **Room + feeds offline** (incl. `feed_pages`, tags/username in gif rows)
 4. **Player + media cache** (SimpleCache by ID, data-saver, quality picker, resume; snap controls: fullscreen + auto-hide UI, tap reveal/pause, seek scrub, pinch-zoom persistence, swipe-player action rail per §9)

@@ -30,6 +30,7 @@ dependencies {
     implementation(project(":core:datastore"))
     implementation(project(":core:player"))
     implementation(libs.material.icons)
+    implementation(libs.material.icons.extended)
     implementation(project(":core:ui"))
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.paging.runtime)
