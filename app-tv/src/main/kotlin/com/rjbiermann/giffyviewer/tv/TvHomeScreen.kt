@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -20,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -39,6 +41,7 @@ import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.tv.material3.Button
 import androidx.tv.material3.Card
+import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
@@ -68,7 +71,10 @@ fun TvHomeScreen(
     // Remote MENU key on a focused card opens creator quick actions.
     var actionsFor by remember { mutableStateOf<Gif?>(null) }
 
-    LazyColumn(modifier = Modifier.fillMaxSize()) {
+    LazyColumn(
+        // Paint the borrowed page color — the window background is a lighter gray.
+        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+    ) {
         item {
             Text(
                 text = "Giffy Viewer",
@@ -213,6 +219,14 @@ private fun GifCard(
     val scale by animateFloatAsState(if (focused) 1.08f else 1f, label = "cardScale")
     Card(
         onClick = onClick,
+        // Mobile tiles use 12dp rounded corners (GifTile in feature:feed).
+        shape =
+            androidx.tv.material3.CardDefaults.shape(
+                androidx.compose.foundation.shape
+                    .RoundedCornerShape(12.dp),
+                androidx.compose.foundation.shape
+                    .RoundedCornerShape(16.dp),
+            ),
         modifier =
             Modifier
                 .width(280.dp)
@@ -232,11 +246,13 @@ private fun GifCard(
     ) {
         Column {
             // avgColor placeholder: no black flash on slow cells.
+            // Clip: the poster must round with the card (mobile GifTile parity).
             Box(
                 modifier =
                     Modifier
                         .width(280.dp)
                         .height(170.dp)
+                        .clip(RoundedCornerShape(12.dp))
                         .background(avgColorOr(gif, MaterialTheme.colorScheme.surfaceVariant)),
             ) {
                 AsyncImage(
