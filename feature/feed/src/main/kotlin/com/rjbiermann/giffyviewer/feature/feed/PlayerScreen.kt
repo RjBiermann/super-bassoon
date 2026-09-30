@@ -333,7 +333,7 @@ private fun PlayerPage(
                             viewConfiguration.touchSlop
                         ) {
                             if (controlsVisible) {
-                                if (player.isPlaying) player.pause() else player.play()
+                                if (player.isPlaying) player.pause() else player.playOrRestart()
                             } else {
                                 onShowControls()
                             }
@@ -375,7 +375,7 @@ private fun PlayerPage(
             visible = controlsVisible && active,
             isPlaying = player.isPlaying,
             onTogglePlay = {
-                if (player.isPlaying) player.pause() else player.play()
+                if (player.isPlaying) player.pause() else player.playOrRestart()
             },
             scrubbing = scrubbing,
             onScrubbing = onScrubbing,
@@ -458,33 +458,36 @@ private fun PlayerControls(
             Spacer(Modifier.height(24.dp))
         }
 
-        // always-visible thin progress bar (PLAN §9): 24dp hit area, 3dp track
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 72.dp)
-                    .height(24.dp)
-                    .pointerInput(durationMs) {
-                        detectTapGestures { }
-                    },
-            contentAlignment = Alignment.BottomCenter,
-        ) {
-            val fraction = if (durationMs > 0) positionMs.toFloat() / durationMs else 0f
+        // thin progress bar shows only while the controls (with their slider)
+        // are hidden — one progress indicator at a time (user feedback 2026-09-30)
+        AnimatedVisibility(visible = !visible, enter = fadeIn(), exit = fadeOut()) {
             Box(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(3.dp)
-                        .background(trackColor, RoundedCornerShape(3.dp)),
+                        .padding(start = 16.dp, end = 72.dp)
+                        .height(24.dp)
+                        .pointerInput(durationMs) {
+                            detectTapGestures { }
+                        },
+                contentAlignment = Alignment.BottomCenter,
             ) {
+                val fraction = if (durationMs > 0) positionMs.toFloat() / durationMs else 0f
                 Box(
                     modifier =
                         Modifier
-                            .fillMaxWidth(fraction.coerceIn(0f, 1f))
+                            .fillMaxWidth()
                             .height(3.dp)
-                            .background(fill, RoundedCornerShape(3.dp)),
-                )
+                            .background(trackColor, RoundedCornerShape(3.dp)),
+                ) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth(fraction.coerceIn(0f, 1f))
+                                .height(3.dp)
+                                .background(fill, RoundedCornerShape(3.dp)),
+                    )
+                }
             }
         }
     }

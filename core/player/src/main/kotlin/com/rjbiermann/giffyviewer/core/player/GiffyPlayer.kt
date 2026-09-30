@@ -38,4 +38,12 @@ class GiffyPlayer internal constructor(
 
     val durationMs: Long
         get() = player.duration.takeIf { it != C.TIME_UNSET } ?: 0
+
+    /** Play tap at end-of-stream restarts from the top (standard player UX). */
+    fun playOrRestart() {
+        if (!player.isPlaying && durationMs > 0 && player.currentPosition >= player.duration) {
+            player.seekTo(0)
+        }
+        player.play()
+    }
 }
