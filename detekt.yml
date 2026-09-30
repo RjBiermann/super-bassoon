@@ -1,0 +1,25 @@
+# Giffy Viewer detekt config — default ruleset, tuned for Compose-era Kotlin.
+build:
+  maxIssues: 0
+complexity:
+  LongMethod:
+    active: false
+  LargeClass:
+    active: false
+  TooManyFunctions:
+    active: true
+    thresholdInInterfaces: 19
+    thresholdInClasses: 19
+style:
+  MagicNumber:
+    active: false
+  MaxLineLength:
+    maxLineLength: 140
+exceptions:
+  TooGenericExceptionCaught:
+    active: false
+naming:
+  FunctionNaming:
+    active: false
+  MatchingDeclarationName:
+    active: false

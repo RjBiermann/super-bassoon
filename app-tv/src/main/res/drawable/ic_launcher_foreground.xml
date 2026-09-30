@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- loop ring -->
+    <path
+        android:pathData="M54,54 m-22,0 a22,22 0 1,1 44,0 a22,22 0 1,1 -44,0"
+        android:strokeColor="#FFB300"
+        android:strokeWidth="6"
+        android:strokeLineCap="round" />
+    <!-- arrowhead on the loop (top-right) -->
+    <path
+        android:pathData="M66,25 L78,33 L66,41 Z"
+        android:fillColor="#FFB300" />
+    <!-- play glyph -->
+    <path
+        android:pathData="M48,44 L64,54 L48,64 Z"
+        android:fillColor="#FFFFFF" />
+</vector>
