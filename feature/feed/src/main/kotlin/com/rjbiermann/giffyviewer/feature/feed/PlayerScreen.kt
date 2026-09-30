@@ -143,6 +143,9 @@ fun PlayerScreen(
     var speed by remember { mutableFloatStateOf(1f) }
     // playback failure overlay (PLAN §9): Retry re-resolves, Skip advances
     var playError by remember { mutableStateOf(false) }
+    // auto-advance plays the next item from 0 — a watched neighbor resuming
+    // near its end would end instantly and cascade swipes (user report)
+    val skipResume = remember { mutableStateOf(false) }
 
     var fullscreen by remember { mutableStateOf(false) }
     var controlsVisible by remember { mutableStateOf(true) }
@@ -201,6 +204,7 @@ fun PlayerScreen(
                     if (state == Player.STATE_ENDED && autoSwipe && !dataSaver) {
                         val next = pagerState.currentPage + 1
                         if (next < items.itemCount) {
+                            skipResume.value = true
                             // instant when the system reduced-motion scale is 0
                             val reduced =
                                 android.provider.Settings.Global.getFloat(
@@ -305,6 +309,7 @@ fun PlayerScreen(
                     onOverflow = { sheetFor = gif },
                     autoSwipeOn = autoSwipe && !dataSaver,
                     onToggleAutoSwipe = { muteScope.launch { settings.setAutoSwipe(!autoSwipe) } },
+                    skipResume = skipResume,
                     playError = playError && page == pagerState.currentPage,
                     onRetry = {
                         playError = false
@@ -361,6 +366,7 @@ private fun PlayerPage(
     onToggleMute: (Boolean) -> Unit,
     onShare: () -> Unit,
     onOverflow: () -> Unit,
+    skipResume: androidx.compose.runtime.MutableState<Boolean>,
     autoSwipeOn: Boolean,
     onToggleAutoSwipe: () -> Unit,
     playError: Boolean,
@@ -369,9 +375,21 @@ private fun PlayerPage(
 ) {
     var popAt by remember { mutableStateOf<Offset?>(null) }
     if (active) {
-        // resume: pull the stored position once per gif before starting playback
+        // resume: stored position per gif, EXCEPT (a) auto-advance always starts
+        // at 0, and (b) fully-watched gifs restart at 0 — a near-end resume would
+        // hit STATE_ENDED instantly and cascade auto-swipes mid-video
+        // (keyed on gif.id only, so the flag flip doesn't restart playback)
         LaunchedEffect(gif.id, dataSaver) {
-            val resume = watchHistory.byGif(gif.id)?.positionMs ?: 0L
+            val history = watchHistory.byGif(gif.id)
+            val resume =
+                when {
+                    skipResume.value -> {
+                        skipResume.value = false
+                        0L
+                    }
+                    history?.watched == true -> 0L
+                    else -> history?.positionMs ?: 0L
+                }
             player.playGif(gif, dataSaver, resumeMs = resume)
             onPlayingChanged(true)
         }
