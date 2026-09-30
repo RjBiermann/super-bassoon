@@ -12,8 +12,11 @@ import com.rjbiermann.giffyviewer.core.model.Gif
  * lose ordering, so results are re-ordered here.
  *
  * Custom PagingSources get NO automatic Room invalidation — we subscribe to the
- * invalidation tracker ourselves, otherwise the first feed load renders empty
- * even after the mediator has stored the data.
+ * invalidation tracker ourselves. PREF tables re-apply read-time filters instantly
+ * (leak-zero); feed_pages re-loads the generation after the mediator fills a cache
+ * miss (first-launch race: the source's refresh load can run before the network
+ * write lands — without this the grid stays empty until process restart).
+ * Anchor survives via getRefreshKey (Room-generated sources behave the same way).
  */
 class FeedPagingSource(
     private val db: GiffyDatabase,
@@ -23,13 +26,13 @@ class FeedPagingSource(
     private val contentFilter: com.rjbiermann.giffyviewer.core.database.ContentFilter,
 ) : PagingSource<Int, Gif>() {
     init {
-        // Only PREF tables invalidate: their changes are read-time filters that must
-        // re-apply instantly (leak-zero). gifs/feed_pages writes from the mediator
-        // must NOT invalidate — Paging already drives the next PagingSource load
-        // after each APPEND, and invalidating mid-scroll restarts the generation,
-        // empties the list for a beat and loses the scroll anchor.
         db.invalidationTracker.addObserver(
-            object : androidx.room.InvalidationTracker.Observer("creator_prefs", "tag_prefs", "keyword_blocks") {
+            object : androidx.room.InvalidationTracker.Observer(
+                "feed_pages",
+                "creator_prefs",
+                "tag_prefs",
+                "keyword_blocks",
+            ) {
                 override fun onInvalidated(tables: Set<String>) {
                     invalidate()
                 }
