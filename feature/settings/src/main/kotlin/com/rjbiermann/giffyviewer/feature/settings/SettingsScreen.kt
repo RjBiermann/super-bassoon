@@ -1,5 +1,6 @@
 package com.rjbiermann.giffyviewer.feature.settings
 
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -49,6 +50,8 @@ fun SettingsScreen(
 ) {
     val blocked by viewModel.blocked.collectAsStateWithLifecycle()
     val dataSaver by viewModel.dataSaver.collectAsStateWithLifecycle()
+    val amoled by viewModel.amoled.collectAsStateWithLifecycle()
+    val dynamicColor by viewModel.dynamicColor.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -152,6 +155,43 @@ fun SettingsScreen(
                         )
                     }
                     Switch(checked = dataSaver, onCheckedChange = { viewModel.setDataSaver(it) })
+                }
+            }
+            item(key = "theme") {
+                Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("AMOLED true-black", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Pure black background — saves power on OLED screens",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(checked = amoled, onCheckedChange = { viewModel.setAmoled(it) })
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Dynamic color", style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    "Wallpaper-based Material You palette (Android 12+)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Switch(
+                                checked = dynamicColor,
+                                onCheckedChange = { viewModel.setDynamicColor(it) },
+                            )
+                        }
+                    }
                 }
             }
             item(key = "backup") {

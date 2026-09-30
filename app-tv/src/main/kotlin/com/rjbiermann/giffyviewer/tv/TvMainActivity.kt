@@ -54,7 +54,14 @@ class TvMainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { GiffyTheme { Root() } }
+        setContent { ThemeHost() }
+    }
+
+    /** Borrowed dark theme, AMOLED option shared with mobile (PLAN §9). */
+    @Composable
+    private fun ThemeHost() {
+        val amoled by settings.amoled.collectAsStateWithLifecycle(initialValue = false)
+        GiffyTheme(amoled = amoled) { Root() }
     }
 
     @Composable

@@ -66,6 +66,22 @@ class SettingsViewModel
             viewModelScope.launch { settings.setDataSaver(enabled) }
         }
 
+        /** PLAN §9 theme options. */
+        val amoled: StateFlow<Boolean> =
+            settings.amoled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+        val dynamicColor: StateFlow<Boolean> =
+            settings.dynamicColor
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+        fun setAmoled(enabled: Boolean) {
+            viewModelScope.launch { settings.setAmoled(enabled) }
+        }
+
+        fun setDynamicColor(enabled: Boolean) {
+            viewModelScope.launch { settings.setDynamicColor(enabled) }
+        }
+
         /** Gate 7: export/import all content controls as JSON. */
         suspend fun exportJson(): String = ContentPrefsBackup.export(dao, settings.dataSaver.first())
 

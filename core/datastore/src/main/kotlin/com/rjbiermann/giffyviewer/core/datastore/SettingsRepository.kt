@@ -23,6 +23,8 @@ class SettingsRepository
             val AGE_CONFIRMED_AT = booleanPreferencesKey("age_confirmed_at")
             val DATA_SAVER = booleanPreferencesKey("data_saver")
             val BLOCK_HINT_SHOWN = booleanPreferencesKey("block_hint_shown")
+            val AMOLED = booleanPreferencesKey("amoled")
+            val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         }
 
         /** True once the user attested 18+. Emits false until then; survives restarts. */
@@ -49,5 +51,18 @@ class SettingsRepository
 
         suspend fun markBlockHintShown() {
             dataStore.edit { it[Keys.BLOCK_HINT_SHOWN] = true }
+        }
+
+        /** PLAN §9 theme options: true-black AMOLED, opt-in dynamic color. */
+        val amoled: Flow<Boolean> = dataStore.data.map { it[Keys.AMOLED] ?: false }
+
+        val dynamicColor: Flow<Boolean> = dataStore.data.map { it[Keys.DYNAMIC_COLOR] ?: false }
+
+        suspend fun setAmoled(enabled: Boolean) {
+            dataStore.edit { it[Keys.AMOLED] = enabled }
+        }
+
+        suspend fun setDynamicColor(enabled: Boolean) {
+            dataStore.edit { it[Keys.DYNAMIC_COLOR] = enabled }
         }
     }

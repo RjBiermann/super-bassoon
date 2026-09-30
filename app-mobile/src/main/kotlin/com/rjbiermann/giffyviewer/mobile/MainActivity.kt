@@ -49,7 +49,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { GiffyTheme { Host() } }
+        setContent { ThemeHost() }
+    }
+
+    /** Reads PLAN §9 theme options and applies them app-wide. */
+    @Composable
+    private fun ThemeHost() {
+        val amoled by settings.amoled.collectAsStateWithLifecycle(initialValue = false)
+        val dynamicColor by settings.dynamicColor.collectAsStateWithLifecycle(initialValue = false)
+        GiffyTheme(amoled = amoled, dynamicColor = dynamicColor) { Host() }
     }
 
     @Composable
