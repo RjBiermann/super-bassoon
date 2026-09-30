@@ -1,8 +1,6 @@
 package com.rjbiermann.giffyviewer.feature.feed
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -35,6 +33,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SuggestionChip
@@ -46,6 +45,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -318,31 +318,30 @@ internal fun QuickBlockSheet(
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
             if (showSpeed) {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f).forEach { speed ->
-                        Text(
-                            text = "$speed×",
-                            color =
-                                if (speed == currentSpeed) {
-                                    GiffyColors.Lime
-                                } else {
-                                    Color.White
-                                },
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier =
-                                Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                                    .clickable {
-                                        onSpeedChange(speed)
-                                    }.padding(horizontal = 12.dp, vertical = 6.dp),
+                // Continuous slider (0.25×–2×): the user asked for fine control
+                // beyond preset chips; applies on release to avoid player thrash.
+                var dragSpeed by remember(currentSpeed) { mutableFloatStateOf(currentSpeed) }
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    Text(
+                        text = "Speed " + String.format("%.2f", dragSpeed) + "×",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color =
+                            if (dragSpeed != currentSpeed) {
+                                GiffyColors.Lime
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("0.25×", style = MaterialTheme.typography.bodySmall)
+                        Slider(
+                            value = dragSpeed,
+                            onValueChange = { dragSpeed = it },
+                            valueRange = 0.25f..2f,
+                            onValueChangeFinished = { onSpeedChange(dragSpeed) },
+                            modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
                         )
+                        Text("2×", style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
