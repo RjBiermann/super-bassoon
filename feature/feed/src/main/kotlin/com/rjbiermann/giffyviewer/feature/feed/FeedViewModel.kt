@@ -152,6 +152,11 @@ class FeedViewModel
             }
         }
 
+        /** Pinned niche tab entries "id|name" (PLAN §7 pin-to-tabs). */
+        val pinnedNiches: StateFlow<Set<String>> =
+            settings.pinnedNiches
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
         fun blockTag(tag: String) {
             viewModelScope.launch {
                 db.contentPrefsDao().upsertTag(

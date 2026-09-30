@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -28,6 +30,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
 import com.rjbiermann.giffyviewer.core.network.NicheDto
 import com.rjbiermann.giffyviewer.core.network.upstreamApi
 import kotlinx.coroutines.launch
@@ -42,8 +46,10 @@ fun NichesScreen(
     onBack: () -> Unit,
     onOpenNiche: (FeedSource.Niche) -> Unit,
     api: upstreamApi,
+    settings: SettingsRepository,
 ) {
     var niches by remember { mutableStateOf<List<NicheDto>>(emptyList()) }
+    val pinned by settings.pinnedNiches.collectAsStateWithLifecycle(initialValue = emptySet())
     var nextPage by remember { mutableIntStateOf(1) }
     var loading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -87,9 +93,23 @@ fun NichesScreen(
         ) {
             items(niches.size, key = { niches[it].id }) { index ->
                 val niche = niches[index]
+                val scope2 = rememberCoroutineScope()
                 ListItem(
                     headlineContent = { Text(niche.name) },
                     supportingContent = { Text("${niche.gifs} gifs · ${niche.subscribers} subscribers") },
+                    trailingContent = {
+                        IconButton(onClick = { scope2.launch { settings.togglePinnedNiche(niche.id, niche.name) } }) {
+                            Icon(
+                                imageVector =
+                                    if (pinned.any { it.startsWith("${niche.id}|") }) {
+                                        Icons.Filled.PushPin
+                                    } else {
+                                        Icons.Outlined.PushPin
+                                    },
+                                contentDescription = if (pinned.any { it.startsWith("${niche.id}|") }) "unpin" else "pin",
+                            )
+                        }
+                    },
                     modifier = Modifier.clickable { onOpenNiche(FeedSource.Niche(niche.id, niche.name)) },
                 )
             }

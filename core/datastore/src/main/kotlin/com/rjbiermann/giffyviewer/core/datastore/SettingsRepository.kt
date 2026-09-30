@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -30,6 +31,7 @@ class SettingsRepository
             val MUTED = booleanPreferencesKey("muted")
             val AUTO_SWIPE = booleanPreferencesKey("auto_swipe")
             val PIN_HASH = stringPreferencesKey("pin_hash")
+            val PINNED_NICHES = stringSetPreferencesKey("pinned_niches")
         }
 
         /** True once the user attested 18+. Emits false until then; survives restarts. */
@@ -79,6 +81,25 @@ class SettingsRepository
 
         suspend fun setAutoSwipe(enabled: Boolean) {
             dataStore.edit { it[Keys.AUTO_SWIPE] = enabled }
+        }
+
+        /** Pinned niche ids — Home chip row tabs (PLAN §7 pin-to-tabs). */
+        val pinnedNiches: Flow<Set<String>> =
+            dataStore.data.map { it[Keys.PINNED_NICHES] ?: emptySet() }
+
+        suspend fun togglePinnedNiche(
+            id: String,
+            name: String,
+        ) {
+            dataStore.edit {
+                val cur = it[Keys.PINNED_NICHES] ?: emptySet()
+                it[Keys.PINNED_NICHES] =
+                    if (cur.any { e -> e.startsWith("$id|") }) {
+                        cur.filterNot { e -> e.startsWith("$id|") }.toSet()
+                    } else {
+                        cur + "$id|$name"
+                    }
+            }
         }
 
         /** Optional PIN app lock (PLAN §6 Phase 6). Null = no lock set.

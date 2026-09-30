@@ -108,6 +108,7 @@ class MainActivity : ComponentActivity() {
                     feedViewModel.open(niche)
                 },
                 api = api,
+                settings = settings,
             )
         } else if (confirmed && showSettings) {
             SettingsScreen(onBack = { showSettings = false })
