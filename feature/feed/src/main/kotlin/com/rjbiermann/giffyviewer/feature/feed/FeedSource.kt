@@ -30,7 +30,13 @@ sealed interface FeedSource {
         override val ttlMs = TTL_SEARCH
     }
 
-    /** Logged-in personalized server feed (PLAN §7); chip hidden when logged out. */
+    /** Top This Week = trending/popular?order=top_week (live-verified). */
+    data object TopThisWeek : FeedSource {
+        override val keyBase = "topweek:v1"
+        override val ttlMs = TTL_TRENDING
+    }
+
+    /** Logged-in personalized personalized server feed (PLAN §7); chip hidden when logged out. */
     data object ForYou : FeedSource {
         override val keyBase = "foryou:v1"
         override val ttlMs = TTL_TRENDING
@@ -62,6 +68,7 @@ fun FeedSource.title(): String =
         is FeedSource.Trending -> "Trending"
         is FeedSource.Discover -> "Discover"
         is FeedSource.ForYou -> "For You"
+        is FeedSource.TopThisWeek -> "Top This Week"
         is FeedSource.Search -> "Search: $query"
         is FeedSource.Favorites -> "Favorites"
     }

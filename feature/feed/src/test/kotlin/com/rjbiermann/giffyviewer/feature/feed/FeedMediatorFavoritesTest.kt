@@ -89,6 +89,7 @@ class FeedMediatorFavoritesTest {
         override suspend fun trendingPopular(
             count: Int,
             page: Int,
+            order: String?,
         ): GifsPageDto = throw NotImplementedError()
 
         override suspend fun likedFeed(

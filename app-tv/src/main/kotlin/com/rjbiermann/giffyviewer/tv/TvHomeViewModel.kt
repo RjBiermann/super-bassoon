@@ -26,6 +26,7 @@ class TvHomeViewModel
     ) : ViewModel() {
         val trending = repository.paging(FeedSource.Trending).cachedIn(viewModelScope)
         val discover = repository.paging(FeedSource.Discover).cachedIn(viewModelScope)
+        val topThisWeek = repository.paging(FeedSource.TopThisWeek).cachedIn(viewModelScope)
         val favorites = repository.paging(FeedSource.Favorites).cachedIn(viewModelScope)
 
         val hasFavorites =

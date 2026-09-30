@@ -60,6 +60,7 @@ fun TvHomeScreen(
 ) {
     val trending = homeViewModel.trending.collectAsLazyPagingItems()
     val discover = homeViewModel.discover.collectAsLazyPagingItems()
+    val topThisWeek = homeViewModel.topThisWeek.collectAsLazyPagingItems()
     val favorites = homeViewModel.favorites.collectAsLazyPagingItems()
     val continueEntries by continueViewModel.entries.collectAsStateWithLifecycle(initialValue = emptyList())
     val hasFavorites by homeViewModel.hasFavorites.collectAsStateWithLifecycle(initialValue = false)
@@ -77,6 +78,7 @@ fun TvHomeScreen(
         }
         item { FeedRow("Trending", trending, onOpenGif, onMenu = { actionsFor = it }) }
         item { FeedRow("Discover", discover, onOpenGif, onMenu = { actionsFor = it }) }
+        item { FeedRow("Top This Week", topThisWeek, onOpenGif, onMenu = { actionsFor = it }) }
         // Empty-state rule: no blank favorites row when nothing is favorited.
         if (hasFavorites) {
             item { FeedRow("Favorites", favorites, onOpenGif, onMenu = { actionsFor = it }) }

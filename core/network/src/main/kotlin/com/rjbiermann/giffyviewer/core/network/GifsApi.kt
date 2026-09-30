@@ -40,6 +40,9 @@ interface upstreamApi {
     suspend fun trendingPopular(
         @Query("count") count: Int = 40,
         @Query("page") page: Int = 1,
+        // order=top_week = Top This Week feed (live-verified 2026-09-30:
+        // different ordering from the default)
+        @Query("order") order: String? = null,
     ): GifsPageDto
 
     /** Personalized server feed — verified exists (401 anonymous); logged-in only. */
