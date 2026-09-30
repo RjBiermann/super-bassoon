@@ -19,9 +19,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -165,6 +168,25 @@ class FeedViewModel
         fun togglePinnedCreator(username: String) {
             viewModelScope.launch { settings.togglePinnedCreator(username) }
         }
+
+        /** Matching creators above search results (§7); tap opens their feed. */
+        @kotlinx.coroutines.ExperimentalCoroutinesApi
+        val creatorResults: StateFlow<List<com.rjbiermann.giffyviewer.core.network.CreatorSearchItemDto>> =
+            mutableSource
+                .map { it }
+                .distinctUntilChanged()
+                .mapLatest { source ->
+                    if (source is FeedSource.Search) {
+                        runCatching { api.creatorsSearch(source.query) }
+                            .getOrDefault(
+                                com.rjbiermann.giffyviewer.core.network
+                                    .CreatorSearchPageDto(),
+                            ).items
+                    } else {
+                        emptyList()
+                    }
+                }.catch { emit(emptyList()) }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
         fun blockTag(tag: String) {
             viewModelScope.launch {

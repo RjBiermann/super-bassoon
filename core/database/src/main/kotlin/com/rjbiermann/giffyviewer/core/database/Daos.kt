@@ -63,6 +63,17 @@ interface SearchHistoryDao {
 
     @Query("DELETE FROM search_history")
     suspend fun clear()
+
+    /** Per-row remove (tap the ✕ on a history row). */
+    @Query("DELETE FROM search_history WHERE query = :query COLLATE NOCASE")
+    suspend fun remove(query: String)
+
+    /** Keep the newest :cap entries (PLAN §5 — oldest evicted on insert). */
+    @Query(
+        "DELETE FROM search_history WHERE id NOT IN " +
+            "(SELECT id FROM search_history ORDER BY searchedAt DESC LIMIT :cap)",
+    )
+    suspend fun trim(cap: Int)
 }
 
 @Dao

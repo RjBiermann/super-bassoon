@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -36,6 +37,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -76,6 +78,7 @@ fun FeedScreen(
     onOpenPlayer: (Int) -> Unit = {},
     onOpenAccount: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    onOpenSearch: () -> Unit = {},
     onOpenNiches: () -> Unit = {},
     viewModel: FeedViewModel = hiltViewModel(),
 ) {
@@ -98,6 +101,9 @@ fun FeedScreen(
             TopAppBar(
                 title = { Text(source.title()) },
                 actions = {
+                    IconButton(onClick = onOpenSearch) {
+                        Icon(Icons.Filled.Search, contentDescription = "search")
+                    }
                     IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Outlined.Settings, contentDescription = "settings")
                     }
@@ -173,6 +179,28 @@ fun FeedScreen(
                         onClick = { viewModel.open(creatorFeed) },
                         label = { Text("@$username") },
                     )
+                }
+            }
+
+            // Matching creators above search results (§7) — tap opens their feed.
+            val creators by viewModel.creatorResults.collectAsStateWithLifecycle(emptyList())
+            if (creators.isNotEmpty()) {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 12.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    creators.forEach { creator ->
+                        SuggestionChip(
+                            onClick = { viewModel.open(FeedSource.Creator(username = creator.username)) },
+                            label = {
+                                Text("@${creator.username} · ${creator.followers}⇡")
+                            },
+                        )
+                    }
                 }
             }
 

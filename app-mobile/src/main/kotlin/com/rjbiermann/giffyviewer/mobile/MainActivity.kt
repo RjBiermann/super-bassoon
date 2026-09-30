@@ -39,6 +39,8 @@ import com.rjbiermann.giffyviewer.core.ui.GiffyTheme
 import com.rjbiermann.giffyviewer.feature.auth.AuthScreen
 import com.rjbiermann.giffyviewer.feature.feed.FeedScreen
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
+import com.rjbiermann.giffyviewer.search.SearchScreen
+import com.rjbiermann.giffyviewer.search.SearchViewModel
 import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
 import com.rjbiermann.giffyviewer.feature.feed.NichesScreen
 import com.rjbiermann.giffyviewer.feature.feed.PlayerScreen
@@ -78,6 +80,7 @@ class MainActivity : ComponentActivity() {
         var showAccount by remember { mutableStateOf(false) }
         var showSettings by remember { mutableStateOf(false) }
         var showNiches by remember { mutableStateOf(false) }
+        var showSearch by remember { mutableStateOf(false) }
 
         val pinHash by settings.pinHash.collectAsStateWithLifecycle(initialValue = null)
         var unlocked by rememberSaveable { mutableStateOf(false) }
@@ -99,6 +102,17 @@ class MainActivity : ComponentActivity() {
             )
         } else if (confirmed && showAccount) {
             AuthScreen(onBack = { showAccount = false })
+        } else if (confirmed && showSearch) {
+            val searchViewModel: SearchViewModel = hiltViewModel()
+            val feedViewModel: FeedViewModel = hiltViewModel()
+            SearchScreen(
+                onBack = { showSearch = false },
+                onSubmit = { q ->
+                    showSearch = false
+                    feedViewModel.open(FeedSource.Search(query = q))
+                },
+                viewModel = searchViewModel,
+            )
         } else if (confirmed && showNiches) {
             val feedViewModel: FeedViewModel = hiltViewModel()
             NichesScreen(
@@ -118,6 +132,7 @@ class MainActivity : ComponentActivity() {
                 onOpenPlayer = { index -> playerStartIndex = index },
                 onOpenAccount = { showAccount = true },
                 onOpenSettings = { showSettings = true },
+                onOpenSearch = { showSearch = true },
                 onOpenNiches = { showNiches = true },
             )
         } else {

@@ -2,6 +2,7 @@ package com.rjbiermann.giffyviewer.core.network
 
 import com.rjbiermann.giffyviewer.core.network.dto.GifsPageDto
 import com.rjbiermann.giffyviewer.core.network.dto.TemporaryTokenDto
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -58,6 +59,21 @@ interface upstreamApi {
         @Query("count") count: Int = 40,
         @Query("page") page: Int = 1,
     ): GifsPageDto
+
+    /** Typed autocomplete (live-verified 2026-09-30, anonymous OK): returns a
+     *  bare JSON array of {type, text, gifs-count}. */
+    @GET("v2/search/suggest")
+    suspend fun suggest(
+        @Query("query") query: String,
+    ): List<SuggestDto>
+
+    /** Creator search (live-verified 2026-09-30, anonymous OK): paginated
+     *  creator cards with follower/gif counts — results-row source. */
+    @GET("v2/creators/search")
+    suspend fun creatorsSearch(
+        @Query("query") query: String,
+        @Query("count") count: Int = 8,
+    ): CreatorSearchPageDto
 
     /** Personalized server feed — verified exists (401 anonymous); logged-in only. */
     @GET("v2/feeds/for-you")
@@ -170,4 +186,30 @@ data class NichesPageDto(
     val page: Int = 1,
     val pages: Int = 1,
     val niches: List<NicheDto> = emptyList(),
+)
+
+/** /v2/search/suggest row — tag-type suggestions tap into a tag feed. */
+@Serializable
+data class SuggestDto(
+    val type: String = "tag",
+    val text: String = "",
+    val gifs: Int = 0,
+)
+
+/** /v2/creators/search item — username is the identity; counts for the row. */
+@Serializable
+data class CreatorSearchItemDto(
+    val username: String = "",
+    val followers: Int = 0,
+    val gifs: Int = 0,
+    @SerialName("publishedCollections") val publishedCollections: Int = 0,
+    @SerialName("profileImageUrl") val profileImageUrl: String? = null,
+)
+
+@Serializable
+data class CreatorSearchPageDto(
+    val page: Int = 1,
+    val pages: Int = 1,
+    val total: Int = 0,
+    val items: List<CreatorSearchItemDto> = emptyList(),
 )

@@ -47,6 +47,7 @@ dependencies {
     implementation(project(":core:auth"))
     implementation(project(":core:player"))
     implementation(project(":feature:feed"))
+    implementation(project(":feature:search"))
     implementation(project(":feature:auth"))
     implementation(project(":feature:settings"))
     implementation(libs.activity.compose)
