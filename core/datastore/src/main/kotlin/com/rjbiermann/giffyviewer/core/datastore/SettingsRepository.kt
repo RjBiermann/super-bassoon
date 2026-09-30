@@ -25,6 +25,7 @@ class SettingsRepository
             val BLOCK_HINT_SHOWN = booleanPreferencesKey("block_hint_shown")
             val AMOLED = booleanPreferencesKey("amoled")
             val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
+            val MUTED = booleanPreferencesKey("muted")
         }
 
         /** True once the user attested 18+. Emits false until then; survives restarts. */
@@ -60,6 +61,13 @@ class SettingsRepository
 
         suspend fun setAmoled(enabled: Boolean) {
             dataStore.edit { it[Keys.AMOLED] = enabled }
+        }
+
+        /** Player mute toggle — persists across sessions (PLAN §9). */
+        val muted: Flow<Boolean> = dataStore.data.map { it[Keys.MUTED] ?: false }
+
+        suspend fun setMuted(enabled: Boolean) {
+            dataStore.edit { it[Keys.MUTED] = enabled }
         }
 
         suspend fun setDynamicColor(enabled: Boolean) {

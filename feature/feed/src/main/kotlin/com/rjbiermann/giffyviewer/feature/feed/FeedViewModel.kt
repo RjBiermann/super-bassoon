@@ -4,11 +4,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import com.rjbiermann.giffyviewer.core.auth.TokenStore
 import com.rjbiermann.giffyviewer.core.database.CreatorPrefEntity
+import com.rjbiermann.giffyviewer.core.database.FavoritesRemoteEntity
 import com.rjbiermann.giffyviewer.core.database.KeywordBlockEntity
 import com.rjbiermann.giffyviewer.core.database.TagPrefEntity
 import com.rjbiermann.giffyviewer.core.model.Gif
+import com.rjbiermann.giffyviewer.core.network.upstreamApi
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +24,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /**
@@ -34,6 +39,8 @@ class FeedViewModel
         private val repository: FeedRepository,
         private val db: com.rjbiermann.giffyviewer.core.database.GiffyDatabase,
         private val settings: com.rjbiermann.giffyviewer.core.datastore.SettingsRepository,
+        private val api: upstreamApi,
+        private val tokenStore: TokenStore,
     ) : ViewModel() {
         private val mutableSource = MutableStateFlow<FeedSource>(FeedSource.Trending)
         val source: StateFlow<FeedSource> = mutableSource.asStateFlow()
@@ -45,6 +52,51 @@ class FeedViewModel
 
         fun open(feed: FeedSource) {
             mutableSource.value = feed
+        }
+
+        /** Server like state (PLAN §5): favorites_remote is the read mirror. */
+        val likedIds: StateFlow<Set<String>> =
+            db
+                .favoritesRemoteDao()
+                .allFlow()
+                .map { rows -> rows.map { it.gifId }.toSet() }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+        /** Logged in = a token exists (PLAN §2). */
+        val isLoggedIn: StateFlow<Boolean> =
+            tokenStore.token
+                .map { it != null }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+        /** Refreshed per use — the swipe player calls this on open (PLAN §5). */
+        fun syncLikes() {
+            viewModelScope.launch {
+                if (tokenStore.tokenOrNull() == null) return@launch
+                runCatching {
+                    withContext(Dispatchers.IO) { api.likedIds() }
+                }.onSuccess { ids ->
+                    db.favoritesRemoteDao().replaceAll(ids.map { toFavoritesRemote(it) })
+                }
+            }
+        }
+
+        /** Optimistic flip + revert on network failure (PLAN §9 action rail). */
+        fun toggleLike(gifId: String) {
+            viewModelScope.launch {
+                val dao = db.favoritesRemoteDao()
+                val liked = gifId in dao.allIds()
+                if (liked) dao.clearById(gifId) else dao.upsert(toFavoritesRemote(gifId))
+                val networkResult =
+                    withContext(Dispatchers.IO) {
+                        runCatching {
+                            if (liked) api.unlikeGif(gifId) else api.likeGif(gifId)
+                        }
+                    }
+                if (networkResult.isFailure) {
+                    // revert to the pre-tap state
+                    if (liked) dao.upsert(toFavoritesRemote(gifId)) else dao.clearById(gifId)
+                }
+            }
         }
 
         fun refresh() {
@@ -108,3 +160,5 @@ class FeedViewModel
             viewModelScope.launch { settings.markBlockHintShown() }
         }
     }
+
+private fun toFavoritesRemote(gifId: String) = FavoritesRemoteEntity(gifId = gifId, syncedAt = System.currentTimeMillis())

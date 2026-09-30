@@ -23,6 +23,9 @@ const val BASE_URL = "https://upstream-api-host.example/"
 val API_JSON: Json =
     Json {
         ignoreUnknownKeys = true
+        // @Body DTOs (LikeBody, FollowBody) use all-default fields — without
+        // this they serialize to {} and the server 400s (live-verified 2026-09-30)
+        encodeDefaults = true
         explicitNulls = false
         coerceInputValues = true
     }

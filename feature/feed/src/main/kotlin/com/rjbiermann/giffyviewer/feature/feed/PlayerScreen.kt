@@ -32,10 +32,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -53,6 +59,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -81,6 +88,7 @@ import com.rjbiermann.giffyviewer.core.player.GiffyPlayer
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.ui.GiffyColors
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -90,7 +98,8 @@ import kotlin.math.roundToInt
  * gif ID. Controls: single tap reveals the overlay / pauses, auto-hide after
  * idle, fullscreen toggle (immersive), always-on thin progress bar with
  * remaining-time chip, draggable scrub, two-finger pinch zoom (1x–3x) that
- * persists across swipes in the session.
+ * resets on swipe (PLAN §9 revised 2026-09-30), and the right action rail
+ * (like / mute / share / overflow).
  */
 private const val IDLE_HIDE_MS = 3_000L
 
@@ -99,6 +108,7 @@ private const val IDLE_HIDE_MS = 3_000L
 fun PlayerScreen(
     startIndex: Int,
     onBack: () -> Unit,
+    onOpenAccount: () -> Unit,
     viewModel: FeedViewModel,
     playerFactory: GiffyPlayerFactory,
     settings: SettingsRepository,
@@ -112,6 +122,10 @@ fun PlayerScreen(
     val context = LocalContext.current
     val view = LocalView.current
     val dataSaver by settings.dataSaver.collectAsStateWithLifecycle(false)
+    val muted by settings.muted.collectAsStateWithLifecycle(false)
+    val likedIds by viewModel.likedIds.collectAsStateWithLifecycle(emptySet())
+    val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle(false)
+    val muteScope = rememberCoroutineScope()
     val player = remember { playerFactory.create(context) }
 
     var fullscreen by remember { mutableStateOf(false) }
@@ -122,9 +136,9 @@ fun PlayerScreen(
     var positionMs by remember { mutableLongStateOf(0L) }
     var durationMs by remember { mutableLongStateOf(0L) }
 
-    // pinch zoom: session-scoped so it persists across swipes (PLAN §9)
-    var zoom by remember { mutableFloatStateOf(1f) }
-    var pan by remember { mutableStateOf(Offset.Zero) }
+    // pinch zoom: resets on swipe (PLAN §9 revised 2026-09-30) — keyed per page
+    val zoom = remember(pagerState.currentPage) { mutableFloatStateOf(1f) }
+    val pan = remember(pagerState.currentPage) { mutableStateOf(Offset.Zero) }
 
     // immersive when fullscreen; restore on exit / dispose
     DisposableEffect(fullscreen) {
@@ -156,6 +170,10 @@ fun PlayerScreen(
             controlsVisible = false
         }
     }
+    // mute applies to the single active player instance (PLAN §9)
+    LaunchedEffect(muted) { player.volume = if (muted) 0f else 1f }
+    // likes are refreshed per use (PLAN §5)
+    LaunchedEffect(Unit) { viewModel.syncLikes() }
     // position + play-state ticker drives progress bar / play button
     LaunchedEffect(scrubbing) {
         while (true) {
@@ -167,6 +185,8 @@ fun PlayerScreen(
             delay(250)
         }
     }
+
+    var sheetFor by remember { mutableStateOf<Gif?>(null) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         AnimatedVisibility(visible = !fullscreen) {
@@ -204,17 +224,34 @@ fun PlayerScreen(
                     onScrub = { scrubPositionMs = it },
                     positionMs = positionMs,
                     durationMs = durationMs,
-                    zoom = zoom,
-                    pan = pan,
+                    zoom = zoom.floatValue,
+                    pan = pan.value,
                     onZoom = { z, p ->
-                        zoom = z.coerceIn(1f, 3f)
-                        pan = p
+                        zoom.floatValue = z.coerceIn(1f, 3f)
+                        pan.value = p
                     },
                     fullscreen = fullscreen,
                     onToggleFullscreen = { fullscreen = !fullscreen },
+                    liked = gif.id in likedIds,
+                    onToggleLike = {
+                        if (isLoggedIn) viewModel.toggleLike(gif.id) else onOpenAccount()
+                    },
+                    muted = muted,
+                    onToggleMute = { on -> muteScope.launch { settings.setMuted(on) } },
+                    onShare = { shareGif(context, gif) },
+                    onOverflow = { sheetFor = gif },
                 )
             }
         }
+    }
+
+    val sheetGif = sheetFor
+    if (sheetGif != null) {
+        QuickBlockSheet(
+            gif = sheetGif,
+            onDismiss = { sheetFor = null },
+            viewModel = viewModel,
+        )
     }
 }
 
@@ -241,6 +278,12 @@ private fun PlayerPage(
     onZoom: (Float, Offset) -> Unit,
     fullscreen: Boolean,
     onToggleFullscreen: () -> Unit,
+    liked: Boolean,
+    onToggleLike: () -> Unit,
+    muted: Boolean,
+    onToggleMute: (Boolean) -> Unit,
+    onShare: () -> Unit,
+    onOverflow: () -> Unit,
 ) {
     if (active) {
         // resume: pull the stored position once per gif before starting playback
@@ -274,7 +317,7 @@ private fun PlayerPage(
             Modifier
                 .fillMaxSize()
                 .background(Color.Black)
-                // two-finger pinch zoom + pan (PLAN §9); zoom persists across pages.
+                // two-finger pinch zoom + pan (PLAN §9); zoom resets per page.
                 // Two-pointer-only: single-finger drags stay unconsumed so the
                 // VerticalPager keeps working.
                 .pointerInput(Unit) {
@@ -422,6 +465,28 @@ private fun PlayerPage(
                 )
             }
         }
+        // right action rail (PLAN §9): like / mute / share / overflow,
+        // inset 72dp from the right edge, hides with the overlay
+        AnimatedVisibility(
+            visible = controlsVisible && active,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.BottomEnd),
+        ) {
+            ActionRail(
+                hasAudio = gif.hasAudio,
+                liked = liked,
+                muted = muted,
+                onToggleLike = onToggleLike,
+                onToggleMute = { onToggleMute(!muted) },
+                onShare = onShare,
+                onOverflow = onOverflow,
+                modifier =
+                    Modifier
+                        .windowInsetsPadding(WindowInsets.navigationBars)
+                        .padding(end = 24.dp, bottom = 96.dp),
+            )
+        }
         PlayerControls(
             visible = controlsVisible && active,
             isPlaying = player.isPlaying,
@@ -551,4 +616,60 @@ private fun formatRemaining(
 ): String {
     val remaining = max(0, durationMs - positionMs) / 1000
     return "-${remaining / 60}:${(remaining % 60).toString().padStart(2, '0')}"
+}
+
+/** Right-edge vertical action rail (PLAN §9 borrowed action set). */
+@Composable
+private fun ActionRail(
+    hasAudio: Boolean,
+    liked: Boolean,
+    muted: Boolean,
+    onToggleLike: () -> Unit,
+    onToggleMute: () -> Unit,
+    onShare: () -> Unit,
+    onOverflow: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        // like: white heart, lime when liked (site pattern)
+        IconButton(onClick = onToggleLike) {
+            Icon(
+                imageVector = if (liked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                contentDescription = if (liked) "unlike" else "like",
+                tint = if (liked) GiffyColors.Lime else Color.White,
+            )
+        }
+        if (hasAudio) {
+            IconButton(onClick = onToggleMute) {
+                Icon(
+                    imageVector = if (muted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
+                    contentDescription = if (muted) "unmute" else "mute",
+                    tint = Color.White,
+                )
+            }
+        }
+        IconButton(onClick = onShare) {
+            Icon(Icons.Filled.Share, contentDescription = "share", tint = Color.White)
+        }
+        IconButton(onClick = onOverflow) {
+            Icon(Icons.Filled.MoreVert, contentDescription = "more actions", tint = Color.White)
+        }
+    }
+}
+
+/** System share sheet — allowed per PLAN §0 (share only, no deep links in-app). */
+private fun shareGif(
+    context: android.content.Context,
+    gif: Gif,
+) {
+    val intent =
+        android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(android.content.Intent.EXTRA_TEXT, "https://upstream-site.example/watch/${gif.id}")
+        }
+    context.startActivity(android.content.Intent.createChooser(intent, "Share"))
 }

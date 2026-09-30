@@ -91,6 +91,12 @@ interface FavoritesRemoteDao {
     @Query("SELECT gifId FROM favorites_remote")
     suspend fun allIds(): List<String>
 
+    @Upsert
+    suspend fun upsert(item: FavoritesRemoteEntity)
+
+    @Query("DELETE FROM favorites_remote WHERE gifId = :gifId")
+    suspend fun clearById(gifId: String)
+
     @Query("DELETE FROM favorites_remote")
     suspend fun clear()
 }

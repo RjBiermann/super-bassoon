@@ -72,6 +72,7 @@ class MainActivity : ComponentActivity() {
             PlayerScreen(
                 startIndex = start,
                 onBack = { playerStartIndex = null },
+                onOpenAccount = { showAccount = true },
                 viewModel = hiltViewModel(),
                 playerFactory = playerFactory,
                 settings = settings,

@@ -194,7 +194,7 @@ private fun OfflineNotice(modifier: Modifier = Modifier) {
 /** PLAN §9 quick sheet: block creator / tags / keyword / don't block. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun QuickBlockSheet(
+internal fun QuickBlockSheet(
     gif: Gif,
     onDismiss: () -> Unit,
     viewModel: FeedViewModel,

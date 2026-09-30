@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.HTTP
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
@@ -55,7 +56,7 @@ interface upstreamApi {
         @Body body: LikeBody = LikeBody(),
     )
 
-    @DELETE("v2/gifs/{id}/like")
+    @HTTP(method = "DELETE", path = "v2/gifs/{id}/like", hasBody = true)
     suspend fun unlikeGif(
         @Path("id") id: String,
         @Body body: LikeBody = LikeBody(),
@@ -98,6 +99,8 @@ interface upstreamApi {
 @Serializable
 data class LikeBody(
     val context: String = "trending",
+    val source: String = "watchlist",
+    val position: Int = 0,
 )
 
 @Serializable
