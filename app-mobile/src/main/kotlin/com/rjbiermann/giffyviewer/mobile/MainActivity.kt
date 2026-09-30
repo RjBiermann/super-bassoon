@@ -38,6 +38,9 @@ import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.ui.GiffyTheme
 import com.rjbiermann.giffyviewer.feature.auth.AuthScreen
 import com.rjbiermann.giffyviewer.feature.feed.FeedScreen
+import com.rjbiermann.giffyviewer.feature.feed.FeedSource
+import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
+import com.rjbiermann.giffyviewer.feature.feed.NichesScreen
 import com.rjbiermann.giffyviewer.feature.feed.PlayerScreen
 import com.rjbiermann.giffyviewer.feature.settings.SettingsScreen
 import dagger.hilt.android.AndroidEntryPoint
@@ -51,6 +54,8 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var playerFactory: GiffyPlayerFactory
 
     @Inject lateinit var db: GiffyDatabase
+
+    @Inject lateinit var api: com.rjbiermann.giffyviewer.core.network.upstreamApi
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -72,6 +77,7 @@ class MainActivity : ComponentActivity() {
         var playerStartIndex by remember { mutableStateOf<Int?>(null) }
         var showAccount by remember { mutableStateOf(false) }
         var showSettings by remember { mutableStateOf(false) }
+        var showNiches by remember { mutableStateOf(false) }
 
         val pinHash by settings.pinHash.collectAsStateWithLifecycle(initialValue = null)
         var unlocked by rememberSaveable { mutableStateOf(false) }
@@ -93,6 +99,16 @@ class MainActivity : ComponentActivity() {
             )
         } else if (confirmed && showAccount) {
             AuthScreen(onBack = { showAccount = false })
+        } else if (confirmed && showNiches) {
+            val feedViewModel: FeedViewModel = hiltViewModel()
+            NichesScreen(
+                onBack = { showNiches = false },
+                onOpenNiche = { niche: FeedSource.Niche ->
+                    showNiches = false
+                    feedViewModel.open(niche)
+                },
+                api = api,
+            )
         } else if (confirmed && showSettings) {
             SettingsScreen(onBack = { showSettings = false })
         } else if (confirmed) {
@@ -101,6 +117,7 @@ class MainActivity : ComponentActivity() {
                 onOpenPlayer = { index -> playerStartIndex = index },
                 onOpenAccount = { showAccount = true },
                 onOpenSettings = { showSettings = true },
+                onOpenNiches = { showNiches = true },
             )
         } else {
             val scope = rememberCoroutineScope()

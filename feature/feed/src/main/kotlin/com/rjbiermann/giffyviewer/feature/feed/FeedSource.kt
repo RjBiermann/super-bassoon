@@ -30,6 +30,15 @@ sealed interface FeedSource {
         override val ttlMs = TTL_SEARCH
     }
 
+    /** Niche feed — v2/niches/{id}/gifs (live-verified, anonymous OK). */
+    data class Niche(
+        val id: String,
+        val name: String,
+    ) : FeedSource {
+        override val keyBase = "niche:$id"
+        override val ttlMs = TTL_SEARCH
+    }
+
     /** Top This Week = trending/popular?order=top_week (live-verified). */
     data object TopThisWeek : FeedSource {
         override val keyBase = "topweek:v1"
@@ -69,6 +78,7 @@ fun FeedSource.title(): String =
         is FeedSource.Discover -> "Discover"
         is FeedSource.ForYou -> "For You"
         is FeedSource.TopThisWeek -> "Top This Week"
+        is FeedSource.Niche -> this.name
         is FeedSource.Search -> "Search: $query"
         is FeedSource.Favorites -> "Favorites"
     }

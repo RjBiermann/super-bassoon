@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Person
@@ -74,6 +76,7 @@ fun FeedScreen(
     onOpenPlayer: (Int) -> Unit = {},
     onOpenAccount: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    onOpenNiches: () -> Unit = {},
     viewModel: FeedViewModel = hiltViewModel(),
 ) {
     val source by viewModel.source.collectAsStateWithLifecycle()
@@ -112,14 +115,23 @@ fun FeedScreen(
         Column(modifier = Modifier.padding(padding).windowInsetsPadding(WindowInsets.navigationBars).fillMaxSize()) {
             // M3 FilterChips — feed tabs (more feeds join in Phase 7: groups, For You, custom)
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 // For You = server personalized feed, logged-in only (PLAN §7);
                 // anonymous client-side blend is spec'd but unscheduled.
                 val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle(false)
-                listOf(FeedSource.Trending, FeedSource.Discover, FeedSource.ForYou, FeedSource.Favorites)
-                    .filterNot { it is FeedSource.ForYou && !isLoggedIn }
+                listOf(
+                    FeedSource.Trending,
+                    FeedSource.Discover,
+                    FeedSource.ForYou,
+                    FeedSource.Favorites,
+                    FeedSource.TopThisWeek,
+                ).filterNot { it is FeedSource.ForYou && !isLoggedIn }
                     .forEach { candidate ->
                         FilterChip(
                             selected = source == candidate,
@@ -128,6 +140,12 @@ fun FeedScreen(
                         )
                     }
             }
+
+            FilterChip(
+                selected = source is FeedSource.Niche,
+                onClick = onOpenNiches,
+                label = { Text(if (source is FeedSource.Niche) (source as FeedSource.Niche).name else "Niches…") },
+            )
 
             // M3 linear indicator for refresh / append activity
             if (items.loadState.refresh is LoadState.Loading ||

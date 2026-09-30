@@ -45,6 +45,20 @@ interface upstreamApi {
         @Query("order") order: String? = null,
     ): GifsPageDto
 
+    /** Niches (live-verified 2026-09-30, anonymous OK): paginated taxonomy. */
+    @GET("v2/niches")
+    suspend fun niches(
+        @Query("count") count: Int = 60,
+        @Query("page") page: Int = 1,
+    ): NichesPageDto
+
+    @GET("v2/niches/{id}/gifs")
+    suspend fun nicheGifs(
+        @Path("id") nicheId: String,
+        @Query("count") count: Int = 40,
+        @Query("page") page: Int = 1,
+    ): GifsPageDto
+
     /** Personalized server feed — verified exists (401 anonymous); logged-in only. */
     @GET("v2/feeds/for-you")
     suspend fun feedForYou(
@@ -140,4 +154,20 @@ data class FollowedNicheDto(
     val gifs: Int = 0,
     val subscribers: Int = 0,
     val tags: List<String> = emptyList(),
+)
+
+@Serializable
+data class NicheDto(
+    val id: String,
+    val name: String,
+    val gifs: Long = 0,
+    val subscribers: Long = 0,
+    val tags: List<String> = emptyList(),
+)
+
+@Serializable
+data class NichesPageDto(
+    val page: Int = 1,
+    val pages: Int = 1,
+    val niches: List<NicheDto> = emptyList(),
 )

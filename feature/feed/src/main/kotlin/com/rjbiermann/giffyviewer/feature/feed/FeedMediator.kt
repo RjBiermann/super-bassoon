@@ -105,6 +105,7 @@ class FeedMediator(
                 )
             }
             is FeedSource.ForYou -> api.feedForYou(count = pageSize, page = page)
+            is FeedSource.Niche -> api.nicheGifs(nicheId = feed.id, count = pageSize, page = page)
             is FeedSource.TopThisWeek -> api.trendingPopular(order = "top_week", count = pageSize, page = page)
             else -> api.trendingPopular(count = pageSize, page = page)
         }

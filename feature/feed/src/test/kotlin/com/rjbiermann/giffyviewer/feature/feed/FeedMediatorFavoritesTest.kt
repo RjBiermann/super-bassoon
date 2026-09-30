@@ -92,6 +92,17 @@ class FeedMediatorFavoritesTest {
             order: String?,
         ): GifsPageDto = throw NotImplementedError()
 
+        override suspend fun niches(
+            count: Int,
+            page: Int,
+        ) = throw NotImplementedError()
+
+        override suspend fun nicheGifs(
+            nicheId: String,
+            count: Int,
+            page: Int,
+        ) = throw NotImplementedError()
+
         override suspend fun likedFeed(
             count: Int,
             page: Int,
