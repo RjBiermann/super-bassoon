@@ -368,51 +368,59 @@ private fun PlayerPage(
         )
         // creator chip + description + tags row (PLAN §9 bottom-left cluster).
         // Tags display-only for now — tappable when tag feeds land.
-        Column(
-            modifier =
-                Modifier
-                    .align(Alignment.BottomStart)
-                    .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(start = 16.dp, bottom = 64.dp, end = 96.dp),
+        // Auto-hide: fades out with the controls — only the thin progress
+        // line stays visible (user request 2026-09-30).
+        AnimatedVisibility(
+            visible = controlsVisible && active,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.BottomStart),
         ) {
-            gif.description?.takeIf { it.isNotBlank() }?.let { desc ->
-                Text(
-                    text = desc,
-                    color = Color.White.copy(alpha = 0.7f),
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(6.dp))
-            }
-            if (gif.tags.isNotEmpty()) {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    gif.tags.take(6).forEach { tag ->
-                        Text(
-                            text = tag,
-                            color = GiffyColors.Lime,
-                            style = MaterialTheme.typography.labelMedium,
-                            modifier =
-                                Modifier
-                                    .background(Color.Transparent, RoundedCornerShape(999.dp))
-                                    .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(999.dp))
-                                    .padding(horizontal = 10.dp, vertical = 4.dp),
-                        )
-                    }
+            Column(
+                modifier =
+                    Modifier
+                        .windowInsetsPadding(WindowInsets.navigationBars)
+                        .padding(start = 16.dp, bottom = 64.dp, end = 96.dp),
+            ) {
+                gif.description?.takeIf { it.isNotBlank() }?.let { desc ->
+                    Text(
+                        text = desc,
+                        color = Color.White.copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(6.dp))
                 }
-                Spacer(Modifier.height(6.dp))
+                if (gif.tags.isNotEmpty()) {
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        gif.tags.take(6).forEach { tag ->
+                            Text(
+                                text = tag,
+                                color = GiffyColors.Lime,
+                                style = MaterialTheme.typography.labelMedium,
+                                modifier =
+                                    Modifier
+                                        .background(Color.Transparent, RoundedCornerShape(999.dp))
+                                        .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(999.dp))
+                                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                }
+                Text(
+                    text = "@${gif.userName}",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                )
             }
-            Text(
-                text = "@${gif.userName}",
-                color = Color.White,
-                style = MaterialTheme.typography.titleMedium,
-            )
         }
         PlayerControls(
             visible = controlsVisible && active,
