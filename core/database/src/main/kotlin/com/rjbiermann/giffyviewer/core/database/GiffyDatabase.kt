@@ -21,8 +21,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         CreatorPrefEntity::class,
         TagPrefEntity::class,
         KeywordBlockEntity::class,
+        HideCountEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 @TypeConverters(ListConverters::class)
@@ -59,6 +60,17 @@ abstract class GiffyDatabase : RoomDatabase() {
                     db.execSQL(
                         "CREATE TABLE IF NOT EXISTS `keyword_blocks` (`pattern` TEXT NOT NULL, " +
                             "`blockedAt` INTEGER NOT NULL, PRIMARY KEY(`pattern`))",
+                    )
+                }
+            }
+
+        /** v4: single rolling 7-day hidden-item counter (PLAN §6). */
+        val MIGRATION_3_4 =
+            object : Migration(3, 4) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `hide_counts` " +
+                            "(`weekStart` INTEGER NOT NULL, `count` INTEGER NOT NULL, PRIMARY KEY(`weekStart`))",
                     )
                 }
             }

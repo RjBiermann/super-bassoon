@@ -87,3 +87,10 @@ data class KeywordBlockEntity(
     @PrimaryKey val pattern: String,
     val blockedAt: Long,
 )
+
+/** Rolling 7-day hidden-item counter (PLAN §6 revised 2026-09-30: single counter). */
+@Entity(tableName = "hide_counts")
+data class HideCountEntity(
+    @PrimaryKey val weekStart: Long,
+    val count: Int,
+)

@@ -49,6 +49,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val blocked by viewModel.blocked.collectAsStateWithLifecycle()
+    val hiddenThisWeek by viewModel.hiddenThisWeek.collectAsStateWithLifecycle(0)
     val dataSaver by viewModel.dataSaver.collectAsStateWithLifecycle()
     val amoled by viewModel.amoled.collectAsStateWithLifecycle()
     val dynamicColor by viewModel.dynamicColor.collectAsStateWithLifecycle()
@@ -141,6 +142,14 @@ fun SettingsScreen(
             section("Blocked creators", blocked.creators) { viewModel.unblockCreator(it) }
             section("Blocked tags", blocked.tags) { viewModel.unblockTag(it) }
             section("Blocked keywords", blocked.keywords) { viewModel.unblockKeyword(it) }
+            item(key = "hidden-this-week") {
+                Text(
+                    "Hidden this week: $hiddenThisWeek",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
             item(key = "data-saver") {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 16.dp),

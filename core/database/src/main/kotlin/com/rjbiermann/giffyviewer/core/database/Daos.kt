@@ -181,4 +181,16 @@ interface ContentPrefsDao {
 
     @Query("SELECT pattern FROM keyword_blocks ORDER BY pattern")
     fun blockedKeywordsFlow(): Flow<List<String>>
+
+    @Query("SELECT count FROM hide_counts WHERE weekStart = :weekStart")
+    fun hideCount(weekStart: Long): Flow<Int?>
+
+    @Query(
+        "INSERT INTO hide_counts(weekStart, count) VALUES(:weekStart, :delta) " +
+            "ON CONFLICT(weekStart) DO UPDATE SET count = count + :delta",
+    )
+    suspend fun addHideCount(
+        weekStart: Long,
+        delta: Int,
+    )
 }

@@ -54,3 +54,8 @@ class ContentFilter
             gifTags: List<String>,
         ): Boolean = hideReason(userName, gifTags) == null
     }
+
+/** Start of the 7-day bucket containing [nowEpochMs] (PLAN §6 rolling counter). */
+fun weekStartMs(nowEpochMs: Long): Long = nowEpochMs / WEEK_MS * WEEK_MS
+
+internal const val WEEK_MS: Long = 7 * 24 * 60 * 60 * 1_000L

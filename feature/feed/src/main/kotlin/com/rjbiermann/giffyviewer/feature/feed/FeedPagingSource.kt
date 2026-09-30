@@ -4,6 +4,7 @@ import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.database.toModel
+import com.rjbiermann.giffyviewer.core.database.weekStartMs
 import com.rjbiermann.giffyviewer.core.model.Gif
 
 /**
@@ -60,9 +61,15 @@ class FeedPagingSource(
                 } else {
                     null
                 }
+            val models = ids.mapNotNull { byId[it]?.toModel() }
+            // hide-count increment lives in the pipeline (PLAN §6): one batched
+            // write per page load — recount on reload is accepted (read-time filter)
+            val hidden = models.count { !contentFilter.allow(it.userName, it.tags) }
+            if (hidden > 0) {
+                db.contentPrefsDao().addHideCount(weekStartMs(System.currentTimeMillis()), hidden)
+            }
             val gifs =
-                ids
-                    .mapNotNull { byId[it]?.toModel() }
+                models
                     .filter { contentFilter.allow(it.userName, it.tags) }
                     .filter { favs == null || it.userName.lowercase() in favs }
             // nextKey exists ONLY when the row was fetched (mediator fills it);

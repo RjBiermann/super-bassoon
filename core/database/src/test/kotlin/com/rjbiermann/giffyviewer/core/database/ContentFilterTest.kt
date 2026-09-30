@@ -75,3 +75,22 @@ class ContentFilterTest {
             assertEquals("creator", f2.hideReason("solarhelen", gifTags))
         }
 }
+
+class WeekStartTest {
+    private val week = WEEK_MS
+
+    @Test
+    fun `weekStart truncates to the 7-day bucket`() {
+        assertEquals(0L, weekStartMs(0L))
+        // a timestamp mid-bucket rounds DOWN to the bucket start
+        assertEquals(2 * week, weekStartMs(2 * week + 5_000L))
+        // exactly on a boundary stays on that boundary
+        assertEquals(3 * week, weekStartMs(3 * week))
+    }
+
+    @Test
+    fun `timestamps in one bucket share one weekStart`() {
+        val now = 1_791_000_000_000L
+        assertEquals(weekStartMs(now), weekStartMs(now + week / 2))
+    }
+}

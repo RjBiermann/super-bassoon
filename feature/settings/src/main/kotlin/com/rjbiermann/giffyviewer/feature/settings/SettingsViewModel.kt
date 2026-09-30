@@ -5,11 +5,13 @@ import androidx.lifecycle.viewModelScope
 import com.rjbiermann.giffyviewer.core.database.ContentPrefsBackup
 import com.rjbiermann.giffyviewer.core.database.ContentPrefsDao
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
+import com.rjbiermann.giffyviewer.core.database.weekStartMs
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -56,6 +58,13 @@ class SettingsViewModel
         fun unblockKeyword(pattern: String) {
             viewModelScope.launch { dao.unblockKeyword(pattern) }
         }
+
+        /** PLAN §6: single rolling 7-day hidden-item counter. */
+        val hiddenThisWeek: StateFlow<Int> =
+            dao
+                .hideCount(weekStartMs(System.currentTimeMillis()))
+                .map { it ?: 0 }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
         /** SD stream URLs on metered/slow connections (PLAN §5 data-saver). */
         val dataSaver: StateFlow<Boolean> =

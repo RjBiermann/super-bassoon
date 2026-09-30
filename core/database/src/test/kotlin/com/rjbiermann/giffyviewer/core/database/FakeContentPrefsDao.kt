@@ -9,6 +9,7 @@ class FakeContentPrefsDao : ContentPrefsDao {
     val creators = MutableStateFlow<List<CreatorPrefEntity>>(emptyList())
     val tags = MutableStateFlow<List<TagPrefEntity>>(emptyList())
     val keywords = MutableStateFlow<List<KeywordBlockEntity>>(emptyList())
+    val hideCounts = mutableMapOf<Long, Int>()
 
     override suspend fun upsertCreator(pref: CreatorPrefEntity) {
         creators.update { it.filterNot { c -> c.username == pref.username } + pref }
@@ -57,6 +58,15 @@ class FakeContentPrefsDao : ContentPrefsDao {
     override fun favoriteTagsFlow(): Flow<List<String>> = MutableStateFlow(tags.value.filter { it.state == "FAVORITED" }.map { it.tag })
 
     override fun tagState(tag: String): Flow<String?> = MutableStateFlow(tags.value.firstOrNull { it.tag == tag }?.state)
+
+    override fun hideCount(weekStart: Long): Flow<Int?> = MutableStateFlow(hideCounts[weekStart])
+
+    override suspend fun addHideCount(
+        weekStart: Long,
+        delta: Int,
+    ) {
+        hideCounts[weekStart] = (hideCounts[weekStart] ?: 0) + delta
+    }
 
     override fun blockedKeywordsFlow(): Flow<List<String>> = MutableStateFlow(keywords.value.map { it.pattern })
 

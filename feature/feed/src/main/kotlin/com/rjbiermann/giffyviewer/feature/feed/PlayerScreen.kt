@@ -201,7 +201,14 @@ fun PlayerScreen(
                 }
 
                 override fun onPlaybackStateChanged(state: Int) {
-                    if (state == Player.STATE_ENDED && autoSwipe && !dataSaver) {
+                    if (state != Player.STATE_ENDED) return
+                    if (!(autoSwipe && !dataSaver)) {
+                        // no auto-swipe: loop the video (user request 2026-09-30)
+                        player.seekTo(0)
+                        player.play()
+                        return
+                    }
+                    {
                         val next = pagerState.currentPage + 1
                         if (next < items.itemCount) {
                             skipResume.value = true
