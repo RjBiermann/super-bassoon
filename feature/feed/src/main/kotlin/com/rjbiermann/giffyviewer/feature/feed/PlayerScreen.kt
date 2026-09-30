@@ -770,7 +770,7 @@ private fun PlayerControls(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(start = 16.dp, end = 72.dp)
+                        // edge to edge when the overlay is hidden (user request)
                         .height(24.dp)
                         .pointerInput(durationMs) {
                             detectTapGestures { }
