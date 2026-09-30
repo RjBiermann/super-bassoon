@@ -84,6 +84,11 @@ When unsure: check PLAN.md first, then ask. Don't invent endpoints or features.
   feature:auth AuthScreen. `watch_history` write verified end-to-end on TV36.
 - Still open (later slices): PIN pad optional lock, settings screen (cache size/data-saver),
   Top This Week + Favorites + group rows (Phase 7 features), focus polish/scaling.
+- D-pad/focus docs: PLAN §7/§9 covers the TV D-pad spec (full navigation, search
+  focus-up, accent-outline focus states, 10-foot contrast) + M3 a11y baseline (≥48dp
+  targets, contentDescription, 4.5:1 contrast); implemented focus lessons live in
+  AGENTS-APP.md TV section (focus scale 1.08, initial-focus FocusRequester fix, MENU
+  quick-actions). Any new D-pad/focus lesson → AGENTS-APP.md.
 
 ## Phase 7 progress (2026-09)
 - Content filter (slice 1), Settings screen (slice 2), UX polish + TV Settings + data

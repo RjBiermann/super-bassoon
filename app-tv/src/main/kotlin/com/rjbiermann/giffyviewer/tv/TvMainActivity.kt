@@ -4,12 +4,15 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -36,6 +39,7 @@ import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.ui.GiffyTheme
 import com.rjbiermann.giffyviewer.feature.auth.AuthScreen
+import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import com.rjbiermann.giffyviewer.feature.settings.SettingsScreen
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -88,13 +92,18 @@ class TvMainActivity : ComponentActivity() {
         var player: Pair<List<Gif>, Int>? by remember { mutableStateOf(null) }
         var showAccount by remember { mutableStateOf(false) }
         var showSettings by remember { mutableStateOf(false) }
+        var showNiches by remember { mutableStateOf(false) }
+        var openNiche: FeedSource.Niche? by remember { mutableStateOf(null) }
+        val pinnedNiches by settings.pinnedNiches.collectAsStateWithLifecycle(initialValue = emptySet())
 
         // D-pad BACK pops the top screen instead of exiting the activity
         androidx.activity.compose.BackHandler(
-            enabled = player != null || showAccount || showSettings,
+            enabled = player != null || showAccount || showSettings || showNiches || openNiche != null,
         ) {
             when {
                 player != null -> player = null
+                openNiche != null -> openNiche = null
+                showNiches -> showNiches = false
                 showSettings -> showSettings = false
                 else -> showAccount = false
             }
@@ -113,6 +122,24 @@ class TvMainActivity : ComponentActivity() {
                     onBack = { player = null },
                 )
             }
+            openNiche != null -> {
+                val niche = openNiche
+                if (niche != null) {
+                    val feedVm: TvNicheFeedViewModel = hiltViewModel()
+                    TvNicheFeedScreen(
+                        niche = niche,
+                        onOpenGif = { gifs, index -> player = gifs to index },
+                        viewModel = feedVm,
+                    )
+                }
+            }
+            showNiches -> {
+                val nichesVm: TvNichesViewModel = hiltViewModel()
+                TvNichesScreen(
+                    onOpenNiche = { niche -> openNiche = niche },
+                    viewModel = nichesVm,
+                )
+            }
             showAccount -> AuthScreen(onBack = { showAccount = false })
             showSettings -> SettingsScreen(onBack = { showSettings = false })
             else -> {
@@ -123,15 +150,38 @@ class TvMainActivity : ComponentActivity() {
                 // until the user tabbed into a row blindly.
                 LaunchedEffect(Unit) { focusRequester.requestFocus() }
                 Column(modifier = Modifier.fillMaxSize()) {
-                    Row {
-                        AccountButton(
-                            focusRequester = focusRequester,
-                            onClick = { showAccount = true },
-                        )
-                        Button(
-                            onClick = { showSettings = true },
-                            modifier = Modifier.padding(16.dp),
-                        ) { Text("Settings") }
+                    // Pinned niches = TV's version of the mobile home chip tabs;
+                    // pills scroll horizontally like the mobile chip row.
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        item {
+                            AccountButton(
+                                focusRequester = focusRequester,
+                                onClick = { showAccount = true },
+                            )
+                        }
+                        item {
+                            Button(
+                                onClick = { showSettings = true },
+                                modifier = Modifier.padding(16.dp),
+                            ) { Text("Settings") }
+                        }
+                        item {
+                            Button(
+                                onClick = { showNiches = true },
+                                modifier = Modifier.padding(16.dp),
+                            ) { Text("Niches") }
+                        }
+                        items(pinnedNiches.toList()) { entry ->
+                            val id = entry.substringBefore('|')
+                            val name = entry.substringAfter('|')
+                            Button(
+                                onClick = { openNiche = FeedSource.Niche(id, name) },
+                                modifier = Modifier.padding(16.dp),
+                            ) { Text(name) }
+                        }
                     }
                     TvHomeScreen(
                         onOpenGif = { gifs, index -> player = gifs to index },

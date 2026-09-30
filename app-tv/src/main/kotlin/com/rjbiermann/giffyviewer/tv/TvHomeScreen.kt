@@ -189,12 +189,12 @@ private fun FeedRow(
 }
 
 /** Snapshot of the loaded pages for D-pad walking inside the player. */
-private fun snapshot(gifs: LazyPagingItems<Gif>): List<Gif> =
+internal fun snapshot(gifs: LazyPagingItems<Gif>): List<Gif> =
     buildList {
         for (i in 0 until gifs.itemCount) gifs[i]?.let { add(it) }
     }
 
-private fun LazyPagingItems<Gif>.indexOf(id: String): Int {
+internal fun LazyPagingItems<Gif>.indexOf(id: String): Int {
     for (i in 0 until itemCount) if (get(i)?.id == id) return i
     return 0
 }
@@ -209,7 +209,7 @@ private fun RowTitle(text: String) {
 }
 
 @Composable
-private fun GifCard(
+internal fun GifCard(
     gif: Gif,
     onMenu: () -> Unit,
     onClick: () -> Unit,
