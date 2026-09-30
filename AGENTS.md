@@ -103,5 +103,20 @@ When unsure: check PLAN.md first, then ask. Don't invent endpoints or features.
   wired in both app modules (see AGENTS-AUTH.md / AGENTS-NETWORK.md). Paste-token is the
   TV fallback. The site never writes `localStorage.auth_data` — capturing it was a wrong
   assumption, now documented.
-- Still open: favorite tag, For You blend, niche groups, collections, hide-count stats,
-  Top This Week row, PIN pad lock, logout WebView-cookie clearing.
+- Still open: favorite tag, For You anonymous blend (server feed landed, live-verified via
+  the app 2026-09-30), niche groups, collections, hide-count stats, Top This Week row,
+  PIN pad lock, logout WebView-cookie clearing. check-sound probe (2026-09-30): GET 405,
+  POST requires a user token (id_token 403 — context unknown) — spec'd-not-scheduled,
+  gif `hasAudio` drives the mute UI.
+
+### Phase 9 progress (2026-09-30)
+- Swipe-player §9 slice set complete + live-verified: theme tokens, player controls,
+  single-progress fix, description+tags display, auto-hide clears all text but the progress
+  line, right action rail (like / mute / share / overflow quick sheet), double-tap like +
+  heart pop, playback speed 0.5–2× in overflow, error Retry/Skip overlay, auto-swipe toggle
+  (reduced-motion aware, data-saver forced off, prefs-persisted), adjacent-item prefetch via
+  Media3 DefaultPreloadManager (prepare-only — no data burn).
+- Live like-write drift fixed: PUT/DELETE /v2/gifs/{id}/like need JSON body
+  {context:trending, source:watchlist, position} + Json encodeDefaults=true (all-default
+  @Body DTOs serialized to {} otherwise); Retrofit DELETE+body needs @HTTP(hasBody=true).
+  Pinch zoom resets on swipe now (PLAN §9 revision 2026-09-30).
