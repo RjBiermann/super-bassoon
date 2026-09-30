@@ -93,16 +93,17 @@ class TvMainActivity : ComponentActivity() {
         var showAccount by remember { mutableStateOf(false) }
         var showSettings by remember { mutableStateOf(false) }
         var showNiches by remember { mutableStateOf(false) }
-        var openNiche: FeedSource.Niche? by remember { mutableStateOf(null) }
+        var openFeed: FeedSource? by remember { mutableStateOf(null) }
         val pinnedNiches by settings.pinnedNiches.collectAsStateWithLifecycle(initialValue = emptySet())
+        val pinnedCreators by settings.pinnedCreators.collectAsStateWithLifecycle(initialValue = emptySet())
 
         // D-pad BACK pops the top screen instead of exiting the activity
         androidx.activity.compose.BackHandler(
-            enabled = player != null || showAccount || showSettings || showNiches || openNiche != null,
+            enabled = player != null || showAccount || showSettings || showNiches || openFeed != null,
         ) {
             when {
                 player != null -> player = null
-                openNiche != null -> openNiche = null
+                openFeed != null -> openFeed = null
                 showNiches -> showNiches = false
                 showSettings -> showSettings = false
                 else -> showAccount = false
@@ -122,12 +123,12 @@ class TvMainActivity : ComponentActivity() {
                     onBack = { player = null },
                 )
             }
-            openNiche != null -> {
-                val niche = openNiche
-                if (niche != null) {
+            openFeed != null -> {
+                val source = openFeed
+                if (source != null) {
                     val feedVm: TvNicheFeedViewModel = hiltViewModel()
-                    TvNicheFeedScreen(
-                        niche = niche,
+                    TvSourceFeedScreen(
+                        source = source,
                         onOpenGif = { gifs, index -> player = gifs to index },
                         viewModel = feedVm,
                     )
@@ -136,7 +137,7 @@ class TvMainActivity : ComponentActivity() {
             showNiches -> {
                 val nichesVm: TvNichesViewModel = hiltViewModel()
                 TvNichesScreen(
-                    onOpenNiche = { niche -> openNiche = niche },
+                    onOpenNiche = { niche -> openFeed = niche },
                     viewModel = nichesVm,
                 )
             }
@@ -178,9 +179,16 @@ class TvMainActivity : ComponentActivity() {
                             val id = entry.substringBefore('|')
                             val name = entry.substringAfter('|')
                             Button(
-                                onClick = { openNiche = FeedSource.Niche(id, name) },
+                                onClick = { openFeed = FeedSource.Niche(id, name) },
                                 modifier = Modifier.padding(16.dp),
                             ) { Text(name) }
+                        }
+                        // Pinned creators = home pills (PLAN §7 pin-to-tabs), same as mobile chips.
+                        items(pinnedCreators.toList()) { username ->
+                            Button(
+                                onClick = { openFeed = FeedSource.Creator(username) },
+                                modifier = Modifier.padding(16.dp),
+                            ) { Text("@$username") }
                         }
                     }
                     TvHomeScreen(

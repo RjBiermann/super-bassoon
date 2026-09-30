@@ -157,6 +157,15 @@ class FeedViewModel
             settings.pinnedNiches
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
+        /** Pinned creator usernames — Home tabs (PLAN §7 pin-to-tabs), shared by both apps. */
+        val pinnedCreators: StateFlow<Set<String>> =
+            settings.pinnedCreators
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+        fun togglePinnedCreator(username: String) {
+            viewModelScope.launch { settings.togglePinnedCreator(username) }
+        }
+
         fun blockTag(tag: String) {
             viewModelScope.launch {
                 db.contentPrefsDao().upsertTag(

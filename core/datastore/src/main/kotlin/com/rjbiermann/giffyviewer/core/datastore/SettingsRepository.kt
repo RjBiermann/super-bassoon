@@ -32,6 +32,7 @@ class SettingsRepository
             val AUTO_SWIPE = booleanPreferencesKey("auto_swipe")
             val PIN_HASH = stringPreferencesKey("pin_hash")
             val PINNED_NICHES = stringSetPreferencesKey("pinned_niches")
+            val PINNED_CREATORS = stringSetPreferencesKey("pinned_creators")
         }
 
         /** True once the user attested 18+. Emits false until then; survives restarts. */
@@ -99,6 +100,19 @@ class SettingsRepository
                     } else {
                         cur + "$id|$name"
                     }
+            }
+        }
+
+        /** Pinned creators — Home tabs (PLAN §7 pin-to-tabs); entries "username".
+         *  Shared by both apps; each app renders its own tab/pill chrome. */
+        val pinnedCreators: Flow<Set<String>> =
+            dataStore.data.map { it[Keys.PINNED_CREATORS] ?: emptySet() }
+
+        suspend fun togglePinnedCreator(username: String) {
+            dataStore.edit {
+                val cur = it[Keys.PINNED_CREATORS] ?: emptySet()
+                val u = username.lowercase().trim()
+                it[Keys.PINNED_CREATORS] = if (u in cur) cur - u else cur + u
             }
         }
 

@@ -57,6 +57,15 @@ sealed interface FeedSource {
         override val ttlMs = TTL_TRENDING
     }
 
+    /** Single creator feed — v2/users/{username}/gifs (same call the Favorites
+     *  round-robin already uses). Pinned creator tabs (PLAN §7 pin-to-tabs). */
+    data class Creator(
+        val username: String,
+    ) : FeedSource {
+        override val keyBase = "user:${username.lowercase().trim()}"
+        override val ttlMs = TTL_SEARCH
+    }
+
     companion object {
         const val TTL_TRENDING = 10 * 60_000L
         const val TTL_SEARCH = 60 * 60_000L
@@ -79,6 +88,7 @@ fun FeedSource.title(): String =
         is FeedSource.ForYou -> "For You"
         is FeedSource.TopThisWeek -> "Top This Week"
         is FeedSource.Niche -> this.name
+        is FeedSource.Creator -> "@${this.username}"
         is FeedSource.Search -> "Search: $query"
         is FeedSource.Favorites -> "Favorites"
     }

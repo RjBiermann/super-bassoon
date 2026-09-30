@@ -147,6 +147,22 @@ private fun QuickActionsDialog(
                 ) {
                     Text(if (state == "FAVORITED") "Unfavorite" else "Favorite")
                 }
+                val pinnedCreators by viewModel.pinnedCreators.collectAsStateWithLifecycle(emptySet())
+                Button(
+                    onClick = {
+                        viewModel.togglePinnedCreator(gif.userName)
+                        onDismiss()
+                    },
+                    modifier = Modifier.padding(vertical = 4.dp),
+                ) {
+                    Text(
+                        if (gif.userName.lowercase() in pinnedCreators) {
+                            "Unpin from home"
+                        } else {
+                            "Pin to home"
+                        },
+                    )
+                }
                 Button(
                     onClick = {
                         viewModel.blockCreator(gif.userName)

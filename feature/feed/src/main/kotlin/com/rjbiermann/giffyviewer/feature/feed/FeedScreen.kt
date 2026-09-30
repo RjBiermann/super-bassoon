@@ -164,6 +164,16 @@ fun FeedScreen(
                         label = { Text(niche.name) },
                     )
                 }
+                // pinned creators become tabs (PLAN §7 pin-to-tabs), shared with TV
+                val pinnedCreators by viewModel.pinnedCreators.collectAsStateWithLifecycle(emptySet())
+                pinnedCreators.forEach { username ->
+                    val creatorFeed = FeedSource.Creator(username)
+                    FilterChip(
+                        selected = source == creatorFeed,
+                        onClick = { viewModel.open(creatorFeed) },
+                        label = { Text("@$username") },
+                    )
+                }
             }
 
             // M3 linear indicator for refresh / append activity
@@ -288,6 +298,17 @@ internal fun QuickBlockSheet(
                 .collectAsState(initial = null)
             listStyle(if (favState == "FAVORITED") "Unfavorite @${gif.userName}" else "Favorite @${gif.userName}") {
                 viewModel.toggleFavoriteCreator(gif.userName)
+                onDismiss()
+            }
+            val pinnedCreators by viewModel.pinnedCreators.collectAsState(initial = emptySet())
+            listStyle(
+                if (gif.userName.lowercase() in pinnedCreators) {
+                    "Unpin @${gif.userName} from home"
+                } else {
+                    "Pin @${gif.userName} to home"
+                },
+            ) {
+                viewModel.togglePinnedCreator(gif.userName)
                 onDismiss()
             }
             listStyle(

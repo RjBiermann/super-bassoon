@@ -23,6 +23,7 @@ class TvHomeViewModel
     constructor(
         repository: FeedRepository,
         private val db: com.rjbiermann.giffyviewer.core.database.GiffyDatabase,
+        val settings: com.rjbiermann.giffyviewer.core.datastore.SettingsRepository,
     ) : ViewModel() {
         val trending = repository.paging(FeedSource.Trending).cachedIn(viewModelScope)
         val discover = repository.paging(FeedSource.Discover).cachedIn(viewModelScope)
@@ -35,6 +36,15 @@ class TvHomeViewModel
                 .favoriteCreatorsFlow()
                 .map { it.isNotEmpty() }
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+        /** Pinned creators — top-row pills (PLAN §7 pin-to-tabs), shared with mobile. */
+        val pinnedCreators =
+            settings.pinnedCreators
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+        fun togglePinnedCreator(username: String) {
+            viewModelScope.launch { settings.togglePinnedCreator(username) }
+        }
 
         /** null = no pref yet; dialog label depends on it. Same rules as mobile. */
         fun creatorState(username: String) = db.contentPrefsDao().creatorState(username.lowercase())

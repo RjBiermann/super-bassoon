@@ -38,6 +38,7 @@ import com.rjbiermann.giffyviewer.core.network.NicheDto
 import com.rjbiermann.giffyviewer.core.network.upstreamApi
 import com.rjbiermann.giffyviewer.feature.feed.FeedRepository
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
+import com.rjbiermann.giffyviewer.feature.feed.title
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -158,19 +159,19 @@ fun TvNichesScreen(
 }
 
 /**
- * Niche feed screen (one niche, grid + player). Reuses the home GifCard
- * look; MENU quick actions stay home-only for now.
+ * Pinned-feed screen (niche or creator — any FeedSource, grid + player).
+ * Reuses the home GifCard look; MENU quick actions stay home-only for now.
  */
 @Composable
-fun TvNicheFeedScreen(
-    niche: FeedSource.Niche,
+fun TvSourceFeedScreen(
+    source: FeedSource,
     onOpenGif: (List<Gif>, Int) -> Unit,
     viewModel: TvNicheFeedViewModel,
 ) {
-    val gifs = remember(niche.id) { viewModel.gifs(niche) }.collectAsLazyPagingItems()
+    val gifs = remember(source.keyBase) { viewModel.gifs(source) }.collectAsLazyPagingItems()
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Text(
-            text = niche.name,
+            text = source.title(),
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.padding(24.dp),
         )
@@ -200,5 +201,5 @@ class TvNicheFeedViewModel
     constructor(
         private val repository: FeedRepository,
     ) : ViewModel() {
-        fun gifs(niche: FeedSource.Niche) = repository.paging(niche).cachedIn(viewModelScope)
+        fun gifs(source: FeedSource) = repository.paging(source).cachedIn(viewModelScope)
     }

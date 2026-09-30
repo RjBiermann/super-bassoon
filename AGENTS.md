@@ -76,6 +76,17 @@ When unsure: check PLAN.md first, then ask. Don't invent endpoints or features.
 - Phone34 emulator dies every few minutes on this host (15GB RAM) — stop gradle/kotlin
   daemons (`./gradlew --stop`) before emulator work, keep test windows short, data is wiped
   on every restart (age gate reappears, DB empty).
+- **Emulator crash root-caused (2026-09-30): qemu SIGSEGV in NVIDIA NVDEC path**
+  (`libnvcuvid` → `MediaCudaVideoHelper` → `cuMemcpy2D_v2`), triggered whenever the guest
+  plays video (51 core dumps, all same signature). Not RAM/OOM. Fix:
+  `ANDROID_EMU_MEDIA_DECODER_CUDA=0` + `ANDROID_EMU_MEDIA_DECODER_CUDA_HEVC=0` set in
+  `~/.bashrc` and `~/.config/environment.d/90-emulator-decode.conf` (emulator falls back to
+  software ffmpeg decode). NOTE: the `android` CLI runs qemu inside a systemd user scope
+  (`systemd-run --user`), so shell exports do NOT reach it — the vars must be in the systemd
+  user environment: `systemctl --user set-environment` (runtime) +
+  `~/.config/environment.d/90-emulator-decode.conf` (persists across logins). Env vars must be
+  set *before* the emulator process starts — restart emulator to apply. Verified against AOSP
+  `emu-main-dev` MediaH264DecoderGeneric.cpp `canUseCudaDecoder()`.
 - Emulator cold-start first fetch: wait 45s+ after Enter before judging the grid empty.
 
 ## Phase 6 progress (2026-09)
