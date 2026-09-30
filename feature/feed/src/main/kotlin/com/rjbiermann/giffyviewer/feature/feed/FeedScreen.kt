@@ -325,7 +325,7 @@ internal fun QuickBlockSheet(
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    listOf(0.5f, 1f, 1.25f, 1.5f, 2f).forEach { speed ->
+                    listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f).forEach { speed ->
                         Text(
                             text = "$speed×",
                             color =
