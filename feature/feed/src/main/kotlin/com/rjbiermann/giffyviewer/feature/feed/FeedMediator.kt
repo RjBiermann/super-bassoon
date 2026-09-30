@@ -104,6 +104,7 @@ class FeedMediator(
                     page = (page - 1) / creators.size + 1,
                 )
             }
+            is FeedSource.ForYou -> api.feedForYou(count = pageSize, page = page)
             else -> api.trendingPopular(count = pageSize, page = page)
         }
 }

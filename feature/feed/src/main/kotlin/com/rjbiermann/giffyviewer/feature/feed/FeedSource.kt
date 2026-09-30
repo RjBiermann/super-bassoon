@@ -30,6 +30,12 @@ sealed interface FeedSource {
         override val ttlMs = TTL_SEARCH
     }
 
+    /** Logged-in personalized server feed (PLAN §7); chip hidden when logged out. */
+    data object ForYou : FeedSource {
+        override val keyBase = "foryou:v1"
+        override val ttlMs = TTL_TRENDING
+    }
+
     /** Recency round-robin over favorited creators (PLAN §7). */
     data object Favorites : FeedSource {
         override val keyBase = "fav:v1"
@@ -55,6 +61,7 @@ fun FeedSource.title(): String =
     when (this) {
         is FeedSource.Trending -> "Trending"
         is FeedSource.Discover -> "Discover"
+        is FeedSource.ForYou -> "For You"
         is FeedSource.Search -> "Search: $query"
         is FeedSource.Favorites -> "Favorites"
     }

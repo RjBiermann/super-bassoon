@@ -42,6 +42,13 @@ interface upstreamApi {
         @Query("page") page: Int = 1,
     ): GifsPageDto
 
+    /** Personalized server feed — verified exists (401 anonymous); logged-in only. */
+    @GET("v2/feeds/for-you")
+    suspend fun feedForYou(
+        @Query("count") count: Int = 40,
+        @Query("page") page: Int = 1,
+    ): GifsPageDto
+
     @GET("v2/feeds/liked")
     suspend fun likedFeed(
         @Query("count") count: Int = 40,

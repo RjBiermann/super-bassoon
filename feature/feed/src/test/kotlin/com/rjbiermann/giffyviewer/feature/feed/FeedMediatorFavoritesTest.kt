@@ -96,6 +96,11 @@ class FeedMediatorFavoritesTest {
             page: Int,
         ): GifsPageDto = throw NotImplementedError()
 
+        override suspend fun feedForYou(
+            count: Int,
+            page: Int,
+        ) = throw NotImplementedError()
+
         override suspend fun likedIds(): List<String> = throw NotImplementedError()
 
         override suspend fun likeGif(

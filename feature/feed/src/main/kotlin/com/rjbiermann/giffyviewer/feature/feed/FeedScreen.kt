@@ -115,13 +115,18 @@ fun FeedScreen(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                listOf(FeedSource.Trending, FeedSource.Discover, FeedSource.Favorites).forEach { candidate ->
-                    FilterChip(
-                        selected = source == candidate,
-                        onClick = { viewModel.open(candidate) },
-                        label = { Text(candidate.title()) },
-                    )
-                }
+                // For You = server personalized feed, logged-in only (PLAN §7);
+                // anonymous client-side blend is spec'd but unscheduled.
+                val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle(false)
+                listOf(FeedSource.Trending, FeedSource.Discover, FeedSource.ForYou, FeedSource.Favorites)
+                    .filterNot { it is FeedSource.ForYou && !isLoggedIn }
+                    .forEach { candidate ->
+                        FilterChip(
+                            selected = source == candidate,
+                            onClick = { viewModel.open(candidate) },
+                            label = { Text(candidate.title()) },
+                        )
+                    }
             }
 
             // M3 linear indicator for refresh / append activity
