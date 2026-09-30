@@ -7,8 +7,9 @@ import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.SimpleCache
-import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.preload.DefaultPreloadManager
+import androidx.media3.exoplayer.source.preload.TargetPreloadStatusControl
 
 /**
  * Builds [GiffyPlayer]s sharing one [SimpleCache] (one instance per process —
@@ -27,13 +28,18 @@ class GiffyPlayerFactory(
                 .setUpstreamDataSourceFactory(upstream)
                 // stream while writing to cache; never fail playback because of cache errors
                 .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
-        val player =
-            ExoPlayer
-                .Builder(context)
-                .setMediaSourceFactory(DefaultMediaSourceFactory(cached))
-                .setSeekBackIncrementMs(5_000)
-                .setSeekForwardIncrementMs(5_000)
-                .build()
-        return GiffyPlayer(player)
+        // Neighbor preloading (PLAN §9): prepare-only target — manifest + init
+        // segments are cached, media body loads on play (no data burn).
+        val builder =
+            DefaultPreloadManager
+                .Builder(
+                    context,
+                    TargetPreloadStatusControl<Int, DefaultPreloadManager.PreloadStatus> {
+                        DefaultPreloadManager.PreloadStatus.PRELOAD_STATUS_SOURCE_PREPARED
+                    },
+                ).setMediaSourceFactory(DefaultMediaSourceFactory(cached))
+                .setCache(cache)
+        val player = builder.buildExoPlayer()
+        return GiffyPlayer(player, builder.build())
     }
 }

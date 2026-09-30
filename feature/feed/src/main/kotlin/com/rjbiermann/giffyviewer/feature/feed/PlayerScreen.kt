@@ -225,6 +225,16 @@ fun PlayerScreen(
     }
     // likes are refreshed per use (PLAN §5)
     LaunchedEffect(Unit) { viewModel.syncLikes() }
+    // adjacent-item prefetch (PLAN §9): prepare next/prev on settle
+    LaunchedEffect(pagerState.currentPage, dataSaver) {
+        val page = pagerState.currentPage
+        val neighbors =
+            buildList {
+                if (page > 0) add(items[page - 1])
+                if (page + 1 < items.itemCount) add(items[page + 1])
+            }
+        player.preloadNeighbors(neighbors.filterNotNull(), dataSaver)
+    }
     // errors belong to the current item; a swipe resets the overlay
     LaunchedEffect(pagerState.currentPage) { playError = false }
     // position + play-state ticker drives progress bar / play button
