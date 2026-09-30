@@ -50,7 +50,7 @@ class SettingsViewModel
         }
 
         fun unblockTag(tag: String) {
-            viewModelScope.launch { dao.unblockTag(tag) }
+            viewModelScope.launch { dao.clearTag(tag) }
         }
 
         fun unblockKeyword(pattern: String) {

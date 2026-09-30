@@ -37,5 +37,18 @@ class AuthViewModel
             }
         }
 
-        fun signOut() = store.clear()
+        /** PLAN §2: wipe token storage + WebView cookies (auth2/kinde session),
+         *  so the next login starts clean instead of auto-reusing the session. */
+        fun signOut() {
+            store.clear()
+            viewModelScope.launch(Dispatchers.IO) {
+                runCatching {
+                    android.webkit.CookieManager.getInstance().apply {
+                        removeAllCookies(null)
+                        removeSessionCookies(null)
+                        flush()
+                    }
+                }
+            }
+        }
     }

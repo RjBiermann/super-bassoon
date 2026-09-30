@@ -22,6 +22,8 @@ class CircuitBreaker(
     /** True if a call may proceed; false (or throw from [checkOrThrow]) while open. */
     fun isOpen(): Boolean = now() < openedUntil
 
+    fun retryAtEpochMs(): Long = openedUntil
+
     fun checkOrThrow() {
         if (isOpen()) throw CircuitOpenException(openedUntil)
     }

@@ -134,6 +134,24 @@ class FeedViewModel
         /** null = no pref yet. Sheet label depends on it. */
         fun creatorState(username: String) = db.contentPrefsDao().creatorState(username.lowercase())
 
+        /** null = no pref yet (PLAN §6 state machine). */
+        fun tagState(tag: String) = db.contentPrefsDao().tagState(tag.lowercase())
+
+        /** Toggle: favorited → removed, otherwise upserted (Groups groundwork). */
+        fun toggleFavoriteTag(tag: String) {
+            viewModelScope.launch {
+                val dao = db.contentPrefsDao()
+                val t = tag.lowercase()
+                if (dao.tagState(t).first() == "FAVORITED") {
+                    dao.unfavoriteTag(t)
+                } else {
+                    dao.upsertTag(
+                        TagPrefEntity(t, "FAVORITED", System.currentTimeMillis()),
+                    )
+                }
+            }
+        }
+
         fun blockTag(tag: String) {
             viewModelScope.launch {
                 db.contentPrefsDao().upsertTag(

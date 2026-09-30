@@ -107,12 +107,10 @@ class RetryAndBreakerTest {
         assertTrue(breaker.isOpen())
 
         val before = server.requestCount
-        try {
-            c.newCall(get()).execute()
-            throw AssertionError("expected CircuitOpenException")
-        } catch (_: CircuitOpenException) {
-            // short-circuited, good
-        }
+        // the open circuit surfaces as a retryable 503, never a thrown
+        // exception (a throw escapes OkHttp's worker thread and crashes the app)
+        val response = c.newCall(get()).execute()
+        assertEquals(503, response.code)
         assertEquals(before, server.requestCount)
     }
 

@@ -153,7 +153,10 @@ interface ContentPrefsDao {
     suspend fun unblockCreator(username: String)
 
     @Query("DELETE FROM tag_prefs WHERE tag = :tag")
-    suspend fun unblockTag(tag: String)
+    suspend fun clearTag(tag: String)
+
+    @Query("DELETE FROM tag_prefs WHERE state = 'FAVORITED' AND tag = :tag")
+    suspend fun unfavoriteTag(tag: String)
 
     @Query("DELETE FROM keyword_blocks WHERE pattern = :pattern")
     suspend fun unblockKeyword(pattern: String)
@@ -166,6 +169,12 @@ interface ContentPrefsDao {
 
     @Query("SELECT state FROM creator_prefs WHERE username = :username")
     fun creatorState(username: String): Flow<String?>
+
+    @Query("SELECT state FROM tag_prefs WHERE tag = :tag")
+    fun tagState(tag: String): Flow<String?>
+
+    @Query("SELECT tag FROM tag_prefs WHERE state = 'FAVORITED' ORDER BY tag")
+    fun favoriteTagsFlow(): Flow<List<String>>
 
     @Query("SELECT tag FROM tag_prefs WHERE state = 'BLOCKED' ORDER BY tag")
     fun blockedTagsFlow(): Flow<List<String>>

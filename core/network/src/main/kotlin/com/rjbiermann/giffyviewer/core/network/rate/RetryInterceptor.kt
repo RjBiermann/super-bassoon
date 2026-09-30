@@ -1,7 +1,10 @@
 package com.rjbiermann.giffyviewer.core.network.rate
 
 import okhttp3.Interceptor
+import okhttp3.Protocol
+import okhttp3.Request
 import okhttp3.Response
+import okhttp3.ResponseBody
 import java.io.IOException
 import kotlin.random.Random
 
@@ -23,7 +26,15 @@ class RetryInterceptor(
 ) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
-        breaker.checkOrThrow()
+        if (breaker.isOpen()) {
+            // The open circuit surfaces as a retryable 503 — NEVER a thrown
+            // exception. A throw here escapes OkHttp's worker thread and
+            // crashes the app (live crash observed 2026-09-30).
+            val retryAfterS =
+                (((breaker.retryAtEpochMs() - System.currentTimeMillis()).coerceAtLeast(0)) / 1_000)
+                    .toString()
+            return circuitOpenResponse(request, retryAfterS)
+        }
 
         var lastException: IOException? = null
 
@@ -83,6 +94,21 @@ class RetryInterceptor(
 
         private fun Random.jittered(base: Long): Long = (base * (0.5 + nextDouble() * 0.5)).toLong().coerceAtLeast(1)
     }
+
+    /** Synthetic retryable response while the circuit is open (PLAN §4). */
+    private fun circuitOpenResponse(
+        request: Request,
+        retryAfterS: String,
+    ): Response =
+        Response
+            .Builder()
+            .request(request)
+            .protocol(Protocol.HTTP_1_1)
+            .code(503)
+            .message("circuit open")
+            .body(ResponseBody.create(null, "circuit open"))
+            .header("Retry-After", retryAfterS)
+            .build()
 }
 
 /**

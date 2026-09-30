@@ -260,6 +260,15 @@ internal fun QuickBlockSheet(
                 onDismiss()
             }
             gif.tags.take(3).forEach { tag ->
+                val tagState by viewModel
+                    .tagState(tag)
+                    .collectAsState(initial = null)
+                listStyle(
+                    if (tagState == "FAVORITED") "Unfavorite tag “$tag”" else "Favorite tag “$tag”",
+                ) {
+                    viewModel.toggleFavoriteTag(tag)
+                    onDismiss()
+                }
                 listStyle("Block tag “$tag”") {
                     viewModel.blockTag(tag)
                     onDismiss()

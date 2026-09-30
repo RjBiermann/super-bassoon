@@ -34,8 +34,12 @@ class FakeContentPrefsDao : ContentPrefsDao {
         creators.update { it.filterNot { c -> c.username == username } }
     }
 
-    override suspend fun unblockTag(tag: String) {
+    override suspend fun clearTag(tag: String) {
         tags.update { it.filterNot { t -> t.tag == tag } }
+    }
+
+    override suspend fun unfavoriteTag(tag: String) {
+        tags.update { it.filterNot { t -> t.tag == tag && t.state == "FAVORITED" } }
     }
 
     override suspend fun unblockKeyword(pattern: String) {
@@ -49,6 +53,10 @@ class FakeContentPrefsDao : ContentPrefsDao {
         MutableStateFlow(creators.value.filter { it.state == "FAVORITED" }.map { it.username })
 
     override fun blockedTagsFlow(): Flow<List<String>> = MutableStateFlow(tags.value.filter { it.state == "BLOCKED" }.map { it.tag })
+
+    override fun favoriteTagsFlow(): Flow<List<String>> = MutableStateFlow(tags.value.filter { it.state == "FAVORITED" }.map { it.tag })
+
+    override fun tagState(tag: String): Flow<String?> = MutableStateFlow(tags.value.firstOrNull { it.tag == tag }?.state)
 
     override fun blockedKeywordsFlow(): Flow<List<String>> = MutableStateFlow(keywords.value.map { it.pattern })
 
