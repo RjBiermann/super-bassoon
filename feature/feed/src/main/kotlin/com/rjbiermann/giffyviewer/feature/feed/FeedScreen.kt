@@ -75,6 +75,7 @@ import com.rjbiermann.giffyviewer.core.ui.GiffyColors
 @Composable
 fun FeedScreen(
     modifier: Modifier = Modifier,
+    gridColumns: Int = 2,
     onOpenPlayer: (Int) -> Unit = {},
     onOpenAccount: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
@@ -204,6 +205,30 @@ fun FeedScreen(
                 }
             }
 
+            // Per-feed server sort chips (§8) — only verified orders surface.
+            val sortOptions = source.sortOptions()
+            if (sortOptions.isNotEmpty()) {
+                val savedSort by remember(source.baseKey) { viewModel.sortFor(source.baseKey) }
+                    .collectAsStateWithLifecycle("")
+                val activeSort = source.activeSort.ifEmpty { savedSort }
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 12.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    sortOptions.forEach { (label, order) ->
+                        FilterChip(
+                            selected = activeSort == order,
+                            onClick = { viewModel.setSort(source, order) },
+                            label = { Text(label) },
+                        )
+                    }
+                }
+            }
+
             // M3 linear indicator for refresh / append activity
             if (items.loadState.refresh is LoadState.Loading ||
                 items.loadState.append is LoadState.Loading
@@ -230,7 +255,7 @@ fun FeedScreen(
                 }
             } else {
                 LazyVerticalStaggeredGrid(
-                    columns = StaggeredGridCells.Fixed(2),
+                    columns = StaggeredGridCells.Fixed(gridColumns),
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(8.dp),
                     verticalItemSpacing = 8.dp,

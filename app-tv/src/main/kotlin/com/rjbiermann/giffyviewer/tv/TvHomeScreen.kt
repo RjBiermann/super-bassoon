@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -34,6 +35,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -97,7 +99,7 @@ fun TvHomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     items(continueEntries, key = { it.gif.id }) { entry ->
-                        GifCard(entry.gif, onMenu = { actionsFor = entry.gif }) {
+                        GifCard(entry.gif, Modifier.width(cardWidth(entry.gif)), onMenu = { actionsFor = entry.gif }) {
                             onOpenGif(listOf(entry.gif), 0)
                         }
                     }
@@ -195,7 +197,7 @@ private fun FeedRow(
         ) {
             items(count = gifs.itemCount, key = { i -> gifs[i]?.id ?: "pending$i" }) { i ->
                 gifs[i]?.let { gif ->
-                    GifCard(gif, onMenu = { onMenu(gif) }) {
+                    GifCard(gif, Modifier.width(cardWidth(gif)), onMenu = { onMenu(gif) }) {
                         onOpenGif(snapshot(gifs), gifs.indexOf(gif.id))
                     }
                 }
@@ -224,9 +226,30 @@ private fun RowTitle(text: String) {
     )
 }
 
+/** Fixed row content height (10-foot legible) — card width derives per gif aspect. */
+internal val CARD_ROW_HEIGHT_DP = 170.dp
+
+/**
+ * Mixed-orientation rows (PLAN §9 TV): card width = row height × the gif's own
+ * aspect, clamped — portrait never narrower than 120dp, landscape capped at the
+ * classic 280dp wide card; unknown aspect → the landscape default.
+ */
+internal fun cardWidth(gif: Gif): Dp =
+    if (gif.width <= 0 || gif.height <= 0) {
+        280.dp
+    } else {
+        val aspect = gif.width.toFloat() / gif.height
+        if (aspect < 1f) {
+            (CARD_ROW_HEIGHT_DP * aspect).coerceAtLeast(120.dp)
+        } else {
+            (CARD_ROW_HEIGHT_DP * aspect).coerceAtMost(280.dp)
+        }
+    }
+
 @Composable
 internal fun GifCard(
     gif: Gif,
+    modifier: Modifier,
     onMenu: () -> Unit,
     onClick: () -> Unit,
 ) {
@@ -244,8 +267,7 @@ internal fun GifCard(
                     .RoundedCornerShape(16.dp),
             ),
         modifier =
-            Modifier
-                .width(280.dp)
+            modifier
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
@@ -266,8 +288,8 @@ internal fun GifCard(
             Box(
                 modifier =
                     Modifier
-                        .width(280.dp)
-                        .height(170.dp)
+                        .fillMaxWidth()
+                        .height(CARD_ROW_HEIGHT_DP)
                         .clip(RoundedCornerShape(12.dp))
                         .background(avgColorOr(gif, MaterialTheme.colorScheme.surfaceVariant)),
             ) {
@@ -281,7 +303,7 @@ internal fun GifCard(
                     contentDescription = "Gif by @${gif.userName}",
                     contentScale = ContentScale.Crop,
                     // fixed landscape card (10-foot norm); portrait gifs crop — fine for browse
-                    modifier = Modifier.width(280.dp).height(170.dp),
+                    modifier = Modifier.fillMaxWidth().height(CARD_ROW_HEIGHT_DP),
                 )
             }
             Text(

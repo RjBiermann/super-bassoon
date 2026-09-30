@@ -4,6 +4,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import kotlinx.coroutines.flow.Flow
@@ -33,6 +34,7 @@ class SettingsRepository
             val PIN_HASH = stringPreferencesKey("pin_hash")
             val PINNED_NICHES = stringSetPreferencesKey("pinned_niches")
             val PINNED_CREATORS = stringSetPreferencesKey("pinned_creators")
+            val GRID_COLUMNS = intPreferencesKey("grid_columns")
         }
 
         /** True once the user attested 18+. Emits false until then; survives restarts. */
@@ -101,6 +103,24 @@ class SettingsRepository
                         cur + "$id|$name"
                     }
             }
+        }
+
+        /** Grid columns (PLAN §6, responsive-first): 0 = Auto (width-derived). */
+        val gridColumns: Flow<Int> = dataStore.data.map { it[Keys.GRID_COLUMNS] ?: 0 }
+
+        suspend fun setGridColumns(columns: Int) {
+            dataStore.edit { it[Keys.GRID_COLUMNS] = columns }
+        }
+
+        /** Per-feed server sort (PLAN §8): dynamic keys "sort:<baseKey>", "" = default. */
+        fun feedSort(baseKey: String): Flow<String> =
+            dataStore.data.map { it[stringPreferencesKey("sort:$baseKey")] ?: "" }
+
+        suspend fun setFeedSort(
+            baseKey: String,
+            sort: String,
+        ) {
+            dataStore.edit { it[stringPreferencesKey("sort:$baseKey")] = sort }
         }
 
         /** Pinned creators — Home tabs (PLAN §7 pin-to-tabs); entries "username".

@@ -70,6 +70,13 @@ class FeedMediatorFavoritesTest {
 
         override suspend fun temporaryToken(): TemporaryTokenDto = throw NotImplementedError()
 
+        override suspend fun suggest(query: String): List<com.rjbiermann.giffyviewer.core.network.SuggestDto> = throw NotImplementedError()
+
+        override suspend fun creatorsSearch(
+            query: String,
+            count: Int,
+        ) = throw NotImplementedError()
+
         override suspend fun search(
             searchText: String,
             order: String,
@@ -81,6 +88,7 @@ class FeedMediatorFavoritesTest {
             username: String,
             count: Int,
             page: Int,
+            order: String,
         ): GifsPageDto {
             userGifsCalls++
             return GifsPageDto(gifs = listOf(gifDtoShell("g1", username)))
@@ -101,6 +109,7 @@ class FeedMediatorFavoritesTest {
             nicheId: String,
             count: Int,
             page: Int,
+            order: String,
         ) = throw NotImplementedError()
 
         override suspend fun likedFeed(

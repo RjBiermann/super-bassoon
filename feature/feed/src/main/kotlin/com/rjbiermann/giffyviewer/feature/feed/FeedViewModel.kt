@@ -54,8 +54,22 @@ class FeedViewModel
                 .cachedIn(viewModelScope)
 
         fun open(feed: FeedSource) {
-            mutableSource.value = feed
+            viewModelScope.launch {
+                // Per-feed sort persistence (§8): a fresh source adopts its saved sort.
+                val saved = settings.feedSort(feed.baseKey).first()
+                val sortable = feed is FeedSource.Search || feed is FeedSource.Creator || feed is FeedSource.Niche
+                val adopt = sortable && saved.isNotEmpty() && sourceIsUnsorted(feed)
+                mutableSource.value = if (adopt) feed.withSort(saved) else feed
+            }
         }
+
+        private fun sourceIsUnsorted(feed: FeedSource): Boolean =
+            when (feed) {
+                is FeedSource.Search -> feed.sort.isEmpty()
+                is FeedSource.Creator -> feed.sort.isEmpty()
+                is FeedSource.Niche -> feed.sort.isEmpty()
+                else -> false
+            }
 
         /** Server like state (PLAN §5): favorites_remote is the read mirror. */
         val likedIds: StateFlow<Set<String>> =
@@ -167,6 +181,20 @@ class FeedViewModel
 
         fun togglePinnedCreator(username: String) {
             viewModelScope.launch { settings.togglePinnedCreator(username) }
+        }
+
+        /** Saved server sort for this feed's base (§8 per-feed persistence). */
+        fun sortFor(baseKey: String): Flow<String> = settings.feedSort(baseKey)
+
+        /** Chip click: persist the sort + open the same feed under its sort key. */
+        fun setSort(
+            source: FeedSource,
+            sort: String,
+        ) {
+            viewModelScope.launch {
+                settings.setFeedSort(source.baseKey, sort)
+                open(source.withSort(sort))
+            }
         }
 
         /** Matching creators above search results (§7); tap opens their feed. */

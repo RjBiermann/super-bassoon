@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
@@ -17,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -181,6 +183,29 @@ fun SettingsScreen(
                         TextButton(onClick = { viewModel.removePin() }) { Text("Remove") }
                     } else {
                         TextButton(onClick = { showSetPin = true }) { Text("Set PIN") }
+                    }
+                }
+            }
+            item(key = "grid-columns") {
+                // §6 Grid columns responsive-first: Auto = width-derived ladder.
+                val cols by viewModel.gridColumns.collectAsStateWithLifecycle(0)
+                Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+                    Text("Grid columns", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "Auto follows window width (1 phone · 2 medium · 3 wide)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+                        listOf(1, 2, 3).forEach { n ->
+                            FilterChip(
+                                selected = cols == n,
+                                onClick = { viewModel.setGridColumns(n) },
+                                label = { Text("$n") },
+                                modifier = Modifier.padding(end = 6.dp),
+                            )
+                        }
+                        TextButton(onClick = { viewModel.setGridColumns(0) }) { Text("Auto") }
                     }
                 }
             }

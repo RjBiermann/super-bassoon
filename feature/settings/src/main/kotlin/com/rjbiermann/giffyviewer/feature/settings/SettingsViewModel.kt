@@ -88,6 +88,14 @@ class SettingsViewModel
             viewModelScope.launch { settings.setDataSaver(enabled) }
         }
 
+        /** Grid columns (PLAN §6 responsive-first): 0 = Auto (width-derived). */
+        val gridColumns: StateFlow<Int> =
+            settings.gridColumns.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+        fun setGridColumns(columns: Int) {
+            viewModelScope.launch { settings.setGridColumns(columns) }
+        }
+
         /** PLAN §9 theme options. */
         val amoled: StateFlow<Boolean> =
             settings.amoled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)

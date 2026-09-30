@@ -91,7 +91,13 @@ class FeedMediator(
 
     private suspend fun fetch(page: Int): GifsPageDto =
         when (feed) {
-            is FeedSource.Search -> api.search(searchText = feed.query, count = pageSize, page = page)
+            is FeedSource.Search ->
+                api.search(
+                    searchText = feed.query,
+                    count = pageSize,
+                    page = page,
+                    order = feed.sort.ifEmpty { "trending" },
+                )
             is FeedSource.Favorites -> {
                 // ponytail: page n maps to creator[(n-1) % n_creators] at fetch time;
                 // a changed favorite set shifts the mapping until the cache refreshes

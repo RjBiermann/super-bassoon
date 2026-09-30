@@ -10,6 +10,9 @@ sealed interface FeedSource {
     /** Base cache key for page keys "base:p<n>". */
     val keyBase: String
 
+    /** Sortless base (DataStore per-feed sort persistence keys on this). */
+    val baseKey: String get() = keyBase
+
     /** TTL in ms: REFRESH re-hits the API only when stale (PLAN §5). */
     val ttlMs: Long
 
@@ -25,8 +28,10 @@ sealed interface FeedSource {
 
     data class Search(
         val query: String,
+        val sort: String = "",
     ) : FeedSource {
-        override val keyBase = "search:${query.lowercase().trim()}"
+        override val keyBase = "search:${query.lowercase().trim()}" + if (sort.isEmpty()) "" else ":sort=$sort"
+        override val baseKey = "search:${query.lowercase().trim()}"
         override val ttlMs = TTL_SEARCH
     }
 
@@ -34,8 +39,10 @@ sealed interface FeedSource {
     data class Niche(
         val id: String,
         val name: String,
+        val sort: String = "",
     ) : FeedSource {
-        override val keyBase = "niche:$id"
+        override val keyBase = "niche:$id" + if (sort.isEmpty()) "" else ":sort=$sort"
+        override val baseKey = "niche:$id"
         override val ttlMs = TTL_SEARCH
     }
 
@@ -61,8 +68,10 @@ sealed interface FeedSource {
      *  round-robin already uses). Pinned creator tabs (PLAN §7 pin-to-tabs). */
     data class Creator(
         val username: String,
+        val sort: String = "",
     ) : FeedSource {
-        override val keyBase = "user:${username.lowercase().trim()}"
+        override val keyBase = "user:${username.lowercase().trim()}" + if (sort.isEmpty()) "" else ":sort=$sort"
+        override val baseKey = "user:${username.lowercase().trim()}"
         override val ttlMs = TTL_SEARCH
     }
 
@@ -94,3 +103,54 @@ fun FeedSource.title(): String =
     }
 
 typealias GifItem = Gif
+
+/** Active server sort of this source ("" = the surface's default). */
+val FeedSource.activeSort: String
+    get() =
+        when (this) {
+            is FeedSource.Search -> sort
+            is FeedSource.Creator -> sort
+            is FeedSource.Niche -> sort
+            else -> ""
+        }
+
+/** Same feed with another server sort (§8 chips); identity sources ignore it. */
+fun FeedSource.withSort(sort: String): FeedSource =
+    when (this) {
+        is FeedSource.Search -> copy(sort = sort)
+        is FeedSource.Creator -> copy(sort = sort)
+        is FeedSource.Niche -> copy(sort = sort)
+        else -> this
+    }
+
+/**
+ * Server sort options per feed surface — ONLY orders verified live 2026-09-30
+ * (BadOrder otherwise): search {trending,latest,top7,top28,score}, creator
+ * {trending,oldest,latest,top7,top28}, niche {trending,oldest,latest,best,hot}.
+ * Empty sort = the surface's default (trending).
+ */
+fun FeedSource.sortOptions(): List<Pair<String, String>> =
+    when (this) {
+        is FeedSource.Search ->
+            listOf(
+                "Newest" to "latest",
+                "Top day" to "top7",
+                "Top month" to "top28",
+                "Most liked" to "score",
+            )
+        is FeedSource.Creator ->
+            listOf(
+                "Newest" to "latest",
+                "Oldest" to "oldest",
+                "Top day" to "top7",
+                "Top month" to "top28",
+            )
+        is FeedSource.Niche ->
+            listOf(
+                "Newest" to "latest",
+                "Oldest" to "oldest",
+                "Best" to "best",
+                "Hot" to "hot",
+            )
+        else -> emptyList()
+    }

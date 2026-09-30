@@ -11,6 +11,10 @@ Compose UI, navigation, platform shells. Spec: PLAN.md §3, §7–9.
 
 ## Mobile app
 - minSdk 24, targetSdk 35, edge-to-edge, Material 3 dynamic color, AMOLED true-black option.
+- **Phone + tablet = one adaptive UI** (PLAN §9): same screens, touch-first everywhere;
+  width is the only variable. `WindowWidthSizeClass` computed once at the app shell,
+  derived layout hint passed down (column counts, margins) — no scattered width checks.
+  No separate tablet screens or codepaths.
 - Masonry 2-col portrait / 3-col landscape, Paging 3.
 - TikTok-style swipe player.
 - Long-press (tile or player) quick sheet: **Like / Unlike** · Block creator · Favorite creator · Block tag `<tag>` · Block all tags on this gif · Block this keyword · Don't block.
@@ -21,6 +25,10 @@ Compose UI, navigation, platform shells. Spec: PLAN.md §3, §7–9.
 
 ## TV app
 - androidx.tv, minSdk 26, full D-pad navigation incl. Groups + settings + PIN pad; 5% overscan margins.
+- Kept as a separate module on purpose (PLAN §1): D-pad focus traversal, tv-material
+  components and 10-foot contrast are different in kind from touch — a merged module
+  would turn every screen into an `isTv` branch. TV shares all :core:* and :feature:*
+  code; only the shell is TV-specific.
 - `TvLazyRow`s: Trending · Discover · Top This Week · Continue Watching · Favorites · one row per favorited group · custom feeds.
 - Focus on username in now-playing → quick actions panel.
 - "Why did this get hidden" toast on filtered-item skip.

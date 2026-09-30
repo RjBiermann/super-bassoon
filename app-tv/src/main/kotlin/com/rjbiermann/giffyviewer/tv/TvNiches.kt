@@ -186,6 +186,7 @@ fun TvSourceFeedScreen(
                 gifs[i]?.let { gif ->
                     GifCard(
                         gif = gif,
+                        modifier = Modifier.fillMaxWidth(),
                         onMenu = {},
                         onClick = { onOpenGif(snapshot(gifs), gifs.indexOf(gif.id)) },
                     )

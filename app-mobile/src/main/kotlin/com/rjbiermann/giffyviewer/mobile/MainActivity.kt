@@ -20,6 +20,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,15 +38,17 @@ import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.ui.GiffyTheme
+import com.rjbiermann.giffyviewer.core.ui.LayoutHint
+import com.rjbiermann.giffyviewer.core.ui.layoutHint
 import com.rjbiermann.giffyviewer.feature.auth.AuthScreen
 import com.rjbiermann.giffyviewer.feature.feed.FeedScreen
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
-import com.rjbiermann.giffyviewer.search.SearchScreen
-import com.rjbiermann.giffyviewer.search.SearchViewModel
 import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
 import com.rjbiermann.giffyviewer.feature.feed.NichesScreen
 import com.rjbiermann.giffyviewer.feature.feed.PlayerScreen
 import com.rjbiermann.giffyviewer.feature.settings.SettingsScreen
+import com.rjbiermann.giffyviewer.search.SearchScreen
+import com.rjbiermann.giffyviewer.search.SearchViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -66,15 +70,20 @@ class MainActivity : ComponentActivity() {
     }
 
     /** Reads PLAN §9 theme options and applies them app-wide. */
+    @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     @Composable
     private fun ThemeHost() {
         val amoled by settings.amoled.collectAsStateWithLifecycle(initialValue = false)
         val dynamicColor by settings.dynamicColor.collectAsStateWithLifecycle(initialValue = false)
-        GiffyTheme(amoled = amoled, dynamicColor = dynamicColor) { Host() }
+        // One adaptive seam (PLAN §9): width class computed here, hint passed down.
+        val windowSize = calculateWindowSizeClass(this)
+        val columnsOverride by settings.gridColumns.collectAsStateWithLifecycle(initialValue = 0)
+        val hint = layoutHint(windowSize.widthSizeClass, columnsOverride)
+        GiffyTheme(amoled = amoled, dynamicColor = dynamicColor) { Host(hint) }
     }
 
     @Composable
-    private fun Host() {
+    private fun Host(hint: LayoutHint) {
         val confirmed by settings.ageConfirmed.collectAsStateWithLifecycle(initialValue = false)
         var playerStartIndex by remember { mutableStateOf<Int?>(null) }
         var showAccount by remember { mutableStateOf(false) }
@@ -129,6 +138,7 @@ class MainActivity : ComponentActivity() {
         } else if (confirmed) {
             FeedScreen(
                 modifier = Modifier.fillMaxSize(),
+                gridColumns = hint.gridColumns,
                 onOpenPlayer = { index -> playerStartIndex = index },
                 onOpenAccount = { showAccount = true },
                 onOpenSettings = { showSettings = true },

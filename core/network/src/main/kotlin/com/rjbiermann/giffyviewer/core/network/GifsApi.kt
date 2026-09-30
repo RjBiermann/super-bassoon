@@ -29,12 +29,14 @@ interface upstreamApi {
         @Query("page") page: Int = 1,
     ): GifsPageDto
 
-    /** One creator's gifs — live-verified: filters by userName, paginated. */
+    /** One creator's gifs — live-verified: filters by userName, paginated.
+     *  Orders verified 2026-09-30: trending, oldest, latest, top, top7, top28. */
     @GET("v2/users/{username}/search")
     suspend fun userGifs(
         @Path("username") username: String,
         @Query("count") count: Int = 40,
         @Query("page") page: Int = 1,
+        @Query("order") order: String = "trending",
     ): GifsPageDto
 
     @GET("v2/feeds/trending/popular")
@@ -58,6 +60,7 @@ interface upstreamApi {
         @Path("id") nicheId: String,
         @Query("count") count: Int = 40,
         @Query("page") page: Int = 1,
+        @Query("order") order: String = "trending",
     ): GifsPageDto
 
     /** Typed autocomplete (live-verified 2026-09-30, anonymous OK): returns a
