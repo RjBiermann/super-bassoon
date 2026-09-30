@@ -13,7 +13,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -760,24 +759,20 @@ private fun PlayerControls(
                     )
                 }
             }
-            Spacer(Modifier.height(24.dp))
         }
 
-        // thin progress bar shows only while the controls (with their slider)
-        // are hidden — one progress indicator at a time (user feedback 2026-09-30)
-        AnimatedVisibility(visible = !visible, enter = fadeIn(), exit = fadeOut()) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        // edge to edge when the overlay is hidden (user request)
-                        .height(24.dp)
-                        .pointerInput(durationMs) {
-                            detectTapGestures { }
-                        },
-                contentAlignment = Alignment.BottomCenter,
-            ) {
-                val fraction = if (durationMs > 0) positionMs.toFloat() / durationMs else 0f
+        // fixed 24dp slot under the controls row — the thin bar fades in/out
+        // inside it, so nothing shifts when the indicators swap (drift-free,
+        // user feedback 2026-09-30). One progress indicator at a time.
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    // edge to edge when the overlay is hidden (user request)
+                    .height(24.dp),
+            contentAlignment = Alignment.BottomCenter,
+        ) {
+            androidx.compose.animation.AnimatedVisibility(visible = !visible, enter = fadeIn(), exit = fadeOut()) {
                 Box(
                     modifier =
                         Modifier
@@ -785,6 +780,7 @@ private fun PlayerControls(
                             .height(3.dp)
                             .background(trackColor, RoundedCornerShape(3.dp)),
                 ) {
+                    val fraction = if (durationMs > 0) positionMs.toFloat() / durationMs else 0f
                     Box(
                         modifier =
                             Modifier
