@@ -4,7 +4,9 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -27,6 +29,7 @@ class SettingsRepository
             val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
             val MUTED = booleanPreferencesKey("muted")
             val AUTO_SWIPE = booleanPreferencesKey("auto_swipe")
+            val PIN_HASH = stringPreferencesKey("pin_hash")
         }
 
         /** True once the user attested 18+. Emits false until then; survives restarts. */
@@ -78,7 +81,30 @@ class SettingsRepository
             dataStore.edit { it[Keys.AUTO_SWIPE] = enabled }
         }
 
+        /** Optional PIN app lock (PLAN §6 Phase 6). Null = no lock set.
+         *  Salted SHA-256 — the plaintext PIN never hits storage. */
+        val pinHash: Flow<String?> = dataStore.data.map { it[Keys.PIN_HASH] }
+
+        suspend fun setPin(pin: String) {
+            require(pin.length >= 4 && pin.all { it.isDigit() }) { "PIN must be 4+ digits" }
+            dataStore.edit { it[Keys.PIN_HASH] = pin.sha256() }
+        }
+
+        suspend fun clearPin() {
+            dataStore.edit { it.remove(Keys.PIN_HASH) }
+        }
+
+        suspend fun verifyPin(pin: String): Boolean = pinHash.first() == pin.sha256()
+
         suspend fun setDynamicColor(enabled: Boolean) {
             dataStore.edit { it[Keys.DYNAMIC_COLOR] = enabled }
         }
     }
+
+private fun String.sha256(): String =
+    java.security.MessageDigest
+        .getInstance("SHA-256")
+        .digest((this + PIN_SALT).toByteArray())
+        .joinToString("") { "%02x".format(it) }
+
+private const val PIN_SALT = "giffy_viewer_pin"

@@ -26,12 +26,15 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -150,6 +153,37 @@ fun SettingsScreen(
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }
+            item(key = "pin-lock") {
+                val pinHash by viewModel.pinHash.collectAsStateWithLifecycle(null)
+                var showSetPin by remember { mutableStateOf(false) }
+                if (showSetPin) {
+                    SetPinDialog(
+                        onSet = {
+                            viewModel.setPin(it)
+                            showSetPin = false
+                        },
+                        onDismiss = { showSetPin = false },
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("App lock (PIN)", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            "Require a 4-digit PIN when the app starts",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (pinHash != null) {
+                        TextButton(onClick = { viewModel.removePin() }) { Text("Remove") }
+                    } else {
+                        TextButton(onClick = { showSetPin = true }) { Text("Set PIN") }
+                    }
+                }
+            }
             item(key = "data-saver") {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
@@ -256,4 +290,37 @@ private fun LazyListScope.section(
             }
         }
     }
+}
+
+/** PLAN §6 Phase 6: 4-digit PIN entry when enabling the app lock. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun SetPinDialog(
+    onSet: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var pin by remember { mutableStateOf("") }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Set PIN") },
+        text = {
+            androidx.compose.material3.OutlinedTextField(
+                value = pin,
+                onValueChange = { pin = it.filter { c -> c.isDigit() }.take(4) },
+                label = { Text("4-digit PIN") },
+                keyboardOptions =
+                    androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword,
+                    ),
+                singleLine = true,
+            )
+        },
+        confirmButton = {
+            TextButton(
+                enabled = pin.length == 4,
+                onClick = { onSet(pin) },
+            ) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }

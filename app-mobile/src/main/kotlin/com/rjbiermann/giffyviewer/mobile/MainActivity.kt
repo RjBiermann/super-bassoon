@@ -4,12 +4,17 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -20,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,7 +73,14 @@ class MainActivity : ComponentActivity() {
         var showAccount by remember { mutableStateOf(false) }
         var showSettings by remember { mutableStateOf(false) }
 
-        if (confirmed && playerStartIndex != null) {
+        val pinHash by settings.pinHash.collectAsStateWithLifecycle(initialValue = null)
+        var unlocked by rememberSaveable { mutableStateOf(false) }
+        if (pinHash != null && !unlocked) {
+            PinLockScreen(
+                onUnlock = { unlocked = true },
+                settings = settings,
+            )
+        } else if (confirmed && playerStartIndex != null) {
             val start = playerStartIndex ?: 0
             PlayerScreen(
                 startIndex = start,
@@ -134,6 +147,93 @@ private fun AgeGate(
             }
             Spacer(Modifier.height(8.dp))
             OutlinedButton(onClick = onExit) { Text("Exit (leaves app)") }
+        }
+    }
+}
+
+/** PLAN §6 Phase 6: optional PIN pad lock — gate before any content. */
+@Composable
+private fun PinLockScreen(
+    onUnlock: () -> Unit,
+    settings: SettingsRepository,
+) {
+    val scope = rememberCoroutineScope()
+    var entry by remember { mutableStateOf("") }
+    var wrong by remember { mutableStateOf(false) }
+
+    fun onDigit(d: Char) {
+        if (entry.length >= 4) return
+        entry += d
+        if (entry.length == 4) {
+            scope.launch {
+                val ok = settings.verifyPin(entry)
+                if (ok) {
+                    onUnlock()
+                } else {
+                    wrong = true
+                    kotlinx.coroutines.delay(400)
+                    entry = ""
+                    wrong = false
+                }
+            }
+        }
+    }
+
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .padding(top = 96.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            if (wrong) "Wrong PIN" else "Enter PIN",
+            color =
+                if (wrong) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onBackground
+                },
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Spacer(Modifier.height(16.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            repeat(4) { i ->
+                Box(
+                    modifier =
+                        Modifier
+                            .size(14.dp)
+                            .background(
+                                if (i < entry.length) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.outline
+                                },
+                                CircleShape,
+                            ),
+                )
+            }
+        }
+        Spacer(Modifier.height(32.dp))
+        val rows = listOf(listOf('1', '2', '3'), listOf('4', '5', '6'), listOf('7', '8', '9'), listOf('⌫', '0', '✓'))
+        rows.forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(20.dp), modifier = Modifier.padding(vertical = 6.dp)) {
+                row.forEach { key ->
+                    androidx.compose.material3.OutlinedButton(
+                        onClick = {
+                            when {
+                                key == '⌫' -> if (entry.isNotEmpty()) entry = entry.dropLast(1)
+                                key == '✓' -> {} // auto-unlocks at 4 digits
+                                else -> onDigit(key)
+                            }
+                        },
+                        modifier = Modifier.size(72.dp),
+                    ) {
+                        Text(key.toString(), style = MaterialTheme.typography.titleLarge)
+                    }
+                }
+            }
         }
     }
 }

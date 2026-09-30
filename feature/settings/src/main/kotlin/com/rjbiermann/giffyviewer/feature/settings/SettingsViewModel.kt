@@ -59,6 +59,19 @@ class SettingsViewModel
             viewModelScope.launch { dao.unblockKeyword(pattern) }
         }
 
+        /** PLAN §6 Phase 6: optional PIN app lock. */
+        val pinHash: StateFlow<String?> =
+            settings.pinHash
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+        fun setPin(pin: String) {
+            viewModelScope.launch { settings.setPin(pin) }
+        }
+
+        fun removePin() {
+            viewModelScope.launch { settings.clearPin() }
+        }
+
         /** PLAN §6: single rolling 7-day hidden-item counter. */
         val hiddenThisWeek: StateFlow<Int> =
             dao
