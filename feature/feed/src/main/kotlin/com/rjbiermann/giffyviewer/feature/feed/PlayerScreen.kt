@@ -7,10 +7,13 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,6 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -58,6 +62,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -361,16 +366,54 @@ private fun PlayerPage(
                         translationY = pan.y
                     },
         )
-        Text(
-            text = "@${gif.userName}",
-            color = Color.White,
-            style = MaterialTheme.typography.titleMedium,
+        // creator chip + description + tags row (PLAN §9 bottom-left cluster).
+        // Tags display-only for now — tappable when tag feeds land.
+        Column(
             modifier =
                 Modifier
                     .align(Alignment.BottomStart)
                     .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(start = 16.dp, bottom = 56.dp),
-        )
+                    .padding(start = 16.dp, bottom = 64.dp, end = 96.dp),
+        ) {
+            gif.description?.takeIf { it.isNotBlank() }?.let { desc ->
+                Text(
+                    text = desc,
+                    color = Color.White.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(6.dp))
+            }
+            if (gif.tags.isNotEmpty()) {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    gif.tags.take(6).forEach { tag ->
+                        Text(
+                            text = tag,
+                            color = GiffyColors.Lime,
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier =
+                                Modifier
+                                    .background(Color.Transparent, RoundedCornerShape(999.dp))
+                                    .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(999.dp))
+                                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                        )
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+            }
+            Text(
+                text = "@${gif.userName}",
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+            )
+        }
         PlayerControls(
             visible = controlsVisible && active,
             isPlaying = player.isPlaying,

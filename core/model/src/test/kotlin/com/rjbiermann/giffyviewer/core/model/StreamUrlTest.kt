@@ -10,6 +10,7 @@ import org.junit.Test
 class StreamUrlTest {
     private val gif =
         Gif(
+            description = null,
             id = "abc",
             userName = "u",
             tags = emptyList(),

@@ -67,7 +67,13 @@ object TvAppModule {
     fun database(
         @ApplicationContext context: Context,
     ): GiffyDatabase =
-        Room.databaseBuilder(context, GiffyDatabase::class.java, GiffyDatabase.NAME).addMigrations(GiffyDatabase.MIGRATION_1_2).build()
+        Room
+            .databaseBuilder(
+                context,
+                GiffyDatabase::class.java,
+                GiffyDatabase.NAME,
+            ).addMigrations(GiffyDatabase.MIGRATION_1_2, GiffyDatabase.MIGRATION_2_3)
+            .build()
 
     /** Images share the API's OkHttp instance → same rate limiter covers media. */
     @Provides

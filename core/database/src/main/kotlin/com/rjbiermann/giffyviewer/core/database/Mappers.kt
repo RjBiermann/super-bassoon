@@ -6,6 +6,7 @@ fun GifEntity.toModel(): Gif =
     Gif(
         id = id,
         userName = userName,
+        description = description,
         tags = tags,
         likes = likes,
         views = views,
@@ -26,6 +27,7 @@ fun Gif.toEntity(now: Long): GifEntity =
     GifEntity(
         id = id,
         userName = userName,
+        description = description,
         tags = tags,
         niches = niches,
         likes = likes,

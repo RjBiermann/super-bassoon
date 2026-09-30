@@ -8,6 +8,7 @@ import androidx.room.PrimaryKey
 data class GifEntity(
     @PrimaryKey val id: String,
     val userName: String,
+    val description: String?,
     val tags: List<String>,
     val niches: List<String>,
     val likes: Long,

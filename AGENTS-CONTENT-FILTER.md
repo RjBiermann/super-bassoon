@@ -10,6 +10,9 @@ paging remote load, Room cache reads, search results, group feeds, shuffle pool,
 "Surprise me", custom/For You blends. If you add a new surface, wire the filter or the feature doesn't ship.
 
 Pipeline order (per item):
+0. **Promoted filter:** `promoted: true` → drop unconditionally — paid placements (§0 no-ads). Not
+    counted in hide counts (that UI is for the user's own blocks, not ads). First check, runs before
+    the user's block sets
 1. Creator block (exact username, O(1) map lookup)
 2. Blocked niche-group tag sets (built once per session, invalidated on edit)
 3. Tag exact match vs `tag_prefs`
@@ -40,6 +43,11 @@ on a fresh install (acceptance criterion). No server, no backup API — local fi
   creator/tag/keyword sets, `refreshFrom(ContentPrefsDao)` before filtering, pipeline
   order creator → tag → keyword. Tags-only text: upstream gif objects carry no
   title/description, so keyword matching is substring over tags.
+- **Promoted filter (stage 0, live-verified):** the gif DTO's `promoted` field is nullable/absent on
+  organic items — treat missing as `false`; a `true` drops the item before every user-block check
+  and does not touch hide counts. Wired as the first branch of `ContentFilter.run` so PROMOTED
+  leaks same zero as blocks (one test case added: `promoted=true` with zero prefs set → filtered,
+  no hide-count row written)
 - Choke point wired in `FeedPagingSource.load` (filters Room reads) + its invalidation
   observer now watches the 3 pref tables, so a block edit re-filters the live grid
   instantly (verified: block @emily.reed → tile gone without a manual refresh).

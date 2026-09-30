@@ -22,7 +22,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         TagPrefEntity::class,
         KeywordBlockEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 @TypeConverters(ListConverters::class)
@@ -60,6 +60,14 @@ abstract class GiffyDatabase : RoomDatabase() {
                         "CREATE TABLE IF NOT EXISTS `keyword_blocks` (`pattern` TEXT NOT NULL, " +
                             "`blockedAt` INTEGER NOT NULL, PRIMARY KEY(`pattern`))",
                     )
+                }
+            }
+
+        /** v3: gif description caption (PLAN §9 player page). */
+        val MIGRATION_2_3 =
+            object : Migration(2, 3) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE `gifs` ADD COLUMN `description` TEXT")
                 }
             }
     }

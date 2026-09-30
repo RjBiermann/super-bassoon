@@ -17,6 +17,7 @@ import kotlinx.serialization.json.jsonPrimitive
 data class GifDtoShell(
     val id: String,
     val userName: String? = null,
+    val description: String? = null,
     val tags: List<String> = emptyList(),
     val likes: Long = 0,
     val views: Long = 0,
@@ -107,6 +108,7 @@ fun GifDtoShell.toModel(): Gif =
     Gif(
         id = id,
         userName = userName.orEmpty(),
+        description = description,
         tags = tags,
         likes = likes,
         views = views,

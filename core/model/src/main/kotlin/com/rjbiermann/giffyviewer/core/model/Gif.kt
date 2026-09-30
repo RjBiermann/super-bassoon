@@ -4,6 +4,8 @@ package com.rjbiermann.giffyviewer.core.model
 data class Gif(
     val id: String,
     val userName: String,
+    /** Free-text caption from the API (no title field exists); often null. */
+    val description: String?,
     val tags: List<String>,
     val likes: Long,
     val views: Long,
