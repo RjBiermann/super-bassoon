@@ -13,8 +13,6 @@
 .externalNativeBuild
 .cxx
 local.properties
-.agents/
 .idea/
-skills-lock.json
 **/build/
 .playwright-mcp/
