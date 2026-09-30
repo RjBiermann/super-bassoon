@@ -1,12 +1,17 @@
 package com.rjbiermann.giffyviewer.feature.auth
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.rjbiermann.giffyviewer.core.auth.TokenStore
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** Paste-token auth state (AGENTS-AUTH.md): save, reveal, sign out. */
+/** Sign-in state (AGENTS-AUTH.md): PKCE WebView login (primary), paste-token
+ * fallback, reveal, sign out.
+ */
 @HiltViewModel
 class AuthViewModel
     @Inject
@@ -15,8 +20,22 @@ class AuthViewModel
     ) : ViewModel() {
         val token: StateFlow<String?> = store.token
 
+        /** PKCE material for the in-flight WebView login, kept until consumed. */
+        private var pkce: TokenStore.Pkce? = null
+
+        fun currentPkce(): TokenStore.Pkce = pkce ?: TokenStore.newPkce().also { pkce = it }
+
         /** @return false when the paste isn't a plausible JWT. */
         fun save(raw: String): Boolean = store.save(raw)
+
+        /** Exchanges the WebView-captured authorization code on IO. */
+        fun exchangeCode(code: String) {
+            val verifier = pkce?.verifier ?: return
+            pkce = null
+            viewModelScope.launch(Dispatchers.IO) {
+                store.exchangeBlocking(code, verifier)
+            }
+        }
 
         fun signOut() = store.clear()
     }

@@ -41,9 +41,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
-/**
- * Paste-token sign-in (the live-verified path — AGENTS-AUTH.md). Raw token is
- * shown ONLY in the reveal dialog.
+/** Paste-token sign-in (fallback — AGENTS-AUTH.md). Raw token is
+ * shown ONLY in the reveal dialog. Primary path is the PKCE WebView login.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,7 +55,20 @@ fun AuthScreen(
     var reveal by remember { mutableStateOf(false) }
     var draft by remember { mutableStateOf("") }
     var error by remember { mutableStateOf(false) }
+    var webLogin by remember { mutableStateOf(false) }
     val signInFocus = remember { FocusRequester() }
+
+    if (webLogin) {
+        WebViewLoginScreen(
+            pkce = viewModel.currentPkce(),
+            onCodeCaptured = { code ->
+                webLogin = false
+                viewModel.exchangeCode(code)
+            },
+            onClose = { webLogin = false },
+        )
+        return
+    }
 
     Scaffold(
         topBar = {
@@ -118,6 +130,13 @@ fun AuthScreen(
                     modifier = Modifier.fillMaxWidth().focusRequester(signInFocus),
                 ) {
                     Text("Sign in")
+                }
+                Spacer(Modifier.height(16.dp))
+                OutlinedButton(
+                    onClick = { webLogin = true },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Sign in with browser")
                 }
             } else {
                 Spacer(Modifier.height(8.dp))

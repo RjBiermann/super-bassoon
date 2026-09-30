@@ -40,11 +40,15 @@ object AppModule {
     @Singleton
     fun network(tokenStore: TokenStore): NetworkComponents {
         var session: AnonymousSession? = null
-        // Signed-in token wins; anonymous temp token is the fallback.
+        // Signed-in token wins; anonymous temp token is the fallback. On 401:
+        // try a silent refresh-token grant first; only if that fails (logged out
+        // or refresh revoked) fall back to the anonymous session.
         val nc =
             buildNetwork(
                 authToken = { tokenStore.tokenOrNull() ?: session?.token() },
-                onUnauthorized = { session?.invalidate() },
+                onUnauthorized = {
+                    if (!tokenStore.refreshBlocking()) session?.invalidate()
+                },
             )
         session = AnonymousSession(nc.api)
         return nc

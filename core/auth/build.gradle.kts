@@ -2,6 +2,7 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ktlint)
     alias(libs.plugins.detekt)
 }
@@ -25,6 +26,8 @@ kotlin {
 dependencies {
     api(libs.kotlinx.coroutines.core)
     implementation(libs.security.crypto)
+    implementation(libs.kotlinx.serialization.json)
+    testImplementation(libs.junit)
 }
 
 detekt {

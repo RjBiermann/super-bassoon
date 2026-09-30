@@ -17,3 +17,4 @@ local.properties
 .idea/
 skills-lock.json
 **/build/
+.playwright-mcp/

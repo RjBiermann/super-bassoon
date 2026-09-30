@@ -95,7 +95,13 @@ When unsure: check PLAN.md first, then ask. Don't invent endpoints or features.
   (mutex-wait + single 401 retry, see AGENTS-NETWORK.md).
 - Phase 5 gate (login survives process death) **verified live on TV36 2026-09-30** with a
   real account id_token: paste → store → authenticated 200s on feeds/search → force-stop
-  → relaunch → still "Signed in" → sign-out works. id_token is a 1h token; re-paste until
-  WebView OAuth. See AGENTS-AUTH.md.
+  → relaunch → still "Signed in" → sign-out works. id_token is a 1h token.
+- **WebView OAuth login DONE (2026-09-30)** — app-driven PKCE (live-verified via Playwright
+  login observation + real emulator login): auth2 authorize → user logs in (email + OTP
+  code) → code intercepted on redirect → in-app token exchange → id_token + **refresh_token**
+  stored. Signed-in + process-death + authenticated feeds verified. On-401 silent refresh
+  wired in both app modules (see AGENTS-AUTH.md / AGENTS-NETWORK.md). Paste-token is the
+  TV fallback. The site never writes `localStorage.auth_data` — capturing it was a wrong
+  assumption, now documented.
 - Still open: favorite tag, For You blend, niche groups, collections, hide-count stats,
-  Top This Week row, WebView OAuth, PIN pad lock.
+  Top This Week row, PIN pad lock, logout WebView-cookie clearing.
