@@ -49,7 +49,7 @@ object TvAppModule {
             buildNetwork(
                 authToken = { tokenStore.tokenOrNull() ?: session?.token() },
                 onUnauthorized = { session?.invalidate() },
-                enableLogging = true,
+                enableLogging = false,
             )
         session = AnonymousSession(nc.api)
         return nc

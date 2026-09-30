@@ -37,5 +37,21 @@ Never log, expose, or transmit the token anywhere except the token-reveal screen
 - Bearer wiring: `AppModule.network()` sends user token first, anonymous temp token fallback.
 - Sign-out currently wipes the token only; WebView cookie clearing lands with WebView login.
   No revoke endpoint exists (POST /v2/auth dead) — TBD via OAuth client.
-- NOT yet done: WebView OAuth capture (primary path), real-token end-to-end check (needs the
-  user's browser token), TV paste-token screen (Phase 6).
+
+## Real-token end-to-end (verified on TV36 2026-09-30)
+- **The browser id_token (issuer `upstream-auth-host.example`) IS the API bearer** — works on
+  `v2/feeds/*`, `v2/users/{name}/search`, `v1/me`, `v2/likes`. The Kinde **access_token**
+  (same issuer but `aud: []`) is **rejected** (`BadTokenFormat`).
+- id_token lifetime is **1 hour** (`iat`→`exp` = 3600s). On expiry the API answers
+  `401 {"error":{"code":"TokenExpired"}}` and the user must re-paste until WebView OAuth
+  lands (no refresh_token available in the paste-only flow).
+- Sign-in, process-death survival (force-stop → relaunch → "Signed in"), and sign-out all
+  verified on TV36 with the real token; authenticated feed/search requests returned 200.
+- TV D-pad UX: the token field moves focus to **Sign in on key DOWN**
+  (`onPreviewKeyEvent` + `FocusRequester` in `AuthScreen`).
+- Test-harness gotcha: `adb shell input text` **garbles long strings** (silently drops /
+  duplicates chars — a "signed-in" paste once stored a 1153-char token that looked like a
+  JWT but got 401 on everything, anonymous-working endpoints included). Paste in **≤60-char
+  chunks** and verify the tail against the source before pressing Sign in.
+- Debug aid: on 401, `NetworkModule` prints the response body (`Auth401 …` line in logcat)
+  — never logs the token itself.

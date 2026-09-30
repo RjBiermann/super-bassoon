@@ -85,6 +85,9 @@ fun buildNetwork(
                     response = chain.proceed(authed(request, token))
                 }
             }
+            if (response.code == 401) {
+                println("Auth401 ${request.url.encodedPath} body=${response.peekBody(300).string()}")
+            }
             response
         }
 

@@ -89,5 +89,13 @@ When unsure: check PLAN.md first, then ask. Don't invent endpoints or features.
 - Content filter (slice 1), Settings screen (slice 2), UX polish + TV Settings + data
   saver (slice 3), Favorite creator (slice 4), Preferences backup import/export (gate 7
   closed, live round-trip verified on Phone34). See AGENTS-CONTENT-FILTER.md / AGENTS-APP.md.
-- Still open: TV quick-actions (favorite/block from TV), favorite tag, For You blend,
-  niche groups, collections, hide-count stats, Top This Week row, WebView OAuth.
+- TV quick-actions verified (MENU on focused card → favorite, DB row landed); along the
+  way fixed: TvLazyColumn prefetch crash (→ compose LazyColumn), stale-empty Favorites
+  page TTL bypass in FeedMediator (with regression test), network token-race 401 fix
+  (mutex-wait + single 401 retry, see AGENTS-NETWORK.md).
+- Phase 5 gate (login survives process death) **verified live on TV36 2026-09-30** with a
+  real account id_token: paste → store → authenticated 200s on feeds/search → force-stop
+  → relaunch → still "Signed in" → sign-out works. id_token is a 1h token; re-paste until
+  WebView OAuth. See AGENTS-AUTH.md.
+- Still open: favorite tag, For You blend, niche groups, collections, hide-count stats,
+  Top This Week row, WebView OAuth, PIN pad lock.
