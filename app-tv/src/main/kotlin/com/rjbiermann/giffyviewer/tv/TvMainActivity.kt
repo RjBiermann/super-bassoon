@@ -57,11 +57,29 @@ class TvMainActivity : ComponentActivity() {
         setContent { ThemeHost() }
     }
 
-    /** Borrowed dark theme, AMOLED option shared with mobile (PLAN §9). */
+    /** Borrowed dark theme, AMOLED option shared with mobile (PLAN §9).
+     *  tv-material components (Cards etc.) read THEIR OWN MaterialTheme, not
+     *  Compose's — without this wrap they render with default light colors. */
     @Composable
     private fun ThemeHost() {
         val amoled by settings.amoled.collectAsStateWithLifecycle(initialValue = false)
-        GiffyTheme(amoled = amoled) { Root() }
+        GiffyTheme(amoled = amoled) {
+            androidx.tv.material3.MaterialTheme(
+                colorScheme =
+                    androidx.tv.material3.darkColorScheme(
+                        primary = com.rjbiermann.giffyviewer.core.ui.GiffyColors.BrandRed,
+                        onPrimary = com.rjbiermann.giffyviewer.core.ui.GiffyColors.TextHigh,
+                        secondary = com.rjbiermann.giffyviewer.core.ui.GiffyColors.Lime,
+                        background = com.rjbiermann.giffyviewer.core.ui.GiffyColors.Page,
+                        surface = com.rjbiermann.giffyviewer.core.ui.GiffyColors.Widget,
+                        onSurface = com.rjbiermann.giffyviewer.core.ui.GiffyColors.TextHigh,
+                        surfaceVariant = com.rjbiermann.giffyviewer.core.ui.GiffyColors.Chrome,
+                        onSurfaceVariant = com.rjbiermann.giffyviewer.core.ui.GiffyColors.TextMid,
+                        border = com.rjbiermann.giffyviewer.core.ui.GiffyColors.OutlineSoft,
+                        borderVariant = com.rjbiermann.giffyviewer.core.ui.GiffyColors.BrandRed,
+                    ),
+            ) { Root() }
+        }
     }
 
     @Composable
