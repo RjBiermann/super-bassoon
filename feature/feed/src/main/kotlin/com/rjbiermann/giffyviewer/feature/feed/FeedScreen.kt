@@ -136,16 +136,6 @@ fun FeedScreen(
                 // For You = server personalized feed, logged-in only (PLAN §7);
                 // anonymous client-side blend is spec'd but unscheduled.
                 val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle(false)
-                val pinnedEntries by viewModel.pinnedNiches.collectAsStateWithLifecycle(emptySet())
-                val pinnedNiches =
-                    remember(pinnedEntries) {
-                        pinnedEntries.mapNotNull { entry ->
-                            entry
-                                .split('|', limit = 2)
-                                .takeIf { it.size == 2 }
-                                ?.let { (id, name) -> FeedSource.Niche(id, name) }
-                        }
-                    }
                 listOf(
                     FeedSource.Trending,
                     FeedSource.Discover,
@@ -160,20 +150,20 @@ fun FeedScreen(
                             label = { Text(candidate.title()) },
                         )
                     }
-            }
 
-            FilterChip(
-                selected = source is FeedSource.Niche && source !in pinnedNiches,
-                onClick = onOpenNiches,
-                label = { Text("Niches…") },
-            )
-            // pinned niches become tabs (PLAN §7 pin-to-tabs)
-            pinnedNiches.forEach { niche ->
                 FilterChip(
-                    selected = source == niche,
-                    onClick = { viewModel.open(niche) },
-                    label = { Text(niche.name) },
+                    selected = source is FeedSource.Niche && source !in pinnedNiches,
+                    onClick = onOpenNiches,
+                    label = { Text("Niches…") },
                 )
+                // pinned niches become tabs (PLAN §7 pin-to-tabs)
+                pinnedNiches.forEach { niche ->
+                    FilterChip(
+                        selected = source == niche,
+                        onClick = { viewModel.open(niche) },
+                        label = { Text(niche.name) },
+                    )
+                }
             }
 
             // M3 linear indicator for refresh / append activity
