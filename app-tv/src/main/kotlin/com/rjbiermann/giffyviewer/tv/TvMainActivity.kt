@@ -102,6 +102,11 @@ class TvMainActivity : ComponentActivity() {
         var openFeed: FeedSource? by remember { mutableStateOf(null) }
         val pinnedNiches by settings.pinnedNiches.collectAsStateWithLifecycle(initialValue = emptySet())
         val pinnedCreators by settings.pinnedCreators.collectAsStateWithLifecycle(initialValue = emptySet())
+        // Custom feed pills (PLAN §7 builder) — from Room, ordered by creation.
+        val customFeeds by db
+            .customFeedDao()
+            .all()
+            .collectAsStateWithLifecycle(initialValue = emptyList())
 
         // D-pad BACK pops the top screen instead of exiting the activity
         androidx.activity.compose.BackHandler(
@@ -191,6 +196,21 @@ class TvMainActivity : ComponentActivity() {
                                 com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
                                     text = name,
                                     onClick = { openFeed = FeedSource.Niche(id, name) },
+                                    modifier = Modifier.padding(6.dp),
+                                )
+                            }
+                            // Custom feeds = home pills (PLAN §7 builder).
+                            items(customFeeds.toList(), key = { "custom" + it.id }) { def ->
+                                com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
+                                    text = def.name,
+                                    onClick = {
+                                        openFeed =
+                                            FeedSource.Custom(
+                                                def.id,
+                                                def.name,
+                                                def.sourcesJson.split(',').filter { it.isNotBlank() },
+                                            )
+                                    },
                                     modifier = Modifier.padding(6.dp),
                                 )
                             }

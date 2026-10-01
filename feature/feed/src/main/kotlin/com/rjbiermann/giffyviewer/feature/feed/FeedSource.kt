@@ -84,6 +84,19 @@ sealed interface FeedSource {
         override val ttlMs = TTL_SEARCH
     }
 
+    /** Custom feed (PLAN §7 builder): named blend of creators/groups/tags,
+     *  fetched round-robin like Group — page n maps to
+     *  refs[(n-1) % n] with inner page (n-1)/n + 1. Sources types:
+     *  "creator:<username>" · "group:<id>|<name>|<tags>" · "tag:<text>". */
+    data class Custom(
+        val id: Long,
+        val name: String,
+        val refs: List<String>,
+    ) : FeedSource {
+        override val keyBase = "custom:$id"
+        override val ttlMs = TTL_SEARCH
+    }
+
     /** Liked gifs (PLAN §7, logged-in): network-LIVE — never cached (§5);
      *  pages have no cache keys and sorts are client-side only. */
     data object Liked : FeedSource {
@@ -115,6 +128,7 @@ fun FeedSource.title(): String =
         is FeedSource.Niche -> this.name
         is FeedSource.Creator -> "@${this.username}"
         is FeedSource.Group -> this.name
+        is FeedSource.Custom -> this.name
         is FeedSource.Search -> "Search: $query"
         is FeedSource.Favorites -> "Favorites"
     }

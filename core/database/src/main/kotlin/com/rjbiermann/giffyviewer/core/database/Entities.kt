@@ -106,3 +106,15 @@ data class NicheGroupEntity(
     val state: String,
     val createdAt: Long,
 )
+
+/**
+ * Custom feed definition (PLAN §7): named blend of creators, groups and single
+ * tags. sources_json = app-side JSON list [{type:"creator"|"group"|"tag", ref}].
+ */
+@Entity(tableName = "custom_feeds")
+data class CustomFeedEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val sourcesJson: String,
+    val createdAt: Long,
+)

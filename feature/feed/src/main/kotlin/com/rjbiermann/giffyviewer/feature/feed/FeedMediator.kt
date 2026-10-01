@@ -144,6 +144,42 @@ class FeedMediator(
                     page = page,
                     order = feed.sort.ifEmpty { "trending" },
                 )
+            is FeedSource.Custom -> {
+                // Round-robin across the blended refs ("creator:<username>" /
+                // "tag:<text>"; groups are expanded to their tags by the
+                // builder). Refs never shrink mid-generation (definitions are
+                // edited in the builder), so the mapping is stable.
+                // ponytail: refs must be non-empty — the builder enforces it.
+                val refs = feed.refs
+                if (refs.isEmpty()) {
+                    GifsPageDto()
+                } else {
+                    val ref = refs[(page - 1) % refs.size]
+                    val inner = (page - 1) / refs.size + 1
+                    when {
+                        ref.startsWith("creator:") ->
+                            api.userGifs(username = ref.removePrefix("creator:"), count = pageSize, page = inner)
+                        ref.startsWith("group:") -> {
+                            val body = ref.removePrefix("group:")
+                            val tag =
+                                body
+                                    .split('|')
+                                    .getOrNull(2)
+                                    ?.split(',')
+                                    ?.firstOrNull { it.isNotBlank() }
+                                    ?: return@fetch GifsPageDto()
+                            api.search(searchText = tag, count = pageSize, page = inner, order = "trending")
+                        }
+                        else ->
+                            api.search(
+                                searchText = ref.removePrefix("tag:"),
+                                count = pageSize,
+                                page = inner,
+                                order = "trending",
+                            )
+                    }
+                }
+            }
             is FeedSource.TopThisWeek -> api.trendingPopular(order = "top_week", count = pageSize, page = page)
             else -> api.trendingPopular(count = pageSize, page = page)
         }

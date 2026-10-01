@@ -22,7 +22,7 @@ import javax.inject.Inject
 class SettingsViewModel
     @Inject
     constructor(
-        db: GiffyDatabase,
+        private val db: GiffyDatabase,
         private val settings: com.rjbiermann.giffyviewer.core.datastore.SettingsRepository,
     ) : ViewModel() {
         private val dao: ContentPrefsDao = db.contentPrefsDao()
@@ -121,11 +121,11 @@ class SettingsViewModel
         }
 
         /** Gate 7: export/import all content controls as JSON. */
-        suspend fun exportJson(): String = ContentPrefsBackup.export(dao, settings.dataSaver.first())
+        suspend fun exportJson(): String = ContentPrefsBackup.export(dao, settings.dataSaver.first(), db.customFeedDao().all().first())
 
         suspend fun importJson(json: String): Result<Int> =
             runCatching {
-                val count = ContentPrefsBackup.import(dao, json)
+                val count = ContentPrefsBackup.import(dao, json, db.customFeedDao())
                 settings.setDataSaver(ContentPrefsBackup.parseDataSaver(json))
                 count
             }

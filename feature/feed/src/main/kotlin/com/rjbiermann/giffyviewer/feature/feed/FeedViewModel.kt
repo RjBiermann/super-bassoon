@@ -193,6 +193,10 @@ class FeedViewModel
             }
         }
 
+        /** Custom feed definitions (PLAN §7 builder) — chips on the home row. */
+        val customFeeds: StateFlow<List<com.rjbiermann.giffyviewer.core.database.CustomFeedEntity>> =
+            db.customFeedDao().all().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
         /** Pinned niche tab entries "id|name" (PLAN §7 pin-to-tabs). */
         val pinnedNiches: StateFlow<Set<String>> =
             settings.pinnedNiches

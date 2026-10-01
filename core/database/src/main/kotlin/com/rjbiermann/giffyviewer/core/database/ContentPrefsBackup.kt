@@ -30,13 +30,23 @@ object ContentPrefsBackup {
     )
 
     @Serializable
+    data class CustomFeedDef(
+        val id: Long,
+        val name: String,
+        /** Pre-expanded refs ("creator:<u>" / "tag:<text>"), comma-joined. */
+        val sourcesJson: String,
+        val createdAt: Long,
+    )
+
+    @Serializable
     data class Backup(
         val format: String = "giffy-prefs",
-        val version: Int = 1,
+        val version: Int = 2,
         val dataSaver: Boolean = false,
         val creatorPrefs: List<CreatorPref> = emptyList(),
         val tagPrefs: List<TagPref> = emptyList(),
         val keywordBlocks: List<KeywordBlock> = emptyList(),
+        val customFeeds: List<CustomFeedDef> = emptyList(),
     )
 
     private val json =
@@ -47,6 +57,7 @@ object ContentPrefsBackup {
     suspend fun export(
         dao: ContentPrefsDao,
         dataSaver: Boolean,
+        customFeeds: List<CustomFeedEntity> = emptyList(),
     ): String =
         json.encodeToString(
             Backup(
@@ -63,6 +74,10 @@ object ContentPrefsBackup {
                     dao.allKeywordBlocks().map {
                         KeywordBlock(it.pattern, it.blockedAt)
                     },
+                customFeeds =
+                    customFeeds.map {
+                        CustomFeedDef(it.id, it.name, it.sourcesJson, it.createdAt)
+                    },
             ),
         )
 
@@ -70,12 +85,27 @@ object ContentPrefsBackup {
     suspend fun import(
         dao: ContentPrefsDao,
         backupJson: String,
+        customFeedDao: CustomFeedDao? = null,
     ): Int {
         val backup = json.decodeFromString<Backup>(backupJson)
         backup.creatorPrefs.forEach { dao.upsertCreator(CreatorPrefEntity(it.username, it.state, it.changedAt)) }
         backup.tagPrefs.forEach { dao.upsertTag(TagPrefEntity(it.tag, it.state, it.changedAt)) }
         backup.keywordBlocks.forEach { dao.blockKeyword(KeywordBlockEntity(it.pattern, it.blockedAt)) }
-        return backup.creatorPrefs.size + backup.tagPrefs.size + backup.keywordBlocks.size
+        customFeedDao?.let { cfd ->
+            backup.customFeeds.forEach {
+                cfd.upsert(
+                    CustomFeedEntity(
+                        // preserve the export's id so existing custom-feed chips/
+                        // cache keys keep pointing at the same definition
+                        id = it.id,
+                        name = it.name,
+                        sourcesJson = it.sourcesJson,
+                        createdAt = it.createdAt,
+                    ),
+                )
+            }
+        }
+        return backup.creatorPrefs.size + backup.tagPrefs.size + backup.keywordBlocks.size + backup.customFeeds.size
     }
 
     fun parseDataSaver(backupJson: String): Boolean = json.decodeFromString<Backup>(backupJson).dataSaver

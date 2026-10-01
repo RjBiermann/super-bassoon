@@ -90,6 +90,7 @@ fun FeedScreen(
     onOpenExplore: () -> Unit = {},
     onOpenFollowing: () -> Unit = {},
     onOpenCollections: () -> Unit = {},
+    onOpenCustomFeeds: () -> Unit = {},
     viewModel: FeedViewModel = hiltViewModel(),
 ) {
     val source by viewModel.source.collectAsStateWithLifecycle()
@@ -223,6 +224,20 @@ fun FeedScreen(
                         label = { Text(group.name) },
                     )
                 }
+                // Custom feeds (PLAN §7 builder) as chips + the builder entry.
+                viewModel.customFeeds.collectAsStateWithLifecycle(emptyList()).value.forEach { def ->
+                    val customFeed = FeedSource.Custom(def.id, def.name, parseCustomRefs(def.sourcesJson))
+                    FilterChip(
+                        selected = source == customFeed,
+                        onClick = { viewModel.open(customFeed) },
+                        label = { Text(def.name) },
+                    )
+                }
+                FilterChip(
+                    selected = false,
+                    onClick = onOpenCustomFeeds,
+                    label = { Text("New feed…") },
+                )
                 // pinned creators become tabs (PLAN §7 pin-to-tabs), shared with TV
                 val pinnedCreators by viewModel.pinnedCreators.collectAsStateWithLifecycle(emptySet())
                 pinnedCreators.forEach { username ->

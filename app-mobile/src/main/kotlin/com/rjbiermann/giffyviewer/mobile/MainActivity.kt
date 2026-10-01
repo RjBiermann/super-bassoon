@@ -43,6 +43,8 @@ import com.rjbiermann.giffyviewer.core.ui.layoutHint
 import com.rjbiermann.giffyviewer.feature.auth.AuthScreen
 import com.rjbiermann.giffyviewer.feature.feed.CollectionsScreen
 import com.rjbiermann.giffyviewer.feature.feed.CollectionsViewModel
+import com.rjbiermann.giffyviewer.feature.feed.CustomFeedsScreen
+import com.rjbiermann.giffyviewer.feature.feed.CustomFeedsViewModel
 import com.rjbiermann.giffyviewer.feature.feed.ExploreScreen
 import com.rjbiermann.giffyviewer.feature.feed.FeedScreen
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
@@ -107,6 +109,7 @@ class MainActivity : ComponentActivity() {
         var showCollections by rememberSaveable { mutableStateOf(false) }
         var aboutNiche: Pair<String, String>? by rememberSaveable { mutableStateOf(null) }
         var showSearch by rememberSaveable { mutableStateOf(false) }
+        var showCustomFeeds by rememberSaveable { mutableStateOf(false) }
 
         androidx.activity.compose.BackHandler(
             enabled =
@@ -119,12 +122,14 @@ class MainActivity : ComponentActivity() {
                     showExplore ||
                     showFollowing ||
                     showCollections ||
-                    showSearch,
+                    showSearch ||
+                    showCustomFeeds,
         ) {
             when {
                 playerStartIndex != null -> playerStartIndex = null
                 aboutNiche != null -> aboutNiche = null
                 showSearch -> showSearch = false
+                showCustomFeeds -> showCustomFeeds = false
                 showFollowing -> showFollowing = false
                 showExplore -> showExplore = false
                 showGroups -> showGroups = false
@@ -205,6 +210,17 @@ class MainActivity : ComponentActivity() {
                 },
                 viewModel = followingVm,
             )
+        } else if (confirmed && showCustomFeeds) {
+            val customFeedsVm: CustomFeedsViewModel = hiltViewModel()
+            val feedViewModel: FeedViewModel = hiltViewModel()
+            CustomFeedsScreen(
+                onBack = { showCustomFeeds = false },
+                onOpenFeed = { custom ->
+                    showCustomFeeds = false
+                    feedViewModel.open(custom)
+                },
+                viewModel = customFeedsVm,
+            )
         } else if (confirmed && showGroups) {
             val groupsViewModel: GroupsViewModel = hiltViewModel()
             val feedViewModel2: FeedViewModel = hiltViewModel()
@@ -251,6 +267,7 @@ class MainActivity : ComponentActivity() {
                 onOpenSearch = { showSearch = true },
                 onOpenNiches = { showNiches = true },
                 onOpenGroups = { showGroups = true },
+                onOpenCustomFeeds = { showCustomFeeds = true },
                 onOpenExplore = { showExplore = true },
                 onOpenFollowing = { showFollowing = true },
                 onOpenCollections = { showCollections = true },

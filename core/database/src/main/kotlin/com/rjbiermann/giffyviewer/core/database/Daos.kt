@@ -220,3 +220,18 @@ interface NicheGroupDao {
     @Query("DELETE FROM niche_groups WHERE id = :id")
     suspend fun delete(id: Long)
 }
+
+@Dao
+interface CustomFeedDao {
+    @Query("SELECT * FROM custom_feeds ORDER BY createdAt")
+    fun all(): Flow<List<CustomFeedEntity>>
+
+    @Query("SELECT * FROM custom_feeds WHERE id = :id")
+    suspend fun byId(id: Long): CustomFeedEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(feed: CustomFeedEntity): Long
+
+    @Query("DELETE FROM custom_feeds WHERE id = :id")
+    suspend fun delete(id: Long)
+}

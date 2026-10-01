@@ -11,6 +11,8 @@ import com.rjbiermann.giffyviewer.core.network.dto.TemporaryTokenDto
 /** In-memory upstreamApi for unit tests; shared by the mediator + liked-feed tests. */
 internal class FakeApi : upstreamApi {
     var userGifsCalls = 0
+    var searchCalls = 0
+    var searchArgs = mutableListOf<Pair<String, Int>>() // (text, page)
     var likedPages: MutableMap<Int, GifsPageDto> = mutableMapOf()
     var likedIdsResult: List<String> = emptyList()
 
@@ -21,7 +23,11 @@ internal class FakeApi : upstreamApi {
         order: String,
         count: Int,
         page: Int,
-    ): GifsPageDto = throw NotImplementedError()
+    ): GifsPageDto {
+        searchCalls++
+        searchArgs.add(searchText to page)
+        return GifsPageDto(gifs = listOf(gifDtoShell("s$searchCalls", searchText)))
+    }
 
     override suspend fun userGifs(
         username: String,

@@ -23,8 +23,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         KeywordBlockEntity::class,
         HideCountEntity::class,
         NicheGroupEntity::class,
+        CustomFeedEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 @TypeConverters(ListConverters::class)
@@ -44,6 +45,8 @@ abstract class GiffyDatabase : RoomDatabase() {
     abstract fun contentPrefsDao(): ContentPrefsDao
 
     abstract fun nicheGroupDao(): NicheGroupDao
+
+    abstract fun customFeedDao(): CustomFeedDao
 
     companion object {
         const val NAME = "giffy.db"
@@ -96,6 +99,18 @@ abstract class GiffyDatabase : RoomDatabase() {
             object : Migration(5, 6) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE `favorites_remote` RENAME TO `liked_ids`")
+                }
+            }
+
+        /** v7: custom feed definitions (PLAN §7 builder). */
+        val MIGRATION_6_7 =
+            object : Migration(6, 7) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `custom_feeds` (" +
+                            "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                            "`name` TEXT NOT NULL, `sourcesJson` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)",
+                    )
                 }
             }
 
