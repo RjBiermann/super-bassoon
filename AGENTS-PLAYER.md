@@ -51,3 +51,14 @@ while the pager still composed page 0 → `items[page]` IndexOutOfBounds.
 Fixed with a bounds guard before `items[page]` (the null check only catches
 placeholders). Full clean pass still pending — the Phone34 emulator dies
 every few minutes on this host, so a 10-min soak keeps getting interrupted.
+
+## Auto-swipe advance (2026-10-01)
+- **Bare-lambda trap:** a `{ ... }` block placed as a statement inside
+  `onPlaybackStateChanged` compiles clean but never runs (it's a discarded
+  lambda expression) — the whole auto-advance was a silent no-op while the
+  toggle looked functional. Symptom: video parked at STATE_ENDED, watch_history
+  frozen, no crash. Now a direct block; live-proven (61 advances, boundary
+  crossed, 0 fatals).
+- Boundary pass recipe: duration chip 10–30s + auto-swipe ON + speed 2× in the
+  overflow sheet → distinct `watch_history.gifId` growth is the advance
+  observable (grid tile dumps are unreliable this session).

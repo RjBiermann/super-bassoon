@@ -226,26 +226,28 @@ fun PlayerScreen(
                         player.play()
                         return
                     }
-                    {
-                        val next = pagerState.currentPage + 1
-                        if (next < items.itemCount) {
-                            skipResume.value = true
-                            // instant when the system reduced-motion scale is 0
-                            val reduced =
-                                android.provider.Settings.Global.getFloat(
-                                    context.contentResolver,
-                                    android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
-                                    1f,
-                                ) == 0f
-                            pagerScope.launch {
-                                if (reduced) pagerState.scrollToPage(next) else pagerState.animateScrollToPage(next)
-                            }
-                        } else {
-                            // end of loaded pool: ask paging for the next page;
-                            // the LaunchedEffect below advances when it lands.
-                            pendingAdvance.value = true
-                            items.retry()
+                    // NOTE: this block was once wrapped in a bare lambda — a bare
+                    // `{ }` is an expression statement and never runs, so the
+                    // auto-advance silently no-op'd (live-proven: video parked at
+                    // end, watch_history frozen).
+                    val next = pagerState.currentPage + 1
+                    if (next < items.itemCount) {
+                        skipResume.value = true
+                        // instant when the system reduced-motion scale is 0
+                        val reduced =
+                            android.provider.Settings.Global.getFloat(
+                                context.contentResolver,
+                                android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+                                1f,
+                            ) == 0f
+                        pagerScope.launch {
+                            if (reduced) pagerState.scrollToPage(next) else pagerState.animateScrollToPage(next)
                         }
+                    } else {
+                        // end of loaded pool: ask paging for the next page;
+                        // the LaunchedEffect below advances when it lands.
+                        pendingAdvance.value = true
+                        items.retry()
                     }
                 }
             }
