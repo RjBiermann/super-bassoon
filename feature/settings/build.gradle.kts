@@ -1,4 +1,4 @@
-// Populated in Phase 7 (see PLAN.md §10, AGENTS-CONTENT-FILTER.md).
+// Populated in Phase 7 (see AGENTS-CONTENT-FILTER.md).
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
