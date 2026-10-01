@@ -173,19 +173,8 @@ interface upstreamApi {
         @Query("count") count: Int = 100,
     ): FollowingCreatorsDto
 
-    /** Niche join/leave (API word: subscription; UI: Join/Leave Niche — §9 lingo).
-     *  Verified 2026: POST/DELETE → 202 with `{}` body; DELETE needs a body. */
-    @POST("v2/niches/{id}/subscription")
-    suspend fun joinNiche(
-        @Path("id") id: String,
-        @Body body: SubscriptionBody = SubscriptionBody(),
-    )
-
-    @HTTP(method = "DELETE", path = "v2/niches/{id}/subscription", hasBody = true)
-    suspend fun leaveNiche(
-        @Path("id") id: String,
-        @Body body: SubscriptionBody = SubscriptionBody(),
-    )
+    /** Niche join/leave (API word: subscription; UI: Join/Leave Niche — §9 lingo)
+     *  lives on [subscribeNiche]/[unsubscribeNiche] ({} body, verified 202). */
 }
 
 @Serializable
@@ -213,9 +202,6 @@ data class FollowingCreatorsDto(
     val total: Int = 0,
     val items: List<CreatorSearchItemDto> = emptyList(),
 )
-
-@Serializable
-class SubscriptionBody
 
 @Serializable
 data class LikeBody(

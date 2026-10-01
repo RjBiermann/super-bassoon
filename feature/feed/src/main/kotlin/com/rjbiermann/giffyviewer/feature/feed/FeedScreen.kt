@@ -177,6 +177,11 @@ fun FeedScreen(
                 )
                 if (isLoggedIn) {
                     FilterChip(
+                        selected = source is FeedSource.Liked,
+                        onClick = { viewModel.open(FeedSource.Liked) },
+                        label = { Text("Liked") },
+                    )
+                    FilterChip(
                         selected = false,
                         onClick = onOpenFollowing,
                         label = { Text("Following…") },

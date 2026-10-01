@@ -84,6 +84,13 @@ sealed interface FeedSource {
         override val ttlMs = TTL_SEARCH
     }
 
+    /** Liked gifs (PLAN §7, logged-in): network-LIVE — never cached (§5);
+     *  pages have no cache keys and sorts are client-side only. */
+    data object Liked : FeedSource {
+        override val keyBase = "liked:v1"
+        override val ttlMs = 0L
+    }
+
     companion object {
         const val TTL_TRENDING = 10 * 60_000L
         const val TTL_SEARCH = 60 * 60_000L
@@ -103,6 +110,7 @@ fun FeedSource.title(): String =
     when (this) {
         is FeedSource.Trending -> "Trending"
         is FeedSource.ForYou -> "For You"
+        is FeedSource.Liked -> "Liked GIFs & Images"
         is FeedSource.TopThisWeek -> "Top This Week"
         is FeedSource.Niche -> this.name
         is FeedSource.Creator -> "@${this.username}"

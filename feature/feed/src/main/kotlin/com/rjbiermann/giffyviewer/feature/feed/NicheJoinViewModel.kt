@@ -41,7 +41,7 @@ class NicheJoinViewModel
             if (!loggedIn) return
             viewModelScope.launch {
                 runCatching {
-                    if (id in _joined.value) api.leaveNiche(id) else api.joinNiche(id)
+                    if (id in _joined.value) api.unsubscribeNiche(nicheId = id) else api.subscribeNiche(nicheId = id)
                 }.onSuccess {
                     _joined.value =
                         if (id in _joined.value) _joined.value - id else _joined.value + id

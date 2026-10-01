@@ -1,0 +1,122 @@
+package com.rjbiermann.giffyviewer.feature.feed
+
+import com.rjbiermann.giffyviewer.core.network.EmptyBody
+import com.rjbiermann.giffyviewer.core.network.FollowBody
+import com.rjbiermann.giffyviewer.core.network.FollowedNichesDto
+import com.rjbiermann.giffyviewer.core.network.LikeBody
+import com.rjbiermann.giffyviewer.core.network.upstreamApi
+import com.rjbiermann.giffyviewer.core.network.dto.GifsPageDto
+import com.rjbiermann.giffyviewer.core.network.dto.TemporaryTokenDto
+
+/** In-memory upstreamApi for unit tests; shared by the mediator + liked-feed tests. */
+internal class FakeApi : upstreamApi {
+    var userGifsCalls = 0
+    var likedPages: MutableMap<Int, GifsPageDto> = mutableMapOf()
+    var likedIdsResult: List<String> = emptyList()
+
+    override suspend fun temporaryToken(): TemporaryTokenDto = throw NotImplementedError()
+
+    override suspend fun search(
+        searchText: String,
+        order: String,
+        count: Int,
+        page: Int,
+    ): GifsPageDto = throw NotImplementedError()
+
+    override suspend fun userGifs(
+        username: String,
+        count: Int,
+        page: Int,
+        order: String,
+    ): GifsPageDto {
+        userGifsCalls++
+        return GifsPageDto(gifs = listOf(gifDtoShell("g1", username)))
+    }
+
+    override suspend fun trendingPopular(
+        count: Int,
+        page: Int,
+        order: String?,
+    ): GifsPageDto = throw NotImplementedError()
+
+    override suspend fun niches(
+        count: Int,
+        page: Int,
+    ) = throw NotImplementedError()
+
+    override suspend fun nicheGifs(
+        nicheId: String,
+        count: Int,
+        page: Int,
+        order: String,
+    ) = throw NotImplementedError()
+
+    override suspend fun verifiedCreators(
+        count: Int,
+        page: Int,
+    ) = throw NotImplementedError()
+
+    override suspend fun suggest(query: String): List<com.rjbiermann.giffyviewer.core.network.SuggestDto> = throw NotImplementedError()
+
+    override suspend fun creatorsSearch(
+        query: String,
+        count: Int,
+    ) = throw NotImplementedError()
+
+    override suspend fun followingCreators(
+        page: Int,
+        count: Int,
+    ) = throw NotImplementedError()
+
+    override suspend fun nicheDetail(id: String) = throw NotImplementedError()
+
+    override suspend fun nicheTopCreators(id: String) = throw NotImplementedError()
+
+    override suspend fun nicheRelated(id: String) = throw NotImplementedError()
+
+    override suspend fun likedFeed(
+        count: Int,
+        page: Int,
+    ): GifsPageDto = likedPages[page] ?: GifsPageDto()
+
+    override suspend fun feedForYou(
+        count: Int,
+        page: Int,
+    ) = throw NotImplementedError()
+
+    override suspend fun likedIds(): List<String> = likedIdsResult
+
+    override suspend fun likeGif(
+        id: String,
+        body: LikeBody,
+    ) = throw NotImplementedError()
+
+    override suspend fun unlikeGif(
+        id: String,
+        body: LikeBody,
+    ) = throw NotImplementedError()
+
+    override suspend fun followCreator(
+        username: String,
+        body: FollowBody,
+    ) = throw NotImplementedError()
+
+    override suspend fun unfollowCreator(
+        username: String,
+        body: FollowBody,
+    ) = throw NotImplementedError()
+
+    override suspend fun followedCreators(): List<String> = throw NotImplementedError()
+
+    override suspend fun subscribeNiche(
+        nicheId: String,
+        body: EmptyBody,
+    ) = throw NotImplementedError()
+
+    override suspend fun unsubscribeNiche(
+        nicheId: String,
+        body: EmptyBody,
+    ) = throw NotImplementedError()
+
+    override suspend fun followedNiches(): FollowedNichesDto = throw NotImplementedError()
+}

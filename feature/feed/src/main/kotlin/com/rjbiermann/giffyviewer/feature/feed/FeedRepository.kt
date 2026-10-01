@@ -32,6 +32,20 @@ class FeedRepository
             feed: FeedSource,
             forceRefresh: Boolean = false,
         ): Flow<PagingData<Gif>> =
+            if (feed is FeedSource.Liked) {
+                // Network-live, never cached (PLAN §7); no RemoteMediator, no Room.
+                Pager(
+                    config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = 10, enablePlaceholders = false),
+                    pagingSourceFactory = { LikedNetworkPagingSource(api, contentFilter, PAGE_SIZE) },
+                ).flow
+            } else {
+                cachedPager(feed, forceRefresh)
+            }
+
+        private fun cachedPager(
+            feed: FeedSource,
+            forceRefresh: Boolean,
+        ): Flow<PagingData<Gif>> =
             Pager(
                 config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = 10, enablePlaceholders = false),
                 initialKey = 1,
