@@ -25,8 +25,21 @@ class AuthViewModel
 
         fun currentPkce(): TokenStore.Pkce = pkce ?: TokenStore.newPkce().also { pkce = it }
 
-        /** @return false when the paste isn't a plausible JWT. */
-        fun save(raw: String): Boolean = store.save(raw)
+        /** @return false when the paste isn't a plausible JWT — or a full Kinde
+         *  token bundle (JSON with id_token + refresh_token, PLAN §2): pasted
+         *  sessions otherwise dead-end after the 1h ID-token expiry.
+         *  Quote-tolerant: some paste paths strip quotes — regex-extract keys
+         *  from both proper JSON and the bare {id_token:...,refresh_token:...} form. */
+        fun save(raw: String): Boolean {
+            val trimmed = raw.trim()
+            if (trimmed.startsWith("{")) {
+                fun key(k: String): String? = Regex("\"?$k\"?\\s*[:=]\\s*\"?([A-Za-z0-9_.-]+)").find(trimmed)?.groupValues?.get(1)
+                val id = key("id_token")
+                val refresh = key("refresh_token")
+                return if (id != null) store.save(id, refresh) else false
+            }
+            return store.save(trimmed)
+        }
 
         /** Exchanges the WebView-captured authorization code on IO. */
         fun exchangeCode(code: String) {
