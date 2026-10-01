@@ -44,9 +44,9 @@ import com.rjbiermann.giffyviewer.feature.auth.AuthScreen
 import com.rjbiermann.giffyviewer.feature.feed.ExploreScreen
 import com.rjbiermann.giffyviewer.feature.feed.FeedScreen
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
+import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
 import com.rjbiermann.giffyviewer.feature.feed.FollowingScreen
 import com.rjbiermann.giffyviewer.feature.feed.FollowingViewModel
-import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
 import com.rjbiermann.giffyviewer.feature.feed.GroupsScreen
 import com.rjbiermann.giffyviewer.feature.feed.GroupsViewModel
 import com.rjbiermann.giffyviewer.feature.feed.NichesScreen
@@ -90,14 +90,40 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun Host(hint: LayoutHint) {
         val confirmed by settings.ageConfirmed.collectAsStateWithLifecycle(initialValue = false)
-        var playerStartIndex by remember { mutableStateOf<Int?>(null) }
-        var showAccount by remember { mutableStateOf(false) }
-        var showSettings by remember { mutableStateOf(false) }
-        var showNiches by remember { mutableStateOf(false) }
-        var showGroups by remember { mutableStateOf(false) }
-        var showExplore by remember { mutableStateOf(false) }
-        var showFollowing by remember { mutableStateOf(false) }
-        var showSearch by remember { mutableStateOf(false) }
+        // Route stack (best practice + PLAN §2 process-death rule): saveable so
+        // the open surface survives process death; one BackHandler pops the TOP
+        // route instead of letting system back kill the activity.
+        var playerStartIndex by rememberSaveable { mutableStateOf<Int?>(null) }
+        var showAccount by rememberSaveable { mutableStateOf(false) }
+        var showSettings by rememberSaveable { mutableStateOf(false) }
+        var showNiches by rememberSaveable { mutableStateOf(false) }
+        var showGroups by rememberSaveable { mutableStateOf(false) }
+        var showExplore by rememberSaveable { mutableStateOf(false) }
+        var showFollowing by rememberSaveable { mutableStateOf(false) }
+        var showSearch by rememberSaveable { mutableStateOf(false) }
+
+        androidx.activity.compose.BackHandler(
+            enabled =
+                playerStartIndex != null ||
+                    showAccount ||
+                    showSettings ||
+                    showNiches ||
+                    showGroups ||
+                    showExplore ||
+                    showFollowing ||
+                    showSearch,
+        ) {
+            when {
+                playerStartIndex != null -> playerStartIndex = null
+                showSearch -> showSearch = false
+                showFollowing -> showFollowing = false
+                showExplore -> showExplore = false
+                showGroups -> showGroups = false
+                showNiches -> showNiches = false
+                showSettings -> showSettings = false
+                else -> showAccount = false
+            }
+        }
 
         val pinHash by settings.pinHash.collectAsStateWithLifecycle(initialValue = null)
         var unlocked by rememberSaveable { mutableStateOf(false) }
