@@ -834,7 +834,8 @@ private fun ActionRail(
             IconButton(onClick = onToggleMute) {
                 Icon(
                     imageVector = if (muted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
-                    contentDescription = if (muted) "unmute" else "mute",
+                    // Site lingo (§9, 2026-10-01): Sound On / Sound Off.
+                    contentDescription = if (muted) "Sound On" else "Sound Off",
                     tint = Color.White,
                 )
             }

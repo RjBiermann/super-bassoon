@@ -90,7 +90,7 @@ When unsure: check PLAN.md first, then ask. Don't invent endpoints or features.
 - Emulator cold-start first fetch: wait 45s+ after Enter before judging the grid empty.
 
 ## Phase 6 progress (2026-09)
-- TV app live: age gate → home (Trending/Discover/Continue Watching rows, tv-material Cards,
+- TV app live: age gate → home (Trending/Explore/Continue Watching rows, tv-material Cards,
   D-pad) → player with D-pad next/prev + resume; paste-token Account screen reuses
   feature:auth AuthScreen. `watch_history` write verified end-to-end on TV36.
 - Still open (later slices): PIN pad optional lock, settings screen (cache size/data-saver),

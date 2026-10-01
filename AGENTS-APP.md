@@ -18,9 +18,10 @@ Compose UI, navigation, platform shells. Spec: PLAN.md §3, §7–9.
 - Masonry 2-col portrait / 3-col landscape, Paging 3.
 - TikTok-style swipe player.
 - Long-press (tile or player) quick sheet: **Like / Unlike** · Block creator · Favorite creator · Block tag `<tag>` · Block all tags on this gif · Block this keyword · Don't block.
-- Creator profile: Follow/Unfollow (server-backed, `v1/me/follows`); niche cards show Subscribe state (`v2/niches/{id}/subscription`).
+- Creator profile: Follow/Unfollow (server-backed, `v1/me/follows`; button states Follow ↔ Following per site); niche cards show Join/Leave state (site wording "Join Niche / Leave Niche", API `v2/niches/{id}/subscription`).
 - Tap username → profile-like view (follow/block/manage lists).
-- Feeds: Trending / Discover / Top(day…all), group feeds, custom feeds, For You, Search, Favorites, Groups, Settings.
+- Feeds: Trending / Explore / Top(day…all), group feeds, custom feeds, For You, Search, Favorites, Groups, Settings.
+- **UI lingo = site words (verified 2026-10-01; normative table lives in PLAN §9 first bullet):** Explore (not "Discover") · Join/Leave Niche · Following (not "Followed" screen label) · Saved Collections · "Liked GIFs & Images" · Sound On/Off · Related Tags / "you might like" · Hot · Latest · Top / Top This Week · Blocked Tags · App-only surfaces keep app labels (Continue Watching, Surprise me, Groups, Favorite creator, Data saver).
 - Surface `RateLimitBus` state as a subtle "cooling down" indicator.
 
 ## TV app
@@ -29,7 +30,7 @@ Compose UI, navigation, platform shells. Spec: PLAN.md §3, §7–9.
   components and 10-foot contrast are different in kind from touch — a merged module
   would turn every screen into an `isTv` branch. TV shares all :core:* and :feature:*
   code; only the shell is TV-specific.
-- `TvLazyRow`s: Trending · Discover · Top This Week · Continue Watching · Favorites · one row per favorited group · custom feeds.
+- `TvLazyRow`s: Trending · Explore · Top This Week · Continue Watching · Favorites · one row per favorited group · custom feeds.
 - Focus on username in now-playing → quick actions panel.
 - "Why did this get hidden" toast on filtered-item skip.
 
