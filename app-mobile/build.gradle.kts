@@ -16,8 +16,14 @@ android {
         applicationId = "com.rjbiermann.giffyviewer"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.2.0"
+
+        // CI passes the release tag (-PversionTag=v0.2.0); local builds fall
+        // back to the development version. versionCode = packed semver so every
+        // tag increases it — Android refuses updates when the code doesn't.
+        val tag = (project.findProperty("versionTag") as String?)?.removePrefix("v") ?: "0.2.0"
+        val (maj, min, pat) = tag.split('.').map { it.toInt() }
+        versionCode = maj * 10_000 + min * 100 + pat
+        versionName = tag
     }
 
     signingConfigs {

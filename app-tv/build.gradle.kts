@@ -19,6 +19,15 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
+
+        // Same tag-driven versioning as mobile (keep both apps in lockstep so a
+        // release ships one version number for both).
+        val tag = (project.findProperty("versionTag") as String?)?.removePrefix("v") ?: "0.1.0"
+        if (project.hasProperty("versionTag")) {
+            val (maj, min, pat) = tag.split('.').map { it.toInt() }
+            versionCode = maj * 10_000 + min * 100 + pat
+            versionName = tag
+        }
     }
 
     signingConfigs {

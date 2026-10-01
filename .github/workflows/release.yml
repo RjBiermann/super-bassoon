@@ -31,23 +31,29 @@ jobs:
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
 
       - name: Build signed release APKs
-        run: ./gradlew :app-mobile:assembleRelease :app-tv:assembleRelease --console=plain -Dorg.gradle.jvmargs=-Xmx3g
+        run: ./gradlew :app-mobile:assembleRelease :app-tv:assembleRelease --console=plain -Dorg.gradle.jvmargs=-Xmx3g -PversionTag=${{ github.ref_name }}
         env:
           SIGNING_STORE_FILE: ${{ github.workspace }}/keystore/release.keystore
           SIGNING_PASS: ${{ secrets.SIGNING_PASS }}
 
-      - name: Verify signatures
+      - name: Verify signatures + stamp obtainium-friendly names
         run: |
           for apk in app-mobile/build/outputs/apk/release/app-mobile-release.apk app-tv/build/outputs/apk/release/app-tv-release.apk; do
             unzip -l "$apk" | grep -q "META-INF" || { echo "UNSIGNED: $apk"; exit 1; }
           done
+          v="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+          cp app-mobile/build/outputs/apk/release/app-mobile-release.apk "dist/GiffyViewer-mobile-${v}.apk"
+          cp app-tv/build/outputs/apk/release/app-tv-release.apk "dist/GiffyViewer-tv-${v}.apk"
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
 
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            app-mobile/build/outputs/apk/release/app-mobile-release.apk
-            app-tv/build/outputs/apk/release/app-tv-release.apk
+            dist/GiffyViewer-mobile-*.apk
+            dist/GiffyViewer-tv-*.apk
           generate_release_notes: true
           body: |
             Unofficial upstream viewer. Not affiliated with or endorsed by upstream.
