@@ -4,17 +4,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -24,9 +19,7 @@ import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSiz
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -40,6 +33,7 @@ import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.ui.GiffyTheme
 import com.rjbiermann.giffyviewer.core.ui.LayoutHint
+import com.rjbiermann.giffyviewer.core.ui.PinLockScreen
 import com.rjbiermann.giffyviewer.core.ui.layoutHint
 import com.rjbiermann.giffyviewer.feature.feed.CollectionsScreen
 import com.rjbiermann.giffyviewer.feature.feed.CollectionsViewModel
@@ -142,7 +136,7 @@ class MainActivity : ComponentActivity() {
         if (pinHash != null && !unlocked) {
             PinLockScreen(
                 onUnlock = { unlocked = true },
-                settings = settings,
+                verifyPin = { settings.verifyPin(it) },
             )
         } else if (confirmed && playerStartIndex != null) {
             val start = playerStartIndex ?: 0
@@ -312,102 +306,5 @@ private fun AgeGate(
             Spacer(Modifier.height(8.dp))
             OutlinedButton(onClick = onExit) { Text("Exit (leaves app)") }
         }
-    }
-}
-
-/** PLAN §6 Phase 6: optional PIN pad lock — gate before any content. */
-@Composable
-private fun PinLockScreen(
-    onUnlock: () -> Unit,
-    settings: SettingsRepository,
-) {
-    val scope = rememberCoroutineScope()
-    var entry by remember { mutableStateOf("") }
-    var wrong by remember { mutableStateOf(false) }
-    // Audit: unlimited instant attempts = brute-force friendly. After 3 wrong
-    // tries each further attempt waits 15s (in-memory — lock is a deterrent,
-    // not vault security; app data can always be cleared device-side).
-    var fails by remember { mutableIntStateOf(0) }
-
-    fun verify(pin: String) {
-        scope.launch {
-            val ok = settings.verifyPin(pin)
-            if (ok) {
-                onUnlock()
-            } else {
-                fails++
-                wrong = true
-                kotlinx.coroutines.delay(if (fails >= 3) 15_000L else 400L)
-                entry = ""
-                wrong = false
-            }
-        }
-    }
-
-    fun onDigit(d: Char) {
-        if (entry.length >= 4) return
-        entry += d
-        if (entry.length == 4) verify(entry)
-    }
-
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                .padding(top = 96.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            if (wrong) "Wrong PIN" else "Enter PIN",
-            color =
-                if (wrong) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.onBackground
-                },
-            style = MaterialTheme.typography.titleMedium,
-        )
-        Spacer(Modifier.height(16.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            repeat(4) { i ->
-                Box(
-                    modifier =
-                        Modifier
-                            .size(14.dp)
-                            .background(
-                                if (i < entry.length) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.outline
-                                },
-                                CircleShape,
-                            ),
-                )
-            }
-        }
-        Spacer(Modifier.height(32.dp))
-        val rows = listOf(listOf('1', '2', '3'), listOf('4', '5', '6'), listOf('7', '8', '9'), listOf('⌫', '0', '✓'))
-        rows.forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(20.dp), modifier = Modifier.padding(vertical = 6.dp)) {
-                row.forEach { key ->
-                    androidx.compose.material3.OutlinedButton(
-                        onClick = {
-                            when {
-                                key == '⌫' -> if (entry.isNotEmpty()) entry = entry.dropLast(1)
-                                // ✓ = submit now (audit: dead key); a 4th digit
-                                // still auto-fires the same verify.
-                                key == '✓' -> if (entry.length == 4) verify(entry)
-                                else -> onDigit(key)
-                            }
-                        },
-                        modifier = Modifier.size(72.dp),
-                    ) {
-                        Text(key.toString(), style = MaterialTheme.typography.titleLarge)
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(24.dp))
     }
 }

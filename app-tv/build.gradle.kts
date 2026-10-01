@@ -14,7 +14,7 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.rjbiermann.giffyviewer"
+        applicationId = "com.rjbiermann.giffyviewer.tv"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

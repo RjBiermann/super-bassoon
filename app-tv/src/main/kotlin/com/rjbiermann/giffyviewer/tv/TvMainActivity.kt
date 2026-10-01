@@ -121,9 +121,17 @@ class TvMainActivity : ComponentActivity() {
             }
         }
 
+        val pinHash by settings.pinHash.collectAsStateWithLifecycle(initialValue = null)
+        var unlocked by remember { mutableStateOf(false) }
+
         // PLAN §1: 5% overscan margins on TV — content never touches the bezel.
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 48.dp, vertical = 27.dp)) {
             when {
+                pinHash != null && !unlocked ->
+                    com.rjbiermann.giffyviewer.core.ui.PinLockScreen(
+                        onUnlock = { unlocked = true },
+                        verifyPin = { settings.verifyPin(it) },
+                    )
                 !confirmed -> AgeGate(onConfirmed = { settings.confirmAge() })
                 player != null -> {
                     val (gifs, start) = player ?: listOf<Gif>() to 0
