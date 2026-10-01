@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -63,26 +62,26 @@ class TvMainActivity : ComponentActivity() {
 
     /** Borrowed dark theme, AMOLED option shared with mobile (PLAN §9).
      *  tv-material components (Cards etc.) read THEIR OWN MaterialTheme, not
-     *  Compose's — without this wrap they render with default light colors. */
+     *  Compose's — without a FULL mapping its default Roboto typography and
+     *  un-overridden colors leak (black-on-black text, wrong fonts). */
     @Composable
     private fun ThemeHost() {
         val amoled by settings.amoled.collectAsStateWithLifecycle(initialValue = false)
         GiffyTheme(amoled = amoled) {
-            androidx.tv.material3.MaterialTheme(
-                colorScheme =
-                    androidx.tv.material3.darkColorScheme(
-                        primary = com.rjbiermann.giffyviewer.core.ui.GiffyColors.BrandRed,
-                        onPrimary = com.rjbiermann.giffyviewer.core.ui.GiffyColors.TextHigh,
-                        secondary = com.rjbiermann.giffyviewer.core.ui.GiffyColors.Lime,
-                        background = com.rjbiermann.giffyviewer.core.ui.GiffyColors.Page,
-                        surface = com.rjbiermann.giffyviewer.core.ui.GiffyColors.Widget,
-                        onSurface = com.rjbiermann.giffyviewer.core.ui.GiffyColors.TextHigh,
-                        surfaceVariant = com.rjbiermann.giffyviewer.core.ui.GiffyColors.Chrome,
-                        onSurfaceVariant = com.rjbiermann.giffyviewer.core.ui.GiffyColors.TextMid,
-                        border = com.rjbiermann.giffyviewer.core.ui.GiffyColors.OutlineSoft,
-                        borderVariant = com.rjbiermann.giffyviewer.core.ui.GiffyColors.BrandRed,
-                    ),
-            ) { Root() }
+            // Surface provides LocalContentColor (M3 defaults to BLACK outside a
+            // Surface — the black-on-black titles; mobile screens all sit in a
+            // Scaffold, these TV screens compose bare Text).
+            androidx.compose.material3.Surface(
+                color = androidx.compose.material3.MaterialTheme.colorScheme.background,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                val composeColors = androidx.compose.material3.MaterialTheme.colorScheme
+                val composeTypo = androidx.compose.material3.MaterialTheme.typography
+                androidx.tv.material3.MaterialTheme(
+                    colorScheme = giffyTvColors(composeColors),
+                    typography = tvTypography(composeTypo),
+                ) { Root() }
+            }
         }
     }
 
@@ -164,31 +163,35 @@ class TvMainActivity : ComponentActivity() {
                             )
                         }
                         item {
-                            Button(
+                            com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
+                                text = "Settings",
                                 onClick = { showSettings = true },
                                 modifier = Modifier.padding(16.dp),
-                            ) { Text("Settings") }
+                            )
                         }
                         item {
-                            Button(
+                            com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
+                                text = "Niches",
                                 onClick = { showNiches = true },
                                 modifier = Modifier.padding(16.dp),
-                            ) { Text("Niches") }
+                            )
                         }
                         items(pinnedNiches.toList()) { entry ->
                             val id = entry.substringBefore('|')
                             val name = entry.substringAfter('|')
-                            Button(
+                            com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
+                                text = name,
                                 onClick = { openFeed = FeedSource.Niche(id, name) },
                                 modifier = Modifier.padding(16.dp),
-                            ) { Text(name) }
+                            )
                         }
                         // Pinned creators = home pills (PLAN §7 pin-to-tabs), same as mobile chips.
                         items(pinnedCreators.toList()) { username ->
-                            Button(
+                            com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
+                                text = "@$username",
                                 onClick = { openFeed = FeedSource.Creator(username) },
                                 modifier = Modifier.padding(16.dp),
-                            ) { Text("@$username") }
+                            )
                         }
                     }
                     TvHomeScreen(
@@ -219,7 +222,10 @@ class TvMainActivity : ComponentActivity() {
                         "Not affiliated with or endorsed by upstream.",
                 )
                 Spacer(Modifier.height(24.dp))
-                Button(onClick = { scope.launch { onConfirmed() } }) { Text("I am 18 or older — Enter") }
+                com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
+                    text = "I am 18 or older — Enter",
+                    onClick = { scope.launch { onConfirmed() } },
+                )
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(onClick = ::finishAffinity) { Text("Exit (leaves app)") }
             }
@@ -233,8 +239,9 @@ private fun AccountButton(
     focusRequester: FocusRequester,
     onClick: () -> Unit,
 ) {
-    Button(
+    com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
+        text = "Account",
         onClick = onClick,
         modifier = Modifier.padding(16.dp).focusRequester(focusRequester),
-    ) { Text("Account") }
+    )
 }

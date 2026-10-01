@@ -42,6 +42,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rjbiermann.giffyviewer.core.ui.giffyFocus
 import kotlinx.coroutines.launch
 
 /** PLAN §6: blocked creators / tags / keywords with unblock actions. */
@@ -304,7 +305,7 @@ private fun LazyListScope.section(
     }
     items(values, key = { "$title:$it" }) { value ->
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().giffyFocus(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {

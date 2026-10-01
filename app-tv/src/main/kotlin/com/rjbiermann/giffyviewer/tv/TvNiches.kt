@@ -36,6 +36,7 @@ import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.network.NicheDto
 import com.rjbiermann.giffyviewer.core.network.upstreamApi
+import com.rjbiermann.giffyviewer.core.ui.giffyFocus
 import com.rjbiermann.giffyviewer.feature.feed.FeedRepository
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import com.rjbiermann.giffyviewer.feature.feed.title
@@ -118,11 +119,20 @@ fun TvNichesScreen(
         ) {
             itemsIndexed(niches, key = { _, n -> n.id }) { index, niche ->
                 val isPinned = pinned.any { it.startsWith("${niche.id}|") }
+                val rowInteraction =
+                    remember {
+                        androidx.compose.foundation.interaction
+                            .MutableInteractionSource()
+                    }
                 Column(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .clickable { onOpenNiche(FeedSource.Niche(niche.id, niche.name)) }
+                            .giffyFocus(rowInteraction, fillOnFocus = MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable(
+                                interactionSource = rowInteraction,
+                                indication = androidx.compose.material3.ripple(),
+                            ) { onOpenNiche(FeedSource.Niche(niche.id, niche.name)) }
                             .onPreviewKeyEvent { event ->
                                 // MENU toggles the home pin (creator-quick-action pattern).
                                 if (event.type == KeyEventType.KeyUp && event.key == Key.Menu) {

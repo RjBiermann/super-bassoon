@@ -111,16 +111,19 @@ class MainActivity : ComponentActivity() {
         androidx.activity.compose.BackHandler(
             enabled =
                 playerStartIndex != null ||
+                    aboutNiche != null ||
                     showAccount ||
                     showSettings ||
                     showNiches ||
                     showGroups ||
                     showExplore ||
                     showFollowing ||
+                    showCollections ||
                     showSearch,
         ) {
             when {
                 playerStartIndex != null -> playerStartIndex = null
+                aboutNiche != null -> aboutNiche = null
                 showSearch -> showSearch = false
                 showFollowing -> showFollowing = false
                 showExplore -> showExplore = false
