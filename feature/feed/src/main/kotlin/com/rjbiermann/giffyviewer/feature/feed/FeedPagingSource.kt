@@ -6,6 +6,7 @@ import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.database.toModel
 import com.rjbiermann.giffyviewer.core.database.weekStartMs
 import com.rjbiermann.giffyviewer.core.model.Gif
+import com.rjbiermann.giffyviewer.core.model.matchesOrientation
 
 /** How long the refresh load waits for the mediator's first write (first-launch race). */
 private const val CACHE_WAIT_MS = 20_000L
@@ -38,6 +39,7 @@ class FeedPagingSource(
                 .ForYouContext("all", emptySet(), emptySet())
         },
     private val fetcher: FeedPageFetcher? = null,
+    private val orientation: suspend () -> String = { "any" },
 ) : PagingSource<Int, Gif>() {
     init {
         db.invalidationTracker.addObserver(
@@ -57,6 +59,7 @@ class FeedPagingSource(
     override suspend fun load(params: LoadParams<Int>): PagingSource.LoadResult<Int, Gif> {
         val page = params.key ?: 1
         return try {
+            val orientation = orientation()
             var entity = pageDao.page(feedPageKey(feed, page))
             // Unfetched page (the cache lags the scroll): fill it HERE — Paging
             // consults the mediator only when the source's data is exhausted, so
@@ -110,6 +113,9 @@ class FeedPagingSource(
                 models
                     .filter { contentFilter.allow(it.userName, it.tags, it.description) }
                     .filter { favs == null || it.userName.lowercase() in favs }
+                    // Orientation pref (§6, AGENTS-APP): read-time, AFTER the
+                    // filter; not counted in hide counts — a pref, not a block.
+                    .filter { it.matchesOrientation(orientation) }
                     .onEach { sessionSeen.add(it.id) }
                     // For You scope (§7 Creators·Niches·All): read-time filter over
                     // the SAME cached server pages — one fetch, three filters.

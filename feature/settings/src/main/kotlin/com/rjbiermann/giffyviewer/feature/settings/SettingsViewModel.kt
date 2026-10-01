@@ -88,6 +88,14 @@ class SettingsViewModel
             viewModelScope.launch { settings.setDataSaver(enabled) }
         }
 
+        /** Orientation filter (§6): any | vertical | horizontal — read-time pref. */
+        val orientationFilter: StateFlow<String> =
+            settings.orientationFilter.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "any")
+
+        fun setOrientationFilter(value: String) {
+            viewModelScope.launch { settings.setOrientationFilter(value) }
+        }
+
         /** Video fit (§5): fit | crop | stretch, shared by both players. */
         val videoFit: StateFlow<String> =
             settings.videoFit.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "fit")

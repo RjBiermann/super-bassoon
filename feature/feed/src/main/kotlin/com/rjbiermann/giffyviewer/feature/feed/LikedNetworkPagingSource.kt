@@ -4,6 +4,7 @@ import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.rjbiermann.giffyviewer.core.database.ContentFilter
 import com.rjbiermann.giffyviewer.core.model.Gif
+import com.rjbiermann.giffyviewer.core.model.matchesOrientation
 import com.rjbiermann.giffyviewer.core.network.upstreamApi
 import com.rjbiermann.giffyviewer.core.network.dto.toModel
 
@@ -16,6 +17,7 @@ class LikedNetworkPagingSource(
     private val api: upstreamApi,
     private val contentFilter: ContentFilter,
     private val pageSize: Int,
+    private val orientation: String = "any",
 ) : PagingSource<Int, Gif>() {
     override suspend fun load(params: LoadParams<Int>): PagingSource.LoadResult<Int, Gif> {
         val page = params.key ?: 1
@@ -25,6 +27,8 @@ class LikedNetworkPagingSource(
                 dto.gifs
                     .map { it.toModel() }
                     .filter { contentFilter.allow(it.userName, it.tags, it.description) }
+                    // Orientation pref (§6): read-time, not a block.
+                    .filter { it.matchesOrientation(orientation) }
             PagingSource.LoadResult.Page(
                 data = gifs,
                 prevKey = if (page == 1) null else page - 1,

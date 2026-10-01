@@ -10,6 +10,7 @@ import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.network.upstreamApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.flatMapLatest
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -74,17 +75,23 @@ class FeedRepository
         ): Flow<PagingData<Gif>> =
             if (feed is FeedSource.Liked) {
                 // Network-live, never cached (PLAN §7); no RemoteMediator, no Room.
-                Pager(
-                    config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = 10, enablePlaceholders = false),
-                    pagingSourceFactory = { LikedNetworkPagingSource(api, contentFilter, PAGE_SIZE) },
-                ).flow
+                settings.orientationFilter.flatMapLatest { orientation ->
+                    Pager(
+                        config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = 10, enablePlaceholders = false),
+                        pagingSourceFactory = { LikedNetworkPagingSource(api, contentFilter, PAGE_SIZE, orientation) },
+                    ).flow
+                }
             } else {
-                cachedPager(feed, forceRefresh)
+                // Orientation pref change restarts the pager (fresh generation).
+                settings.orientationFilter.flatMapLatest { orientation ->
+                    cachedPager(feed, forceRefresh, orientation)
+                }
             }
 
         private fun cachedPager(
             feed: FeedSource,
             forceRefresh: Boolean,
+            orientation: String,
         ): Flow<PagingData<Gif>> =
             Pager(
                 config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = 10, enablePlaceholders = false),

@@ -237,6 +237,28 @@ fun SettingsScreen(
                     }
                 }
             }
+            item(key = "orientation") {
+                // §6 Orientation filter (AGENTS-APP 2026-10): read-time pref.
+                val orientationPref by viewModel.orientationFilter.collectAsStateWithLifecycle("any")
+                Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+                    Text("Orientation", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "Show only vertical or horizontal gifs",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(modifier = Modifier.padding(top = 8.dp)) {
+                        listOf("Any" to "any", "Vertical" to "vertical", "Horizontal" to "horizontal").forEach { (label, value) ->
+                            FilterChip(
+                                selected = orientationPref == value,
+                                onClick = { viewModel.setOrientationFilter(value) },
+                                label = { Text(label) },
+                                modifier = Modifier.padding(end = 6.dp),
+                            )
+                        }
+                    }
+                }
+            }
             item(key = "video-fit") {
                 // §5 Video fit: Fit (default) · Crop · Stretch — both players.
                 val videoFit by viewModel.videoFit.collectAsStateWithLifecycle("fit")

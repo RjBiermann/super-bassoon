@@ -50,3 +50,42 @@ class StreamUrlTest {
         assertEquals(null, gif.copy(sdUrl = null, hdUrl = null).streamUrl(dataSaver = false))
     }
 }
+
+class OrientationTest {
+    private fun gif(
+        w: Int,
+        h: Int,
+    ) = Gif(
+        id = "x",
+        userName = "u",
+        description = null,
+        tags = emptyList(),
+        likes = 0,
+        views = 0,
+        durationSeconds = 1.0,
+        hasAudio = false,
+        width = w,
+        height = h,
+        createDateEpoch = 0,
+        published = true,
+        avgColor = "#000000",
+        sdUrl = null,
+        hdUrl = null,
+        posterUrl = null,
+        niches = emptyList(),
+    )
+
+    @Test
+    fun `orientation predicate`() {
+        assert(gif(1080, 1920).matchesOrientation("vertical"))
+        assert(gif(1920, 1080).matchesOrientation("horizontal"))
+        assert(!gif(1920, 1080).matchesOrientation("vertical"))
+        assert(!gif(1080, 1920).matchesOrientation("horizontal"))
+        // any passes all
+        assert(gif(1080, 1920).matchesOrientation("any"))
+        assert(gif(1920, 1080).matchesOrientation("any"))
+        // unknown dims pass through (TV card-width fallback rule)
+        assert(gif(0, 0).matchesOrientation("vertical"))
+        assert(gif(0, 0).matchesOrientation("horizontal"))
+    }
+}

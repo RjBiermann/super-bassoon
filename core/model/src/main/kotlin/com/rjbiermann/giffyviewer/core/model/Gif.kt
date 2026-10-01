@@ -28,3 +28,15 @@ fun Gif.streamUrl(dataSaver: Boolean): String? =
         dataSaver -> sdUrl ?: hdUrl
         else -> hdUrl ?: sdUrl
     }
+
+/**
+ * Orientation preference check (AGENTS-APP.md 2026-10): "any" passes all;
+ * "vertical"/"horizontal" use the side comparison. Unknown dimensions (0x0)
+ * pass through — same fallback as the TV card-width rule.
+ */
+fun Gif.matchesOrientation(pref: String): Boolean =
+    when (pref) {
+        "vertical" -> height >= width || width <= 0 || height <= 0
+        "horizontal" -> width >= height || width <= 0 || height <= 0
+        else -> true
+    }

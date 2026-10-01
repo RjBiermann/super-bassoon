@@ -37,6 +37,7 @@ class SettingsRepository
             val GRID_COLUMNS = intPreferencesKey("grid_columns")
             val FORYOU_SCOPE = stringPreferencesKey("foryou_scope")
             val VIDEO_FIT = stringPreferencesKey("video_fit")
+            val ORIENTATION_FILTER = stringPreferencesKey("orientation_filter")
         }
 
         /** True once the user attested 18+. Emits false until then; survives restarts. */
@@ -112,6 +113,14 @@ class SettingsRepository
 
         suspend fun setGridColumns(columns: Int) {
             dataStore.edit { it[Keys.GRID_COLUMNS] = columns }
+        }
+
+        /** Orientation filter (§6): any | horizontal | vertical — read-time pref,
+         *  not a block (no hide counts). */
+        val orientationFilter: Flow<String> = dataStore.data.map { it[Keys.ORIENTATION_FILTER] ?: "any" }
+
+        suspend fun setOrientationFilter(value: String) {
+            dataStore.edit { it[Keys.ORIENTATION_FILTER] = value }
         }
 
         /** Video fit (§5): fit | crop | stretch — one shared setting, both players. */

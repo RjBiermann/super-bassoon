@@ -133,7 +133,7 @@ MCP); contrast math under dynamic-color theme (Material guarantees it).
 Sort · date range · duration min/max · resolution · orientation · shuffle seed — persisted
 per feed (`feed_prefs` key), survive restart, applied strictly AFTER ContentFilter.
 
-## Orientation filter (decided 2026-10-01, not yet built)
+## Orientation filter (built 2026-10, live-verified: pref write + pager restart)
 Global DataStore pref `orientation_filter` (`any` default / `horizontal` / `vertical`) in the
 shared SettingsScreen — one toggle covers both apps (TV: horizontal-only use case, mobile:
 vertical-only). Per-feed §6 orientation chips, when they land, default to this value.
