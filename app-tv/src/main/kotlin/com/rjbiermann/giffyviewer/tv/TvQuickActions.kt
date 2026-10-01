@@ -33,6 +33,20 @@ import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
 import androidx.compose.material3.Surface as M3Surface
 
+/** Player-only panel rows (mobile overflow parity): Like · Mute · Speed · Auto-swipe. */
+data class TvPlayerActions(
+    val liked: Boolean,
+    val muted: Boolean,
+    val speed: Float,
+    /** `hasAudio`-aware: a silent gif shows no Mute row (§9 mute UI). */
+    val hasAudio: Boolean,
+    val autoSwipeOn: Boolean,
+    val onToggleLike: () -> Unit,
+    val onToggleMute: () -> Unit,
+    val onCycleSpeed: () -> Unit,
+    val onToggleAutoSwipe: () -> Unit,
+)
+
 /**
  * TV quick actions (mobile QuickBlockSheet parity — D-pad): favorite/pin/block
  * creator, favorite/block tags, add to custom feed. MENU on a focused card or
@@ -45,6 +59,8 @@ fun TvQuickActionsDialog(
     onDismiss: () -> Unit,
     /** The open feed itself as an addable ref (e.g. browsing a niche). */
     addableFeedRef: String? = null,
+    /** Non-null in the player: adds Like/Mute/Speed/Auto-swipe rows. */
+    playerActions: TvPlayerActions? = null,
 ) {
     var showAddToFeed by remember { mutableStateOf(false) }
     val customFeeds by feedViewModel.customFeeds.collectAsStateWithLifecycle(emptyList())
@@ -65,11 +81,45 @@ fun TvQuickActionsDialog(
                 )
                 val first = remember { FocusRequester() }
                 LaunchedEffect(Unit) { first.requestFocus() }
+                playerActions?.let { pa ->
+                    HorizontalDivider()
+                    QuickAction(
+                        text = if (pa.liked) "Unlike" else "Like",
+                        first = first,
+                        onClick = {
+                            pa.onToggleLike()
+                            onDismiss()
+                        },
+                    )
+                    if (pa.hasAudio) {
+                        QuickAction(
+                            text = if (pa.muted) "Unmute" else "Mute",
+                            onClick = {
+                                pa.onToggleMute()
+                                onDismiss()
+                            },
+                        )
+                    }
+                    QuickAction(
+                        text = "Speed %.2f× — tap to change".format(pa.speed),
+                        onClick = {
+                            pa.onCycleSpeed()
+                            onDismiss()
+                        },
+                    )
+                    QuickAction(
+                        text = "Auto-swipe next: ${if (pa.autoSwipeOn) "ON" else "OFF"}",
+                        onClick = {
+                            pa.onToggleAutoSwipe()
+                            onDismiss()
+                        },
+                    )
+                }
                 val favState by feedViewModel
                     .creatorState(gif.userName)
                     .collectAsStateWithLifecycle(initialValue = null)
                 QuickAction(
-                    first = first,
+                    first = if (playerActions == null) first else null,
                     text = if (favState == "FAVORITED") "Unfavorite @${gif.userName}" else "Favorite @${gif.userName}",
                     onClick = {
                         feedViewModel.toggleFavoriteCreator(gif.userName)

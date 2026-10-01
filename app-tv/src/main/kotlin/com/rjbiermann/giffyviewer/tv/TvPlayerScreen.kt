@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -19,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +42,7 @@ import com.rjbiermann.giffyviewer.core.database.WatchHistoryEntity
 import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
+import kotlinx.coroutines.launch
 
 /**
  * 10-foot player: one gif at a time, D-pad up/down (left/right too) walks the
@@ -57,6 +60,7 @@ fun TvPlayerScreen(
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var actionsFor by remember { mutableStateOf<Gif?>(null) }
     val dataSaver by settings.dataSaver.collectAsStateWithLifecycle(false)
     // §5 video fit (shared setting): fit | crop | stretch.
@@ -84,6 +88,16 @@ fun TvPlayerScreen(
     }
 
     val gif = gifs[index]
+    // Seek feedback: "1:23 / 2:45" flashes while seeking (TV keymap §).
+    var seekFlash by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(seekFlash) {
+        if (seekFlash != null) {
+            kotlinx.coroutines.delay(1_500)
+            seekFlash = null
+        }
+    }
+    // Playback speed (MENU panel cycles 0.5 → 1 → 1.5 → 2).
+    var speed by remember { mutableStateOf(1f) }
 
     // D-pad events only reach onPreviewKeyEvent via a FOCUSED node inside the
     // hierarchy — the PlayerView never takes focus, so grab it on entry.
@@ -102,13 +116,42 @@ fun TvPlayerScreen(
                 .focusRequester(playerFocus)
                 .onPreviewKeyEvent { e ->
                     if (e.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
+                    // AGENTS-UX-PATTERNS TV keymap: horizontal = time (±10s,
+                    // hold-repeat = progressive seek), vertical = items,
+                    // CENTER = play/pause, MENU = quick actions, media keys
+                    // ride the same actions.
+                    when (e.nativeKeyEvent.keyCode) {
+                        android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+                        android.view.KeyEvent.KEYCODE_MEDIA_PLAY,
+                        android.view.KeyEvent.KEYCODE_MEDIA_PAUSE,
+                        -> {
+                            player.playWhenReady = !(player.playWhenReady)
+                            true
+                        }
+                        android.view.KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                            seekBy(player, +10_000L) { seekFlash = it }
+                            true
+                        }
+                        android.view.KeyEvent.KEYCODE_MEDIA_REWIND -> {
+                            seekBy(player, -10_000L) { seekFlash = it }
+                            true
+                        }
+                    }
                     when (e.key) {
-                        Key.DirectionDown, Key.DirectionRight -> {
+                        Key.DirectionDown -> {
                             if (index < gifs.size - 1) index++
                             true
                         }
-                        Key.DirectionUp, Key.DirectionLeft -> {
+                        Key.DirectionUp -> {
                             if (index > 0) index--
+                            true
+                        }
+                        Key.DirectionRight -> {
+                            seekBy(player, +10_000L) { seekFlash = it }
+                            true
+                        }
+                        Key.DirectionLeft -> {
+                            seekBy(player, -10_000L) { seekFlash = it }
                             true
                         }
                         // CENTER = play/pause (audit: "can't pause on TV").
@@ -162,6 +205,15 @@ fun TvPlayerScreen(
                             .background(com.rjbiermann.giffyviewer.core.ui.GiffyColors.Lime),
                 )
             }
+            // Seek feedback: "1:23 / 2:45" while seeking (TV keymap §).
+            seekFlash?.let { label ->
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
+                )
+            }
         }
     }
 
@@ -186,11 +238,52 @@ fun TvPlayerScreen(
             }
         }
     }
-    actionsFor?.let { gif ->
+    val muted by settings.muted.collectAsStateWithLifecycle(false)
+    val autoSwipeOn by settings.autoSwipe.collectAsStateWithLifecycle(false)
+    actionsFor?.let { sheetGif ->
         TvQuickActionsDialog(
-            gif = gif,
+            gif = sheetGif,
             feedViewModel = feedViewModel,
+            playerActions =
+                TvPlayerActions(
+                    liked = sheetGif.id in feedViewModel.likedIds.value,
+                    muted = muted,
+                    speed = speed,
+                    hasAudio = sheetGif.hasAudio,
+                    autoSwipeOn = autoSwipeOn,
+                    onToggleLike = { feedViewModel.toggleLike(sheetGif.id) },
+                    onToggleMute = { scope.launch { settings.setMuted(!muted) } },
+                    onCycleSpeed = {
+                        speed =
+                            when (speed) {
+                                0.5f -> 1f
+                                1f -> 1.5f
+                                1.5f -> 2f
+                                else -> 0.5f
+                            }
+                        player.setPlaybackSpeed(speed)
+                    },
+                    onToggleAutoSwipe = { scope.launch { settings.setAutoSwipe(!autoSwipeOn) } },
+                ),
             onDismiss = { actionsFor = null },
         )
     }
+}
+
+/** ±10s step with a "1:23 / 2:45" flash; hold-repeat = progressive seek. */
+private fun seekBy(
+    player: com.rjbiermann.giffyviewer.core.player.GiffyPlayer,
+    deltaMs: Long,
+    flash: (String?) -> Unit,
+) {
+    val target = (player.currentPositionMs + deltaMs).coerceIn(0L, player.durationMs.coerceAtLeast(0L))
+    player.seekTo(target)
+
+    fun fmt(ms: Long): String {
+        val total = ms / 1000
+        return "%d:%02d".format(total / 60, total % 60)
+    }
+    val dur = player.durationMs
+    flash(if (dur > 0) "${fmt(target)} / ${fmt(dur)}" else fmt(target))
+    // cleared by the LaunchedEffect below
 }
