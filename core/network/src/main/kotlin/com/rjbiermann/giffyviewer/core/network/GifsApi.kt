@@ -146,6 +146,20 @@ interface upstreamApi {
     @GET("v2/niches/following")
     suspend fun followedNiches(): FollowedNichesDto
 
+    /** Niche detail (live-verified 2026-10-01, anonymous OK): description,
+     *  cover, counts, rules — the About tab source. `following` reflects the
+     *  caller's auth state. */
+    @GET("v2/niches/{id}")
+    suspend fun nicheDetail(@Path("id") id: String): NicheDetailDto
+
+    /** Niche top-creators (live-verified 2026-10-01, anonymous OK). */
+    @GET("v2/niches/{id}/top-creators")
+    suspend fun nicheTopCreators(@Path("id") id: String): VerifiedCreatorsPageDto
+
+    /** Related niches (live-verified 2026-10-01, anonymous OK). */
+    @GET("v2/niches/{id}/related")
+    suspend fun nicheRelated(@Path("id") id: String): FollowedNichesDto
+
     /** Following (live-verified 2026-10-01): rich creator objects, paginated. */
     @GET("v2/me/following")
     suspend fun followingCreators(
@@ -167,6 +181,24 @@ interface upstreamApi {
         @Body body: SubscriptionBody = SubscriptionBody(),
     )
 }
+
+@Serializable
+data class NicheDetailDto(
+    val niche: NicheDetail = NicheDetail(),
+)
+
+@Serializable
+data class NicheDetail(
+    val id: String = "",
+    val name: String = "",
+    val description: String? = null,
+    val cover: String? = null,
+    val thumbnail: String? = null,
+    val gifs: Int = 0,
+    val subscribers: Int = 0,
+    val rules: List<String>? = null,
+    val tags: List<String> = emptyList(),
+)
 
 @Serializable
 data class FollowingCreatorsDto(

@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -48,6 +49,7 @@ import kotlinx.coroutines.launch
 fun NichesScreen(
     onBack: () -> Unit,
     onOpenNiche: (FeedSource.Niche) -> Unit,
+    onOpenAbout: (id: String, name: String) -> Unit,
     api: upstreamApi,
     settings: SettingsRepository,
     joinViewModel: NicheJoinViewModel = hiltViewModel(),
@@ -110,6 +112,9 @@ fun NichesScreen(
                                 TextButton(onClick = { joinViewModel.toggle(niche.id) }) {
                                     Text(if (niche.id in joined) "Leave" else "Join")
                                 }
+                            }
+                            IconButton(onClick = { onOpenAbout(niche.id, niche.name) }) {
+                                Icon(Icons.Outlined.Info, contentDescription = "about ${niche.name}")
                             }
                             IconButton(onClick = { scope2.launch { settings.togglePinnedNiche(niche.id, niche.name) } }) {
                                 Icon(

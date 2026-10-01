@@ -49,6 +49,8 @@ import com.rjbiermann.giffyviewer.feature.feed.FollowingScreen
 import com.rjbiermann.giffyviewer.feature.feed.FollowingViewModel
 import com.rjbiermann.giffyviewer.feature.feed.GroupsScreen
 import com.rjbiermann.giffyviewer.feature.feed.GroupsViewModel
+import com.rjbiermann.giffyviewer.feature.feed.NicheAboutScreen
+import com.rjbiermann.giffyviewer.feature.feed.NicheJoinViewModel
 import com.rjbiermann.giffyviewer.feature.feed.NichesScreen
 import com.rjbiermann.giffyviewer.feature.feed.PlayerScreen
 import com.rjbiermann.giffyviewer.feature.settings.SettingsScreen
@@ -100,6 +102,7 @@ class MainActivity : ComponentActivity() {
         var showGroups by rememberSaveable { mutableStateOf(false) }
         var showExplore by rememberSaveable { mutableStateOf(false) }
         var showFollowing by rememberSaveable { mutableStateOf(false) }
+        var aboutNiche: Pair<String, String>? by rememberSaveable { mutableStateOf(null) }
         var showSearch by rememberSaveable { mutableStateOf(false) }
 
         androidx.activity.compose.BackHandler(
@@ -155,6 +158,25 @@ class MainActivity : ComponentActivity() {
                 },
                 api = api,
             )
+        } else if (confirmed && aboutNiche != null) {
+            val (id, name) = aboutNiche ?: Pair("", "")
+            val aboutFeedVm: FeedViewModel = hiltViewModel()
+            val joinVm: NicheJoinViewModel = hiltViewModel()
+            NicheAboutScreen(
+                nicheId = id,
+                nicheName = name,
+                onBack = { aboutNiche = null },
+                onOpenCreator = { username ->
+                    aboutNiche = null
+                    aboutFeedVm.open(FeedSource.Creator(username = username))
+                },
+                onOpenNiche = { niche ->
+                    aboutNiche = null
+                    aboutFeedVm.open(niche)
+                },
+                api = api,
+                joinViewModel = joinVm,
+            )
         } else if (confirmed && showFollowing) {
             val followingVm: FollowingViewModel = hiltViewModel()
             val feedVm: FeedViewModel = hiltViewModel()
@@ -200,6 +222,7 @@ class MainActivity : ComponentActivity() {
                     showNiches = false
                     feedViewModel.open(niche)
                 },
+                onOpenAbout = { id, name -> aboutNiche = id to name },
                 api = api,
                 settings = settings,
             )
