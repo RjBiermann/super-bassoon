@@ -145,7 +145,24 @@ interface upstreamApi {
 
     @GET("v2/niches/following")
     suspend fun followedNiches(): FollowedNichesDto
+
+    /** Niche join/leave (API word: subscription; UI: Join/Leave Niche — §9 lingo).
+     *  Verified 2026: POST/DELETE → 202 with `{}` body; DELETE needs a body. */
+    @POST("v2/niches/{id}/subscription")
+    suspend fun joinNiche(
+        @Path("id") id: String,
+        @Body body: SubscriptionBody = SubscriptionBody(),
+    )
+
+    @HTTP(method = "DELETE", path = "v2/niches/{id}/subscription", hasBody = true)
+    suspend fun leaveNiche(
+        @Path("id") id: String,
+        @Body body: SubscriptionBody = SubscriptionBody(),
+    )
 }
+
+@Serializable
+class SubscriptionBody
 
 @Serializable
 data class LikeBody(

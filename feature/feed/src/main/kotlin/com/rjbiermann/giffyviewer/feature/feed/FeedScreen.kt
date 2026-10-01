@@ -13,9 +13,9 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
@@ -129,7 +129,7 @@ fun FeedScreen(
             )
         },
     ) { padding ->
-        Column(modifier = Modifier.padding(padding).windowInsetsPadding(WindowInsets.navigationBars).fillMaxSize()) {
+        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
             // M3 FilterChips — feed tabs (more feeds join in Phase 7: groups, For You, custom)
             // pinned niches become tabs (PLAN §7 pin-to-tabs): "id|name" entries
             val pinnedEntries by viewModel.pinnedNiches.collectAsStateWithLifecycle(emptySet())
@@ -261,13 +261,20 @@ fun FeedScreen(
                 }
             }
 
-            // M3 linear indicator for refresh / append activity
-            if (items.loadState.refresh is LoadState.Loading ||
-                items.loadState.append is LoadState.Loading
-            ) {
-                LinearProgressIndicator(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                )
+            // M3 linear indicator for refresh / append activity. FIXED 4dp slot —
+            // show/hide must not shift the grid (same rule as the player's
+            // progress chrome; user report: the indicator caused UI drift).
+            Box(modifier = Modifier.fillMaxWidth().height(4.dp)) {
+                androidx.compose.animation.AnimatedVisibility(
+                    visible =
+                        items.loadState.refresh is LoadState.Loading ||
+                            items.loadState.append is LoadState.Loading,
+                    enter = androidx.compose.animation.fadeIn(),
+                    exit = androidx.compose.animation.fadeOut(),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
             }
 
             val refreshError = items.loadState.refresh is LoadState.Error
@@ -308,7 +315,15 @@ fun FeedScreen(
                             state = gridState,
                             columns = StaggeredGridCells.Fixed(gridColumns),
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(8.dp),
+                            // Tiles scroll under the system nav (edge-to-edge);
+                            // the inset is a contentPadding, not dead space.
+                            contentPadding =
+                                PaddingValues(
+                                    start = 8.dp,
+                                    end = 8.dp,
+                                    top = 8.dp,
+                                    bottom = 8.dp + navBarDp(),
+                                ),
                             verticalItemSpacing = 8.dp,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
@@ -527,4 +542,11 @@ private fun avgColorOr(
         Color(android.graphics.Color.parseColor(gif.avgColor))
     } catch (_: IllegalArgumentException) {
         fallback
+    }
+
+/** System nav-bar inset as dp (density-based; the layout extension didn't resolve). */
+@Composable
+private fun navBarDp(): androidx.compose.ui.unit.Dp =
+    with(androidx.compose.ui.platform.LocalDensity.current) {
+        WindowInsets.navigationBars.getBottom(this).toDp()
     }
