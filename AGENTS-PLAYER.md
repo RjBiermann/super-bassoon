@@ -35,3 +35,12 @@ Media3/ExoPlayer + SimpleCache. Spec: PLAN.md §5.
 - TV image has no `sqlite3` in run-as — pull `giffy.db` + `-wal` + `-shm` and read on host.
 - TV home uses androidx.tv `Card` for tiles: plain `Modifier.clickable` does NOT take
   D-pad focus inside tv-foundation rows.
+
+## Auto-advance across a page boundary (2026-10-01, logic-verified)
+PlayerScreen `pendingAdvance`: pool end → `retry()` + pendingAdvance; the
+LaunchedEffect re-drives on (pendingAdvance, itemCount, append) changes —
+next < itemCount → advance; append endOfPaginationReached → loop the last
+video; else → retry again. Manual swipe cancels via the currentPage
+LaunchedEffect. Compile-verified + code-reviewed; live soak through an
+actual boundary still pending (needs minutes of playback — cheap unit
+coverage isn't possible against Compose pager state).
