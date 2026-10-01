@@ -72,8 +72,9 @@ a user slice picks from this list. Priority order within each tier.
   permanently blank screen until recomposition. Same silent-failure pattern in
   NichesScreen.loadMore + TvNichesViewModel.loadMore. Shared `EmptyState` (core:ui) covers
   empty states on FeedScreen only — every other list surface needs an error/empty branch.
-- PIN lock (PinLockScreen): `✓` key is dead (`key == '✓' -> {}`, unlock auto-fires at 4 digits);
-  no escape/recovery affordance; 400ms delay, unlimited attempts (lockout absent).
+- PIN lock (PinLockScreen): `✓` key fixed (submits at <4 digits too); brute-force
+  slowdown (3+ wrong → 15s wait) shipped. NO recovery affordance — deliberate
+  (user decision 2026-10: forgotten PIN = clear app data, keeps the lock opaque).
 
 **High (a11y / destructive actions)**
 - GiffyPillButton rest state: BrandRed #D70003 text on near-black ≈ 3.5:1 < 4.5:1 AA
