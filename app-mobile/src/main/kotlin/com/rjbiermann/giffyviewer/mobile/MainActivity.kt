@@ -46,6 +46,8 @@ import com.rjbiermann.giffyviewer.feature.feed.FeedScreen
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
 import com.rjbiermann.giffyviewer.feature.feed.FollowingScreen
+import com.rjbiermann.giffyviewer.feature.feed.CollectionsScreen
+import com.rjbiermann.giffyviewer.feature.feed.CollectionsViewModel
 import com.rjbiermann.giffyviewer.feature.feed.FollowingViewModel
 import com.rjbiermann.giffyviewer.feature.feed.GroupsScreen
 import com.rjbiermann.giffyviewer.feature.feed.GroupsViewModel
@@ -102,6 +104,7 @@ class MainActivity : ComponentActivity() {
         var showGroups by rememberSaveable { mutableStateOf(false) }
         var showExplore by rememberSaveable { mutableStateOf(false) }
         var showFollowing by rememberSaveable { mutableStateOf(false) }
+        var showCollections by rememberSaveable { mutableStateOf(false) }
         var aboutNiche: Pair<String, String>? by rememberSaveable { mutableStateOf(null) }
         var showSearch by rememberSaveable { mutableStateOf(false) }
 
@@ -123,6 +126,7 @@ class MainActivity : ComponentActivity() {
                 showExplore -> showExplore = false
                 showGroups -> showGroups = false
                 showNiches -> showNiches = false
+                showCollections -> showCollections = false
                 showSettings -> showSettings = false
                 else -> showAccount = false
             }
@@ -157,6 +161,12 @@ class MainActivity : ComponentActivity() {
                     feedViewModel.open(FeedSource.Creator(username = username))
                 },
                 api = api,
+            )
+        } else if (confirmed && showCollections) {
+            val collectionsVm: CollectionsViewModel = hiltViewModel()
+            CollectionsScreen(
+                onBack = { showCollections = false },
+                viewModel = collectionsVm,
             )
         } else if (confirmed && aboutNiche != null) {
             val (id, name) = aboutNiche ?: Pair("", "")
@@ -240,6 +250,7 @@ class MainActivity : ComponentActivity() {
                 onOpenGroups = { showGroups = true },
                 onOpenExplore = { showExplore = true },
                 onOpenFollowing = { showFollowing = true },
+                onOpenCollections = { showCollections = true },
             )
         } else {
             val scope = rememberCoroutineScope()

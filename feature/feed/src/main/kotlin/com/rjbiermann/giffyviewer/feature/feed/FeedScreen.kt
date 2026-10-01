@@ -90,6 +90,7 @@ fun FeedScreen(
     onOpenGroups: () -> Unit = {},
     onOpenExplore: () -> Unit = {},
     onOpenFollowing: () -> Unit = {},
+    onOpenCollections: () -> Unit = {},
     viewModel: FeedViewModel = hiltViewModel(),
 ) {
     val source by viewModel.source.collectAsStateWithLifecycle()
@@ -185,6 +186,11 @@ fun FeedScreen(
                         selected = false,
                         onClick = onOpenFollowing,
                         label = { Text("Following…") },
+                    )
+                    FilterChip(
+                        selected = false,
+                        onClick = onOpenCollections,
+                        label = { Text("Collections…") },
                     )
                 }
 

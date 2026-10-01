@@ -146,6 +146,29 @@ interface upstreamApi {
     @GET("v2/niches/following")
     suspend fun followedNiches(): FollowedNichesDto
 
+    /** Saved Collections (live-verified 2026-10-01): list = {collections, users,
+     *  page, pages, totalCount}; create body REQUIRES {name, published}; rename
+     *  = PATCH {folderName} (PUT 405); delete by folderId. */
+    @GET("v2/me/collections")
+    suspend fun meCollections(
+        @Query("page") page: Int = 1,
+        @Query("count") count: Int = 50,
+    ): CollectionsPageDto
+
+    @POST("v2/me/collections")
+    suspend fun createCollection(
+        @Body body: CreateCollectionBody,
+    ): CollectionDto
+
+    @HTTP(method = "PATCH", path = "v2/me/collections/{id}", hasBody = true)
+    suspend fun renameCollection(
+        @Path("id") id: String,
+        @Body body: RenameCollectionBody,
+    ): CollectionDto
+
+    @DELETE("v2/me/collections/{id}")
+    suspend fun deleteCollection(@Path("id") id: String)
+
     /** Niche detail (live-verified 2026-10-01, anonymous OK): description,
      *  cover, counts, rules — the About tab source. `following` reflects the
      *  caller's auth state. */
@@ -193,6 +216,43 @@ data class NicheDetail(
     val subscribers: Int = 0,
     val rules: List<String>? = null,
     val tags: List<String> = emptyList(),
+)
+
+@Serializable
+data class CollectionUserDto(
+    val name: String = "",
+    val followers: Int = 0,
+    val gifs: Int = 0,
+)
+
+@Serializable
+data class CollectionDto(
+    val folderId: String = "",
+    val folderName: String? = null,
+    val description: String? = null,
+    val contentCount: Int = 0,
+    val published: Boolean = false,
+    val thumb: String? = null,
+)
+
+@Serializable
+data class CollectionsPageDto(
+    val collections: List<CollectionDto> = emptyList(),
+    val users: List<CollectionUserDto> = emptyList(),
+    val page: Int = 1,
+    val pages: Int = 1,
+    val totalCount: Int = 0,
+)
+
+@Serializable
+data class CreateCollectionBody(
+    val name: String,
+    val published: Boolean = false,
+)
+
+@Serializable
+data class RenameCollectionBody(
+    @SerialName("folderName") val folderName: String,
 )
 
 @Serializable
