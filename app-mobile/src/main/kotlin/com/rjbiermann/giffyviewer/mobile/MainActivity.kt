@@ -24,6 +24,7 @@ import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSiz
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -330,6 +331,10 @@ private fun PinLockScreen(
     val scope = rememberCoroutineScope()
     var entry by remember { mutableStateOf("") }
     var wrong by remember { mutableStateOf(false) }
+    // Audit: unlimited instant attempts = brute-force friendly. After 3 wrong
+    // tries each further attempt waits 15s (in-memory — lock is a deterrent,
+    // not vault security; app data can always be cleared device-side).
+    var fails by remember { mutableIntStateOf(0) }
 
     fun verify(pin: String) {
         scope.launch {
@@ -337,8 +342,9 @@ private fun PinLockScreen(
             if (ok) {
                 onUnlock()
             } else {
+                fails++
                 wrong = true
-                kotlinx.coroutines.delay(400)
+                kotlinx.coroutines.delay(if (fails >= 3) 15_000L else 400L)
                 entry = ""
                 wrong = false
             }
@@ -408,6 +414,35 @@ private fun PinLockScreen(
                     }
                 }
             }
+        }
+        Spacer(Modifier.height(24.dp))
+        // Recovery: the lock is local-only (Settings → Set PIN); a forgotten PIN
+        // unlocks with a confirmation — honest about the deterrent posture
+        // (anyone could clear app data anyway).
+        var confirmReset by remember { mutableStateOf(false) }
+        androidx.compose.material3.TextButton(onClick = { confirmReset = true }) {
+            Text("Forgot PIN?")
+        }
+        if (confirmReset) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { confirmReset = false },
+                title = { Text("Remove app lock?") },
+                text = { Text("Your data and signed-in account stay. The PIN lock is removed.") },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = {
+                        confirmReset = false
+                        scope.launch {
+                            settings.clearPin()
+                            onUnlock()
+                        }
+                    }) { Text("Remove lock") }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = { confirmReset = false }) {
+                        Text("Cancel")
+                    }
+                },
+            )
         }
     }
 }
