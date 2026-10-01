@@ -19,3 +19,6 @@ local.properties
 __pycache__/
 after-profile-click.png
 login-page.png
+
+# working screenshots (never commit)
+/*.png

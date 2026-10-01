@@ -12,6 +12,11 @@ Media3/ExoPlayer + SimpleCache. Spec: PLAN.md §5.
 ## Playback
 - Resume positions read/write `watch_history` (Room) — feed "Continue Watching" and "Surprise me" exclusion.
 - Data-saver toggle: prefer SD stream when on.
+- **Video fit (spec'd-not-scheduled, PLAN §6):** user setting Fit / Crop / Stretch →
+  `PlayerView.resizeMode` = `RESIZE_MODE_FIT` / `RESIZE_MODE_ZOOM` / `RESIZE_MODE_FILL`
+  (default Fit). One shared DataStore pref consumed by both `PlayerScreen.kt` (mobile,
+  currently sets FIT explicitly) and `TvPlayerScreen.kt` (TV, currently default FIT).
+  Crop/Stretch apply before any pinch-zoom (`graphicsLayer` scale multiplies on top).
 
 ## Verified end-to-end (emulator, 2026-09)
 - Feed tile → PlayerScreen → ExoPlayer playback → 5s position sample → `watch_history` row

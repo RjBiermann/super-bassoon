@@ -53,6 +53,7 @@ fun GroupsScreen(
 ) {
     val groups by viewModel.groups.collectAsStateWithLifecycle()
     var showCreate by rememberSaveable { mutableStateOf(false) }
+    var deleteFor by remember { mutableStateOf<com.rjbiermann.giffyviewer.core.database.NicheGroupEntity?>(null) }
 
     Scaffold(
         topBar = {
@@ -85,7 +86,7 @@ fun GroupsScreen(
                     supportingContent = { Text(group.tagList.replace(",", " · ")) },
                     trailingContent = {
                         Row {
-                            IconButton(onClick = { viewModel.delete(group) }) {
+                            IconButton(onClick = { deleteFor = group }) {
                                 Icon(
                                     Icons.Outlined.Delete,
                                     contentDescription = "delete ${group.name}",
@@ -125,6 +126,21 @@ fun GroupsScreen(
         }
     }
 
+    deleteFor?.let { group ->
+        // Confirm-first: same destructive class as collection delete.
+        AlertDialog(
+            onDismissRequest = { deleteFor = null },
+            title = { Text("Delete group?") },
+            text = { Text("Delete “${group.name}” permanently?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.delete(group)
+                    deleteFor = null
+                }) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { deleteFor = null }) { Text("Cancel") } },
+        )
+    }
     if (showCreate) {
         CreateGroupDialog(
             onCreate = { name, tags ->

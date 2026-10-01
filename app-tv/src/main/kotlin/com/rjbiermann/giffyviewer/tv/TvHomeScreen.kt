@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -92,7 +93,7 @@ fun TvHomeScreen(
             Text(
                 text = "Giffy Viewer",
                 style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp),
             )
         }
         item { FeedRow("Trending", trending, onOpenGif, onMenu = { actionsFor = it }) }
@@ -112,8 +113,8 @@ fun TvHomeScreen(
             Column(modifier = Modifier.padding(vertical = 12.dp)) {
                 RowTitle("Continue Watching")
                 LazyRow(
-                    contentPadding = PaddingValues(horizontal = 24.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     items(continueEntries, key = { it.gif.id }) { entry ->
                         GifCard(entry.gif, Modifier.width(cardWidth(entry.gif)), onMenu = { actionsFor = entry.gif }) {
@@ -206,21 +207,21 @@ private fun CreatorRow(
     creators: List<com.rjbiermann.giffyviewer.core.network.CreatorSearchItemDto>,
     onOpenCreator: (String) -> Unit,
 ) {
-    if (creators.isEmpty()) return
-    Column(modifier = Modifier.padding(vertical = 12.dp)) {
+    // Same reservation rule as FeedRow: loading rows hold their space.
+    Column(modifier = Modifier.padding(vertical = 8.dp).heightIn(min = ROW_RESERVED_HEIGHT)) {
         RowTitle(title)
         androidx.compose.foundation.lazy.LazyRow(
-            contentPadding = PaddingValues(horizontal = 24.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             items(creators.size, key = { i -> creators[i].username }) { i ->
                 val creator = creators[i]
                 Card(onClick = { onOpenCreator(creator.username) }) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(12.dp)) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(10.dp)) {
                         AsyncImage(
                             model = creator.profileImageUrl,
                             contentDescription = "creator ${creator.username}",
-                            modifier = Modifier.size(120.dp).clip(CircleShape),
+                            modifier = Modifier.size(96.dp).clip(CircleShape),
                         )
                         Text(
                             "@${creator.username}",
@@ -246,11 +247,13 @@ private fun FeedRow(
     onOpenGif: (List<Gif>, Int) -> Unit,
     onMenu: (Gif) -> Unit,
 ) {
-    Column(modifier = Modifier.padding(vertical = 12.dp)) {
+    // Reserve the row's space while paging loads — a zero-height row that pops
+    // to full height shoves every row below (homepage UI drift, user report).
+    Column(modifier = Modifier.padding(vertical = 8.dp).heightIn(min = ROW_RESERVED_HEIGHT)) {
         RowTitle(title)
         LazyRow(
-            contentPadding = PaddingValues(horizontal = 24.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             items(count = gifs.itemCount, key = { i -> gifs[i]?.id ?: "pending$i" }) { i ->
                 gifs[i]?.let { gif ->
@@ -279,12 +282,15 @@ private fun RowTitle(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.titleLarge,
-        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
     )
 }
 
 /** Fixed row content height (10-foot legible) — card width derives per gif aspect. */
 internal val CARD_ROW_HEIGHT_DP = 170.dp
+
+/** FeedRow/CreatorRow reserved height (card + caption) while loading. */
+internal val ROW_RESERVED_HEIGHT = 210.dp
 
 /**
  * Mixed-orientation rows (PLAN §9 TV): card width = row height × the gif's own

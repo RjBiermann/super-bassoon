@@ -1,9 +1,10 @@
 package com.rjbiermann.giffyviewer.core.ui
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,7 +18,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.focusable
 import androidx.compose.ui.composed
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -71,8 +71,10 @@ fun GiffyPillButton(
         shape = RoundedCornerShape(24.dp),
         colors =
             ButtonDefaults.buttonColors(
-                containerColor = if (focused) GiffyColors.BrandRed else Color.Transparent,
-                contentColor = if (focused) Color.White else GiffyColors.BrandRed,
+                // Rest = primaryContainer fill + TextHigh (audit: red-on-black was
+                // 3.5:1 < AA); focus = brand red fill + white.
+                containerColor = if (focused) GiffyColors.BrandRed else GiffyColors.TextHigh.copy(alpha = 0.08f),
+                contentColor = if (focused) Color.White else GiffyColors.TextHigh,
             ),
         border = BorderStroke(1.dp, GiffyColors.BrandRed),
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),

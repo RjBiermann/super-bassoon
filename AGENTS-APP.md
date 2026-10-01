@@ -61,6 +61,62 @@ Compose UI, navigation, platform shells. Spec: PLAN.md §3, §7–9.
 - Touch-coordinate scale: Phone34 thumbnails 540×1170 for a 1080×2400 screen = ×2.051,
   NOT ×2 — SAF dialog buttons at (958, 2215), Import button at (423, 810).
 
+## UI/UX audit findings (2026-10, research-only — fixes unscheduled)
+Static review against mobile-accessibility / M3 / ui-ux-pro-max rules. Not a work order;
+a user slice picks from this list. Priority order within each tier.
+
+**Critical**
+- Dead control: CollectionsScreen share `IconButton(onClick = {})` — wire it or remove the icon (repo "no stubs" rule).
+- Explore error path: `onFailure { loading = false }` with no error UI, and the
+  `LaunchedEffect(creators.size)` refetch never re-fires when a failed fetch adds nothing →
+  permanently blank screen until recomposition. Same silent-failure pattern in
+  NichesScreen.loadMore + TvNichesViewModel.loadMore. Shared `EmptyState` (core:ui) covers
+  empty states on FeedScreen only — every other list surface needs an error/empty branch.
+- PIN lock (PinLockScreen): `✓` key is dead (`key == '✓' -> {}`, unlock auto-fires at 4 digits);
+  no escape/recovery affordance; 400ms delay, unlimited attempts (lockout absent).
+
+**High (a11y / destructive actions)**
+- GiffyPillButton rest state: BrandRed #D70003 text on near-black ≈ 3.5:1 < 4.5:1 AA
+  (14sp text) — this is the TV age-gate + all header pills. Fix: lighter red for
+  text-on-black or primaryContainer fill at rest (border can stay, it's decorative).
+- Player bottom text cluster (description/tags/@user) + action rail + Retry/Skip overlay
+  sit directly on video with no gradient scrim — unreadable on bright content.
+- Player Retry/Skip are bare Text+clickable ≈ 36dp tall < 48dp target (error state =
+  imprecise tapping); use TextButton or 48dp min-height.
+- Delete confirm inconsistency: Collections delete confirms, Groups delete is instant —
+  same destructive class needs the same dialog or undo snackbar.
+- TV age gate has no initial-focus FocusRequester (home screen got that fix; the
+  first screen a TV user sees didn't).
+
+**Medium**
+- AuthScreen coaches the DevTools paste-token flow first; PKCE "Sign in with browser"
+  (AGENTS-AUTH primary path) is a secondary button. Invert the hierarchy.
+- Settings Switch rows: whole row should be `Modifier.toggleable(role = Role.Switch)`
+  (target size + TalkBack state announcement), not Switch-only hit area.
+- FeedScreen empty-Favorites hint says "long-press a tile and choose Favorite" — no tiles
+  exist on an empty feed, and the sheet item is creator-favorite. Wording needs a fix.
+- Double-tap like toggles unlike on an already-liked gif (PLAN §9 semantics: double-tap
+  = like); only the rail heart should toggle.
+- TvPlayerScreen has no pause/seek/position at all (D-pad walks + back only) — documented
+  Phase-6 slice limit, but "can't pause on TV" is a real gap. TvSourceFeedScreen
+  `onMenu = {}` is another dead control.
+- Tile a11y noise: image contentDescription "Gif by @user" + visible "@user" Text = creator
+  announced twice per tile; make the image decorative or mergeDescendants. Long-press
+  affordance unannounced (add onLongClickLabel semantics).
+- Search suggestions render a bare count ("1234", no unit) — "1,234 gifs".
+
+**Low**
+- OfflineNotice duplicates core:ui EmptyState — reuse it.
+- QuickBlockSheet speed label `String.format("%.2f")` is locale-dependent (comma decimals)
+  and 2 decimals is false precision for 0.25 steps → Locale.US + %.1f.
+- PinLockScreen: no haptic on keypress / wrong-PIN shake.
+- NichesScreen initial fetch inside `remember { scope.launch {} }` — should be
+  LaunchedEffect(Unit) (same length, correct idiom).
+- contentDescription capitalization varies ("search" vs "Sound On") — copy consistency.
+
+Skipped by design: live D-pad traversal audit (needs emulator session via debroid/mobile
+MCP); contrast math under dynamic-color theme (Material guarantees it).
+
 ## UX polish (Phase 7 slice 3, verified live on Phone34 + TV36)
 - Mobile tiles: avgColor placeholder + reserved aspect ratio (no layout jump / black
   flash), 12dp rounded corners, Coil crossfade, contentDescription "Gif by @user".

@@ -116,97 +116,100 @@ class TvMainActivity : ComponentActivity() {
             }
         }
 
-        when {
-            !confirmed -> AgeGate(onConfirmed = { settings.confirmAge() })
-            player != null -> {
-                val (gifs, start) = player ?: listOf<Gif>() to 0
-                TvPlayerScreen(
-                    gifs = gifs,
-                    startIndex = start,
-                    playerFactory = playerFactory,
-                    settings = settings,
-                    db = db,
-                    onBack = { player = null },
-                )
-            }
-            openFeed != null -> {
-                val source = openFeed
-                if (source != null) {
-                    val feedVm: TvNicheFeedViewModel = hiltViewModel()
-                    TvSourceFeedScreen(
-                        source = source,
-                        onOpenGif = { gifs, index -> player = gifs to index },
-                        viewModel = feedVm,
+        // PLAN §1: 5% overscan margins on TV — content never touches the bezel.
+        Column(modifier = Modifier.fillMaxSize().padding(horizontal = 48.dp, vertical = 27.dp)) {
+            when {
+                !confirmed -> AgeGate(onConfirmed = { settings.confirmAge() })
+                player != null -> {
+                    val (gifs, start) = player ?: listOf<Gif>() to 0
+                    TvPlayerScreen(
+                        gifs = gifs,
+                        startIndex = start,
+                        playerFactory = playerFactory,
+                        settings = settings,
+                        db = db,
+                        onBack = { player = null },
                     )
                 }
-            }
-            showNiches -> {
-                val nichesVm: TvNichesViewModel = hiltViewModel()
-                TvNichesScreen(
-                    onOpenNiche = { niche -> openFeed = niche },
-                    viewModel = nichesVm,
-                )
-            }
-            showAccount -> AuthScreen(onBack = { showAccount = false })
-            showSettings -> SettingsScreen(onBack = { showSettings = false })
-            else -> {
-                val home: TvHomeViewModel = hiltViewModel()
-                val continueVm: ContinueWatchingViewModel = hiltViewModel()
-                val focusRequester = remember { FocusRequester() }
-                // No initial D-pad focus otherwise — header buttons were unreachable
-                // until the user tabbed into a row blindly.
-                LaunchedEffect(Unit) { focusRequester.requestFocus() }
-                Column(modifier = Modifier.fillMaxSize()) {
-                    // Pinned niches = TV's version of the mobile home chip tabs;
-                    // pills scroll horizontally like the mobile chip row.
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        item {
-                            AccountButton(
-                                focusRequester = focusRequester,
-                                onClick = { showAccount = true },
-                            )
-                        }
-                        item {
-                            com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
-                                text = "Settings",
-                                onClick = { showSettings = true },
-                                modifier = Modifier.padding(16.dp),
-                            )
-                        }
-                        item {
-                            com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
-                                text = "Niches",
-                                onClick = { showNiches = true },
-                                modifier = Modifier.padding(16.dp),
-                            )
-                        }
-                        items(pinnedNiches.toList()) { entry ->
-                            val id = entry.substringBefore('|')
-                            val name = entry.substringAfter('|')
-                            com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
-                                text = name,
-                                onClick = { openFeed = FeedSource.Niche(id, name) },
-                                modifier = Modifier.padding(16.dp),
-                            )
-                        }
-                        // Pinned creators = home pills (PLAN §7 pin-to-tabs), same as mobile chips.
-                        items(pinnedCreators.toList()) { username ->
-                            com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
-                                text = "@$username",
-                                onClick = { openFeed = FeedSource.Creator(username) },
-                                modifier = Modifier.padding(16.dp),
-                            )
-                        }
+                openFeed != null -> {
+                    val source = openFeed
+                    if (source != null) {
+                        val feedVm: TvNicheFeedViewModel = hiltViewModel()
+                        TvSourceFeedScreen(
+                            source = source,
+                            onOpenGif = { gifs, index -> player = gifs to index },
+                            viewModel = feedVm,
+                        )
                     }
-                    TvHomeScreen(
-                        onOpenGif = { gifs, index -> player = gifs to index },
-                        onOpenCreator = { username -> openFeed = FeedSource.Creator(username = username) },
-                        homeViewModel = home,
-                        continueViewModel = continueVm,
+                }
+                showNiches -> {
+                    val nichesVm: TvNichesViewModel = hiltViewModel()
+                    TvNichesScreen(
+                        onOpenNiche = { niche -> openFeed = niche },
+                        viewModel = nichesVm,
                     )
+                }
+                showAccount -> AuthScreen(onBack = { showAccount = false })
+                showSettings -> SettingsScreen(onBack = { showSettings = false })
+                else -> {
+                    val home: TvHomeViewModel = hiltViewModel()
+                    val continueVm: ContinueWatchingViewModel = hiltViewModel()
+                    val focusRequester = remember { FocusRequester() }
+                    // No initial D-pad focus otherwise — header buttons were unreachable
+                    // until the user tabbed into a row blindly.
+                    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        // Pinned niches = TV's version of the mobile home chip tabs;
+                        // pills scroll horizontally like the mobile chip row.
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            item {
+                                AccountButton(
+                                    focusRequester = focusRequester,
+                                    onClick = { showAccount = true },
+                                )
+                            }
+                            item {
+                                com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
+                                    text = "Settings",
+                                    onClick = { showSettings = true },
+                                    modifier = Modifier.padding(6.dp),
+                                )
+                            }
+                            item {
+                                com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
+                                    text = "Niches",
+                                    onClick = { showNiches = true },
+                                    modifier = Modifier.padding(6.dp),
+                                )
+                            }
+                            items(pinnedNiches.toList()) { entry ->
+                                val id = entry.substringBefore('|')
+                                val name = entry.substringAfter('|')
+                                com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
+                                    text = name,
+                                    onClick = { openFeed = FeedSource.Niche(id, name) },
+                                    modifier = Modifier.padding(6.dp),
+                                )
+                            }
+                            // Pinned creators = home pills (PLAN §7 pin-to-tabs), same as mobile chips.
+                            items(pinnedCreators.toList()) { username ->
+                                com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
+                                    text = "@$username",
+                                    onClick = { openFeed = FeedSource.Creator(username) },
+                                    modifier = Modifier.padding(6.dp),
+                                )
+                            }
+                        }
+                        TvHomeScreen(
+                            onOpenGif = { gifs, index -> player = gifs to index },
+                            onOpenCreator = { username -> openFeed = FeedSource.Creator(username = username) },
+                            homeViewModel = home,
+                            continueViewModel = continueVm,
+                        )
+                    }
                 }
             }
         }
@@ -216,6 +219,8 @@ class TvMainActivity : ComponentActivity() {
     @Composable
     private fun AgeGate(onConfirmed: suspend () -> Unit) {
         val scope = rememberCoroutineScope()
+        val gateFocus = remember { FocusRequester() }
+        LaunchedEffect(Unit) { gateFocus.requestFocus() }
         Surface(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -232,6 +237,7 @@ class TvMainActivity : ComponentActivity() {
                 com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
                     text = "I am 18 or older — Enter",
                     onClick = { scope.launch { onConfirmed() } },
+                    modifier = Modifier.focusRequester(gateFocus),
                 )
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(onClick = ::finishAffinity) { Text("Exit (leaves app)") }

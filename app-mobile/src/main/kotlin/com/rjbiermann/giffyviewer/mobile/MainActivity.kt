@@ -41,13 +41,13 @@ import com.rjbiermann.giffyviewer.core.ui.GiffyTheme
 import com.rjbiermann.giffyviewer.core.ui.LayoutHint
 import com.rjbiermann.giffyviewer.core.ui.layoutHint
 import com.rjbiermann.giffyviewer.feature.auth.AuthScreen
+import com.rjbiermann.giffyviewer.feature.feed.CollectionsScreen
+import com.rjbiermann.giffyviewer.feature.feed.CollectionsViewModel
 import com.rjbiermann.giffyviewer.feature.feed.ExploreScreen
 import com.rjbiermann.giffyviewer.feature.feed.FeedScreen
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
 import com.rjbiermann.giffyviewer.feature.feed.FollowingScreen
-import com.rjbiermann.giffyviewer.feature.feed.CollectionsScreen
-import com.rjbiermann.giffyviewer.feature.feed.CollectionsViewModel
 import com.rjbiermann.giffyviewer.feature.feed.FollowingViewModel
 import com.rjbiermann.giffyviewer.feature.feed.GroupsScreen
 import com.rjbiermann.giffyviewer.feature.feed.GroupsViewModel
@@ -314,22 +314,24 @@ private fun PinLockScreen(
     var entry by remember { mutableStateOf("") }
     var wrong by remember { mutableStateOf(false) }
 
+    fun verify(pin: String) {
+        scope.launch {
+            val ok = settings.verifyPin(pin)
+            if (ok) {
+                onUnlock()
+            } else {
+                wrong = true
+                kotlinx.coroutines.delay(400)
+                entry = ""
+                wrong = false
+            }
+        }
+    }
+
     fun onDigit(d: Char) {
         if (entry.length >= 4) return
         entry += d
-        if (entry.length == 4) {
-            scope.launch {
-                val ok = settings.verifyPin(entry)
-                if (ok) {
-                    onUnlock()
-                } else {
-                    wrong = true
-                    kotlinx.coroutines.delay(400)
-                    entry = ""
-                    wrong = false
-                }
-            }
-        }
+        if (entry.length == 4) verify(entry)
     }
 
     Column(
@@ -377,7 +379,9 @@ private fun PinLockScreen(
                         onClick = {
                             when {
                                 key == '⌫' -> if (entry.isNotEmpty()) entry = entry.dropLast(1)
-                                key == '✓' -> {} // auto-unlocks at 4 digits
+                                // ✓ = submit now (audit: dead key); a 4th digit
+                                // still auto-fires the same verify.
+                                key == '✓' -> if (entry.length == 4) verify(entry)
                                 else -> onDigit(key)
                             }
                         },

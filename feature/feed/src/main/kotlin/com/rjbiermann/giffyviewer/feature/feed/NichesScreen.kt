@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -60,6 +61,7 @@ fun NichesScreen(
     val pinned by settings.pinnedNiches.collectAsStateWithLifecycle(initialValue = emptySet())
     var nextPage by remember { mutableIntStateOf(1) }
     var loading by remember { mutableStateOf(false) }
+    var loadFailed by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     fun loadMore() {
@@ -68,9 +70,10 @@ fun NichesScreen(
         scope.launch {
             runCatching { api.niches(page = nextPage) }
                 .onSuccess { pageDto ->
+                    loadFailed = false
                     niches = niches + pageDto.niches
                     nextPage = if (pageDto.page < pageDto.pages) pageDto.page + 1 else 0
-                }
+                }.onFailure { loadFailed = true }
             loading = false
         }
     }
@@ -131,6 +134,19 @@ fun NichesScreen(
                     },
                     modifier = Modifier.clickable { onOpenNiche(FeedSource.Niche(niche.id, niche.name)) },
                 )
+            }
+            if (loadFailed) {
+                item(key = "error") {
+                    com.rjbiermann.giffyviewer.core.ui.EmptyState(
+                        message = "Couldn't load niches",
+                        hint = "Check your connection and retry",
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    )
+                    TextButton(
+                        onClick = { loadMore() },
+                        modifier = Modifier.padding(16.dp),
+                    ) { Text("Retry") }
+                }
             }
             if (nextPage > 0) {
                 item(key = "load-more") {

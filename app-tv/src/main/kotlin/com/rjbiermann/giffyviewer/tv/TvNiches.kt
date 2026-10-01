@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -64,6 +65,9 @@ class TvNichesViewModel
         private val _endReached = MutableStateFlow(false)
         val endReached: StateFlow<Boolean> = _endReached
 
+        private val _loadFailed = MutableStateFlow(false)
+        val loadFailed: StateFlow<Boolean> = _loadFailed
+
         private var nextPage = 1
         private var loading = false
 
@@ -74,10 +78,11 @@ class TvNichesViewModel
             viewModelScope.launch {
                 runCatching { api.niches(page = nextPage) }
                     .onSuccess { pageDto ->
+                        _loadFailed.value = false
                         _niches.value = _niches.value + pageDto.niches
                         nextPage = if (pageDto.page < pageDto.pages) pageDto.page + 1 else 0
                         _endReached.value = nextPage == 0
-                    }
+                    }.onFailure { _loadFailed.value = true }
                 loading = false
             }
         }
@@ -99,6 +104,7 @@ fun TvNichesScreen(
 ) {
     val niches by viewModel.niches.collectAsStateWithLifecycle()
     val endReached by viewModel.endReached.collectAsStateWithLifecycle()
+    val loadFailed by viewModel.loadFailed.collectAsStateWithLifecycle()
     val pinned by viewModel.settings.pinnedNiches.collectAsStateWithLifecycle(initialValue = emptySet())
 
     // D-pad browsing has no tap-to-load-more: fetch as focus nears the end.
@@ -111,11 +117,11 @@ fun TvNichesScreen(
         Text(
             text = "Niches",
             style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(24.dp),
+            modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp),
         )
         LazyColumn(
             modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
-            contentPadding = PaddingValues(bottom = 24.dp),
+            contentPadding = PaddingValues(bottom = 16.dp),
         ) {
             itemsIndexed(niches, key = { _, n -> n.id }) { index, niche ->
                 val isPinned = pinned.any { it.startsWith("${niche.id}|") }
@@ -141,7 +147,7 @@ fun TvNichesScreen(
                                 } else {
                                     false
                                 }
-                            }.padding(horizontal = 24.dp, vertical = 10.dp),
+                            }.padding(horizontal = 16.dp, vertical = 8.dp),
                 ) {
                     Text(
                         text = (if (isPinned) "📌 " else "") + niche.name,
@@ -154,13 +160,24 @@ fun TvNichesScreen(
                     )
                 }
             }
+            if (loadFailed) {
+                item(key = "error") {
+                    Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
+                        Text(
+                            "Couldn't load niches — check your connection",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        TextButton(onClick = { viewModel.loadMore() }) { Text("Retry") }
+                    }
+                }
+            }
             if (endReached) {
                 item(key = "end") {
                     Text(
                         "That's all ${niches.size} niches",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(24.dp),
+                        modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp),
                     )
                 }
             }
@@ -183,14 +200,14 @@ fun TvSourceFeedScreen(
         Text(
             text = source.title(),
             style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(24.dp),
+            modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp),
         )
         LazyVerticalGrid(
             columns = GridCells.Fixed(4),
-            modifier = Modifier.fillMaxSize().padding(top = 56.dp),
-            contentPadding = PaddingValues(24.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.fillMaxSize().padding(top = 44.dp),
+            contentPadding = PaddingValues(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             items(count = gifs.itemCount, key = { i -> gifs[i]?.id ?: "pending$i" }) { i ->
                 gifs[i]?.let { gif ->

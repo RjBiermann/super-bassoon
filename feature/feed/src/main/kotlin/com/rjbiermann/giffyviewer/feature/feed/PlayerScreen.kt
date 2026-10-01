@@ -10,7 +10,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -24,6 +23,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -53,6 +53,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -67,7 +68,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -518,6 +518,9 @@ private fun PlayerPage(
             factory = { ctx ->
                 PlayerView(ctx).apply {
                     useController = false
+                    // §5 video fit: Fit is the DEFAULT (never loses content) —
+                    // black bars are expected for aspect-mismatched gifs; the
+                    // Crop/Stretch picker is spec'd-not-scheduled.
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                 }
             },
@@ -537,6 +540,29 @@ private fun PlayerPage(
                         translationY = pan.y
                     },
         )
+        // Bottom gradient scrim (audit H5 / AGENTS-UX-PATTERNS): text and rail
+        // stay legible on bright content; fades with the controls.
+        AnimatedVisibility(
+            visible = controlsVisible && active,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.matchParentSize(),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            androidx.compose.ui.graphics.Brush.verticalGradient(
+                                0f to androidx.compose.ui.graphics.Color.Transparent,
+                                0.65f to androidx.compose.ui.graphics.Color.Transparent,
+                                1f to
+                                    androidx.compose.ui.graphics.Color.Black
+                                        .copy(alpha = 0.55f),
+                            ),
+                        ),
+            )
+        }
         // creator chip + description + tags row (PLAN §9 bottom-left cluster).
         // Tags display-only for now — tappable when tag feeds land.
         // Auto-hide: fades out with the controls — only the thin progress
@@ -655,28 +681,23 @@ private fun PlayerPage(
                 Text("Playback failed", color = Color.White, style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        text = "Retry",
-                        color = GiffyColors.Lime,
-                        style = MaterialTheme.typography.labelLarge,
-                        modifier =
-                            Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .border(1.dp, GiffyColors.Lime, RoundedCornerShape(8.dp))
-                                .clickable(onClick = onRetry)
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
-                    Text(
-                        text = "Skip",
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelLarge,
-                        modifier =
-                            Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                                .clickable(onClick = onSkip)
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
+                    // TextButtons: ≥48dp touch target (audit H6 — bare Text was ~36dp).
+                    TextButton(
+                        onClick = onRetry,
+                        colors =
+                            androidx.compose.material3.ButtonDefaults.textButtonColors(
+                                contentColor = GiffyColors.Lime,
+                            ),
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    ) { Text("Retry", style = MaterialTheme.typography.labelLarge) }
+                    TextButton(
+                        onClick = onSkip,
+                        colors =
+                            androidx.compose.material3.ButtonDefaults.textButtonColors(
+                                contentColor = Color.White,
+                            ),
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    ) { Text("Skip", style = MaterialTheme.typography.labelLarge) }
                 }
             }
         }

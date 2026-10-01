@@ -3,6 +3,7 @@ package com.rjbiermann.giffyviewer.feature.feed
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -19,6 +20,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -53,6 +55,7 @@ fun ExploreScreen(
     var nextPage by remember { mutableIntStateOf(1) }
     var endReached by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
+    var loadFailed by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     fun loadMore() {
@@ -110,6 +113,19 @@ fun ExploreScreen(
                     supportingContent = { Text("${creator.followers} followers · ${creator.gifs} gifs") },
                     modifier = Modifier.clickable { onOpenCreator(creator.username) },
                 )
+            }
+            if (loadFailed) {
+                item(key = "error") {
+                    com.rjbiermann.giffyviewer.core.ui.EmptyState(
+                        message = "Couldn't load creators",
+                        hint = "Check your connection and retry",
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    )
+                    TextButton(
+                        onClick = { loadMore() },
+                        modifier = Modifier.padding(16.dp),
+                    ) { Text("Retry") }
+                }
             }
             if (endReached) {
                 item(key = "end") {

@@ -12,7 +12,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.AlertDialog
@@ -91,9 +90,6 @@ fun CollectionsScreen(
                             }
                             IconButton(onClick = { deleteFor = collection }) {
                                 Icon(Icons.Outlined.Delete, contentDescription = "delete ${collection.folderName}")
-                            }
-                            IconButton(onClick = {}) {
-                                Icon(Icons.Filled.Share, contentDescription = "share ${collection.folderName}")
                             }
                         }
                     },

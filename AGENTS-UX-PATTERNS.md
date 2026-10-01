@@ -40,6 +40,10 @@ conventions* are fine; its *retention playbook* is not.
   collapses to a small anchored window over the grid. Cost is high (PiP
   lifecycle, one-active-player invariant in §9 lives here); viewer value is
   low. Skip unless requested.
+- **Bottom gradient scrim on player text (TikTok/Reels):** description/tags/@user and
+  action-rail icons sit on a bottom gradient instead of raw video — legibility on bright
+  content. Found missing in the 2026-10 audit (AGENTS-APP.md); adopt with the next
+  player-controls touch, cheap (one `Brush.verticalGradient` behind the bottom cluster).
 - **Instagram tap-to-collapse captions/description:** long description lines
   truncate to 2 lines with "more" — already how the description+tags display
   behaves (Phase 9 slice set). Verify parity when touching it; nothing to build.
