@@ -26,8 +26,9 @@ Never log, expose, or transmit the token anywhere except the token-reveal screen
   JWT-shape validation (3 base64url parts) rejects fat-finger pastes. Encrypted at rest —
   confirmed via run-as (Tink keyset only, no plaintext). security-crypto is deprecated
   upstream; revisit when a successor ships.
-- `feature:auth` `AuthScreen` + `AuthViewModel`: paste-token sign-in, reveal+copy dialog
-  (TV use), sign-out. Reached via person icon on the feed app bar.
+- `feature:auth` `AuthScreen` + `AuthViewModel`: **WebView sign-in only** (paste-token
+  + reveal-token REMOVED 2026-10 by user decision — no bearer-token UI remains), sign-out.
+  Reached via person icon on the feed app bar; TV reuses the same screen.
 - Bearer wiring: `AppModule.network()` sends user token first, anonymous temp token fallback.
 - Sign-out currently wipes the token only; WebView cookie clearing lands with WebView login.
   No revoke endpoint exists (POST /v2/auth dead) — TBD via OAuth client.
@@ -39,7 +40,8 @@ Flow (all live-verified against upstream-auth-host.example with a real account):
 2. `TokenStore.authorizeUrl(pkce)` → `https://upstream-auth-host.example/oauth2/auth?client_id=…&redirect_uri=https://upstream-site.example&response_type=code&scope=openid profile email offline&code_challenge=…&code_challenge_method=S256&state=…`. When already signed in on that browser profile this 302s **instantly** with a code; otherwise the auth2 login form shows (which **renders fine in emulator WebViews** — unlike the www site pages).
 3. `WebViewLoginScreen` intercepts the `upstream-site.example/?code=…&state=…` redirect in `shouldOverrideUrlLoading` (state-checked, site JS never runs — no code race) and hands the code up.
 4. `AuthViewModel.exchangeCode(code)` → `TokenStore.exchangeBlocking(code, verifier)` on IO → `POST /oauth2/token` grant_type=authorization_code → stores id_token + refresh_token.
-5. `BackHandler`: WebView history back, else close. Paste-token stays as the fallback (TV).
+5. `BackHandler`: WebView history back, else close. (The old paste-token TV fallback was
+   removed 2026-10; TV signs in through the same WebView flow.)
 
 Verified live on the API-33 emulator (Medium_Phone): user logged in with email + OTP code inside the WebView → code captured on redirect → exchange → "Signed in" → **force-stop → relaunch → still Signed in** → feed requests authenticated, zero Auth401s.
 
@@ -47,7 +49,7 @@ Verified live on the API-33 emulator (Medium_Phone): user logged in with email +
 
 Gone: the earlier `localStorage.auth_data` polling capture — the real site never writes it (wrong assumption, killed by the Playwright observation above).
 
-**Emulator quirk (informational):** upstream-site.example pages can paint black/white in emulator WebViews (old Chrome WebView + the site's own CSS). auth2 login pages render fine. If a device WebView ever fails the auth2 page, paste-token is the fallback.
+**Emulator quirk (informational):** upstream-site.example pages can paint black/white in emulator WebViews (old Chrome WebView + the site's own CSS). auth2 login pages render fine. (The paste-token fallback was removed 2026-10 — if a device WebView ever fails the auth2 page there is no fallback UI; the auth2 page itself is WebView-verified.)
 
 ## Real-token end-to-end (verified on TV36 2026-09-30)
 - **The browser id_token (issuer `upstream-auth-host.example`) IS the API bearer** — works on

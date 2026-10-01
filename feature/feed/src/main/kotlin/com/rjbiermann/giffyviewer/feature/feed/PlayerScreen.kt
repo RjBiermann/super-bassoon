@@ -146,6 +146,11 @@ fun PlayerScreen(
     // auto-advance plays the next item from 0 — a watched neighbor resuming
     // near its end would end instantly and cascade swipes (user report)
     val skipResume = remember { mutableStateOf(false) }
+    // Ended at the last LOADED page: the video sits ended while the next page
+    // fetches — an ended video fires no further ended event, so the advance
+    // must be re-driven when the page lands (user: "keep swiping until there
+    // is no more page").
+    val pendingAdvance = remember { mutableStateOf(false) }
 
     var fullscreen by remember { mutableStateOf(false) }
     var controlsVisible by remember { mutableStateOf(true) }
@@ -223,9 +228,9 @@ fun PlayerScreen(
                                 if (reduced) pagerState.scrollToPage(next) else pagerState.animateScrollToPage(next)
                             }
                         } else {
-                            // end of loaded pool: retry asks paging for the next
-                            // page; advance will happen on the next ended event
-                            // (ponytail: no queue-when-arrived)
+                            // end of loaded pool: ask paging for the next page;
+                            // the LaunchedEffect below advances when it lands.
+                            pendingAdvance.value = true
                             items.retry()
                         }
                     }
@@ -236,6 +241,33 @@ fun PlayerScreen(
     }
     // likes are refreshed per use (PLAN §5)
     LaunchedEffect(Unit) { viewModel.syncLikes() }
+    // Advance past the pool end once the next page lands (or loop when the
+    // server says there is no more — see pendingAdvance + the ended listener).
+    LaunchedEffect(pendingAdvance.value, items.itemCount, items.loadState.append) {
+        if (!pendingAdvance.value) return@LaunchedEffect
+        val next = pagerState.currentPage + 1
+        when {
+            next < items.itemCount -> {
+                pendingAdvance.value = false
+                skipResume.value = true
+                val reduced =
+                    android.provider.Settings.Global.getFloat(
+                        context.contentResolver,
+                        android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+                        1f,
+                    ) == 0f
+                if (reduced) pagerState.scrollToPage(next) else pagerState.animateScrollToPage(next)
+            }
+            (items.loadState.append as? androidx.paging.LoadState.NotLoading)?.endOfPaginationReached == true -> {
+                // truly no more pages: loop the last video (black ended frame
+                // otherwise)
+                pendingAdvance.value = false
+                player.seekTo(0)
+                player.play()
+            }
+            else -> items.retry()
+        }
+    }
     // adjacent-item prefetch (PLAN §9): prepare next/prev on settle
     LaunchedEffect(pagerState.currentPage, dataSaver) {
         val page = pagerState.currentPage
@@ -246,8 +278,12 @@ fun PlayerScreen(
             }
         player.preloadNeighbors(neighbors.filterNotNull(), dataSaver)
     }
-    // errors belong to the current item; a swipe resets the overlay
-    LaunchedEffect(pagerState.currentPage) { playError = false }
+    // errors belong to the current item; a swipe resets the overlay + the
+    // pending pool-end advance (a manual swipe supersedes it)
+    LaunchedEffect(pagerState.currentPage) {
+        playError = false
+        pendingAdvance.value = false
+    }
     // position + play-state ticker drives progress bar / play button
     LaunchedEffect(scrubbing) {
         while (true) {
