@@ -79,8 +79,13 @@ object TvAppModule {
                 context,
                 GiffyDatabase::class.java,
                 GiffyDatabase.NAME,
-            ).addMigrations(GiffyDatabase.MIGRATION_1_2, GiffyDatabase.MIGRATION_2_3, GiffyDatabase.MIGRATION_3_4, GiffyDatabase.MIGRATION_4_5)
-            .build()
+            ).addMigrations(
+                GiffyDatabase.MIGRATION_1_2,
+                GiffyDatabase.MIGRATION_2_3,
+                GiffyDatabase.MIGRATION_3_4,
+                GiffyDatabase.MIGRATION_4_5,
+                GiffyDatabase.MIGRATION_5_6,
+            ).build()
 
     /** Images share the API's OkHttp instance → same rate limiter covers media. */
     @Provides

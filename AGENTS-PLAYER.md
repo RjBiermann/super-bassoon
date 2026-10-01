@@ -5,7 +5,7 @@ Media3/ExoPlayer + SimpleCache. Spec: PLAN.md §5.
 ## Cache
 - **SimpleCache keyed by gif ID, not URL** — URL rotates, ID doesn't.
 - One SimpleCache instance per process (Media3 requirement); evict-by-LRU.
-- Sizes: mobile default 256MB (options 128/256/512) · TV default 1GB (512MB/1GB/2GB), settable in settings.
+- **Fixed constants (PLAN §5, not DataStore-configurable): mobile 512MB · TV 1GB.** Both figures shown in Settings (+ TV) with a Clear cache button (confirm-first).
 - `CacheDataSource` flags: cache + stream (BLOCK_ON_CACHE? no) — enable caching for the data source
   while playback streams in parallel (standard `CacheDataSink`/`CacheDataSource` non-blocking setup).
 

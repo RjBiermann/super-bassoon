@@ -50,23 +50,27 @@ class ContentFilter
             mutex.withLock { groupTags = merged }
         }
 
-        /** Null = allow. Otherwise the reason: "creator" | "tag" | "group" | "keyword". */
+        /** Null = allow. Otherwise the reason: "creator" | "tag" | "group" | "keyword".
+         *  Keyword = case-insensitive substring over description + tags (PLAN §6:
+         *  title/description/tags — gif objects carry no title today). */
         fun hideReason(
             userName: String,
             gifTags: List<String>,
+            description: String? = null,
         ): String? {
             if (userName.lowercase() in creators) return "creator"
             if (gifTags.any { it.lowercase() in tags }) return "tag"
             if (gifTags.any { it.lowercase() in groupTags }) return "group"
-            // upstream gif objects carry no title/description — tags are the only text.
             if (keywords.any { k -> gifTags.any { it.lowercase().contains(k) } }) return "keyword"
+            if (description != null && keywords.any { description.lowercase().contains(it) }) return "keyword"
             return null
         }
 
         fun allow(
             userName: String,
             gifTags: List<String>,
-        ): Boolean = hideReason(userName, gifTags) == null
+            description: String? = null,
+        ): Boolean = hideReason(userName, gifTags, description) == null
     }
 
 /** Start of the 7-day bucket containing [nowEpochMs] (PLAN §6 rolling counter). */

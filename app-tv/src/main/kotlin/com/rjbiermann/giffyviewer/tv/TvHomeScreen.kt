@@ -54,8 +54,8 @@ import androidx.compose.material3.Surface as M3Surface
 
 /**
  * 10-foot UI (PLAN §8 TV): vertical stack of rows, D-pad navigates rows and
- * cards; center opens the player. Rows: Trending · Discover · Continue Watching
- * (Favorites/group rows land in Phase 7 with those features).
+ * cards; center opens the player. Rows: Trending · Top This Week · Continue
+ * Watching (Favorites/group/Explore rows land in Phase 7 with those features).
  */
 @Composable
 fun TvHomeScreen(
@@ -64,7 +64,6 @@ fun TvHomeScreen(
     continueViewModel: ContinueWatchingViewModel,
 ) {
     val trending = homeViewModel.trending.collectAsLazyPagingItems()
-    val discover = homeViewModel.discover.collectAsLazyPagingItems()
     val topThisWeek = homeViewModel.topThisWeek.collectAsLazyPagingItems()
     val favorites = homeViewModel.favorites.collectAsLazyPagingItems()
     val continueEntries by continueViewModel.entries.collectAsStateWithLifecycle(initialValue = emptyList())
@@ -85,7 +84,6 @@ fun TvHomeScreen(
             )
         }
         item { FeedRow("Trending", trending, onOpenGif, onMenu = { actionsFor = it }) }
-        item { FeedRow("Discover", discover, onOpenGif, onMenu = { actionsFor = it }) }
         item { FeedRow("Top This Week", topThisWeek, onOpenGif, onMenu = { actionsFor = it }) }
         // Empty-state rule: no blank favorites row when nothing is favorited.
         if (hasFavorites) {

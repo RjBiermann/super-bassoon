@@ -85,6 +85,12 @@ class FeedMediatorFavoritesTest {
             body: com.rjbiermann.giffyviewer.core.network.SubscriptionBody,
         ) = throw NotImplementedError()
 
+        override suspend fun nicheDetail(id: String) = throw NotImplementedError()
+
+        override suspend fun nicheTopCreators(id: String) = throw NotImplementedError()
+
+        override suspend fun nicheRelated(id: String) = throw NotImplementedError()
+
         override suspend fun leaveNiche(
             id: String,
             body: com.rjbiermann.giffyviewer.core.network.SubscriptionBody,

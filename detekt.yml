@@ -8,7 +8,7 @@ complexity:
     active: false
   TooManyFunctions:
     active: true
-    thresholdInInterfaces: 25 # ContentPrefsDao is one wide data-access surface (tags+creators+keywords)
+    thresholdInInterfaces: 30 # one wide data-access surface per file is by design (ContentPrefsDao, upstreamApi)
     thresholdInClasses: 25 # wide data-access fakes (ContentPrefsDao fake) are one class by design
 style:
   MagicNumber:

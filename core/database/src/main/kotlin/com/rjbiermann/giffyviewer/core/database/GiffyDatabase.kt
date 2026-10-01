@@ -16,7 +16,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         FeedPageEntity::class,
         SearchHistoryEntity::class,
         TagEntity::class,
-        FavoritesRemoteEntity::class,
+        LikedIdsEntity::class,
         WatchHistoryEntity::class,
         CreatorPrefEntity::class,
         TagPrefEntity::class,
@@ -24,7 +24,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         HideCountEntity::class,
         NicheGroupEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 @TypeConverters(ListConverters::class)
@@ -37,7 +37,7 @@ abstract class GiffyDatabase : RoomDatabase() {
 
     abstract fun tagDao(): TagDao
 
-    abstract fun favoritesRemoteDao(): FavoritesRemoteDao
+    abstract fun likedIdsDao(): LikedIdsDao
 
     abstract fun watchHistoryDao(): WatchHistoryDao
 
@@ -87,6 +87,15 @@ abstract class GiffyDatabase : RoomDatabase() {
                             "(`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, " +
                             "`tagList` TEXT NOT NULL, `state` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)",
                     )
+                }
+            }
+
+        /** v5→6: rename the likes mirror to the PLAN §5 name (`liked_ids` — the old
+         *  `favorites_remote` name collides with "favorites", a different concept in §7). */
+        val MIGRATION_5_6 =
+            object : Migration(5, 6) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE `favorites_remote` RENAME TO `liked_ids`")
                 }
             }
 

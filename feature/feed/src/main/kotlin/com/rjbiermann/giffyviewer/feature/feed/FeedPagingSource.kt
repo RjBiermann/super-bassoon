@@ -92,13 +92,13 @@ class FeedPagingSource(
             val models = ids.mapNotNull { byId[it]?.toModel() }
             // hide-count increment lives in the pipeline (PLAN §6): one batched
             // write per page load — recount on reload is accepted (read-time filter)
-            val hidden = models.count { !contentFilter.allow(it.userName, it.tags) }
+            val hidden = models.count { !contentFilter.allow(it.userName, it.tags, it.description) }
             if (hidden > 0) {
                 db.contentPrefsDao().addHideCount(weekStartMs(System.currentTimeMillis()), hidden)
             }
             val gifs =
                 models
-                    .filter { contentFilter.allow(it.userName, it.tags) }
+                    .filter { contentFilter.allow(it.userName, it.tags, it.description) }
                     .filter { favs == null || it.userName.lowercase() in favs }
             // nextKey exists ONLY when the row was fetched (mediator fills it);
             // unfetched page → nextKey=null → APPEND waits for the mediator.

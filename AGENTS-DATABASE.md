@@ -7,10 +7,11 @@ Spec: PLAN.md §5, §6.
 
 - `gifs` — metadata incl. **tags + username stored locally** (offline filtering depends on it)
 - `feed_pages` — key format `"trend:v2:pop:p3"` incl. extended variants; sort/range changes → **distinct keys**
-- `search_history` · `tags` · `favorites_remote` · `watch_history` (resume positions)
+- `search_history` · `tags` · `liked_ids` (tiny mirror of server likes — write-through like/unlike, refreshed from `/v2/likes`; renders liked badges + Liked feed skeleton offline) · `watch_history` (resume positions; write policy: record only after ≥3s playback OR ≥30% played, one row per gif, cap 1000 oldest-evicted) · `hide_counts` (single rolling 7-day counter) · `custom_feeds` (§7, pending)
 - `creator_prefs(username PK, state, favorited_at)` · `tag_prefs(tag PK, state, blocked_at, favorited_at)`
 - `keyword_blocks(pattern PK, blocked_at)` · `niche_groups(id auto, name, tag_list, state)` (state ∈ BLOCKED | FAVORITED)
-- `collections(id, name, created_at)` · `collection_items(collection_id, username)`
+- `pinned_ids` (server-pin mirror, `v2/pins` — Phase 7)
+- Local `collections` + `collection_items` tables: only if the §2 server-collections verification fails (creator-groupings shape per §6/§7 — decide in Phase 2, not Phase 7)
 - `feed_prefs` handled in `:core:datastore`, **not** Room.
 
 ## Rules

@@ -150,15 +150,21 @@ interface upstreamApi {
      *  cover, counts, rules — the About tab source. `following` reflects the
      *  caller's auth state. */
     @GET("v2/niches/{id}")
-    suspend fun nicheDetail(@Path("id") id: String): NicheDetailDto
+    suspend fun nicheDetail(
+        @Path("id") id: String,
+    ): NicheDetailDto
 
     /** Niche top-creators (live-verified 2026-10-01, anonymous OK). */
     @GET("v2/niches/{id}/top-creators")
-    suspend fun nicheTopCreators(@Path("id") id: String): VerifiedCreatorsPageDto
+    suspend fun nicheTopCreators(
+        @Path("id") id: String,
+    ): VerifiedCreatorsPageDto
 
     /** Related niches (live-verified 2026-10-01, anonymous OK). */
     @GET("v2/niches/{id}/related")
-    suspend fun nicheRelated(@Path("id") id: String): FollowedNichesDto
+    suspend fun nicheRelated(
+        @Path("id") id: String,
+    ): FollowedNichesDto
 
     /** Following (live-verified 2026-10-01): rich creator objects, paginated. */
     @GET("v2/me/following")

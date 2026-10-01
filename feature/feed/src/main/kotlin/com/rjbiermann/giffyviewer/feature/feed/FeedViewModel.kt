@@ -6,8 +6,8 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.rjbiermann.giffyviewer.core.auth.TokenStore
 import com.rjbiermann.giffyviewer.core.database.CreatorPrefEntity
-import com.rjbiermann.giffyviewer.core.database.FavoritesRemoteEntity
 import com.rjbiermann.giffyviewer.core.database.KeywordBlockEntity
+import com.rjbiermann.giffyviewer.core.database.LikedIdsEntity
 import com.rjbiermann.giffyviewer.core.database.TagPrefEntity
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.network.upstreamApi
@@ -93,10 +93,10 @@ class FeedViewModel
                 else -> false
             }
 
-        /** Server like state (PLAN §5): favorites_remote is the read mirror. */
+        /** Server like state (PLAN §5): liked_ids is the read mirror. */
         val likedIds: StateFlow<Set<String>> =
             db
-                .favoritesRemoteDao()
+                .likedIdsDao()
                 .allFlow()
                 .map { rows -> rows.map { it.gifId }.toSet() }
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
@@ -114,7 +114,7 @@ class FeedViewModel
                 runCatching {
                     withContext(Dispatchers.IO) { api.likedIds() }
                 }.onSuccess { ids ->
-                    db.favoritesRemoteDao().replaceAll(ids.map { toFavoritesRemote(it) })
+                    db.likedIdsDao().replaceAll(ids.map { toLikedIds(it) })
                 }
             }
         }
@@ -122,9 +122,9 @@ class FeedViewModel
         /** Optimistic flip + revert on network failure (PLAN §9 action rail). */
         fun toggleLike(gifId: String) {
             viewModelScope.launch {
-                val dao = db.favoritesRemoteDao()
+                val dao = db.likedIdsDao()
                 val liked = gifId in dao.allIds()
-                if (liked) dao.clearById(gifId) else dao.upsert(toFavoritesRemote(gifId))
+                if (liked) dao.clearById(gifId) else dao.upsert(toLikedIds(gifId))
                 val networkResult =
                     withContext(Dispatchers.IO) {
                         runCatching {
@@ -133,7 +133,7 @@ class FeedViewModel
                     }
                 if (networkResult.isFailure) {
                     // revert to the pre-tap state
-                    if (liked) dao.upsert(toFavoritesRemote(gifId)) else dao.clearById(gifId)
+                    if (liked) dao.upsert(toLikedIds(gifId)) else dao.clearById(gifId)
                 }
             }
         }
@@ -269,4 +269,4 @@ class FeedViewModel
         }
     }
 
-private fun toFavoritesRemote(gifId: String) = FavoritesRemoteEntity(gifId = gifId, syncedAt = System.currentTimeMillis())
+private fun toLikedIds(gifId: String) = LikedIdsEntity(gifId = gifId, syncedAt = System.currentTimeMillis())

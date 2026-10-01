@@ -21,11 +21,6 @@ sealed interface FeedSource {
         override val ttlMs = TTL_TRENDING
     }
 
-    data object Discover : FeedSource {
-        override val keyBase = "trend:v2:discover"
-        override val ttlMs = TTL_TRENDING
-    }
-
     data class Search(
         val query: String,
         val sort: String = "",
@@ -107,7 +102,6 @@ fun pageNumber(pageKey: String?): Int? = pageKey?.substringAfterLast(":p", "")?.
 fun FeedSource.title(): String =
     when (this) {
         is FeedSource.Trending -> "Trending"
-        is FeedSource.Discover -> "Discover"
         is FeedSource.ForYou -> "For You"
         is FeedSource.TopThisWeek -> "Top This Week"
         is FeedSource.Niche -> this.name

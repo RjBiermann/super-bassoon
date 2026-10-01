@@ -26,7 +26,6 @@ class TvHomeViewModel
         val settings: com.rjbiermann.giffyviewer.core.datastore.SettingsRepository,
     ) : ViewModel() {
         val trending = repository.paging(FeedSource.Trending).cachedIn(viewModelScope)
-        val discover = repository.paging(FeedSource.Discover).cachedIn(viewModelScope)
         val topThisWeek = repository.paging(FeedSource.TopThisWeek).cachedIn(viewModelScope)
         val favorites = repository.paging(FeedSource.Favorites).cachedIn(viewModelScope)
 
@@ -67,9 +66,5 @@ class TvHomeViewModel
                     CreatorPrefEntity(username.lowercase(), "BLOCKED", System.currentTimeMillis()),
                 )
             }
-        }
-
-        companion object {
-            fun titles(): List<String> = listOf("Trending", "Discover")
         }
     }

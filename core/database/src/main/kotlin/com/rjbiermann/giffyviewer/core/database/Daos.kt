@@ -92,23 +92,23 @@ interface TagDao {
 }
 
 @Dao
-interface FavoritesRemoteDao {
+interface LikedIdsDao {
     @Upsert
-    suspend fun replaceAll(items: List<FavoritesRemoteEntity>)
+    suspend fun replaceAll(items: List<LikedIdsEntity>)
 
-    @Query("SELECT * FROM favorites_remote ORDER BY syncedAt DESC")
-    fun allFlow(): Flow<List<FavoritesRemoteEntity>>
+    @Query("SELECT * FROM liked_ids ORDER BY syncedAt DESC")
+    fun allFlow(): Flow<List<LikedIdsEntity>>
 
-    @Query("SELECT gifId FROM favorites_remote")
+    @Query("SELECT gifId FROM liked_ids")
     suspend fun allIds(): List<String>
 
     @Upsert
-    suspend fun upsert(item: FavoritesRemoteEntity)
+    suspend fun upsert(item: LikedIdsEntity)
 
-    @Query("DELETE FROM favorites_remote WHERE gifId = :gifId")
+    @Query("DELETE FROM liked_ids WHERE gifId = :gifId")
     suspend fun clearById(gifId: String)
 
-    @Query("DELETE FROM favorites_remote")
+    @Query("DELETE FROM liked_ids")
     suspend fun clear()
 }
 

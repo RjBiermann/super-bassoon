@@ -168,10 +168,10 @@ fun FeedScreen(
                         )
                     }
 
-                // Explore = Top Creators surface (§9 lingo; replaces the old
-                // Discover gif-feed chip).
+                // Explore = Top Creators surface (§9 lingo) — a screen, not a feed
+                // source; never selected (same as Following/Niches/Groups chips).
                 FilterChip(
-                    selected = source is FeedSource.Discover,
+                    selected = false,
                     onClick = onOpenExplore,
                     label = { Text("Explore") },
                 )

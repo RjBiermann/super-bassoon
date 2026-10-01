@@ -41,8 +41,8 @@ on a fresh install (acceptance criterion). No server, no backup API — local fi
   first feed load after an update: "migration from 1 to 2 was required but not found").
 - `ContentFilter` (core:database, `@Inject @Singleton`): session-cached blocked
   creator/tag/keyword sets, `refreshFrom(ContentPrefsDao)` before filtering, pipeline
-  order creator → tag → keyword. Tags-only text: upstream gif objects carry no
-  title/description, so keyword matching is substring over tags.
+  order creator → tag → keyword. Keyword text spans tags + the gif's `description`
+  (DB v3 stores it — PLAN §6 says title/description/tags; gif objects carry no title today).
 - **Promoted filter (stage 0, live-verified):** the gif DTO's `promoted` field is nullable/absent on
   organic items — treat missing as `false`; a `true` drops the item before every user-block check
   and does not touch hide counts. Wired as the first branch of `ContentFilter.run` so PROMOTED
@@ -72,5 +72,9 @@ on a fresh install (acceptance criterion). No server, no backup API — local fi
 - Mobile round-trip verified: favorite @sweetiefox → Favorites chip shows their gifs →
   `creator_prefs` row `sweetiefox|FAVORITED` → Settings unfavorite → empty state text.
 
-Not yet: favorite tag, niche groups, collections, feed_prefs, hide-count stats,
-Import/Export, TV quick actions/favorite UI (TV row shows only when favorites exist).
+Not yet: favorite tag, collections, hide-count Settings display (Import/Export landed —
+see ContentPrefsBackup below; niche groups landed in DB v5).
+
+## Live status (2026-09)
+- Niche groups: DB v5 (`niche_groups`), GroupsScreen live on both apps, BLOCKED groups feed stage 2.
+- Hide counts: single rolling 7-day counter (`hide_counts`), no per-reason split — matches PLAN §6.

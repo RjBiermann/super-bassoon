@@ -51,8 +51,8 @@ data class TagEntity(
 )
 
 /** Mirror of the account's liked gif ids — refreshed per use, never TTL-cached (PLAN §5). */
-@Entity(tableName = "favorites_remote")
-data class FavoritesRemoteEntity(
+@Entity(tableName = "liked_ids")
+data class LikedIdsEntity(
     @PrimaryKey val gifId: String,
     val syncedAt: Long,
 )

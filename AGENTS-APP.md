@@ -15,7 +15,7 @@ Compose UI, navigation, platform shells. Spec: PLAN.md §3, §7–9.
   width is the only variable. `WindowWidthSizeClass` computed once at the app shell,
   derived layout hint passed down (column counts, margins) — no scattered width checks.
   No separate tablet screens or codepaths.
-- Masonry 2-col portrait / 3-col landscape, Paging 3.
+- Masonry width-derived columns (`Auto`: compact 1 / medium 2 / expanded 3, user-overridable — PLAN §6), Paging 3.
 - TikTok-style swipe player.
 - Long-press (tile or player) quick sheet: **Like / Unlike** · Block creator · Favorite creator · Block tag `<tag>` · Block all tags on this gif · Block this keyword · Don't block.
 - Creator profile: Follow/Unfollow (server-backed, `v1/me/follows`; button states Follow ↔ Following per site); niche cards show Join/Leave state (site wording "Join Niche / Leave Niche", API `v2/niches/{id}/subscription`).
@@ -38,7 +38,7 @@ Compose UI, navigation, platform shells. Spec: PLAN.md §3, §7–9.
 - Mobile: "Favorites" FilterChip in the feed tab row; helpful empty state when nothing
   favorited (no blank screen). Quick sheet: Favorite/Unfavorite follows current state.
 - TV: "Favorites" TvLazyRow appears ONLY when favorites exist (`hasFavorites` flow);
-  TV cannot favorite yet (quick actions panel pending) — row verified hidden.
+  TV favorite/block landed via MENU quick actions on focused cards (2026-09) — row verified live.
 - TV initial focus fix: no focusable grabs D-pad focus on app open — AccountButton gets
   a FocusRequester + LaunchedEffect request, else header buttons are unreachable.
 

@@ -3,13 +3,13 @@
 Retrofit/OkHttp layer: DTOs, rate limiting, error handling. Spec: PLAN.md §2, §4.
 Base URL: `https://upstream-api-host.example/`. Endpoints are undocumented; **verify live before assuming**.
 
-## Endpoints (adapt paths on drift — nothing else)
+## Endpoints (adapt paths on drift — nothing else) — 2026 reality, live-verified
 
-- `GET /v2/auth/temporary` → anonymous token (`addr, agent, session, rtoken, token, expiry_date`)
-- `POST /v2/auth` body `{"authkey": "<sess cookie>"}` → long-lived token
-- `DELETE /v2/auth` → revoke
-- `GET /v2/gifs/{id}` · `GET /v2/gifs/search` (tags, order, count)
-- `/v2/feeds/trending/...`, top endpoints (period: day/week/month/year/all)
+- `GET /v2/auth/temporary` → anonymous token. **Dead: `POST /v2/auth` (authkey) and `DELETE /v2/auth` — 404 live; login is PKCE OAuth via `upstream-auth-host.example` (Kinde) — see AGENTS-AUTH.md.**
+- Content: `GET /v2/gifs/{id}` · `GET /v2/gifs/search` (tags, order, count) · `/v2/feeds/trending/popular` (accepts `order`, e.g. `top_week`) · `/v2/feeds/trending/established` · `/v2/feeds/liked` · `/v2/feeds/for-you` (logged-in)
+- Niches: `GET /v2/niches` · `/{id}` · `/{id}/gifs` (niche feed source, anonymous OK) · `/{id}/top-creators` · `/{id}/related` · `/v2/niches/categories` · `/v2/niches/following`
+- Creators/search: `GET /v2/creators/search` · `/v2/creators/verified` · `GET /v2/users/{username}/search` · `GET /v2/users/{username}/collections` (anonymous OK) · `GET /v2/search/suggest` · `GET /v1/tags/match`
+- Account reads: `GET /v2/me/following` · `GET /v1/me/follows` · `GET /v1/me/followers/populated` · `GET /v2/likes` · `GET /v2/me/collections` (unverified) · `GET /v2/search/user-history`
 
 ## Account actions (write) — ✅ verified live 2026, all writes reverted after test
 

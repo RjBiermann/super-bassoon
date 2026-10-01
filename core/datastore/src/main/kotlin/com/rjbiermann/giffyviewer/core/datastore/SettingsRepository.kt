@@ -113,8 +113,7 @@ class SettingsRepository
         }
 
         /** Per-feed server sort (PLAN §8): dynamic keys "sort:<baseKey>", "" = default. */
-        fun feedSort(baseKey: String): Flow<String> =
-            dataStore.data.map { it[stringPreferencesKey("sort:$baseKey")] ?: "" }
+        fun feedSort(baseKey: String): Flow<String> = dataStore.data.map { it[stringPreferencesKey("sort:$baseKey")] ?: "" }
 
         suspend fun setFeedSort(
             baseKey: String,

@@ -81,6 +81,7 @@ object AppModule {
                 GiffyDatabase.MIGRATION_2_3,
                 GiffyDatabase.MIGRATION_3_4,
                 GiffyDatabase.MIGRATION_4_5,
+                GiffyDatabase.MIGRATION_5_6,
             ).build()
 
     /**
@@ -121,6 +122,6 @@ object AppModule {
         @ApplicationContext context: Context,
     ): DataStore<Preferences> = context.giffySettings
 
-    // mobile default 256 MB (PLAN §5); 128/256/512 options arrive with Phase 7
-    private const val MEDIA_CACHE_BYTES = 256L * 1024 * 1024
+    // Fixed constants, PLAN §5: mobile 512MB / TV 1GB (not DataStore-configurable)
+    private const val MEDIA_CACHE_BYTES = 512L * 1024 * 1024
 }

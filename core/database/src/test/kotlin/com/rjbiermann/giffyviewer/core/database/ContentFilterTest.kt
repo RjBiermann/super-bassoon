@@ -81,6 +81,15 @@ class ContentFilterTest {
         }
 
     @Test
+    fun `keyword block also matches the gif description`() =
+        runTest {
+            val f = filter(keywords = listOf("balloons"))
+            // tags clean, description trips it
+            assertEquals("keyword", f.hideReason("anyone", listOf("solo"), "Beach balloons at noon"))
+            assertNull(f.hideReason("anyone", listOf("solo"), null))
+        }
+
+    @Test
     fun `creator wins over tag wins over keyword`() =
         runTest {
             val f = filter(creators = setOf("x"), tags = setOf("bigger"), keywords = listOf("big"))
