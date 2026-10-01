@@ -112,6 +112,17 @@ class FeedMediatorCustomTest {
     }
 
     @Test
+    fun `niche ref fetches via nicheGifs`() {
+        val feed = FeedSource.Custom(4, "Niche mix", listOf("niche:bbc|Big Black"))
+        val api = FakeApi()
+        val pageDao = FakeFeedPageDao()
+        val result = runBlocking { mediator(feed, api, pageDao).load(LoadType.REFRESH, state()) }
+        assertTrue(result is MediatorResult.Success)
+        assertEquals(1, api.nicheGifsCalls)
+        assertEquals(listOf("bbc" to 1), api.nicheGifsArgs)
+    }
+
+    @Test
     fun `ref parse round-trips`() {
         assertEquals(listOf("creator:alpha", "tag:amateur"), parseCustomRefs("creator:alpha,tag:amateur"))
         assertFalse(parseCustomRefs(",,").isNotEmpty())

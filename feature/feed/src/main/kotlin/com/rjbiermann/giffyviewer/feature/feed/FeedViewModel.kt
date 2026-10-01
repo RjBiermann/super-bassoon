@@ -197,6 +197,24 @@ class FeedViewModel
         val customFeeds: StateFlow<List<com.rjbiermann.giffyviewer.core.database.CustomFeedEntity>> =
             db.customFeedDao().all().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+        /** Quick-sheet "add to custom feed" (PLAN §7): appends a ref, deduped. */
+        fun addToCustomFeed(
+            defId: Long,
+            ref: String,
+        ) {
+            viewModelScope.launch {
+                val def = db.customFeedDao().byId(defId) ?: return@launch
+                val refs = def.sourcesJson.split(',').filter { it.isNotBlank() }
+                if (ref in refs) return@launch
+                // Appending shifts the round-robin mapping — evict cached pages
+                // so the next open refetches the blend with all refs.
+                db.feedPageDao().evictBase("custom:$defId")
+                db
+                    .customFeedDao()
+                    .upsert(def.copy(sourcesJson = (refs + ref).joinToString(",")))
+            }
+        }
+
         /** Pinned niche tab entries "id|name" (PLAN §7 pin-to-tabs). */
         val pinnedNiches: StateFlow<Set<String>> =
             settings.pinnedNiches

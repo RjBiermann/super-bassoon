@@ -1,6 +1,7 @@
 package com.rjbiermann.giffyviewer.feature.feed
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -47,6 +49,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -407,6 +410,8 @@ fun FeedScreen(
                                             gif = gif,
                                             onDismiss = { sheetFor = null },
                                             viewModel = viewModel,
+                                            addableFeedRef =
+                                                (source as? FeedSource.Niche)?.let { "niche:${it.id}|${it.name}" },
                                         )
                                     }
                                 }
@@ -462,7 +467,12 @@ internal fun QuickBlockSheet(
     showSpeed: Boolean = false,
     currentSpeed: Float = 1f,
     onSpeedChange: (Float) -> Unit = {},
+    /** Surfaced when the OPEN feed itself is addable (e.g. a niche). */
+    addableFeedRef: String? = null,
 ) {
+    // Hoisted for the AddToCustomFeedDialog scope below.
+    val customFeeds by viewModel.customFeeds.collectAsState(initial = emptyList())
+    var showAddToFeed by remember { mutableStateOf(false) }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.padding(bottom = 24.dp)) {
             Text(
@@ -522,6 +532,11 @@ internal fun QuickBlockSheet(
                 viewModel.blockCreator(gif.userName)
                 onDismiss()
             }
+            // Quick "add to custom feed" (PLAN §7): one entry + picker dialog —
+            // scales with any number of feeds (per-feed rows would flood).
+            if (customFeeds.isNotEmpty()) {
+                listStyle("Add to custom feed…") { showAddToFeed = true }
+            }
             gif.tags.take(3).forEach { tag ->
                 val tagState by viewModel
                     .tagState(tag)
@@ -543,7 +558,85 @@ internal fun QuickBlockSheet(
             }
             listStyle("Don't block", onDismiss)
         }
+        if (showAddToFeed) {
+            AddToCustomFeedDialog(
+                gif = gif,
+                customFeeds = customFeeds,
+                addableFeedRef = addableFeedRef,
+                onAdd = { defId, ref ->
+                    viewModel.addToCustomFeed(defId, ref)
+                    onDismiss()
+                },
+                onDismiss = { showAddToFeed = false },
+            )
+        }
     }
+}
+
+/** Pick which custom feed + which refs (creator / tags) to add. */
+@Composable
+private fun AddToCustomFeedDialog(
+    gif: Gif,
+    customFeeds: List<com.rjbiermann.giffyviewer.core.database.CustomFeedEntity>,
+    onAdd: (defId: Long, ref: String) -> Unit,
+    onDismiss: () -> Unit,
+    addableFeedRef: String? = null,
+) {
+    var feedId by remember { mutableStateOf(customFeeds.firstOrNull()?.id) }
+    val creatorRef = "creator:${gif.userName.lowercase().trim()}"
+    val tagRefs = gif.tags.take(3).map { "tag:${it.lowercase().trim()}" }
+    val nicheRef = addableFeedRef
+    val selected = remember { mutableStateListOf(creatorRef) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add to custom feed") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                customFeeds.forEach { def ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clickable { feedId = def.id },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        androidx.compose.material3.RadioButton(
+                            selected = feedId == def.id,
+                            onClick = { feedId = def.id },
+                        )
+                        Text(def.name)
+                    }
+                }
+                HorizontalDivider()
+                (listOfNotNull(nicheRef, creatorRef) + tagRefs).forEach { ref ->
+                    val label =
+                        when {
+                            ref.startsWith("creator:") -> "@${ref.removePrefix("creator:")}"
+                            ref.startsWith("niche:") -> "Niche: ${ref.removePrefix("niche:").substringAfter('|')}"
+                            else -> "#${ref.removePrefix("tag:")}"
+                        }
+                    Row(
+                        modifier =
+                            Modifier.fillMaxWidth().clickable {
+                                if (ref in selected) selected.remove(ref) else selected.add(ref)
+                            },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        androidx.compose.material3.Checkbox(checked = ref in selected, onCheckedChange = {
+                            if (it) selected.add(ref) else selected.remove(ref)
+                        })
+                        Text(label)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.Button(
+                enabled = feedId != null && selected.isNotEmpty(),
+                onClick = {
+                    feedId?.let { id -> selected.forEach { ref -> onAdd(id, ref) } }
+                },
+            ) { Text("Add") }
+        },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable

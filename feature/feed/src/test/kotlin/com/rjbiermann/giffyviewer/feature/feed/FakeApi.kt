@@ -12,6 +12,8 @@ import com.rjbiermann.giffyviewer.core.network.dto.TemporaryTokenDto
 internal class FakeApi : upstreamApi {
     var userGifsCalls = 0
     var searchCalls = 0
+    var nicheGifsCalls = 0
+    var nicheGifsArgs = mutableListOf<Pair<String, Int>>()
     var searchArgs = mutableListOf<Pair<String, Int>>() // (text, page)
     var likedPages: MutableMap<Int, GifsPageDto> = mutableMapOf()
     var likedIdsResult: List<String> = emptyList()
@@ -55,7 +57,11 @@ internal class FakeApi : upstreamApi {
         count: Int,
         page: Int,
         order: String,
-    ) = throw NotImplementedError()
+    ): GifsPageDto {
+        nicheGifsCalls++
+        nicheGifsArgs.add(nicheId to page)
+        return GifsPageDto(gifs = listOf(gifDtoShell("n$searchCalls", nicheId)))
+    }
 
     override suspend fun verifiedCreators(
         count: Int,

@@ -114,7 +114,9 @@ fun CustomFeedsScreen(
     var tagInput by remember { mutableStateOf("") }
     val feeds by viewModel.feeds.collectAsStateWithLifecycle(emptyList())
     val groups by viewModel.favoriteGroups.collectAsStateWithLifecycle(emptyList())
-    val canSave = name.isNotBlank() && refs.isNotEmpty()
+    // Empty feed is valid: create it now, fill it later from any tile's
+    // long-press "Add to custom feed…" quick action.
+    val canSave = name.isNotBlank()
 
     Scaffold(
         topBar = {
