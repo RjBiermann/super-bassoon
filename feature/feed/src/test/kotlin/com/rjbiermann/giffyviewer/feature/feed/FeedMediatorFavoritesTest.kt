@@ -44,6 +44,8 @@ class FeedMediatorFavoritesTest {
     private class FakeFeedPageDao : FeedPageDao {
         val pages = HashMap<String, FeedPageEntity>()
 
+        override suspend fun pagesForBase(keyBase: String): List<FeedPageEntity> = pages.values.filter { it.pageKey.startsWith(keyBase) }
+
         override suspend fun upsert(page: FeedPageEntity) {
             pages[page.pageKey] = page
         }
@@ -53,8 +55,6 @@ class FeedMediatorFavoritesTest {
         override fun pageFlow(pageKey: String): Flow<FeedPageEntity?> = throw NotImplementedError()
 
         override suspend fun gifsByIds(ids: List<String>): List<GifEntity> = emptyList()
-
-        override suspend fun pagesForBase(keyBase: String): List<FeedPageEntity> = throw NotImplementedError()
 
         override suspend fun evictStale(olderThan: Long) = throw NotImplementedError()
 

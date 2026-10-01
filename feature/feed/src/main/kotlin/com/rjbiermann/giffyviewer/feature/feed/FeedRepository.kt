@@ -99,11 +99,38 @@ class FeedRepository
                         force = forceRefresh,
                         favorites = { db.contentPrefsDao().favoriteCreators() },
                     ),
-                pagingSourceFactory = { FeedPagingSource(db, feed, db.feedPageDao(), PAGE_SIZE, contentFilter) { forYouContext() } },
+                pagingSourceFactory = {
+                    FeedPagingSource(
+                        db,
+                        feed,
+                        db.feedPageDao(),
+                        PAGE_SIZE,
+                        contentFilter,
+                        { forYouContext() },
+                        // The source self-fills unfetched pages (fast-scroll race);
+                        // same fetcher the mediator uses.
+                        FeedPageFetcher(
+                            feed,
+                            db.gifDao(),
+                            db.feedPageDao(),
+                            api,
+                            PAGE_SIZE,
+                            favorites = { db.contentPrefsDao().favoriteCreators() },
+                        ),
+                    )
+                },
             ).flow
 
         companion object {
             const val PAGE_SIZE = 20
             private const val CTX_TTL_MS = 5 * 60_000L
+
+            // Session-wide ids ever returned per feed. The server reshuffles page
+            // contents between fetches, so a DB-row-only dedup misses ids still
+            // live in the pager's list → duplicate LazyGrid keys → crash
+            // (live: "Key was already used" during scroll).
+            private val seenIds = HashMap<String, MutableSet<String>>()
+
+            fun seenFor(keyBase: String): MutableSet<String> = seenIds.getOrPut(keyBase) { mutableSetOf() }
         }
     }

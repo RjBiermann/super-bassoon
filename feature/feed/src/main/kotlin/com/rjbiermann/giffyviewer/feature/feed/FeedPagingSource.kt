@@ -6,8 +6,6 @@ import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.database.toModel
 import com.rjbiermann.giffyviewer.core.database.weekStartMs
 import com.rjbiermann.giffyviewer.core.model.Gif
-import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.withTimeoutOrNull
 
 /** How long the refresh load waits for the mediator's first write (first-launch race). */
 private const val CACHE_WAIT_MS = 20_000L
@@ -39,6 +37,7 @@ class FeedPagingSource(
             com.rjbiermann.giffyviewer.feature.feed.FeedRepository
                 .ForYouContext("all", emptySet(), emptySet())
         },
+    private val fetcher: FeedPageFetcher? = null,
 ) : PagingSource<Int, Gif>() {
     init {
         db.invalidationTracker.addObserver(
@@ -59,18 +58,14 @@ class FeedPagingSource(
         val page = params.key ?: 1
         return try {
             var entity = pageDao.page(feedPageKey(feed, page))
-            // First-launch race: the refresh load can hit an empty cache before
-            // the mediator's network write lands — returning empty here used to
-            // strand the grid until process restart (seen live on TV). Instead,
-            // wait a bounded time for the page row to appear; Favorites writes
-            // no row when nothing is favorited, so it never waits.
-            if (entity == null && page == 1 && params is LoadParams.Refresh && feed !is FeedSource.Favorites) {
-                entity =
-                    withTimeoutOrNull(CACHE_WAIT_MS) {
-                        pageDao
-                            .pageFlow(feedPageKey(feed, 1))
-                            .firstOrNull { it != null }
-                    }
+            // Unfetched page (the cache lags the scroll): fill it HERE — Paging
+            // consults the mediator only when the source's data is exhausted, so
+            // a fast scroll used to reach an unfetched page and either stall the
+            // feed (null next = end-of-list) or drain empty pages (user report).
+            // Same fetcher the mediator uses → one API call, rate-limit safe.
+            if (entity == null) {
+                fetcher?.fill(page)
+                entity = pageDao.page(feedPageKey(feed, page))
             }
             // upstream pagination overlaps: page n re-lists some of page n-1.
             // Paging requires unique keys → drop ids already shown by earlier pages.
@@ -95,7 +90,16 @@ class FeedPagingSource(
                 } else {
                     null
                 }
-            val models = ids.mapNotNull { byId[it]?.toModel() }
+            // Session dedup (repository-level): covers ids still live in the
+            // pager's list even when their source row was rewritten (server
+            // reshuffles) — duplicate grid keys crash the measure pass.
+            val sessionSeen =
+                com.rjbiermann.giffyviewer.feature.feed.FeedRepository
+                    .seenFor(feed.keyBase)
+            val models =
+                ids
+                    .filterNot { it in sessionSeen }
+                    .mapNotNull { byId[it]?.toModel() }
             // hide-count increment lives in the pipeline (PLAN §6): one batched
             // write per page load — recount on reload is accepted (read-time filter)
             val hidden = models.count { !contentFilter.allow(it.userName, it.tags, it.description) }
@@ -106,6 +110,7 @@ class FeedPagingSource(
                 models
                     .filter { contentFilter.allow(it.userName, it.tags, it.description) }
                     .filter { favs == null || it.userName.lowercase() in favs }
+                    .onEach { sessionSeen.add(it.id) }
                     // For You scope (§7 Creators·Niches·All): read-time filter over
                     // the SAME cached server pages — one fetch, three filters.
                     .filter {
@@ -115,8 +120,6 @@ class FeedPagingSource(
                             else -> true
                         }
                     }
-            // nextKey exists ONLY when the row was fetched (mediator fills it);
-            // unfetched page → nextKey=null → APPEND waits for the mediator.
             val nextKey = entity?.nextPageKey?.let { pageNumber(it) }
             PagingSource.LoadResult.Page(
                 data = gifs,

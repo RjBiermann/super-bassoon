@@ -202,28 +202,61 @@ class TvMainActivity : ComponentActivity() {
                                     modifier = Modifier.padding(6.dp),
                                 )
                             }
-                            // Custom feeds = home pills (PLAN §7 builder).
-                            items(customFeeds.toList(), key = { "custom" + it.id }) { def ->
-                                com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
-                                    text = def.name,
-                                    onClick = {
-                                        openFeed =
-                                            FeedSource.Custom(
-                                                def.id,
-                                                def.name,
-                                                def.sourcesJson.split(',').filter { it.isNotBlank() },
+                            // Custom feeds + pinned tabs consolidated under a
+                            // More ▾ menu (user: pinned pills made the row
+                            // unusable) — D-pad opens the dropdown.
+                            item {
+                                androidx.compose.foundation.layout.Box {
+                                    var moreOpen by remember { mutableStateOf(false) }
+                                    com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
+                                        text = "More ▾",
+                                        onClick = { moreOpen = true },
+                                        modifier = Modifier.padding(6.dp),
+                                    )
+                                    androidx.compose.material3.DropdownMenu(
+                                        expanded = moreOpen,
+                                        onDismissRequest = { moreOpen = false },
+                                    ) {
+                                        customFeeds.toList().forEach { def ->
+                                            androidx.compose.material3.DropdownMenuItem(
+                                                text = { androidx.compose.material3.Text(def.name) },
+                                                onClick = {
+                                                    moreOpen = false
+                                                    openFeed =
+                                                        FeedSource.Custom(
+                                                            def.id,
+                                                            def.name,
+                                                            def.sourcesJson.split(',').filter { it.isNotBlank() },
+                                                        )
+                                                },
                                             )
-                                    },
-                                    modifier = Modifier.padding(6.dp),
-                                )
-                            }
-                            // Pinned creators = home pills (PLAN §7 pin-to-tabs), same as mobile chips.
-                            items(pinnedCreators.toList()) { username ->
-                                com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
-                                    text = "@$username",
-                                    onClick = { openFeed = FeedSource.Creator(username) },
-                                    modifier = Modifier.padding(6.dp),
-                                )
+                                        }
+                                        val pinnedEntries =
+                                            pinnedNiches.map { entry ->
+                                                Pair(
+                                                    entry.substringBefore('|'),
+                                                    entry.substringAfter('|'),
+                                                )
+                                            } + pinnedCreators.map { Pair("user:${it.lowercase()}", "@$it") }
+                                        if (pinnedEntries.isNotEmpty()) {
+                                            androidx.compose.material3.HorizontalDivider()
+                                            pinnedEntries.forEach { (ref, name) ->
+                                                androidx.compose.material3.DropdownMenuItem(
+                                                    text = { androidx.compose.material3.Text(name) },
+                                                    onClick = {
+                                                        moreOpen = false
+                                                        openFeed =
+                                                            if (ref.startsWith("user:")) {
+                                                                FeedSource.Creator(ref.removePrefix("user:"))
+                                                            } else {
+                                                                FeedSource.Niche(ref, name)
+                                                            }
+                                                    },
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                         TvHomeScreen(

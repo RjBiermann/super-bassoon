@@ -63,6 +63,8 @@ fun TvQuickActionsDialog(
     playerActions: TvPlayerActions? = null,
 ) {
     var showAddToFeed by remember { mutableStateOf(false) }
+    // Two views (user: "too many options"): main / tags submenu.
+    var view by remember { mutableStateOf("main") }
     val customFeeds by feedViewModel.customFeeds.collectAsStateWithLifecycle(emptyList())
     Dialog(onDismissRequest = onDismiss) {
         M3Surface(
@@ -81,6 +83,26 @@ fun TvQuickActionsDialog(
                 )
                 val first = remember { FocusRequester() }
                 LaunchedEffect(Unit) { first.requestFocus() }
+                if (view == "tags") {
+                    gif.tags.take(3).forEach { tag ->
+                        val tagState by feedViewModel
+                            .tagState(tag)
+                            .collectAsStateWithLifecycle(initialValue = null)
+                        QuickAction(
+                            text = if (tagState == "FAVORITED") "Unfavorite tag “$tag”" else "Favorite tag “$tag”",
+                            onClick = {
+                                feedViewModel.toggleFavoriteTag(tag)
+                                onDismiss()
+                            },
+                        )
+                        QuickAction(text = "Block tag “$tag”") {
+                            feedViewModel.blockTag(tag)
+                            onDismiss()
+                        }
+                    }
+                    QuickAction(text = "‹ Back") { view = "main" }
+                    return@M3Surface
+                }
                 playerActions?.let { pa ->
                     HorizontalDivider()
                     QuickAction(
@@ -147,22 +169,8 @@ fun TvQuickActionsDialog(
                     HorizontalDivider()
                     QuickAction(text = "Add to custom feed…") { showAddToFeed = true }
                 }
-                HorizontalDivider()
-                gif.tags.take(3).forEach { tag ->
-                    val tagState by feedViewModel
-                        .tagState(tag)
-                        .collectAsStateWithLifecycle(initialValue = null)
-                    QuickAction(
-                        text = if (tagState == "FAVORITED") "Unfavorite tag “$tag”" else "Favorite tag “$tag”",
-                        onClick = {
-                            feedViewModel.toggleFavoriteTag(tag)
-                            onDismiss()
-                        },
-                    )
-                    QuickAction(text = "Block tag “$tag”") {
-                        feedViewModel.blockTag(tag)
-                        onDismiss()
-                    }
+                if (gif.tags.isNotEmpty()) {
+                    QuickAction(text = "Tags…") { view = "tags" }
                 }
                 QuickAction(text = "Close") { onDismiss() }
             }

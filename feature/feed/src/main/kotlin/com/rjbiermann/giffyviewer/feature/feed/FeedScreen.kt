@@ -26,6 +26,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -156,15 +158,15 @@ fun FeedScreen(
                         .padding(horizontal = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                // For You = server personalized feed, logged-in only (PLAN §7);
-                // anonymous client-side blend is spec'd but unscheduled.
+                // FIXED set only — three primary tabs + a More menu (consolidated;
+                // pinned/custom grow unbounded and the row became unusable).
+                // For You = server personalized feed, logged-in only (PLAN §7).
                 val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle(false)
                 // Site home order: For You first when logged in (verified sweep).
                 listOf(
                     FeedSource.ForYou,
                     FeedSource.Trending,
                     FeedSource.Favorites,
-                    FeedSource.TopThisWeek,
                 ).filterNot { it is FeedSource.ForYou && !isLoggedIn }
                     .forEach { candidate ->
                         FilterChip(
@@ -174,82 +176,131 @@ fun FeedScreen(
                         )
                     }
 
-                // Explore = Top Creators surface (§9 lingo) — a screen, not a feed
-                // source; never selected (same as Following/Niches/Groups chips).
-                FilterChip(
-                    selected = false,
-                    onClick = onOpenExplore,
-                    label = { Text("Explore") },
-                )
-                if (isLoggedIn) {
-                    FilterChip(
-                        selected = source is FeedSource.Liked,
-                        onClick = { viewModel.open(FeedSource.Liked) },
-                        label = { Text("Liked") },
-                    )
-                    FilterChip(
-                        selected = false,
-                        onClick = onOpenFollowing,
-                        label = { Text("Following…") },
-                    )
-                    FilterChip(
-                        selected = false,
-                        onClick = onOpenCollections,
-                        label = { Text("Collections…") },
-                    )
-                }
-
-                FilterChip(
-                    selected = source is FeedSource.Niche && source !in pinnedNiches,
-                    onClick = onOpenNiches,
-                    label = { Text("Niches…") },
-                )
-                FilterChip(
-                    selected = false,
-                    onClick = onOpenGroups,
-                    label = { Text("Groups…") },
-                )
-                // pinned niches become tabs (PLAN §7 pin-to-tabs)
-                pinnedNiches.forEach { niche ->
-                    FilterChip(
-                        selected = source == niche,
-                        onClick = { viewModel.open(niche) },
-                        label = { Text(niche.name) },
-                    )
-                }
-                // FAVORITED groups become tabs (PLAN §7 groups)
+                // More ▾ = every secondary surface, grouped in sections (M3
+                // DropdownMenu): screens · custom feeds · pinned tabs. The open
+                // surface keeps a selected marker when it lives here.
+                var moreOpen by remember { mutableStateOf(false) }
                 val favGroups by viewModel.favoriteGroups.collectAsStateWithLifecycle(emptyList())
-                favGroups.filter { it.state == "FAVORITED" }.forEach { group ->
-                    val groupFeed = FeedSource.Group(group.id, group.name, group.tagList.split(','))
-                    FilterChip(
-                        selected = source == groupFeed,
-                        onClick = { viewModel.open(groupFeed) },
-                        label = { Text(group.name) },
-                    )
-                }
-                // Custom feeds (PLAN §7 builder) as chips + the builder entry.
-                viewModel.customFeeds.collectAsStateWithLifecycle(emptyList()).value.forEach { def ->
-                    val customFeed = FeedSource.Custom(def.id, def.name, parseCustomRefs(def.sourcesJson))
-                    FilterChip(
-                        selected = source == customFeed,
-                        onClick = { viewModel.open(customFeed) },
-                        label = { Text(def.name) },
-                    )
-                }
-                FilterChip(
-                    selected = false,
-                    onClick = onOpenCustomFeeds,
-                    label = { Text("New feed…") },
-                )
-                // pinned creators become tabs (PLAN §7 pin-to-tabs), shared with TV
                 val pinnedCreators by viewModel.pinnedCreators.collectAsStateWithLifecycle(emptySet())
-                pinnedCreators.forEach { username ->
-                    val creatorFeed = FeedSource.Creator(username)
+                val customFeeds by viewModel.customFeeds.collectAsStateWithLifecycle(emptyList())
+                Box {
                     FilterChip(
-                        selected = source == creatorFeed,
-                        onClick = { viewModel.open(creatorFeed) },
-                        label = { Text("@$username") },
+                        selected =
+                            source is FeedSource.TopThisWeek ||
+                                source is FeedSource.Liked ||
+                                source is FeedSource.Custom ||
+                                (source is FeedSource.Niche) ||
+                                source is FeedSource.Creator ||
+                                source is FeedSource.Group,
+                        onClick = { moreOpen = true },
+                        label = { Text("More ▾") },
                     )
+                    DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Top This Week") },
+                            onClick = {
+                                moreOpen = false
+                                viewModel.open(FeedSource.TopThisWeek)
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Explore") },
+                            onClick = {
+                                moreOpen = false
+                                onOpenExplore()
+                            },
+                        )
+                        if (isLoggedIn) {
+                            DropdownMenuItem(
+                                text = { Text("Liked GIFs & Images") },
+                                onClick = {
+                                    moreOpen = false
+                                    viewModel.open(FeedSource.Liked)
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Following…") },
+                                onClick = {
+                                    moreOpen = false
+                                    onOpenFollowing()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Collections…") },
+                                onClick = {
+                                    moreOpen = false
+                                    onOpenCollections()
+                                },
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = { Text("Niches…") },
+                            onClick = {
+                                moreOpen = false
+                                onOpenNiches()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Groups…") },
+                            onClick = {
+                                moreOpen = false
+                                onOpenGroups()
+                            },
+                        )
+                        if (customFeeds.isNotEmpty()) {
+                            HorizontalDivider()
+                            Text(
+                                "Custom feeds",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                            )
+                            customFeeds.forEach { def ->
+                                DropdownMenuItem(
+                                    text = { Text(def.name) },
+                                    onClick = {
+                                        moreOpen = false
+                                        viewModel.open(FeedSource.Custom(def.id, def.name, parseCustomRefs(def.sourcesJson)))
+                                    },
+                                )
+                            }
+                            DropdownMenuItem(
+                                text = { Text("New feed…") },
+                                onClick = {
+                                    moreOpen = false
+                                    onOpenCustomFeeds()
+                                },
+                            )
+                        }
+                        val pinnedSection =
+                            pinnedNiches.map { it as FeedSource } +
+                                favGroups.filter { it.state == "FAVORITED" }.map {
+                                    FeedSource.Group(
+                                        it.id,
+                                        it.name,
+                                        it.tagList.split(','),
+                                    ) as FeedSource
+                                } +
+                                pinnedCreators.map { FeedSource.Creator(it) as FeedSource }
+                        if (pinnedSection.isNotEmpty()) {
+                            HorizontalDivider()
+                            Text(
+                                "Pinned",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                            )
+                            pinnedSection.forEach { feed ->
+                                DropdownMenuItem(
+                                    text = { Text(feed.title()) },
+                                    onClick = {
+                                        moreOpen = false
+                                        viewModel.open(feed)
+                                    },
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -497,55 +548,68 @@ internal fun QuickBlockSheet(
                     }
                 }
             }
-            val favState by viewModel
-                .creatorState(gif.userName)
-                .collectAsState(initial = null)
-            listStyle(if (favState == "FAVORITED") "Unfavorite @${gif.userName}" else "Favorite @${gif.userName}") {
-                viewModel.toggleFavoriteCreator(gif.userName)
-                onDismiss()
-            }
-            val pinnedCreators by viewModel.pinnedCreators.collectAsState(initial = emptySet())
-            listStyle(
-                if (gif.userName.lowercase() in pinnedCreators) {
-                    "Unpin @${gif.userName} from home"
-                } else {
-                    "Pin @${gif.userName} to home"
-                },
-            ) {
-                viewModel.togglePinnedCreator(gif.userName)
-                onDismiss()
-            }
-            listStyle(
-                "Block creator",
-            ) {
-                viewModel.blockCreator(gif.userName)
-                onDismiss()
-            }
-            // Quick "add to custom feed" (PLAN §7): one entry + picker dialog —
-            // scales with any number of feeds (per-feed rows would flood).
-            if (customFeeds.isNotEmpty()) {
-                listStyle("Add to custom feed…") { showAddToFeed = true }
-            }
-            gif.tags.take(3).forEach { tag ->
-                val tagState by viewModel
-                    .tagState(tag)
+            // Two views instead of a flat flood (user: "too many options"):
+            // main = creator + the rest; Tags… swaps to a tag submenu.
+            var view by remember { mutableStateOf("main") }
+            if (view == "main") {
+                val favState by viewModel
+                    .creatorState(gif.userName)
                     .collectAsState(initial = null)
+                listStyle(if (favState == "FAVORITED") "Unfavorite @${gif.userName}" else "Favorite @${gif.userName}") {
+                    viewModel.toggleFavoriteCreator(gif.userName)
+                    onDismiss()
+                }
+                val pinnedCreators by viewModel.pinnedCreators.collectAsState(initial = emptySet())
                 listStyle(
-                    if (tagState == "FAVORITED") "Unfavorite tag “$tag”" else "Favorite tag “$tag”",
+                    if (gif.userName.lowercase() in pinnedCreators) {
+                        "Unpin @${gif.userName} from home"
+                    } else {
+                        "Pin @${gif.userName} to home"
+                    },
                 ) {
-                    viewModel.toggleFavoriteTag(tag)
+                    viewModel.togglePinnedCreator(gif.userName)
                     onDismiss()
                 }
-                listStyle("Block tag “$tag”") {
-                    viewModel.blockTag(tag)
+                listStyle("Block creator") {
+                    viewModel.blockCreator(gif.userName)
                     onDismiss()
                 }
+                // Quick "add to custom feed" (PLAN §7): one entry + picker dialog
+                // (its checkboxes cover the tags too — no per-tag rows here).
+                if (customFeeds.isNotEmpty()) {
+                    listStyle("Add to custom feed…") { showAddToFeed = true }
+                }
+                if (gif.tags.isNotEmpty()) {
+                    listStyle("Tags…") { view = "tags" }
+                }
+                listStyle("Block keyword “${gif.tags.firstOrNull() ?: gif.userName}”") {
+                    viewModel.blockKeyword(gif.tags.firstOrNull() ?: gif.userName)
+                    onDismiss()
+                }
+                listStyle("Close", onDismiss)
+            } else {
+                Text(
+                    "Tags",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+                gif.tags.take(3).forEach { tag ->
+                    val tagState by viewModel
+                        .tagState(tag)
+                        .collectAsState(initial = null)
+                    listStyle(
+                        if (tagState == "FAVORITED") "Unfavorite tag “$tag”" else "Favorite tag “$tag”",
+                    ) {
+                        viewModel.toggleFavoriteTag(tag)
+                        onDismiss()
+                    }
+                    listStyle("Block tag “$tag”") {
+                        viewModel.blockTag(tag)
+                        onDismiss()
+                    }
+                }
+                listStyle("‹ Back", { view = "main" })
             }
-            listStyle("Block keyword “${gif.tags.firstOrNull() ?: gif.userName}”") {
-                viewModel.blockKeyword(gif.tags.firstOrNull() ?: gif.userName)
-                onDismiss()
-            }
-            listStyle("Don't block", onDismiss)
         }
         if (showAddToFeed) {
             AddToCustomFeedDialog(

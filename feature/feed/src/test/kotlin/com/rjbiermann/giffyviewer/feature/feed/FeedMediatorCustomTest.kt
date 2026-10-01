@@ -42,6 +42,8 @@ class FeedMediatorCustomTest {
     private class FakeFeedPageDao : FeedPageDao {
         val pages = HashMap<String, FeedPageEntity>()
 
+        override suspend fun pagesForBase(keyBase: String): List<FeedPageEntity> = pages.values.filter { it.pageKey.startsWith(keyBase) }
+
         override suspend fun upsert(page: FeedPageEntity) {
             pages[page.pageKey] = page
         }
@@ -51,8 +53,6 @@ class FeedMediatorCustomTest {
         override fun pageFlow(pageKey: String): Flow<FeedPageEntity?> = throw NotImplementedError()
 
         override suspend fun gifsByIds(ids: List<String>): List<GifEntity> = emptyList()
-
-        override suspend fun pagesForBase(keyBase: String): List<FeedPageEntity> = throw NotImplementedError()
 
         override suspend fun evictStale(olderThan: Long) = throw NotImplementedError()
 
@@ -120,6 +120,25 @@ class FeedMediatorCustomTest {
         assertTrue(result is MediatorResult.Success)
         assertEquals(1, api.nicheGifsCalls)
         assertEquals(listOf("bbc" to 1), api.nicheGifsArgs)
+    }
+
+    @Test
+    fun `append with poisoned state advances past highest cached page`() {
+        // Fast scroll: the source's in-memory list ends on an EMPTY unfetched
+        // page (lastNext=null) — Paging consults us; the OLD fallback (page 1's
+        // next) re-fetched p2 forever. Regression: feed "just stops".
+        val feed = FeedSource.Custom(9, "Race", listOf("creator:alpha"))
+        val api = FakeApi()
+        val pageDao = FakeFeedPageDao()
+        // cache has p1+p2 (e.g. from an earlier session)
+        runBlocking { mediator(feed, api, pageDao).load(LoadType.REFRESH, emptyState()) }
+        runBlocking { mediator(feed, api, pageDao).load(LoadType.APPEND, emptyState()) }
+        // poisoned: state's last page = empty, nextKey = null
+        val result = runBlocking { mediator(feed, api, pageDao).load(LoadType.APPEND, emptyState()) }
+        assertTrue(result is MediatorResult.Success)
+        assertFalse((result as MediatorResult.Success).endOfPaginationReached)
+        // p1(refresh) + p2(append1) + p3(append2) = 3 userGifs calls, NOT another p2
+        assertEquals(3, api.userGifsCalls)
     }
 
     @Test
