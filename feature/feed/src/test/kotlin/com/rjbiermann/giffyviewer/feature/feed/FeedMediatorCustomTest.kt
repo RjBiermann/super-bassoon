@@ -55,6 +55,8 @@ class FeedMediatorCustomTest {
         override suspend fun pagesForBase(keyBase: String): List<FeedPageEntity> = throw NotImplementedError()
 
         override suspend fun evictStale(olderThan: Long) = throw NotImplementedError()
+
+        override suspend fun evictBase(base: String) = throw NotImplementedError()
     }
 
     private fun state(): PagingState<Int, Gif> =

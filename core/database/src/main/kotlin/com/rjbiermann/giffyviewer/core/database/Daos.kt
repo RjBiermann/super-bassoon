@@ -51,6 +51,9 @@ interface FeedPageDao {
 
     @Query("DELETE FROM feed_pages WHERE fetchedAt < :olderThan")
     suspend fun evictStale(olderThan: Long)
+
+    @Query("DELETE FROM feed_pages WHERE pageKey LIKE :base || ':p%'")
+    suspend fun evictBase(base: String)
 }
 
 @Dao

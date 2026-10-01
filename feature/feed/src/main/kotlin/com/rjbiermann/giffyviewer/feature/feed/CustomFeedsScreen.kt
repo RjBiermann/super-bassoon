@@ -81,7 +81,13 @@ class CustomFeedsViewModel
         }
 
         fun delete(id: Long) {
-            viewModelScope.launch { db.customFeedDao().delete(id) }
+            // Evict the feed's cached pages too — a stale "custom:<id>:p*" row
+            // otherwise lingers until TTL eviction (and would resurrect a
+            // deleted feed's tiles if a new definition ever reuses the id).
+            viewModelScope.launch {
+                db.feedPageDao().evictBase("custom:$id")
+                db.customFeedDao().delete(id)
+            }
         }
     }
 
