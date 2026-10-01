@@ -211,6 +211,8 @@ data class FeedPrefs(
     val duration: String = "", // "" | lt10 | 10-30 | 30-60 | 1-5m | gt5m
     val resolution: String = "", // "" | sd | hd
     val orientation: String = "", // "" (follow global) | any | vertical | horizontal
+    /** §8 shuffle: 0 = off; non-zero = per-session seed (Reshuffle regenerates). */
+    val shuffleSeed: Long = 0L,
 )
 
 private val FeedPrefsJson =

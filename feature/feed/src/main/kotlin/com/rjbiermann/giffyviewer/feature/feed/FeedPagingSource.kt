@@ -126,7 +126,16 @@ class FeedPagingSource(
                     .filter { it.matchesOrientation(orientation) }
                     .filter { durationIn(it.durationSeconds, prefs.duration) }
                     .filter { it.resolutionMatches(prefs.resolution) }
-                    .onEach { sessionSeen.add(it.id) }
+                    // §8 shuffle: deterministic per-seed order — hashing every id
+                    // with the seed yields ONE global order across all pages
+                    // (stable across recomposition; Reshuffle = new seed).
+                    .let { gifs ->
+                        if (prefs.shuffleSeed != 0L) {
+                            gifs.sortedBy { (it.id.hashCode() * 31L + prefs.shuffleSeed).inv() }
+                        } else {
+                            gifs
+                        }
+                    }.onEach { sessionSeen.add(it.id) }
                     // For You scope (§7 Creators·Niches·All): read-time filter over
                     // the SAME cached server pages — one fetch, three filters.
                     .filter {

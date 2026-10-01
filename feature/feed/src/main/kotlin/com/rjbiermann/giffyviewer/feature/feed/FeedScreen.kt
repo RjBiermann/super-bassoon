@@ -830,6 +830,7 @@ private fun FeedFilterDialog(
     var duration by remember { mutableStateOf(prefs.duration) }
     var resolution by remember { mutableStateOf(prefs.resolution) }
     var orientation by remember { mutableStateOf(prefs.orientation) }
+    var shuffleSeed by remember { mutableStateOf(prefs.shuffleSeed) }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Filter feed") },
@@ -858,6 +859,26 @@ private fun FeedFilterDialog(
                         )
                     }
                 }
+                Text("Shuffle", style = MaterialTheme.typography.titleSmall)
+                Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(
+                        selected = shuffleSeed == 0L,
+                        onClick = { shuffleSeed = 0L },
+                        label = { Text("Off") },
+                    )
+                    FilterChip(
+                        selected = shuffleSeed != 0L,
+                        onClick = { if (shuffleSeed == 0L) shuffleSeed = System.currentTimeMillis() },
+                        label = { Text("On") },
+                    )
+                    if (shuffleSeed != 0L) {
+                        FilterChip(
+                            selected = false,
+                            onClick = { shuffleSeed = System.currentTimeMillis() },
+                            label = { Text("Reshuffle") },
+                        )
+                    }
+                }
                 Text("Orientation", style = MaterialTheme.typography.titleSmall)
                 Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf(
@@ -878,6 +899,7 @@ private fun FeedFilterDialog(
                         duration = duration,
                         resolution = resolution,
                         orientation = orientation,
+                        shuffleSeed = shuffleSeed,
                     ),
                 )
             }) { Text("Apply") }
