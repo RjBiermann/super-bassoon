@@ -63,6 +63,14 @@ interface upstreamApi {
         @Query("order") order: String = "trending",
     ): GifsPageDto
 
+    /** Verified-creator list (live-verified 2026-10-01, anonymous OK) — the
+     *  Explore surface (§9: site Explore = Top Creators). Server pages in 10s. */
+    @GET("v2/creators/verified")
+    suspend fun verifiedCreators(
+        @Query("count") count: Int = 20,
+        @Query("page") page: Int = 1,
+    ): VerifiedCreatorsPageDto
+
     /** Typed autocomplete (live-verified 2026-09-30, anonymous OK): returns a
      *  bare JSON array of {type, text, gifs-count}. */
     @GET("v2/search/suggest")
@@ -207,6 +215,11 @@ data class CreatorSearchItemDto(
     val gifs: Int = 0,
     @SerialName("publishedCollections") val publishedCollections: Int = 0,
     @SerialName("profileImageUrl") val profileImageUrl: String? = null,
+)
+
+@Serializable
+data class VerifiedCreatorsPageDto(
+    val creators: List<CreatorSearchItemDto> = emptyList(),
 )
 
 @Serializable

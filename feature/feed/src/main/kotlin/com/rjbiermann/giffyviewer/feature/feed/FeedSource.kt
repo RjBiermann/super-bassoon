@@ -148,23 +148,26 @@ fun FeedSource.sortOptions(): List<Pair<String, String>> =
     when (this) {
         is FeedSource.Search ->
             listOf(
-                "Newest" to "latest",
-                "Top day" to "top7",
-                "Top month" to "top28",
-                "Most liked" to "score",
+                // Site tag/search sort wording (§8, verified 2026-10-01).
+                "Latest" to "latest",
+                "Top This Week" to "top7",
+                "Top This Month" to "top28",
+                "Most liked" to "score", // app-only; no site equivalent
             )
         is FeedSource.Creator ->
             listOf(
-                "Newest" to "latest",
-                "Oldest" to "oldest",
-                "Top day" to "top7",
-                "Top month" to "top28",
+                // Site creator/profile sorts: Hot · Latest · Top (§8).
+                "Latest" to "latest",
+                "Oldest" to "oldest", // app-only
+                "Top This Week" to "top7",
+                "Top This Month" to "top28",
             )
         is FeedSource.Niche ->
             listOf(
-                "Newest" to "latest",
-                "Oldest" to "oldest",
-                "Best" to "best",
+                // Site niche sorts: Hot · Latest · Top; "best" is the API's Top.
+                "Latest" to "latest",
+                "Oldest" to "oldest", // app-only
+                "Top" to "best",
                 "Hot" to "hot",
             )
         else -> emptyList()

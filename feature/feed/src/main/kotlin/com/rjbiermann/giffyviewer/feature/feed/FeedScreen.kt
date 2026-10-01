@@ -82,6 +82,7 @@ fun FeedScreen(
     onOpenSearch: () -> Unit = {},
     onOpenNiches: () -> Unit = {},
     onOpenGroups: () -> Unit = {},
+    onOpenExplore: () -> Unit = {},
     viewModel: FeedViewModel = hiltViewModel(),
 ) {
     val source by viewModel.source.collectAsStateWithLifecycle()
@@ -146,7 +147,6 @@ fun FeedScreen(
                 val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle(false)
                 listOf(
                     FeedSource.Trending,
-                    FeedSource.Discover,
                     FeedSource.ForYou,
                     FeedSource.Favorites,
                     FeedSource.TopThisWeek,
@@ -158,6 +158,14 @@ fun FeedScreen(
                             label = { Text(candidate.title()) },
                         )
                     }
+
+                // Explore = Top Creators surface (§9 lingo; replaces the old
+                // Discover gif-feed chip).
+                FilterChip(
+                    selected = source is FeedSource.Discover,
+                    onClick = onOpenExplore,
+                    label = { Text("Explore") },
+                )
 
                 FilterChip(
                     selected = source is FeedSource.Niche && source !in pinnedNiches,

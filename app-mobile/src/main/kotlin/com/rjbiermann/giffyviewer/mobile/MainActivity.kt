@@ -41,6 +41,7 @@ import com.rjbiermann.giffyviewer.core.ui.GiffyTheme
 import com.rjbiermann.giffyviewer.core.ui.LayoutHint
 import com.rjbiermann.giffyviewer.core.ui.layoutHint
 import com.rjbiermann.giffyviewer.feature.auth.AuthScreen
+import com.rjbiermann.giffyviewer.feature.feed.ExploreScreen
 import com.rjbiermann.giffyviewer.feature.feed.FeedScreen
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
@@ -92,6 +93,7 @@ class MainActivity : ComponentActivity() {
         var showSettings by remember { mutableStateOf(false) }
         var showNiches by remember { mutableStateOf(false) }
         var showGroups by remember { mutableStateOf(false) }
+        var showExplore by remember { mutableStateOf(false) }
         var showSearch by remember { mutableStateOf(false) }
 
         val pinHash by settings.pinHash.collectAsStateWithLifecycle(initialValue = null)
@@ -114,14 +116,24 @@ class MainActivity : ComponentActivity() {
             )
         } else if (confirmed && showAccount) {
             AuthScreen(onBack = { showAccount = false })
+        } else if (confirmed && showExplore) {
+            val feedViewModel: FeedViewModel = hiltViewModel()
+            ExploreScreen(
+                onBack = { showExplore = false },
+                onOpenCreator = { username ->
+                    showExplore = false
+                    feedViewModel.open(FeedSource.Creator(username = username))
+                },
+                api = api,
+            )
         } else if (confirmed && showGroups) {
             val groupsViewModel: GroupsViewModel = hiltViewModel()
-            val feedViewModel: FeedViewModel = hiltViewModel()
+            val feedViewModel2: FeedViewModel = hiltViewModel()
             GroupsScreen(
                 onBack = { showGroups = false },
                 onOpenGroup = { group ->
                     showGroups = false
-                    feedViewModel.open(group)
+                    feedViewModel2.open(group)
                 },
                 viewModel = groupsViewModel,
             )
@@ -159,6 +171,7 @@ class MainActivity : ComponentActivity() {
                 onOpenSearch = { showSearch = true },
                 onOpenNiches = { showNiches = true },
                 onOpenGroups = { showGroups = true },
+                onOpenExplore = { showExplore = true },
             )
         } else {
             val scope = rememberCoroutineScope()

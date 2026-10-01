@@ -70,6 +70,11 @@ class FeedMediatorFavoritesTest {
 
         override suspend fun temporaryToken(): TemporaryTokenDto = throw NotImplementedError()
 
+        override suspend fun verifiedCreators(
+            count: Int,
+            page: Int,
+        ) = throw NotImplementedError()
+
         override suspend fun suggest(query: String): List<com.rjbiermann.giffyviewer.core.network.SuggestDto> = throw NotImplementedError()
 
         override suspend fun creatorsSearch(
