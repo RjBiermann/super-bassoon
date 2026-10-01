@@ -137,4 +137,44 @@ class LiveSmokeTest {
                     .map { it.createDate }
             }
         }
+
+    /**
+     * Probe: does the search/trending endpoint cap pagination? (400 at page 6.)
+     * Run with -Dlive=true.
+     */
+    @Test
+    fun `page cap probe`() =
+        runBlocking {
+            assumeTrue("skipped: pass -Dlive=true", live())
+            val carrier = arrayOfNulls<String>(1)
+            val net = buildNetwork(authToken = { carrier[0] })
+            carrier[0] = net.api.temporaryToken().token
+            for (cfg in listOf(40 to 5, 40 to 6, 100 to 2, 100 to 3, 20 to 10)) {
+                val r =
+                    runCatching {
+                        net.api.search(searchText = "dance", count = cfg.first, page = cfg.second).gifs.size
+                    }
+                println("PROBE cap count=${cfg.first} page=${cfg.second} -> ok=${r.getOrNull()} err=${r.exceptionOrNull()?.message}")
+            }
+        }
+
+    /**
+     * Probe: trending/popular pagination cap — 400 seen at page 6 (count=40).
+     * Run with -Dlive=true.
+     */
+    @Test
+    fun `trending page cap probe`() =
+        runBlocking {
+            assumeTrue("skipped: pass -Dlive=true", live())
+            val carrier = arrayOfNulls<String>(1)
+            val net = buildNetwork(authToken = { carrier[0] })
+            carrier[0] = net.api.temporaryToken().token
+            for (cfg in listOf(40 to 1, 40 to 2, 40 to 3, 40 to 4, 100 to 1)) {
+                val r =
+                    runCatching {
+                        net.api.trendingPopular(count = cfg.first, page = cfg.second).gifs.size
+                    }
+                println("PROBE tcap count=${cfg.first} page=${cfg.second} -> ok=${r.getOrNull()} err=${r.exceptionOrNull()?.message}")
+            }
+        }
 }

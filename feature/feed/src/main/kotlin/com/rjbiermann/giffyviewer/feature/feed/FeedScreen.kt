@@ -453,6 +453,21 @@ fun FeedScreen(
                 )
             } else if (items.itemCount == 0 &&
                 items.loadState.refresh is LoadState.NotLoading &&
+                (
+                    listOf(feedPrefs.duration, feedPrefs.resolution, feedPrefs.orientation).any { it.isNotEmpty() } ||
+                        feedPrefs.untaggedOnly
+                )
+            ) {
+                // Strict client filter (lt10 etc.) can legitimately match zero
+                // tiles — trending's server pool is ~100 items (live-proven:
+                // page 3×40 → 20, page 4 → HTTP 400). Never a blank screen.
+                com.rjbiermann.giffyviewer.core.ui.EmptyState(
+                    message = "No videos match this filter",
+                    hint = "Clear or loosen the filter chips",
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else if (items.itemCount == 0 &&
+                items.loadState.refresh is LoadState.NotLoading &&
                 (source is FeedSource.Favorites || source is FeedSource.ForYou)
             ) {
                 // UX: helpful empty state, never a blank screen (shared EmptyState).

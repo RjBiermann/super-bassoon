@@ -178,3 +178,14 @@ per-session Fisher-Yates, stable across recomposition, reshuffle action availabl
   no-ops while the blobs persisted — the earlier verifications only
   proved storage, not filtering. Fixed by combine(orientationFilter,
   feedPrefs) → flatMapLatest → params handed to the source.
+- Filter dead-end (live-proven + fixed): a strict client filter can empty
+  EVERY cached page; with 0 visible items nothing scrolls → no APPEND →
+  the feed starves on an eternal spinner. FeedPagingSource.load now walks
+  consecutive unfetched pages through the empties (bounded ≤8 — rate-limit
+  safe) and terminates on a missing/invalid next key.
+- Trending server pool is ~100 items: page 3×40 → 20 gifs, page 4 → HTTP
+  400 (probe kept in LiveSmokeTest `trending page cap probe`). Cache rows
+  from older pool rotations coexist, so deep cached pages are historical.
+  Strict filters can therefore legitimately match zero tiles → FeedScreen
+  shows "No videos match this filter / Clear or loosen the filter chips"
+  instead of a blank grid. "Clear" refills (live-verified both ways).

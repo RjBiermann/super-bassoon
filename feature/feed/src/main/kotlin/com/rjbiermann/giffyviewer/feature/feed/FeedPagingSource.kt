@@ -78,98 +78,122 @@ class FeedPagingSource(
     }
 
     override suspend fun load(params: LoadParams<Int>): PagingSource.LoadResult<Int, Gif> {
-        val page = params.key ?: 1
+        var page = params.key ?: 1
         return try {
             val prefs = prefs()
             // Per-feed orientation "" = follow the global §6 pref.
             val orientation = prefs.orientation.ifEmpty { orientation() }
-            var entity = pageDao.page(feedPageKey(feed, page))
-            // Unfetched page (the cache lags the scroll): fill it HERE — Paging
-            // consults the mediator only when the source's data is exhausted, so
-            // a fast scroll used to reach an unfetched page and either stall the
-            // feed (null next = end-of-list) or drain empty pages (user report).
-            // Same fetcher the mediator uses → one API call, rate-limit safe.
-            if (entity == null) {
-                fetcher?.fill(page)
-                entity = pageDao.page(feedPageKey(feed, page))
-            }
-            // upstream pagination overlaps: page n re-lists some of page n-1.
-            // Paging requires unique keys → drop ids already shown by earlier pages.
-            val seen =
-                pageDao
-                    .pagesForBase(feed.keyBase)
-                    .filter { (pageNumber(it.pageKey) ?: 0) < page }
-                    .flatMapTo(HashSet()) { it.gifIds }
-            val ids = (entity?.gifIds ?: emptyList()).filterNot { it in seen }
-            val byId = if (ids.isEmpty()) emptyMap() else pageDao.gifsByIds(ids).associateBy { it.id }
-            // ContentFilter choke point (leak-zero): blocked creators/tags/keywords
-            // never reach the UI, however they got into the cache. BLOCKED group
-            // tags ride the same reload (§6 stage 2).
-            contentFilter.refreshFrom(db.contentPrefsDao())
-            contentFilter.refreshGroupTags(db.nicheGroupDao())
-            // Favorites feed keeps unfavorited rows out at read time (instant
-            // un-favorite; the round-robin cache itself refreshes on TTL).
-            val scopeCtx = if (feed is FeedSource.ForYou) forYouContext() else null
-            val favs =
-                if (feed is FeedSource.Favorites) {
-                    db.contentPrefsDao().favoriteCreators().mapTo(HashSet()) { it.lowercase() }
-                } else {
-                    null
+            var gifs: List<Gif> = emptyList()
+            var nextKey: Int? = null
+            // §8 filter dead-end fix (live-proven): a strict client filter can
+            // empty EVERY cached page; with 0 visible items nothing scrolls →
+            // no APPEND → the feed starves forever. Fetch consecutive unfetched
+            // pages through the empties (bounded: rate-limit safe, ≤10/5s).
+            var empties = 0
+            do {
+                var entity = pageDao.page(feedPageKey(feed, page))
+                // Unfetched page (the cache lags the scroll): fill it HERE — Paging
+                // consults the mediator only when the source's data is exhausted, so
+                // a fast scroll used to reach an unfetched page and either stall the
+                // feed (null next = end-of-list) or drain empty pages (user report).
+                // Same fetcher the mediator uses → one API call, rate-limit safe.
+                if (entity == null) {
+                    fetcher?.fill(page)
+                    entity = pageDao.page(feedPageKey(feed, page))
                 }
-            // Session dedup (repository-level): covers ids still live in the
-            // pager's list even when their source row was rewritten (server
-            // reshuffles) — duplicate grid keys crash the measure pass.
-            val sessionSeen =
-                com.rjbiermann.giffyviewer.feature.feed.FeedRepository
-                    .seenFor(feed.keyBase)
-            val models =
-                ids
-                    .filterNot { it in sessionSeen }
-                    .mapNotNull { byId[it]?.toModel() }
-            // hide-count increment lives in the pipeline (PLAN §6): one batched
-            // write per page load — recount on reload is accepted (read-time filter)
-            val hidden = models.count { !contentFilter.allow(it.userName, it.tags, it.description) }
-            if (hidden > 0) {
-                db.contentPrefsDao().addHideCount(weekStartMs(System.currentTimeMillis()), hidden)
-            }
-            val gifs =
-                models
-                    .filter { contentFilter.allow(it.userName, it.tags, it.description) }
-                    .filter { favs == null || it.userName.lowercase() in favs }
-                    // §8 range chips: client-side, read-time, AFTER the filter;
-                    // not counted in hide counts — prefs, not blocks.
-                    .filter { it.matchesOrientation(orientation) }
-                    .filter { untagged(it, feed, prefs) }
-                    .filter { durationIn(it.durationSeconds, prefs.duration) }
-                    .filter { it.resolutionMatches(prefs.resolution) }
-                    // §8 shuffle: deterministic per-seed order — hashing every id
-                    // with the seed yields ONE global order across all pages
-                    // (stable across recomposition; Reshuffle = new seed).
-                    .let { gifs ->
-                        if (prefs.shuffleSeed != 0L) {
-                            // seed mixed via splitmix-style XOR: affine keys (h+c, h*c)
-                            // sort identically for every seed — XOR of a seed-scaled
-                            // constant actually permutes the order
-                            gifs.sortedBy {
-                                it.id.hashCode().toLong() xor (prefs.shuffleSeed * -7046029254386353131L)
-                            }
-                        } else {
-                            gifs
-                        }
-                    }.onEach { sessionSeen.add(it.id) }
-                    // For You scope (§7 Creators·Niches·All): read-time filter over
-                    // the SAME cached server pages — one fetch, three filters.
-                    .filter {
-                        when (scopeCtx?.scope) {
-                            "creators" -> it.userName.lowercase() in scopeCtx!!.followed
-                            "niches" -> it.tags.any { t -> t.lowercase() in scopeCtx!!.joinedTags }
-                            else -> true
-                        }
+                // upstream pagination overlaps: page n re-lists some of page n-1.
+                // Paging requires unique keys → drop ids already shown by earlier pages.
+                val seen =
+                    pageDao
+                        .pagesForBase(feed.keyBase)
+                        .filter { (pageNumber(it.pageKey) ?: 0) < page }
+                        .flatMapTo(HashSet()) { it.gifIds }
+                val ids = (entity?.gifIds ?: emptyList()).filterNot { it in seen }
+                val byId = if (ids.isEmpty()) emptyMap() else pageDao.gifsByIds(ids).associateBy { it.id }
+                // ContentFilter choke point (leak-zero): blocked creators/tags/keywords
+                // never reach the UI, however they got into the cache. BLOCKED group
+                // tags ride the same reload (§6 stage 2).
+                contentFilter.refreshFrom(db.contentPrefsDao())
+                contentFilter.refreshGroupTags(db.nicheGroupDao())
+                // Favorites feed keeps unfavorited rows out at read time (instant
+                // un-favorite; the round-robin cache itself refreshes on TTL).
+                val scopeCtx = if (feed is FeedSource.ForYou) forYouContext() else null
+                val favs =
+                    if (feed is FeedSource.Favorites) {
+                        db.contentPrefsDao().favoriteCreators().mapTo(HashSet()) { it.lowercase() }
+                    } else {
+                        null
                     }
-            val nextKey = entity?.nextPageKey?.let { pageNumber(it) }
+                // Session dedup (repository-level): covers ids still live in the
+                // pager's list even when their source row was rewritten (server
+                // reshuffles) — duplicate grid keys crash the measure pass.
+                val sessionSeen =
+                    com.rjbiermann.giffyviewer.feature.feed.FeedRepository
+                        .seenFor(feed.keyBase)
+                val models =
+                    ids
+                        .filterNot { it in sessionSeen }
+                        .mapNotNull { byId[it]?.toModel() }
+                // hide-count increment lives in the pipeline (PLAN §6): one batched
+                // write per page load — recount on reload is accepted (read-time filter)
+                val hidden = models.count { !contentFilter.allow(it.userName, it.tags, it.description) }
+                if (hidden > 0) {
+                    db.contentPrefsDao().addHideCount(weekStartMs(System.currentTimeMillis()), hidden)
+                }
+                val pageGifs =
+                    models
+                        .filter { contentFilter.allow(it.userName, it.tags, it.description) }
+                        .filter { favs == null || it.userName.lowercase() in favs }
+                        // §8 range chips: client-side, read-time, AFTER the filter;
+                        // not counted in hide counts — prefs, not blocks.
+                        .filter { it.matchesOrientation(orientation) }
+                        .filter { untagged(it, feed, prefs) }
+                        .filter { durationIn(it.durationSeconds, prefs.duration) }
+                        .filter { it.resolutionMatches(prefs.resolution) }
+                        // §8 shuffle: deterministic per-seed order — hashing every id
+                        // with the seed yields ONE global order across all pages
+                        // (stable across recomposition; Reshuffle = new seed).
+                        .let { gifs ->
+                            if (prefs.shuffleSeed != 0L) {
+                                // seed mixed via splitmix-style XOR: affine keys (h+c, h*c)
+                                // sort identically for every seed — XOR of a seed-scaled
+                                // constant actually permutes the order
+                                gifs.sortedBy {
+                                    it.id.hashCode().toLong() xor (prefs.shuffleSeed * -7046029254386353131L)
+                                }
+                            } else {
+                                gifs
+                            }
+                        }.onEach { sessionSeen.add(it.id) }
+                        // For You scope (§7 Creators·Niches·All): read-time filter over
+                        // the SAME cached server pages — one fetch, three filters.
+                        .filter {
+                            when (scopeCtx?.scope) {
+                                "creators" -> it.userName.lowercase() in scopeCtx!!.followed
+                                "niches" -> it.tags.any { t -> t.lowercase() in scopeCtx!!.joinedTags }
+                                else -> true
+                            }
+                        }
+                // loop tail: consume empty pages with a next key (≤3 consecutive
+                // — rate-limit safety), otherwise return what we have.
+                if (pageGifs.isNotEmpty()) {
+                    gifs = pageGifs
+                    nextKey = entity?.nextPageKey?.let { pageNumber(it) }
+                } else {
+                    nextKey = entity?.nextPageKey?.let { pageNumber(it) }
+                    if (nextKey != null && nextKey > page) {
+                        empties++
+                        page = nextKey
+                    } else {
+                        // no next page: return the empty result as-is
+                        nextKey = entity?.nextPageKey?.let { pageNumber(it) }?.takeIf { it > page }
+                        empties = 99
+                    }
+                }
+            } while (gifs.isEmpty() && empties <= 8)
             PagingSource.LoadResult.Page(
                 data = gifs,
-                prevKey = if (page == 1) null else page - 1,
+                prevKey = if (params.key ?: 1 == 1) null else (params.key ?: 1) - 1,
                 nextKey = nextKey,
             )
         } catch (t: Throwable) {
