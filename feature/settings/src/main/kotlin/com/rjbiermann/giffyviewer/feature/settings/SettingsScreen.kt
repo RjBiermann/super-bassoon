@@ -209,6 +209,28 @@ fun SettingsScreen(
                     }
                 }
             }
+            item(key = "video-fit") {
+                // §5 Video fit: Fit (default) · Crop · Stretch — both players.
+                val videoFit by viewModel.videoFit.collectAsStateWithLifecycle("fit")
+                Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+                    Text("Video fit", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "Fit shows the whole video (bars where aspects differ)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(modifier = Modifier.padding(top = 8.dp)) {
+                        listOf("Fit" to "fit", "Crop" to "crop", "Stretch" to "stretch").forEach { (label, value) ->
+                            FilterChip(
+                                selected = videoFit == value,
+                                onClick = { viewModel.setVideoFit(value) },
+                                label = { Text(label) },
+                                modifier = Modifier.padding(end = 6.dp),
+                            )
+                        }
+                    }
+                }
+            }
             item(key = "data-saver") {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 16.dp),

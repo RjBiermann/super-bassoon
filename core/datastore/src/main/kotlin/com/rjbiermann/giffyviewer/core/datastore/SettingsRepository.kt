@@ -36,6 +36,7 @@ class SettingsRepository
             val PINNED_CREATORS = stringSetPreferencesKey("pinned_creators")
             val GRID_COLUMNS = intPreferencesKey("grid_columns")
             val FORYOU_SCOPE = stringPreferencesKey("foryou_scope")
+            val VIDEO_FIT = stringPreferencesKey("video_fit")
         }
 
         /** True once the user attested 18+. Emits false until then; survives restarts. */
@@ -111,6 +112,13 @@ class SettingsRepository
 
         suspend fun setGridColumns(columns: Int) {
             dataStore.edit { it[Keys.GRID_COLUMNS] = columns }
+        }
+
+        /** Video fit (§5): fit | crop | stretch — one shared setting, both players. */
+        val videoFit: Flow<String> = dataStore.data.map { it[Keys.VIDEO_FIT] ?: "fit" }
+
+        suspend fun setVideoFit(fit: String) {
+            dataStore.edit { it[Keys.VIDEO_FIT] = fit }
         }
 
         /** For You scope (§7 Creators · Niches · All, logged-in; default All). */

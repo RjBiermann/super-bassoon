@@ -133,6 +133,12 @@ When unsure: check PLAN.md first, then ask. Don't invent endpoints or features.
   heart pop, playback speed 0.5–2× in overflow, error Retry/Skip overlay, auto-swipe toggle
   (reduced-motion aware, data-saver forced off, prefs-persisted), adjacent-item prefetch via
   Media3 DefaultPreloadManager (prepare-only — no data burn).
+- Theme-mode research (2026-09-30, decision): System/Light/Dark selector **considered and rejected** —
+  the app stays dark-only with the borrowed upstream palette (PLAN §9). SYSTEM mode is a near-free
+  ~30-line slice (enum pref + selector + `isSystemInDarkTheme()` pass-through) if ever wanted, but
+  LIGHT is new design, not a port: no light tokens exist to borrow (site is dark-only), it needs an
+  invented ~20-role scheme + fresh contrast audit + status-bar-icon handling — deferred until there
+  is an actual light palette to ship. AMOLED + dynamic-color options unchanged.
 - Live like-write drift fixed: PUT/DELETE /v2/gifs/{id}/like need JSON body
   {context:trending, source:watchlist, position} + Json encodeDefaults=true (all-default
   @Body DTOs serialized to {} otherwise); Retrofit DELETE+body needs @HTTP(hasBody=true).

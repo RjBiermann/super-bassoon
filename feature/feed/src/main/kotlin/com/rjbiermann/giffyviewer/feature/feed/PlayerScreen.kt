@@ -135,6 +135,7 @@ fun PlayerScreen(
     val likedIds by viewModel.likedIds.collectAsStateWithLifecycle(emptySet())
     val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle(false)
     val autoSwipe by settings.autoSwipe.collectAsStateWithLifecycle(false)
+    val videoFit by settings.videoFit.collectAsStateWithLifecycle("fit")
     val muteScope = rememberCoroutineScope()
     val player = remember { playerFactory.create(context) }
 
@@ -322,6 +323,7 @@ fun PlayerScreen(
                         player.playGif(gif, dataSaver)
                     },
                     onSkip = { playError = false },
+                    videoFit = videoFit,
                 )
             }
         }
@@ -378,9 +380,16 @@ private fun PlayerPage(
     playError: Boolean,
     onRetry: () -> Unit,
     onSkip: () -> Unit,
+    videoFit: String,
 ) {
     // React to the shared player's media swaps (attach gating below).
     val playingId by player.currentGifId.collectAsStateWithLifecycle()
+    val videoFitMode =
+        when (videoFit) {
+            "crop" -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+            "stretch" -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+            else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+        }
     var popAt by remember { mutableStateOf<Offset?>(null) }
     if (active) {
         // resume: stored position per gif, EXCEPT (a) auto-advance always starts
@@ -518,9 +527,7 @@ private fun PlayerPage(
             factory = { ctx ->
                 PlayerView(ctx).apply {
                     useController = false
-                    // §5 video fit: Fit is the DEFAULT (never loses content) —
-                    // black bars are expected for aspect-mismatched gifs; the
-                    // Crop/Stretch picker is spec'd-not-scheduled.
+                    // §5 video fit: user choice (Fit default · Crop · Stretch).
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                 }
             },
@@ -529,6 +536,7 @@ private fun PlayerPage(
                 // playing THIS page's gif — otherwise the new page renders the
                 // previous video's last frame for a beat (user report).
                 view.player = if (active && playingId == gif.id) player else null
+                view.resizeMode = videoFitMode
             },
             modifier =
                 Modifier

@@ -88,6 +88,14 @@ class SettingsViewModel
             viewModelScope.launch { settings.setDataSaver(enabled) }
         }
 
+        /** Video fit (§5): fit | crop | stretch, shared by both players. */
+        val videoFit: StateFlow<String> =
+            settings.videoFit.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "fit")
+
+        fun setVideoFit(fit: String) {
+            viewModelScope.launch { settings.setVideoFit(fit) }
+        }
+
         /** Grid columns (PLAN §6 responsive-first): 0 = Auto (width-derived). */
         val gridColumns: StateFlow<Int> =
             settings.gridColumns.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)

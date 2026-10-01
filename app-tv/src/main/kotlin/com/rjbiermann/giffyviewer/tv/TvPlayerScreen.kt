@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.database.WatchHistoryEntity
@@ -55,6 +56,14 @@ fun TvPlayerScreen(
 ) {
     val context = LocalContext.current
     val dataSaver by settings.dataSaver.collectAsStateWithLifecycle(false)
+    // §5 video fit (shared setting): fit | crop | stretch.
+    val videoFit by settings.videoFit.collectAsStateWithLifecycle("fit")
+    val fitMode =
+        when (videoFit) {
+            "crop" -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+            "stretch" -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+            else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+        }
     var index by
         remember {
             mutableIntStateOf(startIndex.coerceAtLeast(0).coerceAtMost(gifs.size - 1))
@@ -113,7 +122,10 @@ fun TvPlayerScreen(
                 factory = { ctx ->
                     PlayerView(ctx).apply { useController = false }
                 },
-                update = { view -> view.player = player },
+                update = { view ->
+                    view.player = player
+                    view.resizeMode = fitMode
+                },
                 modifier = Modifier.fillMaxSize(),
             )
             // Thin lime progress line (mobile parity).
