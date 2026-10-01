@@ -142,7 +142,7 @@ fun SearchScreen(
                         modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
                     )
                     Text(
-                        text = "${suggestion.gifs}",
+                        text = "%,d gifs".format(suggestion.gifs),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

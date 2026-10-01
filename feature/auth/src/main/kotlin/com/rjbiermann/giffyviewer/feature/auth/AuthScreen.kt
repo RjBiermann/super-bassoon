@@ -97,18 +97,32 @@ fun AuthScreen(
             if (token == null) {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Paste your upstream bearer token",
+                    "Sign in with browser",
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Sign in at upstream.com, open browser DevTools → Network, " +
-                        "copy the token from any request's Authorization header " +
-                        "(without the \"Bearer \" prefix).",
+                    "One tap, opens upstream.com in a WebView — the token " +
+                        "exchange happens in-app (PKCE). No copy-pasting.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(24.dp))
+                Button(
+                    onClick = { webLogin = true },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Sign in with browser")
+                }
+                Spacer(Modifier.height(24.dp))
+                Text(
+                    "Or paste a bearer token (fallback — TV and WebView failures): " +
+                        "sign in at upstream.com, open DevTools → Network, copy the " +
+                        "Authorization header value.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
                     value = draft,
                     onValueChange = {
@@ -130,7 +144,7 @@ fun AuthScreen(
                             },
                 )
                 Spacer(Modifier.height(16.dp))
-                Button(
+                OutlinedButton(
                     onClick = {
                         if (!viewModel.save(draft)) error = true else draft = ""
                     },
@@ -138,13 +152,6 @@ fun AuthScreen(
                     modifier = Modifier.fillMaxWidth().focusRequester(signInFocus),
                 ) {
                     Text("Sign in")
-                }
-                Spacer(Modifier.height(16.dp))
-                OutlinedButton(
-                    onClick = { webLogin = true },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Sign in with browser")
                 }
             } else {
                 Spacer(Modifier.height(8.dp))

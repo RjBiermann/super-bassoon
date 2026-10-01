@@ -511,7 +511,9 @@ private fun PlayerPage(
                             (secondUp.position - secondDown.position).getDistance() <
                             viewConfiguration.touchSlop
                         ) {
-                            onToggleLike()
+                            // PLAN §9: double-tap = LIKE (never unlike) —
+                            // un-like stays a rail action only.
+                            if (!liked) onToggleLike()
                             popAt = down.position
                         } else {
                             if (controlsVisible) {

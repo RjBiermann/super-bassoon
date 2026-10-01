@@ -338,7 +338,11 @@ fun FeedScreen(
 
             val refreshError = items.loadState.refresh is LoadState.Error
             if (items.itemCount == 0 && refreshError) {
-                OfflineNotice(modifier = Modifier.fillMaxSize())
+                com.rjbiermann.giffyviewer.core.ui.EmptyState(
+                    message = "Nothing cached yet",
+                    hint = "You're offline — reconnect to load the feed.",
+                    modifier = Modifier.fillMaxSize(),
+                )
             } else if (items.itemCount == 0 &&
                 items.loadState.refresh is LoadState.NotLoading &&
                 (source is FeedSource.Favorites || source is FeedSource.ForYou)
@@ -352,7 +356,7 @@ fun FeedScreen(
                 val hint =
                     when {
                         source is FeedSource.ForYou -> "Follow creators and join niches to fill it"
-                        else -> "long-press a tile and choose Favorite"
+                        else -> "long-press a tile and choose “Favorite @creator”"
                     }
                 com.rjbiermann.giffyviewer.core.ui
                     .EmptyState(modifier = Modifier.fillMaxSize(), message = msg, hint = hint)
@@ -442,21 +446,6 @@ fun FeedScreen(
 /** Pill appears after ~10 items scrolled (PLAN §9). */
 private const val SCROLL_PILL_THRESHOLD = 10
 
-/** Airplane-mode cold start: cached rows render; only an empty cache shows this. */
-@Composable
-private fun OfflineNotice(modifier: Modifier = Modifier) {
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Nothing cached yet", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "You're offline — reconnect to load the feed.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
 /** PLAN §9 quick sheet: block creator / tags / keyword / don't block. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -486,7 +475,7 @@ internal fun QuickBlockSheet(
                 var dragSpeed by remember(currentSpeed) { mutableFloatStateOf(currentSpeed) }
                 Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
                     Text(
-                        text = "Speed " + String.format("%.2f", dragSpeed) + "×",
+                        text = "Speed " + String.format(java.util.Locale.US, "%.2f", dragSpeed) + "×",
                         style = MaterialTheme.typography.bodyMedium,
                         color =
                             if (dragSpeed != currentSpeed) {
@@ -659,6 +648,7 @@ private fun GifTile(
                 .combinedClickable(
                     onClick = onClick,
                     onLongClick = onLongPress,
+                    onLongClickLabel = "Open quick actions",
                 ),
     ) {
         // avgColor placeholder + reserved aspect ratio: no layout jump while loading,
@@ -678,7 +668,9 @@ private fun GifTile(
                         .data(gif.posterUrl)
                         .crossfade(200)
                         .build(),
-                contentDescription = "Gif by @${gif.userName}",
+                // Decorative: the visible "@user" Text announces the creator;
+                // a duplicated contentDescription read both (audit 2026-10).
+                contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
