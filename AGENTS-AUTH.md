@@ -1,6 +1,6 @@
 # AGENTS-AUTH.md — `:core:auth` + `:feature:auth`
 
-Login, token storage, revocation. Spec: PLAN.md §2. **REVISED 2026 — live-verified.**
+Login, token storage, revocation (auth flows formerly PLAN.md §2). **REVISED 2026 — live-verified.**
 
 ## Login reality (2026, live-verified via Playwright run 2026-09-30)
 - The web login runs via `upstream-auth-host.example` (Kinde OAuth). **The old `sess` cookie + `POST /v2/auth` authkey exchange is dead (404 live).**

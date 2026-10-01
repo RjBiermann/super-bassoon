@@ -1,8 +1,8 @@
 # AGENTS-UX-PATTERNS.md — Instagram/TikTok practices, Giffy-mapped (DOC ONLY)
 
 Reference doc, no implementation commitments. Each pattern is either
-**already in the plan** (pointer to PLAN §) or a **candidate** (not scheduled —
-build only if a user slice actually needs it; if adopted, it goes into PLAN
+**already in the app** or a **candidate** (not scheduled —
+build only if a user slice actually needs it; if adopted, document it in the AGENTS-*.md files
 first, per the AGENTS.md "adapt endpoint paths only" rule with respect to scope).
 
 Borrow only **interaction/UX patterns**. Instagram/TikTok engagement-hacking
@@ -15,18 +15,18 @@ conventions* are fine; its *retention playbook* is not.
 
 | Pattern (origin) | Where |
 |---|---|
-| TikTok-style vertical snap feed player with right action rail | PLAN §9 swipe-player bullets |
-| Double-tap to like + heart pop (TikTok/Reels) | PLAN §9 Gestures |
-| Auto-hiding player chrome, tap to reveal / pause | PLAN §9 swipe-view controls |
-| Mute default with persistent mute state (silent-first autoplay convention) | PLAN §9 mute-state persistence, §5 audio |
-| Auto-advance on video end + loop-off toggle (TikTok autoplay) | PLAN §9 auto-swipe bullet |
-| Instagram "New posts" scroll-top + refresh pill, pull-to-refresh | PLAN §9 Refresh feed bullet |
-| Bottom bar ≤5 items, everything else as in-Home chips (both apps' nav discipline) | PLAN §9 Navigation |
-| Hold hints / one-time coach toasts (first-use affordance onboarding) | PLAN §9 UX-consistency gaps (double-tap hint) |
+| TikTok-style vertical snap feed player with right action rail | implemented in AGENTS-APP.md |
+| Double-tap to like + heart pop (TikTok/Reels) | implemented in AGENTS-APP.md |
+| Auto-hiding player chrome, tap to reveal / pause | implemented in AGENTS-APP.md |
+| Mute default with persistent mute state (silent-first autoplay convention) | implemented in AGENTS-APP.md |
+| Auto-advance on video end + loop-off toggle (TikTok autoplay) | implemented in AGENTS-APP.md |
+| Instagram "New posts" scroll-top + refresh pill, pull-to-refresh | implemented in AGENTS-APP.md |
+| Bottom bar ≤5 items, everything else as in-Home chips (both apps' nav discipline) | implemented in AGENTS-APP.md |
+| Hold hints / one-time coach toasts (first-use affordance onboarding) | implemented in AGENTS-APP.md |
 | Continue Watching resume (TikTok "watch history" inset; IG auto-resume) | §5 watch_history, §9 Tabs |
 | Live-preview trends aside — preview-on-hover is TV only (see candidates) | this doc, TV section |
-| Reduced-motion honored — animations collapse to instant | PLAN §9 Player lifecycle |
-| 48dp targets, tap zones sized to thumb reach (mobile bare-thumb ergonomics) | PLAN §9 Accessibility |
+| Reduced-motion honored — animations collapse to instant | implemented in AGENTS-APP.md |
+| 48dp targets, tap zones sized to thumb reach (mobile bare-thumb ergonomics) | implemented in AGENTS-APP.md |
 
 ## Candidates (not scheduled — mapped per device)
 
@@ -76,7 +76,7 @@ conventions* are fine; its *retention playbook* is not.
   outright (bandage: data burn for zero intent signal, viewer-only).
 
 ## TV D-pad research (2026-10, research-only — porting mobile features to TV)
-Doc-only reference, same graduation rule as this file (user slice → PLAN §9 bullet → code).
+Doc-only reference, same graduation rule as this file (user slice → AGENTS-APP.md note → code).
 Trigger: "port more mobile features to TV / D-pad". Scope: what leading TV apps actually
 bind to keys, what Giffy TV already has, and the gap — with anti-confusion rules so the
 keymap stays legible.
@@ -112,12 +112,12 @@ jump on YouTube only — nicety, not a convention worth copying.
 | Share sheet | skip — no established TV share convention | skip |
 | Pinch zoom | skip — no D-pad analog, mobile-only gesture | skip |
 
-### Recommended keymap (candidate — PLAN edit first if adopted)
+### Recommended keymap (candidate — AGENTS-APP.md edit first if adopted)
 
 Player: Center play/pause · Down/Up prev/next · Left/Right ±10s (+hold repeat) ·
 MENU quick-actions panel (Like · Mute · Speed · Auto-swipe · Block/Favorite set it already
 has) · BACK dismiss panel then exit · handle `KEYCODE_MEDIA_PLAY_PAUSE/FF/REW` to the same
-actions. Home: unchanged (MENU on card, focus-up into search already spec'd PLAN §9).
+actions. Home: unchanged (MENU on card, focus-up into search already implemented).
 Fix-with-touch: `TvSourceFeedScreen` `onMenu = {}` dead control (audit finding).
 
 ### Anti-confusion rules (the whole point)
@@ -140,6 +140,6 @@ Fix-with-touch: `TvSourceFeedScreen` `onMenu = {}` dead control (audit finding).
 | TV | D-pad equivalents of every borrowed gesture (hold = MENU, actions = quick panel); no hover-only affordances |
 
 ## When a candidate graduates
-Adoption order: user slice → PLAN §9 bullet (numbered, dated) → AGENTS-APP.md
-verification note. Nothing on the Candidates list becomes code without a PLAN
+Adoption order: user slice → AGENTS-APP.md note (numbered, dated) → code.
+Nothing on the Candidates list becomes code without
 edit first — this file stays commentary, never the spec.

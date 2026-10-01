@@ -1,6 +1,7 @@
 # AGENTS-APP.md — `:app-mobile` + `:app-tv`
 
-Compose UI, navigation, platform shells. Spec: PLAN.md §3, §7–9.
+Compose UI, navigation, platform shells. Age gate + navigation + feeds + per-feed
+prefs + the normative UI-lingo table below (formerly PLAN.md §3, §7–9).
 
 ## Age gate (both platforms — blocking)
 - Start destination until `age_confirmed_at` set in DataStore.
@@ -11,22 +12,33 @@ Compose UI, navigation, platform shells. Spec: PLAN.md §3, §7–9.
 
 ## Mobile app
 - minSdk 24, targetSdk 35, edge-to-edge, Material 3 dynamic color, AMOLED true-black option.
-- **Phone + tablet = one adaptive UI** (PLAN §9): same screens, touch-first everywhere;
+- **Phone + tablet = one adaptive UI** (AGENTS.md shell-agnostic rule): same screens, touch-first everywhere;
   width is the only variable. `WindowWidthSizeClass` computed once at the app shell,
   derived layout hint passed down (column counts, margins) — no scattered width checks.
   No separate tablet screens or codepaths.
-- Masonry width-derived columns (`Auto`: compact 1 / medium 2 / expanded 3, user-overridable — PLAN §6), Paging 3.
+- Masonry width-derived columns (`Auto`: compact 1 / medium 2 / expanded 3, user-overridable ), Paging 3.
 - TikTok-style swipe player.
 - Long-press (tile or player) quick sheet: **Like / Unlike** · Block creator · Favorite creator · Block tag `<tag>` · Block all tags on this gif · Block this keyword · Don't block.
 - Creator profile: Follow/Unfollow (server-backed, `v1/me/follows`; button states Follow ↔ Following per site); niche cards show Join/Leave state (site wording "Join Niche / Leave Niche", API `v2/niches/{id}/subscription`).
 - Tap username → profile-like view (follow/block/manage lists).
 - Feeds: Trending / Explore / Top(day…all), group feeds, custom feeds, For You, Search, Favorites, Groups, Settings.
-- **UI lingo = site words (verified 2026-10-01; normative table lives in PLAN §9 first bullet):** Explore (not "Discover") · Join/Leave Niche · Following (not "Followed" screen label) · Saved Collections · "Liked GIFs & Images" · Sound On/Off · Related Tags / "you might like" · Hot · Latest · Top / Top This Week · Blocked Tags · App-only surfaces keep app labels (Continue Watching, Surprise me, Groups, Favorite creator, Data saver).
+- **UI lingo = site words (verified live via logged-in Playwright sweep, 2026-10-01 — normative for every user-visible label):**
+  - For You / Trending (home tabs; For You scope dropdown **Creators · Niches · All**).
+  - **Explore** (NOT "Discover" — site nav renders Home · Explore · Niches · Profile); Explore = "Top Creators" surface (`/explore/creators`).
+  - Follow states **Follow ↔ Following**; following page heading "Following", per-creator **unfollow button**.
+  - Niche pages: tabs **Feed · About**, **Join Niche / Leave Niche**, **"N Members / N Posts"**, Niche Rules, Top Creators, "Niches you might also like"; profile menu item **My Niches** — say "joined niches", not "subscriptions" (API paths keep `/subscription`).
+  - Collections screen header **Saved Collections** + **Create New Collection** (server's default collection is named "Likes"); liked page heading **"Liked GIFs & Images"** (its URL says favourites but the page never does).
+  - Watch-page sections **Related Tags** (See All), "Suggested Niches"/"Suggested Creators", related-gifs strip **"you might like"**; per-card count text "N views".
+  - Player rail **Sound On/Off**, **open fullscreen**, **show more** (⋯) menu = Share · Add to a Niche · Add to a Collection · Report; fullscreen overlay **Close video · Previous video · Next video**.
+  - Settings content-prefs heading **"Select Your Content Preferences"** with **"Blocked Tags"** + **"add tag"**; result tabs **GIFs / Creators / Niches** (Images is a site-only upload surface).
+  - Sorts (niche/creator/profile): **Hot · Latest · Top**; tag/search pages: **Trending · Top This Week · Top This Month · Latest**.
+  - **"Pinned" stays "Pinned"** — the API's own word (`v2/pins`); no site UI surface exists.
+  - **App-only surfaces keep app labels** (no site equivalent — do not retrofit site wording): Continue Watching · Surprise me · Groups (niche groups) · Favorite creator · Data saver · autoplay toggle · Grid columns · Preferences backup.
 - Surface `RateLimitBus` state as a subtle "cooling down" indicator.
 
 ## TV app
 - androidx.tv, minSdk 26, full D-pad navigation incl. Groups + settings + PIN pad; 5% overscan margins.
-- Kept as a separate module on purpose (PLAN §1): D-pad focus traversal, tv-material
+- Kept as a separate module on purpose (deliberate split): D-pad focus traversal, tv-material
   components and 10-foot contrast are different in kind from touch — a merged module
   would turn every screen into an `isTv` branch. TV shares all :core:* and :feature:*
   code; only the shell is TV-specific.
@@ -53,7 +65,7 @@ Compose UI, navigation, platform shells. Spec: PLAN.md §3, §7–9.
 - Settings screen: "Preferences backup" section with Export/Import buttons (SAF
   `CreateDocument("application/json")` / `OpenDocument`) + snackbar feedback
   ("Preferences exported" / "Imported N entries" / "Import failed — not a Giffy
-  preferences file"). Closes PLAN gate 7 (round-trip on fresh install).
+  preferences file"). Closes verification gate 7 (round-trip on fresh install).
 - Live round-trip: block @cherrymoon__ + favorite @candyai → Export to
   `Download/giffy-prefs.json` → uninstall → fresh install → age gate → Import →
   both prefs restored, blocked creator leak-zero in feed, snackbar "Imported 2 entries".
@@ -96,7 +108,7 @@ a user slice picks from this list. Priority order within each tier.
   (target size + TalkBack state announcement), not Switch-only hit area.
 - FeedScreen empty-Favorites hint says "long-press a tile and choose Favorite" — no tiles
   exist on an empty feed, and the sheet item is creator-favorite. Wording needs a fix.
-- Double-tap like toggles unlike on an already-liked gif (PLAN §9 semantics: double-tap
+- Double-tap like toggles unlike on an already-liked gif (AGENTS-APP semantics: double-tap
   = like); only the rail heart should toggle.
 - TvPlayerScreen has no pause/seek/position at all (D-pad walks + back only) — documented
   Phase-6 slice limit, but "can't pause on TV" is a real gap. TvSourceFeedScreen

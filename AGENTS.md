@@ -1,21 +1,38 @@
 # Giffy Viewer — Agent Guidance (root)
 
 Unofficial upstream Android client. Pure viewer, GitHub-Releases-only distribution.
-Full spec: `PLAN.md` — read it before working in this repo. Phase order there is fixed.
+The **AGENTS-*.md files are the full spec** (PLAN.md is deleted; its content was
+merged into these files — historic `former-PLAN spec §N` comments in code refer to it, the
+section numbers no longer map, AGENTS docs are current).
 
 ## Non-negotiable
 
 - **Viewer only.** No scraping, rehosting, redistribution, or deep-linking beyond share.
 - **No "upstream" branding** anywhere in app/README. App name: *Giffy Viewer*. Disclaimer required.
 - **No analytics, ads, trackers, Firebase, crash reporting.**
+- **No ads anywhere — hard rule.** No ad SDKs, no ad units, no sponsored placements,
+  no affiliate links, no premium upsell surfaces. Every rendered item comes from a real
+  API response through ContentFilter; `promoted: true` gifs are dropped in filter stage 0
+  (paid items inside genuine responses don't render either).
+- **Responsive-first, shell-agnostic.** One touch screen set scales with window width;
+  all UI/logic lives in shared `:core:*`/`:feature:*` modules, `:app-*` are thin platform
+  shells — a future desktop/iOS/web target is a new shell, not new screens. Shared modules
+  must not hardcode Android-only idioms a non-Android shell couldn't provide. TV is a
+  separate module on purpose (D-pad/10-foot is a different input modality, see AGENTS-APP.md).
+- **Fallbacks are spec'd, not scheduled:** design a fallback branch but don't build it
+  until live verification proves the primary path needs it — otherwise it's dead code.
+- **LeakCanary** is `debugImplementation` only (both app modules) — never ships, no phone-home.
+- **No WorkManager** — background refresh is silent network-on-open (stale-while-revalidate),
+  no scheduled jobs.
 - **No TODOs, no placeholders, no stubs.** Every committed file compiles and works.
 - Adapt **API endpoint paths only** when live-site checks reveal drift — never architecture, rules, or features.
+- Prefer **verifying against the live site** rather than assuming.
 
 ## Stack (fixed)
 
 Kotlin 2.x · Compose/Material 3 · Retrofit + OkHttp · Room + Paging 3 · Hilt · Coil ·
 Media3/ExoPlayer + SimpleCache · kotlinx-serialization (`ignoreUnknownKeys=true`) ·
-WorkManager · security-crypto (`EncryptedSharedPreferences`, alias `giffy_auth`) ·
+security-crypto (`EncryptedSharedPreferences`, alias `giffy_auth`) ·
 version catalog (`gradle/libs.versions.toml`) · ktlint + detekt fail the build.
 minSdk 24 (mobile) / 26 (TV) · targetSdk 35 · DB name `giffy.db`.
 
@@ -42,15 +59,15 @@ minSdk 24 (mobile) / 26 (TV) · targetSdk 35 · DB name `giffy.db`.
 
 | File | Covers | Plan § |
 |---|---|---|
-| `AGENTS-NETWORK.md` | OkHttp, rate limiter, 429/5xx, circuit breaker, DTOs, ContentFilter entry point | 2, 4 |
-| `AGENTS-DATABASE.md` | Room schema, migrations, cache-first, TTLs, watch history | 5 |
-| `AGENTS-AUTH.md` | WebView login, token storage/reveal, TV paste-token, logout/revoke | 2 |
-| `AGENTS-PLAYER.md` | ExoPlayer, SimpleCache-by-ID, data-saver, resume | 5 |
-| `AGENTS-CONTENT-FILTER.md` | The single ContentFilter choke point, blocks, groups, collections, leak-zero | 6 |
-| `AGENTS-APP.md` | Mobile + TV UI, age gate, navigation, per-feed prefs display | 3, 7–9 |
-| `AGENTS-UX-PATTERNS.md` | Instagram/TikTok interaction practices mapped per device type — doc-only reference, no implementation | 7–9 |
+| `AGENTS-NETWORK.md` | OkHttp, rate limiter, 429/5xx, circuit breaker, endpoint inventory, DTOs |
+| `AGENTS-DATABASE.md` | Room schema, migrations, cache-first, TTLs, watch history |
+| `AGENTS-AUTH.md` | WebView login, token storage/reveal, TV paste-token, logout/revoke |
+| `AGENTS-PLAYER.md` | ExoPlayer, SimpleCache-by-ID, data-saver, resume |
+| `AGENTS-CONTENT-FILTER.md` | The single ContentFilter choke point, blocks, groups, collections, leak-zero |
+| `AGENTS-APP.md` | Mobile + TV UI, age gate, navigation, per-feed prefs display, UI lingo |
+| `AGENTS-UX-PATTERNS.md` | Instagram/TikTok interaction practices mapped per device type — doc-only reference, no implementation |
 
-## Verification gates (per phase, from PLAN §10)
+## Verification gates (per phase)
 
 1. Skeleton builds, ktlint+detekt run.
 2. Network validated against live site **before** building on it.
@@ -60,7 +77,7 @@ minSdk 24 (mobile) / 26 (TV) · targetSdk 35 · DB name `giffy.db`.
 6. Filter leak-zero on every surface.
 7. Export → import round-trip on fresh install.
 
-When unsure: check PLAN.md first, then ask. Don't invent endpoints or features.
+When unsure: check the matching AGENTS doc first, then ask. Don't invent endpoints or features.
 
 ## Device testing (adb / emulator)
 - Use the **debroid** skill and the **mobile** MCP server for all adb/emulator testing
@@ -94,11 +111,11 @@ When unsure: check PLAN.md first, then ask. Don't invent endpoints or features.
 - TV app live: age gate → home (Trending/Explore/Continue Watching rows, tv-material Cards,
   D-pad) → player with D-pad next/prev + resume; paste-token Account screen reuses
   feature:auth AuthScreen. `watch_history` write verified end-to-end on TV36.
-- Still open (later slices): PIN pad optional lock, settings screen (cache size/data-saver),
-  Top This Week + Favorites + group rows (Phase 7 features), focus polish/scaling.
-- D-pad/focus docs: PLAN §7/§9 covers the TV D-pad spec (full navigation, search
+- (All "still open" items from this era have since shipped — see later sessions.)
+- D-pad/focus docs: the TV D-pad spec (full navigation, search
   focus-up, accent-outline focus states, 10-foot contrast) + M3 a11y baseline (≥48dp
-  targets, contentDescription, 4.5:1 contrast); implemented focus lessons live in
+  targets, contentDescription, 4.5:1 contrast) lives in AGENTS-APP.md;
+  implemented focus lessons live in
   AGENTS-APP.md TV section (focus scale 1.08, initial-focus FocusRequester fix, MENU
   quick-actions). Any new D-pad/focus lesson → AGENTS-APP.md.
 
@@ -120,11 +137,9 @@ When unsure: check PLAN.md first, then ask. Don't invent endpoints or features.
   wired in both app modules (see AGENTS-AUTH.md / AGENTS-NETWORK.md). Paste-token is the
   TV fallback. The site never writes `localStorage.auth_data` — capturing it was a wrong
   assumption, now documented.
-- Still open: favorite tag, For You anonymous blend (server feed landed, live-verified via
-  the app 2026-09-30), niche groups, collections, hide-count stats, Top This Week row,
-  PIN pad lock, logout WebView-cookie clearing. check-sound probe (2026-09-30): GET 405,
-  POST requires a user token (id_token 403 — context unknown) — spec'd-not-scheduled,
-  gif `hasAudio` drives the mute UI.
+- check-sound probe (2026-09-30): GET 405, POST requires a user token (id_token 403 —
+  context unknown) — spec'd-not-scheduled; gif `hasAudio` drives the mute UI.
+
 
 ### Phase 9 progress (2026-09-30)
 - Swipe-player §9 slice set complete + live-verified: theme tokens, player controls,
@@ -134,7 +149,7 @@ When unsure: check PLAN.md first, then ask. Don't invent endpoints or features.
   (reduced-motion aware, data-saver forced off, prefs-persisted), adjacent-item prefetch via
   Media3 DefaultPreloadManager (prepare-only — no data burn).
 - Theme-mode research (2026-09-30, decision): System/Light/Dark selector **considered and rejected** —
-  the app stays dark-only with the borrowed upstream palette (PLAN §9). SYSTEM mode is a near-free
+  the app stays dark-only with the borrowed upstream palette. SYSTEM mode is a near-free
   ~30-line slice (enum pref + selector + `isSystemInDarkTheme()` pass-through) if ever wanted, but
   LIGHT is new design, not a port: no light tokens exist to borrow (site is dark-only), it needs an
   invented ~20-role scheme + fresh contrast audit + status-bar-icon handling — deferred until there
@@ -142,7 +157,7 @@ When unsure: check PLAN.md first, then ask. Don't invent endpoints or features.
 - Live like-write drift fixed: PUT/DELETE /v2/gifs/{id}/like need JSON body
   {context:trending, source:watchlist, position} + Json encodeDefaults=true (all-default
   @Body DTOs serialized to {} otherwise); Retrofit DELETE+body needs @HTTP(hasBody=true).
-  Pinch zoom resets on swipe now (PLAN §9 revision 2026-09-30).
+  Pinch zoom resets on swipe now (2026-09-30 revision).
 
 ### Session 2026-10-01 (pending-items close-out)
 - Gate 338 CLOSED: auto-swipe advance was a silent no-op (bare `{ }` lambda in

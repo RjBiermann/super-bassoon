@@ -1,18 +1,28 @@
 # AGENTS-PLAYER.md — `:core:player`
 
-Media3/ExoPlayer + SimpleCache. Spec: PLAN.md §5.
+Media3/ExoPlayer + SimpleCache (cache-first rules formerly PLAN.md §5).
 
 ## Cache
 - **SimpleCache keyed by gif ID, not URL** — URL rotates, ID doesn't.
 - One SimpleCache instance per process (Media3 requirement); evict-by-LRU.
-- **Fixed constants (PLAN §5, not DataStore-configurable): mobile 512MB · TV 1GB.** Both figures shown in Settings (+ TV) with a Clear cache button (confirm-first).
+- **Fixed constants (fixed constants, not DataStore-configurable): mobile 512MB · TV 1GB.** Both figures shown in Settings (+ TV) with a Clear cache button (confirm-first).
 - `CacheDataSource` flags: cache + stream (BLOCK_ON_CACHE? no) — enable caching for the data source
   while playback streams in parallel (standard `CacheDataSink`/`CacheDataSource` non-blocking setup).
+
+## Expired media URLs (failure-driven, never pre-emptive)
+- `urls.*` are tokenized and expire well before the 24h metadata TTL — cached rows
+  go stale while metadata stays useful. On player 403/fatal-load-error: re-fetch
+  `GET /v2/gifs/{id}` (rate-limited), upsert the fresh row, retry playback ONCE;
+  still failing → player error state. Never refresh URLs speculatively (rate-limit invariant).
+- **HLS→MP4 fallback:** player tries HLS first; on manifest/load failure fall back
+  to the direct MP4 rendition (`urls.hd`/`urls.sd`) before surfacing the error —
+  `hls: true` is per-gif, not guaranteed on every item.
+- Playback speed (0.5×–2×) is **session-only** — resets to 1× on player exit.
 
 ## Playback
 - Resume positions read/write `watch_history` (Room) — feed "Continue Watching" and "Surprise me" exclusion.
 - Data-saver toggle: prefer SD stream when on.
-- **Video fit (spec'd-not-scheduled, PLAN §6):** user setting Fit / Crop / Stretch →
+- **Video fit:** user setting Fit / Crop / Stretch →
   `PlayerView.resizeMode` = `RESIZE_MODE_FIT` / `RESIZE_MODE_ZOOM` / `RESIZE_MODE_FILL`
   (default Fit). One shared DataStore pref consumed by both `PlayerScreen.kt` (mobile,
   currently sets FIT explicitly) and `TvPlayerScreen.kt` (TV, currently default FIT).
@@ -26,7 +36,7 @@ Media3/ExoPlayer + SimpleCache. Spec: PLAN.md §5.
 - Data-saver is wired end-to-end: `Gif.streamUrl(dataSaver)` → `GiffyPlayer.playGif`;
   covered by `StreamUrlTest` (:core:model). Toggle UI intentionally deferred to the
   Phase 7 settings screen.
-- "Continue Watching" is a TV row (PLAN §9); mobile has no such row.
+- "Continue Watching" is a TV row (AGENTS.md shell-agnostic rule); mobile has no such row.
 
 ## TV player (Phase 6, verified on TV36 emulator 2026-09)
 - D-pad: down/right = next gif, up/left = previous, BACK = exit (BackHandler in Root).

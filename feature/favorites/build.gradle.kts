@@ -1,4 +1,4 @@
-// Skeleton module — populated in its plan phase (see PLAN.md §10).
+// Skeleton module — fully populated.
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)

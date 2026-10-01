@@ -1,6 +1,6 @@
 # AGENTS-CONTENT-FILTER.md — content controls (mostly `:core:database` + `:core:datastore`)
 
-The single ContentFilter choke point. Spec: PLAN.md §6. **Leak-zero invariant:** blocked
+The single ContentFilter choke point (formerly PLAN.md §6). **Leak-zero invariant:** blocked
 content must never render on ANY surface — feed, search, shuffle, groups, For You, random.
 
 ## One interceptor, applied everywhere
@@ -42,7 +42,7 @@ on a fresh install (acceptance criterion). No server, no backup API — local fi
 - `ContentFilter` (core:database, `@Inject @Singleton`): session-cached blocked
   creator/tag/keyword sets, `refreshFrom(ContentPrefsDao)` before filtering, pipeline
   order creator → tag → keyword. Keyword text spans tags + the gif's `description`
-  (DB v3 stores it — PLAN §6 says title/description/tags; gif objects carry no title today).
+  (DB v3 stores it — the spec says title/description/tags; gif objects carry no title today).
 - **Promoted filter (stage 0, live-verified):** the gif DTO's `promoted` field is nullable/absent on
   organic items — treat missing as `false`; a `true` drops the item before every user-block check
   and does not touch hide counts. Wired as the first branch of `ContentFilter.run` so PROMOTED
@@ -77,7 +77,7 @@ see ContentPrefsBackup below; niche groups landed in DB v5).
 
 ## Live status (2026-09)
 - Niche groups: DB v5 (`niche_groups`), GroupsScreen live on both apps, BLOCKED groups feed stage 2.
-- Hide counts: single rolling 7-day counter (`hide_counts`), no per-reason split — matches PLAN §6.
+- Hide counts: single rolling 7-day counter (`hide_counts`), no per-reason split — matches the spec.
 
 ## Orientation filter (planned, decided 2026-10-01)
 NOT part of the ContentFilter pipeline — a global DataStore pref `orientation_filter`

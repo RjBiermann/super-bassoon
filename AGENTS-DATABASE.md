@@ -1,7 +1,7 @@
 # AGENTS-DATABASE.md — `:core:database`
 
 Room as **single source of truth** with stale-while-revalidate. DB name: `giffy.db`.
-Spec: PLAN.md §5, §6.
+(Cache-first rules + schema formerly PLAN.md §5, §6.)
 
 ## Tables (current spec)
 

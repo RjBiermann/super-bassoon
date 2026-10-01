@@ -1,4 +1,4 @@
-// Populated in Phase 5 (see PLAN.md §10, AGENTS-AUTH.md).
+// Populated in Phase 5 (see AGENTS-AUTH.md).
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
