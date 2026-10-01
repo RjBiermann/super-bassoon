@@ -143,3 +143,15 @@ When unsure: check PLAN.md first, then ask. Don't invent endpoints or features.
   {context:trending, source:watchlist, position} + Json encodeDefaults=true (all-default
   @Body DTOs serialized to {} otherwise); Retrofit DELETE+body needs @HTTP(hasBody=true).
   Pinch zoom resets on swipe now (PLAN §9 revision 2026-09-30).
+
+### Session 2026-10-01 (pending-items close-out)
+- Gate 338 CLOSED: auto-swipe advance was a silent no-op (bare `{ }` lambda in
+  onPlaybackStateChanged never invoked) — fixed; 61 distinct videos across the
+  page-1→page-2 boundary in ~25 min, 0 fatals. Recipe in AGENTS-PLAYER.md.
+- Filter dead-end closed: strict client filters now walk consecutive unfetched
+  pages (bounded ≤8) and terminate on the trending pool cap (~100 items; page 4
+  ×40 → HTTP 400 — probe kept in LiveSmokeTest). Filtered-empty grids show
+  "No videos match this filter" (live-verified both directions).
+- Post-obfuscation release smoke re-run green (R8 + Hosts decode + dead-end fix).
+- Only open gate: 324 (tagged release) — blocked on user adding SIGNING_KEY/
+  SIGNING_PASS secrets, then tag v0.2.0.
