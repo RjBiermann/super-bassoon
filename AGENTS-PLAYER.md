@@ -44,3 +44,10 @@ video; else → retry again. Manual swipe cancels via the currentPage
 LaunchedEffect. Compile-verified + code-reviewed; live soak through an
 actual boundary still pending (needs minutes of playback — cheap unit
 coverage isn't possible against Compose pager state).
+
+**Update (2026-10-01, soak):** the boundary soak DID exercise this path and
+caught a real crash — during a paging refresh the presenter list emptied
+while the pager still composed page 0 → `items[page]` IndexOutOfBounds.
+Fixed with a bounds guard before `items[page]` (the null check only catches
+placeholders). Full clean pass still pending — the Phone34 emulator dies
+every few minutes on this host, so a 10-min soak keeps getting interrupted.

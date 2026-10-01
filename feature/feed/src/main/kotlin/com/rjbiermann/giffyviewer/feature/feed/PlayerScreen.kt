@@ -316,6 +316,11 @@ fun PlayerScreen(
         }
 
         VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+            // Soak-found crash (2026-10-01): during a paging refresh the
+            // presenter list can momentarily empty while the pager still
+            // composes page 0 — items.get(page) throws out-of-bounds. Guard
+            // bounds first; the null check below only catches placeholders.
+            if (page >= items.itemCount) return@VerticalPager
             val gif = items[page]
             if (gif != null) {
                 PlayerPage(
