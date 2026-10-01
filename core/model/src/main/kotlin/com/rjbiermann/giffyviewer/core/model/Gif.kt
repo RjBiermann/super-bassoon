@@ -40,3 +40,11 @@ fun Gif.matchesOrientation(pref: String): Boolean =
         "horizontal" -> width >= height || width <= 0 || height <= 0
         else -> true
     }
+
+/** §8 resolution chip: "hd" = an HD stream must exist; "" / "sd" pass all
+ *  (SD streams exist on every gif). */
+fun Gif.resolutionMatches(chip: String): Boolean =
+    when (chip) {
+        "hd" -> hdUrl != null
+        else -> true
+    }

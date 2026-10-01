@@ -82,16 +82,17 @@ class FeedRepository
                     ).flow
                 }
             } else {
-                // Orientation pref change restarts the pager (fresh generation).
-                settings.orientationFilter.flatMapLatest { orientation ->
-                    cachedPager(feed, forceRefresh, orientation)
+                // Orientation + §8 per-feed pref changes restart the pager
+                // (fresh generation re-reads cached pages through the filters).
+                settings.feedPrefs(feed.baseKey).flatMapLatest { prefs ->
+                    cachedPager(feed, forceRefresh, prefs)
                 }
             }
 
         private fun cachedPager(
             feed: FeedSource,
             forceRefresh: Boolean,
-            orientation: String,
+            prefs: com.rjbiermann.giffyviewer.core.datastore.FeedPrefs,
         ): Flow<PagingData<Gif>> =
             Pager(
                 config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = 10, enablePlaceholders = false),

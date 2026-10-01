@@ -7,6 +7,7 @@ import com.rjbiermann.giffyviewer.core.database.toModel
 import com.rjbiermann.giffyviewer.core.database.weekStartMs
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.model.matchesOrientation
+import com.rjbiermann.giffyviewer.core.model.resolutionMatches
 
 /** How long the refresh load waits for the mediator's first write (first-launch race). */
 private const val CACHE_WAIT_MS = 20_000L
@@ -40,6 +41,11 @@ class FeedPagingSource(
         },
     private val fetcher: FeedPageFetcher? = null,
     private val orientation: suspend () -> String = { "any" },
+    private val prefs: suspend () -> com.rjbiermann.giffyviewer.core.datastore.FeedPrefs =
+        {
+            com.rjbiermann.giffyviewer.core.datastore
+                .FeedPrefs()
+        },
 ) : PagingSource<Int, Gif>() {
     init {
         db.invalidationTracker.addObserver(
@@ -59,7 +65,9 @@ class FeedPagingSource(
     override suspend fun load(params: LoadParams<Int>): PagingSource.LoadResult<Int, Gif> {
         val page = params.key ?: 1
         return try {
-            val orientation = orientation()
+            val prefs = prefs()
+            // Per-feed orientation "" = follow the global §6 pref.
+            val orientation = prefs.orientation.ifEmpty { orientation() }
             var entity = pageDao.page(feedPageKey(feed, page))
             // Unfetched page (the cache lags the scroll): fill it HERE — Paging
             // consults the mediator only when the source's data is exhausted, so
@@ -113,9 +121,11 @@ class FeedPagingSource(
                 models
                     .filter { contentFilter.allow(it.userName, it.tags, it.description) }
                     .filter { favs == null || it.userName.lowercase() in favs }
-                    // Orientation pref (§6, AGENTS-APP): read-time, AFTER the
-                    // filter; not counted in hide counts — a pref, not a block.
+                    // §8 range chips: client-side, read-time, AFTER the filter;
+                    // not counted in hide counts — prefs, not blocks.
                     .filter { it.matchesOrientation(orientation) }
+                    .filter { durationIn(it.durationSeconds, prefs.duration) }
+                    .filter { it.resolutionMatches(prefs.resolution) }
                     .onEach { sessionSeen.add(it.id) }
                     // For You scope (§7 Creators·Niches·All): read-time filter over
                     // the SAME cached server pages — one fetch, three filters.
@@ -142,4 +152,20 @@ class FeedPagingSource(
             state.closestPageToPosition(anchor)?.prevKey?.plus(1)
                 ?: state.closestPageToPosition(anchor)?.nextKey?.minus(1)
         }
+}
+
+/** §8 duration chip → seconds bounds (null = unbounded). */
+internal fun durationIn(
+    seconds: Double,
+    chip: String,
+): Boolean {
+    val d = seconds
+    return when (chip) {
+        "lt10" -> d < 10
+        "10-30" -> d >= 10 && d < 30
+        "30-60" -> d >= 30 && d < 60
+        "1-5m" -> d >= 60 && d < 300
+        "gt5m" -> d >= 300
+        else -> true
+    }
 }

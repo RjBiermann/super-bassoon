@@ -134,6 +134,14 @@ Sort · date range · duration min/max · resolution · orientation · shuffle s
 per feed (`feed_prefs` key), survive restart, applied strictly AFTER ContentFilter.
 
 ## Orientation filter (built 2026-10, live-verified: pref write + pager restart)
+
+## §8 range chips (built 2026-10, live-verified on Trending: duration chip → pref JSON + grid restart)
+Client-side per-feed filters: duration (<10s/10–30s/30–60s/1–5m/>5m) · resolution (HD only) ·
+orientation (Global default = the §6 global pref). Persisted per feed in DataStore
+(`feedprefs:<baseKey>` JSON via `FeedPrefs`); Filter ▾ + Clear chips above the grid
+(mobile; TV deferred — its global orientation filter covers the primary use case).
+Read-time AFTER ContentFilter, not in hide counts. Date range + untagged-only chips
+stay unbuilt (server param unverified / group-feeds-only).
 Global DataStore pref `orientation_filter` (`any` default / `horizontal` / `vertical`) in the
 shared SettingsScreen — one toggle covers both apps (TV: horizontal-only use case, mobile:
 vertical-only). Per-feed §6 orientation chips, when they land, default to this value.

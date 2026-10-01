@@ -367,6 +367,52 @@ fun FeedScreen(
                 }
             }
 
+            // §8 range chips (client-side per-feed filters): Filter ▾ entry →
+            // dialog with duration / resolution / orientation chip groups.
+            // Orientation "" follows the global §6 pref (Settings).
+            var showFilter by remember { mutableStateOf(false) }
+            val feedPrefs by remember(source.baseKey) { viewModel.feedPrefs(source.baseKey) }
+                .collectAsStateWithLifecycle(
+                    com.rjbiermann.giffyviewer.core.datastore
+                        .FeedPrefs(),
+                )
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                FilterChip(
+                    selected = listOf(feedPrefs.duration, feedPrefs.resolution, feedPrefs.orientation).any { it.isNotEmpty() },
+                    onClick = { showFilter = true },
+                    label = { Text("Filter ▾") },
+                )
+                if (listOf(feedPrefs.duration, feedPrefs.resolution, feedPrefs.orientation).any { it.isNotEmpty() }) {
+                    FilterChip(
+                        selected = false,
+                        onClick = {
+                            viewModel.setFeedPrefs(
+                                source.baseKey,
+                                com.rjbiermann.giffyviewer.core.datastore
+                                    .FeedPrefs(),
+                            )
+                        },
+                        label = { Text("Clear") },
+                    )
+                }
+            }
+            if (showFilter) {
+                FeedFilterDialog(
+                    prefs = feedPrefs,
+                    onApply = { next ->
+                        viewModel.setFeedPrefs(source.baseKey, next)
+                        showFilter = false
+                    },
+                    onDismiss = { showFilter = false },
+                )
+            }
+
             // M3 linear indicator for refresh / append activity. FIXED 4dp slot —
             // show/hide must not shift the grid (same rule as the player's
             // progress chrome; user report: the indicator caused UI drift).
@@ -762,3 +808,69 @@ private fun navBarDp(): androidx.compose.ui.unit.Dp =
     with(androidx.compose.ui.platform.LocalDensity.current) {
         WindowInsets.navigationBars.getBottom(this).toDp()
     }
+
+/** §8 per-feed filter dialog: duration / resolution / orientation chips. */
+@Composable
+private fun FeedFilterDialog(
+    prefs: com.rjbiermann.giffyviewer.core.datastore.FeedPrefs,
+    onApply: (com.rjbiermann.giffyviewer.core.datastore.FeedPrefs) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var duration by remember { mutableStateOf(prefs.duration) }
+    var resolution by remember { mutableStateOf(prefs.resolution) }
+    var orientation by remember { mutableStateOf(prefs.orientation) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Filter feed") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Duration", style = MaterialTheme.typography.titleSmall)
+                Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(
+                        "Any" to "",
+                        "<10s" to "lt10",
+                        "10–30s" to "10-30",
+                        "30–60s" to "30-60",
+                        "1–5m" to "1-5m",
+                        ">5m" to "gt5m",
+                    ).forEach { (label, value) ->
+                        FilterChip(selected = duration == value, onClick = { duration = value }, label = { Text(label) })
+                    }
+                }
+                Text("Resolution", style = MaterialTheme.typography.titleSmall)
+                Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("Any" to "", "HD only" to "hd").forEach { (label, value) ->
+                        FilterChip(
+                            selected = resolution == value,
+                            onClick = { resolution = value },
+                            label = { Text(label) },
+                        )
+                    }
+                }
+                Text("Orientation", style = MaterialTheme.typography.titleSmall)
+                Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(
+                        "Global" to "",
+                        "Any" to "any",
+                        "Vertical" to "vertical",
+                        "Horizontal" to "horizontal",
+                    ).forEach { (label, value) ->
+                        FilterChip(selected = orientation == value, onClick = { orientation = value }, label = { Text(label) })
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = {
+                onApply(
+                    com.rjbiermann.giffyviewer.core.datastore.FeedPrefs(
+                        duration = duration,
+                        resolution = resolution,
+                        orientation = orientation,
+                    ),
+                )
+            }) { Text("Apply") }
+        },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}

@@ -115,6 +115,23 @@ class SettingsRepository
             dataStore.edit { it[Keys.GRID_COLUMNS] = columns }
         }
 
+        /** §8 per-feed filter prefs (client-side: duration/resolution/orientation),
+         *  one JSON blob per feed base — empty string fields = inherit the global
+         *  pref (orientation) or no filter (duration/resolution). */
+        fun feedPrefs(baseKey: String): Flow<com.rjbiermann.giffyviewer.core.datastore.FeedPrefs> =
+            dataStore.data.map {
+                it[stringPreferencesKey("feedprefs:$baseKey")]?.let { json ->
+                    runCatching { FeedPrefsJson.decodeFromString<FeedPrefs>(json) }.getOrNull()
+                } ?: FeedPrefs()
+            }
+
+        suspend fun setFeedPrefs(
+            baseKey: String,
+            prefs: com.rjbiermann.giffyviewer.core.datastore.FeedPrefs,
+        ) {
+            dataStore.edit { it[stringPreferencesKey("feedprefs:$baseKey")] = FeedPrefsJson.encodeToString(prefs) }
+        }
+
         /** Orientation filter (§6): any | horizontal | vertical — read-time pref,
          *  not a block (no hide counts). */
         val orientationFilter: Flow<String> = dataStore.data.map { it[Keys.ORIENTATION_FILTER] ?: "any" }
@@ -187,3 +204,14 @@ private fun String.sha256(): String =
         .joinToString("") { "%02x".format(it) }
 
 private const val PIN_SALT = "giffy_viewer_pin"
+
+/** §8 range-chip prefs for ONE feed (DataStore-persisted JSON, see SettingsRepository). */
+@kotlinx.serialization.Serializable
+data class FeedPrefs(
+    val duration: String = "", // "" | lt10 | 10-30 | 30-60 | 1-5m | gt5m
+    val resolution: String = "", // "" | sd | hd
+    val orientation: String = "", // "" (follow global) | any | vertical | horizontal
+)
+
+private val FeedPrefsJson =
+    kotlinx.serialization.json.Json { ignoreUnknownKeys = true; encodeDefaults = true }

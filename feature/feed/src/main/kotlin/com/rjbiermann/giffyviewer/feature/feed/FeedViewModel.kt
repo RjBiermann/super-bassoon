@@ -247,6 +247,16 @@ class FeedViewModel
             viewModelScope.launch { settings.togglePinnedCreator(username) }
         }
 
+        /** §8 per-feed filter prefs (duration/resolution/orientation). */
+        fun feedPrefs(baseKey: String): Flow<com.rjbiermann.giffyviewer.core.datastore.FeedPrefs> = settings.feedPrefs(baseKey)
+
+        fun setFeedPrefs(
+            baseKey: String,
+            prefs: com.rjbiermann.giffyviewer.core.datastore.FeedPrefs,
+        ) {
+            viewModelScope.launch { settings.setFeedPrefs(baseKey, prefs) }
+        }
+
         /** Saved server sort for this feed's base (§8 per-feed persistence). */
         fun sortFor(baseKey: String): Flow<String> = settings.feedSort(baseKey)
 
