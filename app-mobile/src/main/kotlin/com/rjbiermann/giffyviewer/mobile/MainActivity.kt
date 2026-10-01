@@ -44,6 +44,8 @@ import com.rjbiermann.giffyviewer.feature.auth.AuthScreen
 import com.rjbiermann.giffyviewer.feature.feed.ExploreScreen
 import com.rjbiermann.giffyviewer.feature.feed.FeedScreen
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
+import com.rjbiermann.giffyviewer.feature.feed.FollowingScreen
+import com.rjbiermann.giffyviewer.feature.feed.FollowingViewModel
 import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
 import com.rjbiermann.giffyviewer.feature.feed.GroupsScreen
 import com.rjbiermann.giffyviewer.feature.feed.GroupsViewModel
@@ -94,6 +96,7 @@ class MainActivity : ComponentActivity() {
         var showNiches by remember { mutableStateOf(false) }
         var showGroups by remember { mutableStateOf(false) }
         var showExplore by remember { mutableStateOf(false) }
+        var showFollowing by remember { mutableStateOf(false) }
         var showSearch by remember { mutableStateOf(false) }
 
         val pinHash by settings.pinHash.collectAsStateWithLifecycle(initialValue = null)
@@ -125,6 +128,21 @@ class MainActivity : ComponentActivity() {
                     feedViewModel.open(FeedSource.Creator(username = username))
                 },
                 api = api,
+            )
+        } else if (confirmed && showFollowing) {
+            val followingVm: FollowingViewModel = hiltViewModel()
+            val feedVm: FeedViewModel = hiltViewModel()
+            FollowingScreen(
+                onBack = { showFollowing = false },
+                onOpenCreator = { username ->
+                    showFollowing = false
+                    feedVm.open(FeedSource.Creator(username = username))
+                },
+                onOpenNiche = { niche ->
+                    showFollowing = false
+                    feedVm.open(niche)
+                },
+                viewModel = followingVm,
             )
         } else if (confirmed && showGroups) {
             val groupsViewModel: GroupsViewModel = hiltViewModel()
@@ -172,6 +190,7 @@ class MainActivity : ComponentActivity() {
                 onOpenNiches = { showNiches = true },
                 onOpenGroups = { showGroups = true },
                 onOpenExplore = { showExplore = true },
+                onOpenFollowing = { showFollowing = true },
             )
         } else {
             val scope = rememberCoroutineScope()

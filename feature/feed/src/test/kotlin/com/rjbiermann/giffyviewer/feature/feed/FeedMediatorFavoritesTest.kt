@@ -75,6 +75,11 @@ class FeedMediatorFavoritesTest {
             page: Int,
         ) = throw NotImplementedError()
 
+        override suspend fun followingCreators(
+            page: Int,
+            count: Int,
+        ) = throw NotImplementedError()
+
         override suspend fun joinNiche(
             id: String,
             body: com.rjbiermann.giffyviewer.core.network.SubscriptionBody,

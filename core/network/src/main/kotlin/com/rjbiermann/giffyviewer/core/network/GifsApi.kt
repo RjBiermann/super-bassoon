@@ -146,6 +146,13 @@ interface upstreamApi {
     @GET("v2/niches/following")
     suspend fun followedNiches(): FollowedNichesDto
 
+    /** Following (live-verified 2026-10-01): rich creator objects, paginated. */
+    @GET("v2/me/following")
+    suspend fun followingCreators(
+        @Query("page") page: Int = 1,
+        @Query("count") count: Int = 100,
+    ): FollowingCreatorsDto
+
     /** Niche join/leave (API word: subscription; UI: Join/Leave Niche — §9 lingo).
      *  Verified 2026: POST/DELETE → 202 with `{}` body; DELETE needs a body. */
     @POST("v2/niches/{id}/subscription")
@@ -160,6 +167,14 @@ interface upstreamApi {
         @Body body: SubscriptionBody = SubscriptionBody(),
     )
 }
+
+@Serializable
+data class FollowingCreatorsDto(
+    val page: Int = 1,
+    val pages: Int = 1,
+    val total: Int = 0,
+    val items: List<CreatorSearchItemDto> = emptyList(),
+)
 
 @Serializable
 class SubscriptionBody

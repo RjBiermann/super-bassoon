@@ -89,6 +89,7 @@ fun FeedScreen(
     onOpenNiches: () -> Unit = {},
     onOpenGroups: () -> Unit = {},
     onOpenExplore: () -> Unit = {},
+    onOpenFollowing: () -> Unit = {},
     viewModel: FeedViewModel = hiltViewModel(),
 ) {
     val source by viewModel.source.collectAsStateWithLifecycle()
@@ -174,6 +175,13 @@ fun FeedScreen(
                     onClick = onOpenExplore,
                     label = { Text("Explore") },
                 )
+                if (isLoggedIn) {
+                    FilterChip(
+                        selected = false,
+                        onClick = onOpenFollowing,
+                        label = { Text("Following…") },
+                    )
+                }
 
                 FilterChip(
                     selected = source is FeedSource.Niche && source !in pinnedNiches,
