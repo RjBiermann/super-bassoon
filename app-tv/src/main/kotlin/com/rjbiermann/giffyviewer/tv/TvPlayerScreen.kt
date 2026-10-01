@@ -52,9 +52,12 @@ fun TvPlayerScreen(
     playerFactory: GiffyPlayerFactory,
     settings: SettingsRepository,
     db: GiffyDatabase,
+    /** Shared quick-action model — MENU opens favorite/block/custom-feed. */
+    feedViewModel: com.rjbiermann.giffyviewer.feature.feed.FeedViewModel,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
+    var actionsFor by remember { mutableStateOf<Gif?>(null) }
     val dataSaver by settings.dataSaver.collectAsStateWithLifecycle(false)
     // §5 video fit (shared setting): fit | crop | stretch.
     val videoFit by settings.videoFit.collectAsStateWithLifecycle("fit")
@@ -111,6 +114,12 @@ fun TvPlayerScreen(
                         // CENTER = play/pause (audit: "can't pause on TV").
                         Key.DirectionCenter -> {
                             player.playWhenReady = !(player.playWhenReady)
+                            true
+                        }
+                        // MENU = quick actions for the on-screen gif (parity
+                        // with the mobile player overflow sheet).
+                        Key.Menu -> {
+                            actionsFor = gifs.getOrNull(index)
                             true
                         }
                         else -> false
@@ -176,5 +185,12 @@ fun TvPlayerScreen(
                 )
             }
         }
+    }
+    actionsFor?.let { gif ->
+        TvQuickActionsDialog(
+            gif = gif,
+            feedViewModel = feedViewModel,
+            onDismiss = { actionsFor = null },
+        )
     }
 }

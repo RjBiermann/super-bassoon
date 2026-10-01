@@ -133,6 +133,7 @@ class TvMainActivity : ComponentActivity() {
                         playerFactory = playerFactory,
                         settings = settings,
                         db = db,
+                        feedViewModel = hiltViewModel(),
                         onBack = { player = null },
                     )
                 }
@@ -140,10 +141,12 @@ class TvMainActivity : ComponentActivity() {
                     val source = openFeed
                     if (source != null) {
                         val feedVm: TvNicheFeedViewModel = hiltViewModel()
+                        val quickVm: com.rjbiermann.giffyviewer.feature.feed.FeedViewModel = hiltViewModel()
                         TvSourceFeedScreen(
                             source = source,
                             onOpenGif = { gifs, index -> player = gifs to index },
                             viewModel = feedVm,
+                            feedViewModel = quickVm,
                         )
                     }
                 }

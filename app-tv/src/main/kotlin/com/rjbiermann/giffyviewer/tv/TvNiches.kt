@@ -20,7 +20,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -194,8 +196,12 @@ fun TvSourceFeedScreen(
     source: FeedSource,
     onOpenGif: (List<Gif>, Int) -> Unit,
     viewModel: TvNicheFeedViewModel,
+    /** Shared quick-action model (favorite/block/custom-feed adds). */
+    feedViewModel: com.rjbiermann.giffyviewer.feature.feed.FeedViewModel,
 ) {
     val gifs = remember(source.keyBase) { viewModel.gifs(source) }.collectAsLazyPagingItems()
+    // MENU quick actions (mobile QuickBlockSheet parity) — any pinned feed.
+    var actionsFor by remember { mutableStateOf<Gif?>(null) }
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Text(
             text = source.title(),
@@ -214,12 +220,20 @@ fun TvSourceFeedScreen(
                     GifCard(
                         gif = gif,
                         modifier = Modifier.fillMaxWidth(),
-                        onMenu = {},
+                        onMenu = { actionsFor = gif },
                         onClick = { onOpenGif(snapshot(gifs), gifs.indexOf(gif.id)) },
                     )
                 }
             }
         }
+    }
+    actionsFor?.let { gif ->
+        TvQuickActionsDialog(
+            gif = gif,
+            feedViewModel = feedViewModel,
+            addableFeedRef = (source as? FeedSource.Niche)?.let { "niche:${it.id}|${it.name}" },
+            onDismiss = { actionsFor = null },
+        )
     }
 }
 

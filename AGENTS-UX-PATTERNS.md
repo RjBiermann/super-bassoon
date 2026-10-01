@@ -75,6 +75,62 @@ conventions* are fine; its *retention playbook* is not.
 - **Row autoplay trailer (IG TV-style hero row):** molested pattern — skip
   outright (bandage: data burn for zero intent signal, viewer-only).
 
+## TV D-pad research (2026-10, research-only — porting mobile features to TV)
+Doc-only reference, same graduation rule as this file (user slice → PLAN §9 bullet → code).
+Trigger: "port more mobile features to TV / D-pad". Scope: what leading TV apps actually
+bind to keys, what Giffy TV already has, and the gap — with anti-confusion rules so the
+keymap stays legible.
+
+### Market scan (what mainstream TV apps bind)
+
+| App | Center | Left/Right | Up/Down | Hold | Back | Speed control |
+|---|---|---|---|---|---|---|
+| Netflix | play/pause | ±10s step; show progress bar | Up = back to browse row / exit | hold R/L = progressive FF/RW | dismiss controls, then exit | menu only ("Playback speed" in settings overlay) |
+| YouTube | play/pause | ±10s with scrub timeline | Up = Up-next/related carousel | hold R = 2×→ progressive FF | dismiss overlay, then exit | menu only |
+| Prime / Disney+ | play/pause | ±10s when controls visible | Up/Down = controls rows / episodes | hold = repeat same action | dismiss controls first | menu only |
+
+Denominators: directions map **spatially** (horizontal = time, vertical = items/rows); one
+press = one small action; **hold always repeats its own key's action** (key repeat — never a
+different action); everything beyond the base keys lives in a panel reached from the player;
+speed is **never a bare shortcut**; BACK dismisses overlays before navigating; remote
+transport keys (`KEYCODE_MEDIA_*`) are handled alongside D-pad. Number keys 0–9 = percent
+jump on YouTube only — nicety, not a convention worth copying.
+
+### Giffy TV today vs mobile player
+
+| Mobile feature | TV D-pad port | Status |
+|---|---|---|
+| Tap pause | Center = play/pause | shipped (audit gap closed) |
+| Swipe next/prev | Down/Up = next/prev | shipped |
+| Overflow quick sheet | MENU = quick-actions panel | shipped (partial parity) |
+| Playback speed 0.5–2× | MENU panel item (submenu or cycling row) | gap |
+| Like / double-tap like | MENU panel Like (no double-tap binding — see rules) | gap |
+| Mute rail (Sound On/Off) | MENU panel Mute, `hasAudio`-aware per §9 | gap |
+| Auto-swipe toggle | MENU panel toggle; reduced-motion + data-saver rules already in prefs | gap |
+| Progress line | Left/Right = ±10s (press = one step, hold = repeat); show position while seeking | gap |
+| Hold-for-2× (player only) | skip — hold Right (progressive FF) is the TV idiom for the same need | candidate, low priority |
+| Share sheet | skip — no established TV share convention | skip |
+| Pinch zoom | skip — no D-pad analog, mobile-only gesture | skip |
+
+### Recommended keymap (candidate — PLAN edit first if adopted)
+
+Player: Center play/pause · Down/Up prev/next · Left/Right ±10s (+hold repeat) ·
+MENU quick-actions panel (Like · Mute · Speed · Auto-swipe · Block/Favorite set it already
+has) · BACK dismiss panel then exit · handle `KEYCODE_MEDIA_PLAY_PAUSE/FF/REW` to the same
+actions. Home: unchanged (MENU on card, focus-up into search already spec'd PLAN §9).
+Fix-with-touch: `TvSourceFeedScreen` `onMenu = {}` dead control (audit finding).
+
+### Anti-confusion rules (the whole point)
+1. **Spatial honesty:** horizontal = time, vertical = items — never swap meanings per screen.
+2. **One key, one meaning app-wide:** MENU is quick actions on content everywhere (tiles +
+   player); never two different behaviors for the same key on the same surface.
+3. **No double-tap bindings** — phone remotes debounce taps; TV remotes send accidental
+   repeats. Mobile double-tap-like ports to the panel's Like item instead.
+4. **Hold repeats its own key's action** (progressive seek), never triggers a new one.
+5. **Everything else goes in the MENU panel** — if it needs a new bare key, it first needs a
+   strong reason the panel isn't enough.
+6. **BACK dismisses overlays before navigation**, and never bypasses the age gate / PIN.
+
 ## Device-type summary used across the doc
 
 | Device | Borrowed posture |

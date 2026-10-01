@@ -27,8 +27,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -41,11 +39,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
-import androidx.tv.material3.Button
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.MaterialTheme
@@ -54,7 +50,6 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.rjbiermann.giffyviewer.core.model.Gif
-import androidx.compose.material3.Surface as M3Surface
 
 /**
  * 10-foot UI (PLAN §8 TV): vertical stack of rows, D-pad navigates rows and
@@ -127,76 +122,14 @@ fun TvHomeScreen(
     }
 
     actionsFor?.let { gif ->
-        QuickActionsDialog(
+        val quickVm: com.rjbiermann.giffyviewer.feature.feed.FeedViewModel =
+            androidx.hilt.navigation.compose
+                .hiltViewModel()
+        TvQuickActionsDialog(
             gif = gif,
-            viewModel = homeViewModel,
+            feedViewModel = quickVm,
             onDismiss = { actionsFor = null },
         )
-    }
-}
-
-@Composable
-private fun QuickActionsDialog(
-    gif: Gif,
-    viewModel: TvHomeViewModel,
-    onDismiss: () -> Unit,
-) {
-    val state by viewModel
-        .creatorState(gif.userName)
-        .collectAsStateWithLifecycle(initialValue = null)
-    Dialog(onDismissRequest = onDismiss) {
-        M3Surface(
-            shape = MaterialTheme.shapes.medium,
-            tonalElevation = 6.dp,
-            modifier = Modifier.width(360.dp),
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "@${gif.userName}",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(bottom = 12.dp),
-                )
-                val first = remember { FocusRequester() }
-                LaunchedEffect(Unit) { first.requestFocus() }
-                Button(
-                    onClick = {
-                        viewModel.toggleFavoriteCreator(gif.userName)
-                        onDismiss()
-                    },
-                    modifier = Modifier.focusRequester(first).padding(vertical = 4.dp),
-                ) {
-                    Text(if (state == "FAVORITED") "Unfavorite" else "Favorite")
-                }
-                val pinnedCreators by viewModel.pinnedCreators.collectAsStateWithLifecycle(emptySet())
-                Button(
-                    onClick = {
-                        viewModel.togglePinnedCreator(gif.userName)
-                        onDismiss()
-                    },
-                    modifier = Modifier.padding(vertical = 4.dp),
-                ) {
-                    Text(
-                        if (gif.userName.lowercase() in pinnedCreators) {
-                            "Unpin from home"
-                        } else {
-                            "Pin to home"
-                        },
-                    )
-                }
-                Button(
-                    onClick = {
-                        viewModel.blockCreator(gif.userName)
-                        onDismiss()
-                    },
-                    modifier = Modifier.padding(vertical = 4.dp),
-                ) {
-                    Text("Block creator")
-                }
-                Button(onClick = onDismiss, modifier = Modifier.padding(vertical = 4.dp)) {
-                    Text("Cancel")
-                }
-            }
-        }
     }
 }
 
