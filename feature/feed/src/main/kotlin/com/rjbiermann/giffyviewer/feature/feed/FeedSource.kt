@@ -97,6 +97,13 @@ sealed interface FeedSource {
         override val ttlMs = TTL_SEARCH
     }
 
+    /** "Surprise me" (§8): a random unwatched pool the repository refreshes
+     *  per open — session-only, no Room rows, TTL 0 (always regenerate). */
+    data object Surprise : FeedSource {
+        override val keyBase = "surprise:v1"
+        override val ttlMs = 0L
+    }
+
     /** Liked gifs (PLAN §7, logged-in): network-LIVE — never cached (§5);
      *  pages have no cache keys and sorts are client-side only. */
     data object Liked : FeedSource {
@@ -131,6 +138,7 @@ fun FeedSource.title(): String =
         is FeedSource.Custom -> this.name
         is FeedSource.Search -> "Search: $query"
         is FeedSource.Favorites -> "Favorites"
+        is FeedSource.Surprise -> "Surprise me"
     }
 
 typealias GifItem = Gif

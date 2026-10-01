@@ -39,6 +39,8 @@ class FeedMediatorFavoritesTest {
         override fun byIdFlow(id: String): Flow<GifEntity?> = throw NotImplementedError()
 
         override fun countFlow(): Flow<Int> = throw NotImplementedError()
+
+        override suspend fun randomUnwatched(limit: Int): List<GifEntity> = emptyList()
     }
 
     private class FakeFeedPageDao : FeedPageDao {

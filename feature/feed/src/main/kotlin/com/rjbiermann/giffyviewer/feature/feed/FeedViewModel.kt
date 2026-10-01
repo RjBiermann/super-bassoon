@@ -247,6 +247,17 @@ class FeedViewModel
             viewModelScope.launch { settings.togglePinnedCreator(username) }
         }
 
+        /** "Surprise me" (§8): refresh the random unwatched pool + open it as a
+         *  feed source. Returns true when a pool landed (the host opens the
+         *  surface; empty = nothing cached or everything watched). */
+        fun surpriseMe(onReady: (Boolean) -> Unit) {
+            viewModelScope.launch {
+                val ok = repository.refreshSurprise()
+                if (ok) open(FeedSource.Surprise)
+                onReady(ok)
+            }
+        }
+
         /** §8 per-feed filter prefs (duration/resolution/orientation). */
         fun feedPrefs(baseKey: String): Flow<com.rjbiermann.giffyviewer.core.datastore.FeedPrefs> = settings.feedPrefs(baseKey)
 

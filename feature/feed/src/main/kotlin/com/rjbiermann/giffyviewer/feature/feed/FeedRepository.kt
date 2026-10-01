@@ -6,9 +6,13 @@ import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import com.rjbiermann.giffyviewer.core.database.ContentFilter
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
+import com.rjbiermann.giffyviewer.core.database.toModel
 import com.rjbiermann.giffyviewer.core.model.Gif
+import com.rjbiermann.giffyviewer.core.model.matchesOrientation
 import com.rjbiermann.giffyviewer.core.network.upstreamApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flatMapLatest
 import javax.inject.Inject
@@ -66,14 +70,34 @@ class FeedRepository
 
         private fun now(): Long = System.currentTimeMillis()
 
-        /** [forceRefresh] bypasses the REFRESH TTL once (pull-to-refresh /
-         *  "Refresh feed" pill — PLAN §9): the pager restart starts a fresh
-         *  generation whose REFRESH must hit the network even when cache is fresh. */
+        /** "Surprise me" pool (§8) — session-only, regenerated per request. */
+        private val surprisePool = MutableStateFlow<List<Gif>?>(null)
+
+        suspend fun refreshSurprise(): Boolean {
+            val orientation = settings.orientationFilter.first()
+            contentFilter.refreshFrom(db.contentPrefsDao())
+            contentFilter.refreshGroupTags(db.nicheGroupDao())
+            val pool =
+                db
+                    .gifDao()
+                    .randomUnwatched(PAGE_SIZE * 2)
+                    .map { it.toModel() }
+                    .filter { contentFilter.allow(it.userName, it.tags, it.description) }
+                    .filter { it.matchesOrientation(orientation) }
+            surprisePool.value = pool.ifEmpty { null }
+            return pool.isNotEmpty()
+        }
+
         fun paging(
             feed: FeedSource,
             forceRefresh: Boolean = false,
         ): Flow<PagingData<Gif>> =
-            if (feed is FeedSource.Liked) {
+            if (feed is FeedSource.Surprise) {
+                Pager(
+                    config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = 10, enablePlaceholders = false),
+                    pagingSourceFactory = { SurprisePoolPagingSource(surprisePool) },
+                ).flow
+            } else if (feed is FeedSource.Liked) {
                 // Network-live, never cached (PLAN §7); no RemoteMediator, no Room.
                 settings.orientationFilter.flatMapLatest { orientation ->
                     Pager(

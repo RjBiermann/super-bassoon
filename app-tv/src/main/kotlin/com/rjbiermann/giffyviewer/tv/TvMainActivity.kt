@@ -53,6 +53,8 @@ class TvMainActivity : ComponentActivity() {
 
     @Inject lateinit var tokenStore: TokenStore
 
+    @Inject lateinit var repository: com.rjbiermann.giffyviewer.feature.feed.FeedRepository
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -159,6 +161,7 @@ class TvMainActivity : ComponentActivity() {
                 else -> {
                     val home: TvHomeViewModel = hiltViewModel()
                     val continueVm: ContinueWatchingViewModel = hiltViewModel()
+                    val homeScope = rememberCoroutineScope()
                     val focusRequester = remember { FocusRequester() }
                     // No initial D-pad focus otherwise — header buttons were unreachable
                     // until the user tabbed into a row blindly.
@@ -208,6 +211,16 @@ class TvMainActivity : ComponentActivity() {
                                         expanded = moreOpen,
                                         onDismissRequest = { moreOpen = false },
                                     ) {
+                                        androidx.compose.material3.DropdownMenuItem(
+                                            text = { androidx.compose.material3.Text("Surprise me") },
+                                            onClick = {
+                                                moreOpen = false
+                                                homeScope.launch {
+                                                    val ok = repository.refreshSurprise()
+                                                    if (ok) openFeed = FeedSource.Surprise
+                                                }
+                                            },
+                                        )
                                         customFeeds.toList().forEach { def ->
                                             androidx.compose.material3.DropdownMenuItem(
                                                 text = { androidx.compose.material3.Text(def.name) },

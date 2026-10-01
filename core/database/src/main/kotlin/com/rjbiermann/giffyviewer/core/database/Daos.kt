@@ -10,6 +10,14 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface GifDao {
+    /** "Surprise me" (§8): random unwatched cached gifs — excludes watch history. */
+    @Query(
+        "SELECT * FROM gifs " +
+            "WHERE id NOT IN (SELECT gifId FROM watch_history) " +
+            "ORDER BY RANDOM() LIMIT :limit",
+    )
+    suspend fun randomUnwatched(limit: Int): List<GifEntity>
+
     @Upsert
     suspend fun upsertAll(gifs: List<GifEntity>)
 

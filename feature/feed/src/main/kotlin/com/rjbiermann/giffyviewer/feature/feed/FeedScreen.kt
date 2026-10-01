@@ -193,6 +193,17 @@ fun FeedScreen(
                     )
                     DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
                         DropdownMenuItem(
+                            text = { Text("Surprise me") },
+                            onClick = {
+                                moreOpen = false
+                                viewModel.surpriseMe { ok ->
+                                    if (!ok) {
+                                        scope.launch { snackbarHostState.showSnackbar("Nothing cached yet") }
+                                    }
+                                }
+                            },
+                        )
+                        DropdownMenuItem(
                             text = { Text("Top This Week") },
                             onClick = {
                                 moreOpen = false
