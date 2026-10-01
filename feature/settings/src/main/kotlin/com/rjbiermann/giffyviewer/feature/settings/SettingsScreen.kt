@@ -294,7 +294,32 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Switch(checked = dataSaver, onCheckedChange = { viewModel.setDataSaver(it) })
+                    Switch(checked = dataSaver, onCheckedChange = null)
+                }
+            }
+            item(key = "data-saver-toggle") {
+                // A11y (audit finding 1): whole-row toggleable — TalkBack reads
+                // the switch state instead of a color-only widget.
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .toggleable(
+                                value = dataSaver,
+                                role = Role.Switch,
+                                onValueChange = { viewModel.setDataSaver(it) },
+                            ),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Data saver", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            "Prefer SD streams — lower bandwidth, faster start",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = dataSaver, onCheckedChange = null)
                 }
             }
             item(key = "theme") {

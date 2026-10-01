@@ -339,6 +339,14 @@ Orientation note: until the chip row exists, orientation filtering is the global
 - [x] UI state (backstack, tab, swipe item + playhead, search query) survives process death alongside login — search query via SavedStateHandle (2026-10-01); all MainActivity surface flags + swipe start index were already rememberSaveable; per-gif playhead persists through watch_history (5s samples) and resumes for unwatched items; death-time pager index falls back to the saved start index (deliberate: current video restarts, standard behavior)
 - [x] 30-min idle: no crash, no leak, behavior identical to fresh
 
+### Date-range probe (2026-10-01): server ignores every candidate param
+`createdAfter`, `created_after`, `date`, `dateFrom` each probed live with a
+2027-01-01 future bound — all four returned 38 gifs dated years earlier
+(oldest createDate 2019): **the API has no date-range filter**. The §8
+range-chip surface stays duration/resolution/orientation (client-side);
+date chips will never be built unless the API grows a real param. Probe
+kept in LiveSmokeTest `date range param probe` (-Dlive=true).
+
 ### Phase 10 release pipeline (built 2026-10-01; secrets pending)
 - `.github/workflows/release.yml`: tag `v*` → decode `SIGNING_KEY` (base64 keystore) →
   signed `assembleRelease` (both apps) → signature check → GH Release with the two APKs.

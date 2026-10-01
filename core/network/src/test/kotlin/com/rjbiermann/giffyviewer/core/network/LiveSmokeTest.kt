@@ -76,4 +76,65 @@ class LiveSmokeTest {
             println("PROBE promoted=true items across ${raw.size} trending gifs: $promotedCount")
             assertEquals(0, promotedCount)
         }
+
+    /**
+     * Gate: date-range filtering. Probe the plausible param shapes and report
+     * which, if any, change the result set. Run with -Dlive=true.
+     */
+    @Test
+    fun `date range param probe`() =
+        runBlocking {
+            assumeTrue("skipped: pass -Dlive=true", live())
+            val carrier = arrayOfNulls<String>(1)
+            val net = buildNetwork(authToken = { carrier[0] })
+            carrier[0] = net.api.temporaryToken().token
+            val baseline =
+                net.api
+                    .search(searchText = "dance", count = 40)
+                    .gifs
+                    .map { it.id }
+
+            suspend fun probe(
+                name: String,
+                call: suspend () -> List<Long>,
+            ) {
+                val dates = runCatching { call() }.getOrElse { emptyList() }
+                val min = dates.minOrNull()
+                // Server reshuffles page contents — the only meaningful check
+                // is whether the returned set RESPECTS the date bound.
+                println(
+                    "PROBE date $name -> ${dates.size} gifs, oldest=$min, respects-bound=${min != null && min >= 1798848000L} // 2027-01-01 UTC in seconds",
+                )
+            }
+            probe("createdAfter") {
+                net.api
+                    .searchDateProbe(createdAfter = "2027-01-01")
+                    .gifs
+                    .map { it.createDate }
+            }
+            probe("created_after") {
+                net.api
+                    .searchDateProbe(created_after = "2027-01-01")
+                    .gifs
+                    .map { it.createDate }
+            }
+            probe("date") {
+                net.api
+                    .searchDateProbe(date = "2027-01-01")
+                    .gifs
+                    .map { it.createDate }
+            }
+            probe("dateFrom") {
+                net.api
+                    .searchDateProbe(dateFrom = "2027-01-01")
+                    .gifs
+                    .map { it.createDate }
+            }
+            probe("baseline") {
+                net.api
+                    .search(searchText = "dance", count = 40)
+                    .gifs
+                    .map { it.createDate }
+            }
+        }
 }

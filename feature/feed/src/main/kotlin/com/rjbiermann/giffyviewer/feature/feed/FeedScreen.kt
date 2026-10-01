@@ -791,6 +791,19 @@ private fun GifTile(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
+            // Audio-know-before-tap (PLAN §307): hasAudio badge on tiles.
+            if (gif.hasAudio) {
+                Box(
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(6.dp)
+                            .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 5.dp, vertical = 2.dp),
+                ) {
+                    Text("🔊", style = MaterialTheme.typography.labelSmall)
+                }
+            }
         }
         Text(
             text = "@${gif.userName}",

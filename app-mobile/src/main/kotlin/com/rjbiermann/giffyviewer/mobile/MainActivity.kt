@@ -131,6 +131,16 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // §9 player lifecycle: keep the screen on while the swipe player is up.
+        androidx.compose.runtime.DisposableEffect(playerStartIndex) {
+            val win = window
+            if (playerStartIndex != null) {
+                win.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            } else {
+                win.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+            onDispose { win.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+        }
         val pinHash by settings.pinHash.collectAsStateWithLifecycle(initialValue = null)
         var unlocked by rememberSaveable { mutableStateOf(false) }
         if (pinHash != null && !unlocked) {

@@ -21,6 +21,17 @@ interface GifsApi {
     @GET("v2/auth/temporary")
     suspend fun temporaryToken(): TemporaryTokenDto
 
+    /** Probe-only: candidate date-range param shapes (gate: date chips). */
+    @GET("v2/gifs/search")
+    suspend fun searchDateProbe(
+        @Query("search_text") text: String = "dance",
+        @Query("createdAfter") createdAfter: String? = null,
+        @Query("created_after") created_after: String? = null,
+        @Query("date") date: String? = null,
+        @Query("dateFrom") dateFrom: String? = null,
+        @Query("count") count: Int = 40,
+    ): GifsPageDto
+
     @GET("v2/gifs/search")
     suspend fun search(
         @Query("search_text") searchText: String,

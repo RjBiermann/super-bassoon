@@ -74,6 +74,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -900,11 +903,18 @@ private fun ActionRail(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // like: white heart, lime when liked (site pattern)
-        IconButton(onClick = onToggleLike) {
+        // like: white heart, lime when liked (site pattern). Live region so
+        // TalkBack announces the optimistic outcome (audit finding 7).
+        IconButton(
+            onClick = onToggleLike,
+            modifier =
+                Modifier.semantics {
+                    liveRegion = LiveRegionMode.Polite
+                },
+        ) {
             Icon(
                 imageVector = if (liked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                contentDescription = if (liked) "unlike" else "like",
+                contentDescription = if (liked) "Liked — tap to unlike" else "Like",
                 tint = if (liked) GiffyColors.Lime else Color.White,
             )
         }

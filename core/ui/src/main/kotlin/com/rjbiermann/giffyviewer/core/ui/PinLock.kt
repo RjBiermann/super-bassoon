@@ -27,6 +27,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
@@ -89,7 +92,12 @@ fun PinLockScreen(
             style = MaterialTheme.typography.titleMedium,
         )
         Spacer(Modifier.height(16.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        // A11y (audit finding 5): entry progress announced as digit count,
+        // not by dot color alone.
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.semantics { contentDescription = "${entry.length} of 4 digits entered" },
+        ) {
             repeat(4) { i ->
                 Box(
                     modifier =
@@ -126,7 +134,22 @@ fun PinLockScreen(
                         },
                         modifier = requester.then(Modifier.size(72.dp)),
                     ) {
-                        Text(key.toString(), style = MaterialTheme.typography.titleLarge, color = Color.White)
+                        Text(
+                            key.toString(),
+                            style = MaterialTheme.typography.titleLarge,
+                            color = Color.White,
+                            modifier =
+                                Modifier.clearAndSetSemantics {
+                                    // A11y (audit finding 11): glyph keys get real
+                                    // names instead of raw "backspace"/"check" reads.
+                                    contentDescription =
+                                        when (key) {
+                                            '⌫' -> "Delete last digit"
+                                            '✓' -> "Submit PIN"
+                                            else -> key.toString()
+                                        }
+                                },
+                        )
                     }
                 }
             }

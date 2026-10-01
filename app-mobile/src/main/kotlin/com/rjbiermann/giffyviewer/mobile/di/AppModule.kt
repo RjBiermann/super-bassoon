@@ -13,8 +13,8 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import com.rjbiermann.giffyviewer.core.auth.TokenStore
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.network.AnonymousSession
-import com.rjbiermann.giffyviewer.core.network.NetworkComponents
 import com.rjbiermann.giffyviewer.core.network.GifsApi
+import com.rjbiermann.giffyviewer.core.network.NetworkComponents
 import com.rjbiermann.giffyviewer.core.network.buildNetwork
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import dagger.Module
