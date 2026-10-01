@@ -11,6 +11,28 @@ import org.junit.Test
 class ContentFilterTest {
     private val gifTags = listOf("Bigger", "Femboy", "NSFW")
 
+    @Test
+    fun `blocked niche-group tags feed the pipeline (stage 2)`() =
+        runTest {
+            val f = ContentFilter()
+            f.refreshFrom(FakeContentPrefsDao())
+            f.refreshGroupTags(
+                object : NicheGroupDao {
+                    override suspend fun upsert(group: NicheGroupEntity): Long = 0
+
+                    override fun all(): kotlinx.coroutines.flow.Flow<List<NicheGroupEntity>> = kotlinx.coroutines.flow.flowOf(emptyList())
+
+                    override suspend fun blocked(): List<NicheGroupEntity> =
+                        listOf(NicheGroupEntity(1, "No Femboy", " bigger ,femboy,, ", "BLOCKED", 0))
+
+                    override suspend fun delete(id: Long) {}
+                },
+            )
+            assertEquals("group", f.hideReason("anyone", gifTags))
+            // whitespace/empty tag entries are ignored, not treated as tags
+            assertNull(f.hideReason("anyone", listOf("Solo")))
+        }
+
     private suspend fun filter(
         creators: Set<String> = emptySet(),
         tags: Set<String> = emptySet(),

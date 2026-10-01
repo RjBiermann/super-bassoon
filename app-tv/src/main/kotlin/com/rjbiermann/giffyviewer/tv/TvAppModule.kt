@@ -51,7 +51,14 @@ object TvAppModule {
             buildNetwork(
                 authToken = { tokenStore.tokenOrNull() ?: session?.token() },
                 onUnauthorized = {
-                    if (!tokenStore.refreshBlocking()) session?.invalidate()
+                    // Refresh failed → clear the stale user token (PLAN §2) so
+                    // browsing falls back to the anonymous session (see mobile).
+                    if (!tokenStore.refreshBlocking()) {
+                        tokenStore.clear()
+                        session?.invalidate()
+                    } else {
+                        session?.invalidate()
+                    }
                 },
                 enableLogging = false,
             )
@@ -72,7 +79,7 @@ object TvAppModule {
                 context,
                 GiffyDatabase::class.java,
                 GiffyDatabase.NAME,
-            ).addMigrations(GiffyDatabase.MIGRATION_1_2, GiffyDatabase.MIGRATION_2_3, GiffyDatabase.MIGRATION_3_4)
+            ).addMigrations(GiffyDatabase.MIGRATION_1_2, GiffyDatabase.MIGRATION_2_3, GiffyDatabase.MIGRATION_3_4, GiffyDatabase.MIGRATION_4_5)
             .build()
 
     /** Images share the API's OkHttp instance → same rate limiter covers media. */

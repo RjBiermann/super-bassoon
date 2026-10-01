@@ -94,3 +94,15 @@ data class HideCountEntity(
     @PrimaryKey val weekStart: Long,
     val count: Int,
 )
+
+/** Niche group (PLAN §6): user-defined tag bundle; full feeds + macro-filter. */
+@Entity(tableName = "niche_groups")
+data class NicheGroupEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    /** Comma-separated tag list (matches the site's groups storage shape). */
+    val tagList: String,
+    /** BLOCKED | FAVORITED | NEUTRAL. */
+    val state: String,
+    val createdAt: Long,
+)

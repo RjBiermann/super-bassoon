@@ -112,6 +112,23 @@ class FeedMediator(
             }
             is FeedSource.ForYou -> api.feedForYou(count = pageSize, page = page)
             is FeedSource.Niche -> api.nicheGifs(nicheId = feed.id, count = pageSize, page = page)
+            is FeedSource.Group -> {
+                // ponytail: page n maps to tag[(n-1) % n_tags]; a changed tag list
+                // shifts the mapping until the cache refreshes (same pattern as
+                // the Favorites creator rotation; dedup handled by the source).
+                // Groups UI requires 1+ tags, so empty is a degenerate safe path.
+                val tags = feed.tags
+                if (tags.isEmpty()) {
+                    GifsPageDto()
+                } else {
+                    api.search(
+                        searchText = tags[(page - 1) % tags.size],
+                        count = pageSize,
+                        page = (page - 1) / tags.size + 1,
+                        order = "trending",
+                    )
+                }
+            }
             is FeedSource.Creator -> api.userGifs(username = feed.username, count = pageSize, page = page)
             is FeedSource.TopThisWeek -> api.trendingPopular(order = "top_week", count = pageSize, page = page)
             else -> api.trendingPopular(count = pageSize, page = page)

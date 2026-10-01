@@ -81,6 +81,7 @@ fun FeedScreen(
     onOpenSettings: () -> Unit = {},
     onOpenSearch: () -> Unit = {},
     onOpenNiches: () -> Unit = {},
+    onOpenGroups: () -> Unit = {},
     viewModel: FeedViewModel = hiltViewModel(),
 ) {
     val source by viewModel.source.collectAsStateWithLifecycle()
@@ -163,12 +164,27 @@ fun FeedScreen(
                     onClick = onOpenNiches,
                     label = { Text("Niches…") },
                 )
+                FilterChip(
+                    selected = false,
+                    onClick = onOpenGroups,
+                    label = { Text("Groups…") },
+                )
                 // pinned niches become tabs (PLAN §7 pin-to-tabs)
                 pinnedNiches.forEach { niche ->
                     FilterChip(
                         selected = source == niche,
                         onClick = { viewModel.open(niche) },
                         label = { Text(niche.name) },
+                    )
+                }
+                // FAVORITED groups become tabs (PLAN §7 groups)
+                val favGroups by viewModel.favoriteGroups.collectAsStateWithLifecycle(emptyList())
+                favGroups.filter { it.state == "FAVORITED" }.forEach { group ->
+                    val groupFeed = FeedSource.Group(group.id, group.name, group.tagList.split(','))
+                    FilterChip(
+                        selected = source == groupFeed,
+                        onClick = { viewModel.open(groupFeed) },
+                        label = { Text(group.name) },
                     )
                 }
                 // pinned creators become tabs (PLAN §7 pin-to-tabs), shared with TV

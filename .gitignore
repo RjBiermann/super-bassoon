@@ -17,3 +17,5 @@ local.properties
 **/build/
 .playwright-mcp/
 __pycache__/
+after-profile-click.png
+login-page.png

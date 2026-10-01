@@ -47,7 +47,16 @@ object AppModule {
             buildNetwork(
                 authToken = { tokenStore.tokenOrNull() ?: session?.token() },
                 onUnauthorized = {
-                    if (!tokenStore.refreshBlocking()) session?.invalidate()
+                    // Silent refresh first; if the grant is dead (revoked/expired
+                    // family), CLEAR the stale user token (PLAN §2: refresh fails
+                    // → clear state) so browsing falls back to the anonymous
+                    // session instead of 401-looping forever.
+                    if (!tokenStore.refreshBlocking()) {
+                        tokenStore.clear()
+                        session?.invalidate()
+                    } else {
+                        session?.invalidate()
+                    }
                 },
             )
         session = AnonymousSession(nc.api)
@@ -67,8 +76,12 @@ object AppModule {
                 context,
                 GiffyDatabase::class.java,
                 GiffyDatabase.NAME,
-            ).addMigrations(GiffyDatabase.MIGRATION_1_2, GiffyDatabase.MIGRATION_2_3, GiffyDatabase.MIGRATION_3_4)
-            .build()
+            ).addMigrations(
+                GiffyDatabase.MIGRATION_1_2,
+                GiffyDatabase.MIGRATION_2_3,
+                GiffyDatabase.MIGRATION_3_4,
+                GiffyDatabase.MIGRATION_4_5,
+            ).build()
 
     /**
      * Images share the API's OkHttp instance so media requests go through the same

@@ -22,8 +22,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         TagPrefEntity::class,
         KeywordBlockEntity::class,
         HideCountEntity::class,
+        NicheGroupEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 @TypeConverters(ListConverters::class)
@@ -41,6 +42,8 @@ abstract class GiffyDatabase : RoomDatabase() {
     abstract fun watchHistoryDao(): WatchHistoryDao
 
     abstract fun contentPrefsDao(): ContentPrefsDao
+
+    abstract fun nicheGroupDao(): NicheGroupDao
 
     companion object {
         const val NAME = "giffy.db"
@@ -71,6 +74,18 @@ abstract class GiffyDatabase : RoomDatabase() {
                     db.execSQL(
                         "CREATE TABLE IF NOT EXISTS `hide_counts` " +
                             "(`weekStart` INTEGER NOT NULL, `count` INTEGER NOT NULL, PRIMARY KEY(`weekStart`))",
+                    )
+                }
+            }
+
+        /** v4→5: niche groups (PLAN §6 — user-defined tag bundles; BLOCKED feeds the filter). */
+        val MIGRATION_4_5 =
+            object : Migration(4, 5) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `niche_groups` " +
+                            "(`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, " +
+                            "`tagList` TEXT NOT NULL, `state` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)",
                     )
                 }
             }

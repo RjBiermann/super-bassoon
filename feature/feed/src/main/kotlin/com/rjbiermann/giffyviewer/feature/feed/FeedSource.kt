@@ -75,6 +75,20 @@ sealed interface FeedSource {
         override val ttlMs = TTL_SEARCH
     }
 
+/**
+     * Group feed (PLAN §7): a user-defined tag bundle fetched round-robin — page n
+     * maps to tag[(n-1) % n_tags], same pattern as the Favorites creator rotation
+     * (live-verified: v2/gifs/search's search_text matches tags). Cached group:<id>.
+     */
+    data class Group(
+        val id: Long,
+        val name: String,
+        val tags: List<String>,
+    ) : FeedSource {
+        override val keyBase = "group:$id"
+        override val ttlMs = TTL_SEARCH
+    }
+
     companion object {
         const val TTL_TRENDING = 10 * 60_000L
         const val TTL_SEARCH = 60 * 60_000L
@@ -98,6 +112,7 @@ fun FeedSource.title(): String =
         is FeedSource.TopThisWeek -> "Top This Week"
         is FeedSource.Niche -> this.name
         is FeedSource.Creator -> "@${this.username}"
+        is FeedSource.Group -> this.name
         is FeedSource.Search -> "Search: $query"
         is FeedSource.Favorites -> "Favorites"
     }

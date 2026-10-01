@@ -205,3 +205,18 @@ interface ContentPrefsDao {
         delta: Int,
     )
 }
+
+@Dao
+interface NicheGroupDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(group: NicheGroupEntity): Long
+
+    @Query("SELECT * FROM niche_groups ORDER BY createdAt DESC")
+    fun all(): Flow<List<NicheGroupEntity>>
+
+    @Query("SELECT * FROM niche_groups WHERE state = 'BLOCKED'")
+    suspend fun blocked(): List<NicheGroupEntity>
+
+    @Query("DELETE FROM niche_groups WHERE id = :id")
+    suspend fun delete(id: Long)
+}

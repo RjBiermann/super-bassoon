@@ -37,7 +37,12 @@ class FeedPagingSource(
 ) : PagingSource<Int, Gif>() {
     init {
         db.invalidationTracker.addObserver(
-            object : androidx.room.InvalidationTracker.Observer("creator_prefs", "tag_prefs", "keyword_blocks") {
+            object : androidx.room.InvalidationTracker.Observer(
+                "creator_prefs",
+                "tag_prefs",
+                "keyword_blocks",
+                "niche_groups",
+            ) {
                 override fun onInvalidated(tables: Set<String>) {
                     invalidate()
                 }
@@ -72,8 +77,10 @@ class FeedPagingSource(
             val ids = (entity?.gifIds ?: emptyList()).filterNot { it in seen }
             val byId = if (ids.isEmpty()) emptyMap() else pageDao.gifsByIds(ids).associateBy { it.id }
             // ContentFilter choke point (leak-zero): blocked creators/tags/keywords
-            // never reach the UI, however they got into the cache.
+            // never reach the UI, however they got into the cache. BLOCKED group
+            // tags ride the same reload (§6 stage 2).
             contentFilter.refreshFrom(db.contentPrefsDao())
+            contentFilter.refreshGroupTags(db.nicheGroupDao())
             // Favorites feed keeps unfavorited rows out at read time (instant
             // un-favorite; the round-robin cache itself refreshes on TTL).
             val favs =

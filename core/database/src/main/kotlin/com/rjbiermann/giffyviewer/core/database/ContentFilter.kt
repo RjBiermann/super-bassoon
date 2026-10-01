@@ -26,6 +26,9 @@ class ContentFilter
         @Volatile
         private var keywords: List<String> = emptyList()
 
+        @Volatile
+        private var groupTags: Set<String> = emptySet()
+
         suspend fun refreshFrom(dao: ContentPrefsDao) {
             mutex.withLock {
                 creators =
@@ -37,13 +40,24 @@ class ContentFilter
             }
         }
 
-        /** Null = allow. Otherwise the reason: "creator" | "tag" | "keyword". */
+        /** Stage 2 (§6): every BLOCKED group's tags join the global block set.
+         *  Called alongside [refreshFrom] by the paging source (one session reload). */
+        suspend fun refreshGroupTags(dao: NicheGroupDao) {
+            val merged =
+                dao.blocked().flatMapTo(HashSet()) { g ->
+                    g.tagList.split(',').mapNotNull { t -> t.trim().lowercase().takeIf(String::isNotEmpty) }
+                }
+            mutex.withLock { groupTags = merged }
+        }
+
+        /** Null = allow. Otherwise the reason: "creator" | "tag" | "group" | "keyword". */
         fun hideReason(
             userName: String,
             gifTags: List<String>,
         ): String? {
             if (userName.lowercase() in creators) return "creator"
             if (gifTags.any { it.lowercase() in tags }) return "tag"
+            if (gifTags.any { it.lowercase() in groupTags }) return "group"
             // upstream gif objects carry no title/description — tags are the only text.
             if (keywords.any { k -> gifTags.any { it.lowercase().contains(k) } }) return "keyword"
             return null
