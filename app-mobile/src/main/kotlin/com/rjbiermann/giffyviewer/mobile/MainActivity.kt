@@ -416,33 +416,5 @@ private fun PinLockScreen(
             }
         }
         Spacer(Modifier.height(24.dp))
-        // Recovery: the lock is local-only (Settings → Set PIN); a forgotten PIN
-        // unlocks with a confirmation — honest about the deterrent posture
-        // (anyone could clear app data anyway).
-        var confirmReset by remember { mutableStateOf(false) }
-        androidx.compose.material3.TextButton(onClick = { confirmReset = true }) {
-            Text("Forgot PIN?")
-        }
-        if (confirmReset) {
-            androidx.compose.material3.AlertDialog(
-                onDismissRequest = { confirmReset = false },
-                title = { Text("Remove app lock?") },
-                text = { Text("Your data and signed-in account stay. The PIN lock is removed.") },
-                confirmButton = {
-                    androidx.compose.material3.TextButton(onClick = {
-                        confirmReset = false
-                        scope.launch {
-                            settings.clearPin()
-                            onUnlock()
-                        }
-                    }) { Text("Remove lock") }
-                },
-                dismissButton = {
-                    androidx.compose.material3.TextButton(onClick = { confirmReset = false }) {
-                        Text("Cancel")
-                    }
-                },
-            )
-        }
     }
 }
