@@ -25,6 +25,8 @@ kotlin {
 }
 
 dependencies {
+    implementation(project(":core:auth"))
+    implementation(project(":feature:auth"))
     implementation(project(":core:database"))
     implementation(project(":core:datastore"))
     implementation(project(":core:ui"))

@@ -41,7 +41,6 @@ import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.ui.GiffyTheme
 import com.rjbiermann.giffyviewer.core.ui.LayoutHint
 import com.rjbiermann.giffyviewer.core.ui.layoutHint
-import com.rjbiermann.giffyviewer.feature.auth.AuthScreen
 import com.rjbiermann.giffyviewer.feature.feed.CollectionsScreen
 import com.rjbiermann.giffyviewer.feature.feed.CollectionsViewModel
 import com.rjbiermann.giffyviewer.feature.feed.CustomFeedsScreen
@@ -101,7 +100,6 @@ class MainActivity : ComponentActivity() {
         // the open surface survives process death; one BackHandler pops the TOP
         // route instead of letting system back kill the activity.
         var playerStartIndex by rememberSaveable { mutableStateOf<Int?>(null) }
-        var showAccount by rememberSaveable { mutableStateOf(false) }
         var showSettings by rememberSaveable { mutableStateOf(false) }
         var showNiches by rememberSaveable { mutableStateOf(false) }
         var showGroups by rememberSaveable { mutableStateOf(false) }
@@ -116,7 +114,6 @@ class MainActivity : ComponentActivity() {
             enabled =
                 playerStartIndex != null ||
                     aboutNiche != null ||
-                    showAccount ||
                     showSettings ||
                     showNiches ||
                     showGroups ||
@@ -136,8 +133,7 @@ class MainActivity : ComponentActivity() {
                 showGroups -> showGroups = false
                 showNiches -> showNiches = false
                 showCollections -> showCollections = false
-                showSettings -> showSettings = false
-                else -> showAccount = false
+                else -> showSettings = false
             }
         }
 
@@ -153,14 +149,12 @@ class MainActivity : ComponentActivity() {
             PlayerScreen(
                 startIndex = start,
                 onBack = { playerStartIndex = null },
-                onOpenAccount = { showAccount = true },
+                onOpenAccount = { showSettings = true },
                 viewModel = hiltViewModel(),
                 playerFactory = playerFactory,
                 settings = settings,
                 db = db,
             )
-        } else if (confirmed && showAccount) {
-            AuthScreen(onBack = { showAccount = false })
         } else if (confirmed && showExplore) {
             val feedViewModel: FeedViewModel = hiltViewModel()
             ExploreScreen(
@@ -263,7 +257,6 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier.fillMaxSize(),
                 gridColumns = hint.gridColumns,
                 onOpenPlayer = { index -> playerStartIndex = index },
-                onOpenAccount = { showAccount = true },
                 onOpenSettings = { showSettings = true },
                 onOpenSearch = { showSearch = true },
                 onOpenNiches = { showNiches = true },

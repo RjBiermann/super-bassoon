@@ -117,6 +117,7 @@ private const val IDLE_HIDE_MS = 3_000L
 fun PlayerScreen(
     startIndex: Int,
     onBack: () -> Unit,
+    /** Like while logged out → open Settings (holds the account section). */
     onOpenAccount: () -> Unit,
     viewModel: FeedViewModel,
     playerFactory: GiffyPlayerFactory,

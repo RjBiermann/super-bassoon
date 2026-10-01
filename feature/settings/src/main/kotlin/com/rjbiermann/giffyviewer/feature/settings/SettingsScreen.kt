@@ -60,6 +60,8 @@ fun SettingsScreen(
     val dataSaver by viewModel.dataSaver.collectAsStateWithLifecycle()
     val amoled by viewModel.amoled.collectAsStateWithLifecycle()
     val dynamicColor by viewModel.dynamicColor.collectAsStateWithLifecycle()
+    val authViewModel: com.rjbiermann.giffyviewer.feature.auth.AuthViewModel = hiltViewModel()
+    var webLogin by remember { mutableStateOf<com.rjbiermann.giffyviewer.core.auth.TokenStore.Pkce?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -113,6 +115,19 @@ fun SettingsScreen(
             }
         }
 
+    // Full-screen WebView over the settings (account sign-in).
+    webLogin?.let { pkce ->
+        com.rjbiermann.giffyviewer.feature.auth.WebViewLoginScreen(
+            pkce = pkce,
+            onCodeCaptured = { code ->
+                webLogin = null
+                authViewModel.exchangeCode(code)
+            },
+            onClose = { webLogin = null },
+        )
+        return
+    }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -136,6 +151,17 @@ fun SettingsScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
+            item(key = "account") {
+                // Account first (merged 2026-10): one settings surface, no separate page.
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text("Account", style = MaterialTheme.typography.titleSmall)
+                    com.rjbiermann.giffyviewer.feature.auth.AuthSection(
+                        viewModel = authViewModel,
+                        onOpenWebView = { webLogin = it },
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
             if (blocked.creators.isEmpty() && blocked.tags.isEmpty() && blocked.keywords.isEmpty()) {
                 item {
                     Text(

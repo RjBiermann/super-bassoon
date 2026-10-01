@@ -37,7 +37,6 @@ import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.ui.GiffyTheme
-import com.rjbiermann.giffyviewer.feature.auth.AuthScreen
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import com.rjbiermann.giffyviewer.feature.settings.SettingsScreen
 import dagger.hilt.android.AndroidEntryPoint
@@ -96,7 +95,6 @@ class TvMainActivity : ComponentActivity() {
     private fun Root() {
         val confirmed by settings.ageConfirmed.collectAsStateWithLifecycle(initialValue = false)
         var player: Pair<List<Gif>, Int>? by remember { mutableStateOf(null) }
-        var showAccount by remember { mutableStateOf(false) }
         var showSettings by remember { mutableStateOf(false) }
         var showNiches by remember { mutableStateOf(false) }
         var openFeed: FeedSource? by remember { mutableStateOf(null) }
@@ -110,14 +108,14 @@ class TvMainActivity : ComponentActivity() {
 
         // D-pad BACK pops the top screen instead of exiting the activity
         androidx.activity.compose.BackHandler(
-            enabled = player != null || showAccount || showSettings || showNiches || openFeed != null,
+            enabled = player != null || showSettings || showNiches || openFeed != null,
         ) {
             when {
                 player != null -> player = null
                 openFeed != null -> openFeed = null
                 showNiches -> showNiches = false
                 showSettings -> showSettings = false
-                else -> showAccount = false
+                else -> showSettings = false
             }
         }
 
@@ -157,7 +155,6 @@ class TvMainActivity : ComponentActivity() {
                         viewModel = nichesVm,
                     )
                 }
-                showAccount -> AuthScreen(onBack = { showAccount = false })
                 showSettings -> SettingsScreen(onBack = { showSettings = false })
                 else -> {
                     val home: TvHomeViewModel = hiltViewModel()
@@ -174,16 +171,10 @@ class TvMainActivity : ComponentActivity() {
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             item {
-                                AccountButton(
-                                    focusRequester = focusRequester,
-                                    onClick = { showAccount = true },
-                                )
-                            }
-                            item {
                                 com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
                                     text = "Settings",
                                     onClick = { showSettings = true },
-                                    modifier = Modifier.padding(6.dp),
+                                    modifier = Modifier.padding(6.dp).focusRequester(focusRequester),
                                 )
                             }
                             item {
@@ -300,17 +291,4 @@ class TvMainActivity : ComponentActivity() {
             }
         }
     }
-}
-
-@Composable
-/** Header buttons need a requested initial focus — nothing else grabs it on this screen. */
-private fun AccountButton(
-    focusRequester: FocusRequester,
-    onClick: () -> Unit,
-) {
-    com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
-        text = "Account",
-        onClick = onClick,
-        modifier = Modifier.padding(6.dp).focusRequester(focusRequester),
-    )
 }
