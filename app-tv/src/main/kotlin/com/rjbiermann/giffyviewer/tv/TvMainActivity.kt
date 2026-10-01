@@ -193,6 +193,7 @@ class TvMainActivity : ComponentActivity() {
                     }
                     TvHomeScreen(
                         onOpenGif = { gifs, index -> player = gifs to index },
+                        onOpenCreator = { username -> openFeed = FeedSource.Creator(username = username) },
                         homeViewModel = home,
                         continueViewModel = continueVm,
                     )

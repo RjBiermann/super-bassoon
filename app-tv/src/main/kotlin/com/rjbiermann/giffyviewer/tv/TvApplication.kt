@@ -3,13 +3,13 @@ package com.rjbiermann.giffyviewer.tv
 import android.app.Application
 import com.rjbiermann.giffyviewer.core.auth.TokenStore
 import dagger.hilt.android.HiltAndroidApp
-import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /** TV shell: same proactive token-refresh timer as mobile (PLAN §2). */
 @HiltAndroidApp

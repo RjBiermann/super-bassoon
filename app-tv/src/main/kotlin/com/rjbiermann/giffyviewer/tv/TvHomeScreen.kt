@@ -10,10 +10,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -21,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
@@ -60,12 +63,21 @@ import androidx.compose.material3.Surface as M3Surface
 @Composable
 fun TvHomeScreen(
     onOpenGif: (list: List<Gif>, index: Int) -> Unit,
+    onOpenCreator: (String) -> Unit,
     homeViewModel: TvHomeViewModel,
     continueViewModel: ContinueWatchingViewModel,
 ) {
     val trending = homeViewModel.trending.collectAsLazyPagingItems()
     val topThisWeek = homeViewModel.topThisWeek.collectAsLazyPagingItems()
     val favorites = homeViewModel.favorites.collectAsLazyPagingItems()
+    val liked = homeViewModel.liked.collectAsLazyPagingItems()
+    val followingVm: com.rjbiermann.giffyviewer.feature.feed.FollowingViewModel =
+        androidx.hilt.navigation.compose
+            .hiltViewModel()
+    val followingCreators by followingVm.creators.collectAsStateWithLifecycle(initialValue = emptyList())
+    val isLoggedIn = homeViewModel.isLoggedIn
+    LaunchedEffect(Unit) { if (isLoggedIn) followingVm.refresh() }
+    val exploreCreators by homeViewModel.exploreCreators.collectAsStateWithLifecycle(initialValue = emptyList())
     val continueEntries by continueViewModel.entries.collectAsStateWithLifecycle(initialValue = emptyList())
     val hasFavorites by homeViewModel.hasFavorites.collectAsStateWithLifecycle(initialValue = false)
 
@@ -84,10 +96,17 @@ fun TvHomeScreen(
             )
         }
         item { FeedRow("Trending", trending, onOpenGif, onMenu = { actionsFor = it }) }
+        // Explore = Top Creators (§9 lingo) — creators row, tap → creator feed.
+        item { CreatorRow("Explore", exploreCreators, onOpenCreator) }
         item { FeedRow("Top This Week", topThisWeek, onOpenGif, onMenu = { actionsFor = it }) }
         // Empty-state rule: no blank favorites row when nothing is favorited.
         if (hasFavorites) {
             item { FeedRow("Favorites", favorites, onOpenGif, onMenu = { actionsFor = it }) }
+        }
+        // Logged-in rows (§9 TV): Liked (network-live) + Following creators.
+        if (isLoggedIn) {
+            item { FeedRow("Liked GIFs & Images", liked, onOpenGif, onMenu = { actionsFor = it }) }
+            item { CreatorRow("Following", followingCreators.map { it }, onOpenCreator) }
         }
         item {
             Column(modifier = Modifier.padding(vertical = 12.dp)) {
@@ -174,6 +193,46 @@ private fun QuickActionsDialog(
                 }
                 Button(onClick = onDismiss, modifier = Modifier.padding(vertical = 4.dp)) {
                     Text("Cancel")
+                }
+            }
+        }
+    }
+}
+
+/** Explore/Following rows: creator cards (avatar + @name), tap → creator feed. */
+@Composable
+private fun CreatorRow(
+    title: String,
+    creators: List<com.rjbiermann.giffyviewer.core.network.CreatorSearchItemDto>,
+    onOpenCreator: (String) -> Unit,
+) {
+    if (creators.isEmpty()) return
+    Column(modifier = Modifier.padding(vertical = 12.dp)) {
+        RowTitle(title)
+        androidx.compose.foundation.lazy.LazyRow(
+            contentPadding = PaddingValues(horizontal = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            items(creators.size, key = { i -> creators[i].username }) { i ->
+                val creator = creators[i]
+                Card(onClick = { onOpenCreator(creator.username) }) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(12.dp)) {
+                        AsyncImage(
+                            model = creator.profileImageUrl,
+                            contentDescription = "creator ${creator.username}",
+                            modifier = Modifier.size(120.dp).clip(CircleShape),
+                        )
+                        Text(
+                            "@${creator.username}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                        Text(
+                            "${creator.followers} followers · ${creator.gifs} gifs",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }

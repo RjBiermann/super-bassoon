@@ -21,10 +21,11 @@ import javax.inject.Inject
 class TvHomeViewModel
     @Inject
     constructor(
-        repository: FeedRepository,
+        private val repository: FeedRepository,
         private val db: com.rjbiermann.giffyviewer.core.database.GiffyDatabase,
         val settings: com.rjbiermann.giffyviewer.core.datastore.SettingsRepository,
         tokenStore: com.rjbiermann.giffyviewer.core.auth.TokenStore,
+        private val api: com.rjbiermann.giffyviewer.core.network.upstreamApi,
     ) : ViewModel() {
         val trending = repository.paging(FeedSource.Trending).cachedIn(viewModelScope)
         val topThisWeek = repository.paging(FeedSource.TopThisWeek).cachedIn(viewModelScope)
@@ -35,6 +36,19 @@ class TvHomeViewModel
 
         /** Logged-in surfaces (Liked/Following rows) show only with a token. */
         val isLoggedIn = tokenStore.tokenOrNull() != null
+
+        /** Explore row (§9: Top Creators) — first page of verified creators, anon OK. */
+        val exploreCreators =
+            kotlinx.coroutines.flow.MutableStateFlow<List<com.rjbiermann.giffyviewer.core.network.CreatorSearchItemDto>>(
+                emptyList(),
+            )
+
+        init {
+            viewModelScope.launch {
+                runCatching { api.verifiedCreators() }
+                    .onSuccess { exploreCreators.value = it.creators }
+            }
+        }
 
         val hasFavorites =
             db
