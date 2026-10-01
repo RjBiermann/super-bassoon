@@ -39,3 +39,15 @@ Export/import of content prefs as JSON via SAF document pickers (Settings screen
   Without it, a cold start fetches + upserts but the grid stays empty FOREVER (UI never reloads).
   Symptom that misleads: restarting the app "fixes" it (initial load now finds data).
 - Room `IN` queries don't preserve ordering — `FeedPagingSource` re-orders to the page's gifIds.
+- **Paging consults the RemoteMediator only when the source's data is exhausted** (last
+  loaded page nextKey=null) — never per append while the source keeps returning pages.
+  Fast scrolling therefore reaches an unfetched page first: the source returning an EMPTY
+  page with next=null makes Paging read end-of-list (appends die; mediator's page-1
+  fallback then re-fetches p2 forever), and an optimistic page+1 key makes it drain empty
+  pages (mediator never consulted). Fix shipped 2026-10 (`f5a5954`): the SOURCE fills an
+  unfetched page itself via the shared `FeedPageFetcher`, and the mediator's APPEND
+  fallback advances past the highest CACHED page (`pagesForBase` max + 1), never page 1.
+- **Server reshuffles page contents between fetches** → an id already live in the pager's
+  list can re-enter a later page; DB-row dedup can't see the live list → duplicate
+  LazyGrid keys crash the measure pass ("Key was already used"). Fix: session-wide
+  seen-set per feed keyBase in FeedRepository; the source registers ids it returns.
