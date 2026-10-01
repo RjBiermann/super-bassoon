@@ -7,7 +7,7 @@ Spec: PLAN.md §5, §6.
 
 - `gifs` — metadata incl. **tags + username stored locally** (offline filtering depends on it)
 - `feed_pages` — key format `"trend:v2:pop:p3"` incl. extended variants; sort/range changes → **distinct keys**
-- `search_history` · `tags` · `liked_ids` (tiny mirror of server likes — write-through like/unlike, refreshed from `/v2/likes`; renders liked badges + Liked feed skeleton offline) · `watch_history` (resume positions; write policy: record only after ≥3s playback OR ≥30% played, one row per gif, cap 1000 oldest-evicted) · `hide_counts` (single rolling 7-day counter) · `custom_feeds` (§7, pending)
+- `search_history` · `tags` · `liked_ids` (tiny mirror of server likes — write-through like/unlike, refreshed from `/v2/likes`; renders liked badges + Liked feed skeleton offline) · `watch_history` (resume positions; write policy: record only after ≥3s playback OR ≥30% played, one row per gif, cap 1000 oldest-evicted) · `hide_counts` (single rolling 7-day counter) · `custom_feeds` (§7, built 2026-10 — v7 migration, MIGRATION_6_7)
 - `creator_prefs(username PK, state, favorited_at)` · `tag_prefs(tag PK, state, blocked_at, favorited_at)`
 - `keyword_blocks(pattern PK, blocked_at)` · `niche_groups(id auto, name, tag_list, state)` (state ∈ BLOCKED | FAVORITED)
 - `pinned_ids` (server-pin mirror, `v2/pins` — Phase 7)
