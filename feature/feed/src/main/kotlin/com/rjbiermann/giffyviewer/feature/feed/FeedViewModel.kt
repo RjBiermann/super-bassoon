@@ -10,7 +10,7 @@ import com.rjbiermann.giffyviewer.core.database.KeywordBlockEntity
 import com.rjbiermann.giffyviewer.core.database.LikedIdsEntity
 import com.rjbiermann.giffyviewer.core.database.TagPrefEntity
 import com.rjbiermann.giffyviewer.core.model.Gif
-import com.rjbiermann.giffyviewer.core.network.upstreamApi
+import com.rjbiermann.giffyviewer.core.network.GifsApi
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -45,7 +45,7 @@ class FeedViewModel
         private val repository: FeedRepository,
         private val db: com.rjbiermann.giffyviewer.core.database.GiffyDatabase,
         private val settings: com.rjbiermann.giffyviewer.core.datastore.SettingsRepository,
-        private val api: upstreamApi,
+        private val api: GifsApi,
         private val tokenStore: TokenStore,
     ) : ViewModel() {
         private val mutableSource = MutableStateFlow<FeedSource>(FeedSource.Trending)

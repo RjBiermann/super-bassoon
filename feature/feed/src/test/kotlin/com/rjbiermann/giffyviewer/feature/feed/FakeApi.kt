@@ -3,13 +3,13 @@ package com.rjbiermann.giffyviewer.feature.feed
 import com.rjbiermann.giffyviewer.core.network.EmptyBody
 import com.rjbiermann.giffyviewer.core.network.FollowBody
 import com.rjbiermann.giffyviewer.core.network.FollowedNichesDto
+import com.rjbiermann.giffyviewer.core.network.GifsApi
 import com.rjbiermann.giffyviewer.core.network.LikeBody
-import com.rjbiermann.giffyviewer.core.network.upstreamApi
 import com.rjbiermann.giffyviewer.core.network.dto.GifsPageDto
 import com.rjbiermann.giffyviewer.core.network.dto.TemporaryTokenDto
 
-/** In-memory upstreamApi for unit tests; shared by the mediator + liked-feed tests. */
-internal class FakeApi : upstreamApi {
+/** In-memory GifsApi for unit tests; shared by the mediator + liked-feed tests. */
+internal class FakeApi : GifsApi {
     var userGifsCalls = 0
     var searchCalls = 0
     var nicheGifsCalls = 0

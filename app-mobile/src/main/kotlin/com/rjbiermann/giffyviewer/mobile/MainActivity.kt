@@ -66,7 +66,7 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var db: GiffyDatabase
 
-    @Inject lateinit var api: com.rjbiermann.giffyviewer.core.network.upstreamApi
+    @Inject lateinit var api: com.rjbiermann.giffyviewer.core.network.GifsApi
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

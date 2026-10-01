@@ -38,7 +38,7 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.network.NicheDto
-import com.rjbiermann.giffyviewer.core.network.upstreamApi
+import com.rjbiermann.giffyviewer.core.network.GifsApi
 import com.rjbiermann.giffyviewer.core.ui.giffyFocus
 import com.rjbiermann.giffyviewer.feature.feed.FeedRepository
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
@@ -58,7 +58,7 @@ import javax.inject.Inject
 class TvNichesViewModel
     @Inject
     constructor(
-        private val api: upstreamApi,
+        private val api: GifsApi,
         val settings: SettingsRepository,
     ) : ViewModel() {
         private val _niches = MutableStateFlow<List<NicheDto>>(emptyList())

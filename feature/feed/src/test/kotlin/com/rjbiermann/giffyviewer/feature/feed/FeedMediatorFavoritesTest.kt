@@ -10,7 +10,7 @@ import com.rjbiermann.giffyviewer.core.database.FeedPageEntity
 import com.rjbiermann.giffyviewer.core.database.GifDao
 import com.rjbiermann.giffyviewer.core.database.GifEntity
 import com.rjbiermann.giffyviewer.core.model.Gif
-import com.rjbiermann.giffyviewer.core.network.upstreamApi
+import com.rjbiermann.giffyviewer.core.network.GifsApi
 import com.rjbiermann.giffyviewer.core.network.dto.GifDtoShell
 import com.rjbiermann.giffyviewer.core.network.dto.UrlsDto
 import kotlinx.coroutines.flow.Flow
@@ -66,7 +66,7 @@ class FeedMediatorFavoritesTest {
     private fun mediator(
         pageDao: FeedPageDao,
         gifDao: GifDao,
-        api: upstreamApi,
+        api: GifsApi,
         favorites: suspend () -> List<String>,
     ) = FeedMediator(
         feed = FeedSource.Favorites,

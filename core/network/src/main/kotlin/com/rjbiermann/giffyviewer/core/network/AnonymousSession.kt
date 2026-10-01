@@ -10,7 +10,7 @@ import kotlinx.coroutines.sync.Mutex
  * Paging never auto-retries them).
  */
 class AnonymousSession(
-    private val api: upstreamApi,
+    private val api: GifsApi,
 ) {
     private val mutex = Mutex()
 

@@ -3,7 +3,7 @@ package com.rjbiermann.giffyviewer.feature.feed
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rjbiermann.giffyviewer.core.auth.TokenStore
-import com.rjbiermann.giffyviewer.core.network.upstreamApi
+import com.rjbiermann.giffyviewer.core.network.GifsApi
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,7 +20,7 @@ import javax.inject.Inject
 class FollowingViewModel
     @Inject
     constructor(
-        private val api: upstreamApi,
+        private val api: GifsApi,
         tokenStore: TokenStore,
     ) : ViewModel() {
         val loggedIn = tokenStore.tokenOrNull() != null

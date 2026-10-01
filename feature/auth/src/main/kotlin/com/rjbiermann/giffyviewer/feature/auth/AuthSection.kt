@@ -40,7 +40,7 @@ fun AuthSection(
             Text("Sign in with browser", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             Text(
-                "One tap, opens upstream.com in a WebView — the token exchange " +
+                "One tap, opens the site in a WebView — the token exchange " +
                     "happens in-app (PKCE). No copy-pasting.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

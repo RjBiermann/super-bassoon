@@ -37,8 +37,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
+import com.rjbiermann.giffyviewer.core.network.GifsApi
 import com.rjbiermann.giffyviewer.core.network.NicheDto
-import com.rjbiermann.giffyviewer.core.network.upstreamApi
 import kotlinx.coroutines.launch
 
 /**
@@ -51,7 +51,7 @@ fun NichesScreen(
     onBack: () -> Unit,
     onOpenNiche: (FeedSource.Niche) -> Unit,
     onOpenAbout: (id: String, name: String) -> Unit,
-    api: upstreamApi,
+    api: GifsApi,
     settings: SettingsRepository,
     joinViewModel: NicheJoinViewModel = hiltViewModel(),
 ) {

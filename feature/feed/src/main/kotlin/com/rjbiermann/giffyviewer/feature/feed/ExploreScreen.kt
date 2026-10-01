@@ -36,7 +36,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.rjbiermann.giffyviewer.core.network.CreatorSearchItemDto
-import com.rjbiermann.giffyviewer.core.network.upstreamApi
+import com.rjbiermann.giffyviewer.core.network.GifsApi
 import kotlinx.coroutines.launch
 
 /**
@@ -49,7 +49,7 @@ import kotlinx.coroutines.launch
 fun ExploreScreen(
     onBack: () -> Unit,
     onOpenCreator: (String) -> Unit,
-    api: upstreamApi,
+    api: GifsApi,
 ) {
     var creators by remember { mutableStateOf<List<CreatorSearchItemDto>>(emptyList()) }
     var nextPage by remember { mutableIntStateOf(1) }

@@ -51,7 +51,7 @@ fun WebViewLoginScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Sign in — upstream.com") },
+                title = { Text("Sign in with browser") },
                 navigationIcon = {
                     IconButton(onClick = onClose) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "close")

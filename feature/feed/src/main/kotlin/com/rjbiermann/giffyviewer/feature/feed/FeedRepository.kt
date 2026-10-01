@@ -9,7 +9,7 @@ import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.database.toModel
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.model.matchesOrientation
-import com.rjbiermann.giffyviewer.core.network.upstreamApi
+import com.rjbiermann.giffyviewer.core.network.GifsApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -27,7 +27,7 @@ import javax.inject.Singleton
 class FeedRepository
     @Inject
     constructor(
-        private val api: upstreamApi,
+        private val api: GifsApi,
         private val db: GiffyDatabase,
         private val contentFilter: ContentFilter,
         private val settings: com.rjbiermann.giffyviewer.core.datastore.SettingsRepository,

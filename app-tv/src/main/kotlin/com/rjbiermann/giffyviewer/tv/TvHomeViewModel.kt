@@ -25,7 +25,7 @@ class TvHomeViewModel
         private val db: com.rjbiermann.giffyviewer.core.database.GiffyDatabase,
         val settings: com.rjbiermann.giffyviewer.core.datastore.SettingsRepository,
         tokenStore: com.rjbiermann.giffyviewer.core.auth.TokenStore,
-        private val api: com.rjbiermann.giffyviewer.core.network.upstreamApi,
+        private val api: com.rjbiermann.giffyviewer.core.network.GifsApi,
     ) : ViewModel() {
         val trending = repository.paging(FeedSource.Trending).cachedIn(viewModelScope)
         val topThisWeek = repository.paging(FeedSource.TopThisWeek).cachedIn(viewModelScope)

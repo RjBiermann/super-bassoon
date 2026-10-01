@@ -131,7 +131,12 @@ class FeedPagingSource(
                     // (stable across recomposition; Reshuffle = new seed).
                     .let { gifs ->
                         if (prefs.shuffleSeed != 0L) {
-                            gifs.sortedBy { (it.id.hashCode() * 31L + prefs.shuffleSeed).inv() }
+                            // seed mixed via splitmix-style XOR: affine keys (h+c, h*c)
+                            // sort identically for every seed — XOR of a seed-scaled
+                            // constant actually permutes the order
+                            gifs.sortedBy {
+                                it.id.hashCode().toLong() xor (prefs.shuffleSeed * -7046029254386353131L)
+                            }
                         } else {
                             gifs
                         }

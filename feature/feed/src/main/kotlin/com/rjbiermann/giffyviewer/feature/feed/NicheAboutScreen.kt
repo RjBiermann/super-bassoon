@@ -35,7 +35,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
-import com.rjbiermann.giffyviewer.core.network.upstreamApi
+import com.rjbiermann.giffyviewer.core.network.GifsApi
 import kotlinx.coroutines.launch
 
 /**
@@ -52,7 +52,7 @@ fun NicheAboutScreen(
     onBack: () -> Unit,
     onOpenCreator: (String) -> Unit,
     onOpenNiche: (FeedSource.Niche) -> Unit,
-    api: upstreamApi,
+    api: GifsApi,
     joinViewModel: NicheJoinViewModel,
 ) {
     var detail by remember { mutableStateOf<com.rjbiermann.giffyviewer.core.network.NicheDetail?>(null) }

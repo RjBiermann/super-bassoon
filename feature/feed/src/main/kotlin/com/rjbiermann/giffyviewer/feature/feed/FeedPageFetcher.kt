@@ -4,7 +4,7 @@ import com.rjbiermann.giffyviewer.core.database.FeedPageDao
 import com.rjbiermann.giffyviewer.core.database.FeedPageEntity
 import com.rjbiermann.giffyviewer.core.database.GifDao
 import com.rjbiermann.giffyviewer.core.database.toEntity
-import com.rjbiermann.giffyviewer.core.network.upstreamApi
+import com.rjbiermann.giffyviewer.core.network.GifsApi
 import com.rjbiermann.giffyviewer.core.network.dto.GifsPageDto
 import com.rjbiermann.giffyviewer.core.network.dto.toModel
 
@@ -19,7 +19,7 @@ class FeedPageFetcher(
     private val feed: FeedSource,
     private val gifDao: GifDao,
     private val pageDao: FeedPageDao,
-    private val api: upstreamApi,
+    private val api: GifsApi,
     private val pageSize: Int,
     private val now: () -> Long = System::currentTimeMillis,
     private val favorites: suspend () -> List<String> = { emptyList() },

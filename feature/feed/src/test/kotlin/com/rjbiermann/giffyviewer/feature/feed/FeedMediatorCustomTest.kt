@@ -10,7 +10,7 @@ import com.rjbiermann.giffyviewer.core.database.FeedPageEntity
 import com.rjbiermann.giffyviewer.core.database.GifDao
 import com.rjbiermann.giffyviewer.core.database.GifEntity
 import com.rjbiermann.giffyviewer.core.model.Gif
-import com.rjbiermann.giffyviewer.core.network.upstreamApi
+import com.rjbiermann.giffyviewer.core.network.GifsApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -68,7 +68,7 @@ class FeedMediatorCustomTest {
 
     private fun mediator(
         feed: FeedSource.Custom,
-        api: upstreamApi,
+        api: GifsApi,
         pageDao: FeedPageDao,
     ) = FeedMediator(feed = feed, gifDao = FakeGifDao(), pageDao = pageDao, api = api, pageSize = 20, now = { 0L })
 

@@ -14,7 +14,7 @@ import com.rjbiermann.giffyviewer.core.auth.TokenStore
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.network.AnonymousSession
 import com.rjbiermann.giffyviewer.core.network.NetworkComponents
-import com.rjbiermann.giffyviewer.core.network.upstreamApi
+import com.rjbiermann.giffyviewer.core.network.GifsApi
 import com.rjbiermann.giffyviewer.core.network.buildNetwork
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import dagger.Module
@@ -64,7 +64,7 @@ object AppModule {
     }
 
     @Provides
-    fun api(network: NetworkComponents): upstreamApi = network.api
+    fun api(network: NetworkComponents): GifsApi = network.api
 
     @Provides
     @Singleton

@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.rjbiermann.giffyviewer.core.auth.TokenStore
 import com.rjbiermann.giffyviewer.core.network.CollectionDto
 import com.rjbiermann.giffyviewer.core.network.CreateCollectionBody
-import com.rjbiermann.giffyviewer.core.network.upstreamApi
+import com.rjbiermann.giffyviewer.core.network.GifsApi
 import com.rjbiermann.giffyviewer.core.network.RenameCollectionBody
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,7 +23,7 @@ import javax.inject.Inject
 class CollectionsViewModel
     @Inject
     constructor(
-        private val api: upstreamApi,
+        private val api: GifsApi,
         tokenStore: TokenStore,
     ) : ViewModel() {
         val loggedIn = tokenStore.tokenOrNull() != null

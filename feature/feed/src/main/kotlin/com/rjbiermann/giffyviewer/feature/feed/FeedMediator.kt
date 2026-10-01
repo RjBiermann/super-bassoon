@@ -6,7 +6,7 @@ import androidx.paging.PagingState
 import androidx.paging.RemoteMediator
 import com.rjbiermann.giffyviewer.core.database.FeedPageDao
 import com.rjbiermann.giffyviewer.core.database.GifDao
-import com.rjbiermann.giffyviewer.core.network.upstreamApi
+import com.rjbiermann.giffyviewer.core.network.GifsApi
 import java.io.IOException
 
 /**
@@ -23,7 +23,7 @@ class FeedMediator(
     private val feed: FeedSource,
     private val gifDao: GifDao,
     private val pageDao: FeedPageDao,
-    api: upstreamApi,
+    api: GifsApi,
     private val pageSize: Int,
     /** One-shot TTL bypass for this generation's REFRESH (PLAN §9 pull-to-refresh). */
     private val force: Boolean = false,

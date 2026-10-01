@@ -1,7 +1,7 @@
 package com.rjbiermann.giffyviewer.feature.feed
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 /** §8 shuffle: one deterministic global order per seed, stable across loads. */
@@ -9,7 +9,10 @@ class ShuffleOrderTest {
     private fun shuffled(
         ids: List<String>,
         seed: Long,
-    ): List<String> = ids.sortedBy { (it.hashCode() * 31L + seed).inv() }
+    ): List<String> =
+        ids.sortedBy {
+            it.hashCode().toLong() xor (seed * -7046029254386353131L)
+        }
 
     @Test
     fun `seed gives stable order`() {
@@ -21,7 +24,8 @@ class ShuffleOrderTest {
     @Test
     fun `new seed changes the order`() {
         val ids = (1..50).map { "gif$it" }
-        assertTrue(shuffled(ids, 1L) != shuffled(ids, 2L))
+        // adjacent seeds MUST differ (an additive key sorts the same for all)
+        for (s in 1L..49L) assertNotEquals(shuffled(ids, s), shuffled(ids, s + 1))
     }
 
     @Test

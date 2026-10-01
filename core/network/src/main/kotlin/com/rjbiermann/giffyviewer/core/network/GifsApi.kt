@@ -14,10 +14,10 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 /**
- * upstream undocumented API (PLAN §2, live-verified 2026). Endpoint paths only may
+ * the site's undocumented API (PLAN §2, live-verified 2026). Endpoint paths only may
  * drift — architecture doesn't.
  */
-interface upstreamApi {
+interface GifsApi {
     @GET("v2/auth/temporary")
     suspend fun temporaryToken(): TemporaryTokenDto
 

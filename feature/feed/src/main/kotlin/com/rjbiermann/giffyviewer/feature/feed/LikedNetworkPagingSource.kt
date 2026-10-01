@@ -5,7 +5,7 @@ import androidx.paging.PagingState
 import com.rjbiermann.giffyviewer.core.database.ContentFilter
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.model.matchesOrientation
-import com.rjbiermann.giffyviewer.core.network.upstreamApi
+import com.rjbiermann.giffyviewer.core.network.GifsApi
 import com.rjbiermann.giffyviewer.core.network.dto.toModel
 
 /**
@@ -14,7 +14,7 @@ import com.rjbiermann.giffyviewer.core.network.dto.toModel
  * (leak-zero: a blocked creator stays blocked even in your own likes).
  */
 class LikedNetworkPagingSource(
-    private val api: upstreamApi,
+    private val api: GifsApi,
     private val contentFilter: ContentFilter,
     private val pageSize: Int,
     private val orientation: String = "any",

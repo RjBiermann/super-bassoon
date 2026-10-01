@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.database.SearchHistoryEntity
-import com.rjbiermann.giffyviewer.core.network.upstreamApi
+import com.rjbiermann.giffyviewer.core.network.GifsApi
 import com.rjbiermann.giffyviewer.core.network.SuggestDto
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -34,7 +34,7 @@ import javax.inject.Inject
 class SearchViewModel
     @Inject
     constructor(
-        private val api: upstreamApi,
+        private val api: GifsApi,
         private val db: GiffyDatabase,
         savedState: androidx.lifecycle.SavedStateHandle,
     ) : ViewModel() {

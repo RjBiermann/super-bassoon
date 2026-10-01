@@ -31,7 +31,7 @@ val API_JSON: Json =
     }
 
 data class NetworkComponents(
-    val api: upstreamApi,
+    val api: GifsApi,
     val limiter: RollingWindowRateLimiter,
     val breaker: CircuitBreaker,
     val bus: RateLimitBus,
@@ -126,7 +126,7 @@ fun buildNetwork(
             .build()
 
     return NetworkComponents(
-        api = retrofit.create(upstreamApi::class.java),
+        api = retrofit.create(GifsApi::class.java),
         limiter = limiter,
         breaker = breaker,
         bus = bus,
