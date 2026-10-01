@@ -64,9 +64,11 @@ class FeedViewModel
                 .combine(refreshGen) { feed, gen -> feed to gen }
                 .flatMapLatest { (feed, gen) ->
                     flow {
-                        val force = gen > 0 && consumedGen != gen
+                        val forced =
+                            (gen > 0 && consumedGen != gen) || feed.keyBase in pendingForce.value
+                        pendingForce.value = pendingForce.value - feed.keyBase
                         consumedGen = gen
-                        emitAll(repository.paging(feed, forceRefresh = force))
+                        emitAll(repository.paging(feed, forceRefresh = forced))
                     }
                 }.cachedIn(viewModelScope)
 
@@ -212,13 +214,20 @@ class FeedViewModel
         /** Saved server sort for this feed's base (§8 per-feed persistence). */
         fun sortFor(baseKey: String): Flow<String> = settings.feedSort(baseKey)
 
-        /** Chip click: persist the sort + open the same feed under its sort key. */
+        /** KeyBases owed a one-shot TTL bypass on their next fetch: sort changes
+         *  are deliberate actions — the feed must update immediately, not serve
+         *  a possibly-stale cached row until the TTL lapses (user report). */
+        private val pendingForce = MutableStateFlow<Set<String>>(emptySet())
+
+        /** Chip click: persist the sort + open the same feed under its sort key,
+         *  forced fresh once. */
         fun setSort(
             source: FeedSource,
             sort: String,
         ) {
             viewModelScope.launch {
                 settings.setFeedSort(source.baseKey, sort)
+                pendingForce.value = pendingForce.value + source.baseKey
                 open(source.withSort(sort))
             }
         }
