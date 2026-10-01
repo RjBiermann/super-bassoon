@@ -24,10 +24,17 @@ class TvHomeViewModel
         repository: FeedRepository,
         private val db: com.rjbiermann.giffyviewer.core.database.GiffyDatabase,
         val settings: com.rjbiermann.giffyviewer.core.datastore.SettingsRepository,
+        tokenStore: com.rjbiermann.giffyviewer.core.auth.TokenStore,
     ) : ViewModel() {
         val trending = repository.paging(FeedSource.Trending).cachedIn(viewModelScope)
         val topThisWeek = repository.paging(FeedSource.TopThisWeek).cachedIn(viewModelScope)
         val favorites = repository.paging(FeedSource.Favorites).cachedIn(viewModelScope)
+
+        /** Liked (PLAN §7): network-live, never cached — same source as mobile. */
+        val liked = repository.paging(FeedSource.Liked).cachedIn(viewModelScope)
+
+        /** Logged-in surfaces (Liked/Following rows) show only with a token. */
+        val isLoggedIn = tokenStore.tokenOrNull() != null
 
         val hasFavorites =
             db

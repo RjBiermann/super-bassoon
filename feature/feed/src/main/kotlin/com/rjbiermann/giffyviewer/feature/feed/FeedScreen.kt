@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
-import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -315,7 +314,13 @@ fun FeedScreen(
             } else {
                 // §9 Refresh-feed: pull-to-refresh (same path as TTL revalidate) +
                 // scroll-up "Refresh feed" pill = scroll-to-top + force revalidate.
-                val gridState = rememberLazyStaggeredGridState()
+                // Fresh state per feed/sort: a sort change starts at the top
+                // (user report — the grid kept the old scroll offset).
+                val gridState =
+                    remember(source.keyBase) {
+                        androidx.compose.foundation.lazy.staggeredgrid
+                            .LazyStaggeredGridState()
+                    }
                 val showPill by rememberScrollingUp(gridState, SCROLL_PILL_THRESHOLD)
                 val reducedMotion =
                     remember {
