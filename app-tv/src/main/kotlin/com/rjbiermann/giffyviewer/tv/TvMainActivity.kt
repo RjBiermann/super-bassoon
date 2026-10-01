@@ -255,6 +255,6 @@ private fun AccountButton(
     com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
         text = "Account",
         onClick = onClick,
-        modifier = Modifier.padding(16.dp).focusRequester(focusRequester),
+        modifier = Modifier.padding(6.dp).focusRequester(focusRequester),
     )
 }
