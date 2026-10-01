@@ -167,7 +167,9 @@ interface upstreamApi {
     ): CollectionDto
 
     @DELETE("v2/me/collections/{id}")
-    suspend fun deleteCollection(@Path("id") id: String)
+    suspend fun deleteCollection(
+        @Path("id") id: String,
+    )
 
     /** Niche detail (live-verified 2026-10-01, anonymous OK): description,
      *  cover, counts, rules — the About tab source. `following` reflects the

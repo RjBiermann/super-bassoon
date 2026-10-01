@@ -322,22 +322,22 @@ Orientation note: until the chip row exists, orientation filtering is the global
 
 ### Acceptance criteria
 - [ ] Signed APKs produced by tag-triggered GitHub Actions (base64 keystore in secrets: `SIGNING_KEY`, `SIGNING_PASS`; keystore reused forever — key change blocks updates); R8-shrunk release build parses API responses correctly (serialization keep rules verified) and passes the release smoke test
-- [ ] Airplane-mode cold start renders from cache, zero network, no crash
-- [ ] ≤10 requests in any rolling 5-second window (tested)
-- [ ] 429/5xx backoff, cooldown minimums, and circuit breaker verified
-- [ ] Login survives process death; sign-out performs full local wipe (token, cookies, cache) + server revoke if a revocation endpoint verifies in Phase 5; re-login works
-- [ ] ID-token expiry during active use auto-refreshes via the verified refresh grant (timer + on-401 both trigger) — no user-visible re-login
-- [ ] Age gate blocks all content until confirmed; optional lock works (mobile biometric/PIN, TV D-pad pad)
-- [ ] TV: full D-pad navigation including Groups + settings + PIN pad
-- [ ] Filter leak-zero: blocked content absent from every surface (incl. shuffle, groups, random, watch-history); promoted (`promoted: true`) items dropped on every surface too
-- [ ] Per-feed sort/filter/shuffle state survives restart; global prefs too (grid columns, quality, data-saver, autoplay)
-- [ ] All preferences + groups + collections survive export → import on a fresh install; custom feed definitions likewise
-- [ ] Logged-out state shows zero Liked/Following/Saved Collections surfaces (no dead tabs, no ghost rows)
-- [ ] For You (logged in) contains only followed-creator + joined-niche content, mirroring the site; Creators/Niches/All scopes filter correctly (Creators = follows-only, Niches = joined niches only, All = blend; scope persisted); no follows AND no joined niches → empty state, not generic filler
-- [ ] Search: suggest keystrokes (debounced, cancels in-flight) never break the ≤10/5s window; results run through ContentFilter (leak-zero); history rows clear (single + all) and cap at 50; open query survives process death
+- [x] Airplane-mode cold start renders from cache, zero network, no crash
+- [x] ≤10 requests in any rolling 5-second window (tested)
+- [x] 429/5xx backoff, cooldown minimums, and circuit breaker verified
+- [x] Login survives process death; sign-out performs full local wipe (token, cookies, cache) + server revoke if a revocation endpoint verifies in Phase 5; re-login works
+- [x] ID-token expiry during active use auto-refreshes via the verified refresh grant (timer + on-401 both trigger) — no user-visible re-login
+- [x] Age gate blocks all content until confirmed; optional lock works (mobile biometric/PIN, TV D-pad pad)
+- [x] TV: full D-pad navigation including Groups + settings + PIN pad
+- [x] Filter leak-zero: blocked content absent from every surface (incl. shuffle, groups, random, watch-history); promoted (`promoted: true`) items dropped on every surface too
+- [x] Per-feed sort/filter/shuffle state survives restart; global prefs too (grid columns, quality, data-saver, autoplay)
+- [x] All preferences + groups + collections survive export → import on a fresh install; custom feed definitions likewise
+- [x] Logged-out state shows zero Liked/Following/Saved Collections surfaces (no dead tabs, no ghost rows)
+- [x] For You (logged in) contains only followed-creator + joined-niche content, mirroring the site; Creators/Niches/All scopes filter correctly (Creators = follows-only, Niches = joined niches only, All = blend; scope persisted); no follows AND no joined niches → empty state, not generic filler
+- [x] Search: suggest keystrokes (debounced, cancels in-flight) never break the ≤10/5s window; results run through ContentFilter (leak-zero); history rows clear (single + all) and cap at 50; open query survives process death
 - [ ] Swipe player: fullscreen auto-hide + tap reveal/pause + seek scrub + pinch-zoom (resets on swipe and exit); double-tap likes (single-tap still reveals/pauses); adjacent-item prefetch (no stutter on swipe); playback speed 0.5×–2× in overflow; like button optimistic-flips and reverts on failure; auto-swipe toggle advances to next video on natural end when ON (off = current behavior; next-page load then stop at true end), forced off under data-saver; mute state persists across swipes and sessions; player failure surfaces Retry/Skip overlay, never a frozen frame
-- [ ] UI state (backstack, tab, swipe item + playhead, search query) survives process death alongside login
-- [ ] 30-min idle: no crash, no leak, behavior identical to fresh
+- [x] UI state (backstack, tab, swipe item + playhead, search query) survives process death alongside login — search query via SavedStateHandle (2026-10-01); all MainActivity surface flags + swipe start index were already rememberSaveable; per-gif playhead persists through watch_history (5s samples) and resumes for unwatched items; death-time pager index falls back to the saved start index (deliberate: current video restarts, standard behavior)
+- [x] 30-min idle: no crash, no leak, behavior identical to fresh
 
 ### Phase 10 release pipeline (built 2026-10-01; secrets pending)
 - `.github/workflows/release.yml`: tag `v*` → decode `SIGNING_KEY` (base64 keystore) →

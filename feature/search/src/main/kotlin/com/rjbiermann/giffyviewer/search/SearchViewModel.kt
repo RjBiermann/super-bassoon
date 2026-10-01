@@ -36,9 +36,18 @@ class SearchViewModel
     constructor(
         private val api: upstreamApi,
         private val db: GiffyDatabase,
+        savedState: androidx.lifecycle.SavedStateHandle,
     ) : ViewModel() {
-        /** The live text field. */
-        val query = MutableStateFlow("")
+        /**
+         * The live text field, restored across process death (gate: UI state
+         * survives process death alongside login).
+         */
+        val query =
+            MutableStateFlow(savedState.get<String>("query") ?: "").also { flow ->
+                viewModelScope.launch {
+                    flow.collect { savedState["query"] = it }
+                }
+            }
 
         /** Debounced autocomplete rows; empty query = no network (history only). */
         val suggestions: StateFlow<List<SuggestDto>> =

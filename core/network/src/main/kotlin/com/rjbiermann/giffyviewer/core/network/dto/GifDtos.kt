@@ -23,6 +23,8 @@ data class GifDtoShell(
     val views: Long = 0,
     val duration: Double = 0.0,
     val hasAudio: Boolean = false,
+    /** Server-side ad/promo flag (gate 332): the app must never surface these. */
+    val promoted: Boolean? = null,
     val width: Int = 0,
     val height: Int = 0,
     val createDate: Long = 0,
