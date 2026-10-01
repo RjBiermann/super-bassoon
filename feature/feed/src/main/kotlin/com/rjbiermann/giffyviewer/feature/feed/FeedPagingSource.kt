@@ -34,6 +34,11 @@ class FeedPagingSource(
     private val pageDao: com.rjbiermann.giffyviewer.core.database.FeedPageDao,
     private val pageSize: Int,
     private val contentFilter: com.rjbiermann.giffyviewer.core.database.ContentFilter,
+    private val forYouContext: suspend () -> com.rjbiermann.giffyviewer.feature.feed.FeedRepository.ForYouContext =
+        {
+            com.rjbiermann.giffyviewer.feature.feed.FeedRepository
+                .ForYouContext("all", emptySet(), emptySet())
+        },
 ) : PagingSource<Int, Gif>() {
     init {
         db.invalidationTracker.addObserver(
@@ -83,6 +88,7 @@ class FeedPagingSource(
             contentFilter.refreshGroupTags(db.nicheGroupDao())
             // Favorites feed keeps unfavorited rows out at read time (instant
             // un-favorite; the round-robin cache itself refreshes on TTL).
+            val scopeCtx = if (feed is FeedSource.ForYou) forYouContext() else null
             val favs =
                 if (feed is FeedSource.Favorites) {
                     db.contentPrefsDao().favoriteCreators().mapTo(HashSet()) { it.lowercase() }
@@ -100,6 +106,15 @@ class FeedPagingSource(
                 models
                     .filter { contentFilter.allow(it.userName, it.tags, it.description) }
                     .filter { favs == null || it.userName.lowercase() in favs }
+                    // For You scope (§7 Creators·Niches·All): read-time filter over
+                    // the SAME cached server pages — one fetch, three filters.
+                    .filter {
+                        when (scopeCtx?.scope) {
+                            "creators" -> it.userName.lowercase() in scopeCtx!!.followed
+                            "niches" -> it.tags.any { t -> t.lowercase() in scopeCtx!!.joinedTags }
+                            else -> true
+                        }
+                    }
             // nextKey exists ONLY when the row was fetched (mediator fills it);
             // unfetched page → nextKey=null → APPEND waits for the mediator.
             val nextKey = entity?.nextPageKey?.let { pageNumber(it) }

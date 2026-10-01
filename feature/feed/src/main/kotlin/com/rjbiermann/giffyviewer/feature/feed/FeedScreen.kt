@@ -93,6 +93,7 @@ fun FeedScreen(
     viewModel: FeedViewModel = hiltViewModel(),
 ) {
     val source by viewModel.source.collectAsStateWithLifecycle()
+    val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle(false)
     val items = viewModel.gifs.collectAsLazyPagingItems()
     val showBlockHint by viewModel.showBlockHint.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -256,6 +257,27 @@ fun FeedScreen(
                 }
             }
 
+            // For You scope selector (§7 Creators·Niches·All — logged-in only).
+            if (source is FeedSource.ForYou && isLoggedIn) {
+                val scope by viewModel.forYouScope.collectAsStateWithLifecycle("all")
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 12.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    listOf("All" to "all", "Creators" to "creators", "Niches" to "niches").forEach { (label, value) ->
+                        FilterChip(
+                            selected = scope == value,
+                            onClick = { viewModel.setForYouScope(value) },
+                            label = { Text(label) },
+                        )
+                    }
+                }
+            }
+
             // Per-feed server sort chips (§8) — only verified orders surface.
             val sortOptions = source.sortOptions()
             if (sortOptions.isNotEmpty()) {
@@ -299,18 +321,23 @@ fun FeedScreen(
             val refreshError = items.loadState.refresh is LoadState.Error
             if (items.itemCount == 0 && refreshError) {
                 OfflineNotice(modifier = Modifier.fillMaxSize())
-            } else if (source is FeedSource.Favorites &&
-                items.itemCount == 0 &&
-                items.loadState.refresh is LoadState.NotLoading
+            } else if (items.itemCount == 0 &&
+                items.loadState.refresh is LoadState.NotLoading &&
+                (source is FeedSource.Favorites || source is FeedSource.ForYou)
             ) {
-                // UX: helpful empty state, never a blank screen.
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        "No favorites yet — long-press a tile and choose Favorite.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                // UX: helpful empty state, never a blank screen (shared EmptyState).
+                val msg =
+                    when {
+                        source is FeedSource.ForYou -> "Your For You feed is empty"
+                        else -> "No favorites yet"
+                    }
+                val hint =
+                    when {
+                        source is FeedSource.ForYou -> "Follow creators and join niches to fill it"
+                        else -> "long-press a tile and choose Favorite"
+                    }
+                com.rjbiermann.giffyviewer.core.ui
+                    .EmptyState(modifier = Modifier.fillMaxSize(), message = msg, hint = hint)
             } else {
                 // §9 Refresh-feed: pull-to-refresh (same path as TTL revalidate) +
                 // scroll-up "Refresh feed" pill = scroll-to-top + force revalidate.

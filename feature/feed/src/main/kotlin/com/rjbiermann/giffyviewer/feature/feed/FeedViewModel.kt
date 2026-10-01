@@ -198,6 +198,20 @@ class FeedViewModel
             settings.pinnedNiches
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
+        /** For You scope (§7 Creators·Niches·All, logged-in; default All). */
+        val forYouScope: StateFlow<String> =
+            settings.forYouScope
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "all")
+
+        fun setForYouScope(scope: String) {
+            viewModelScope.launch {
+                settings.setForYouScope(scope)
+                // Read-time filter lives in the paging source — restart the
+                // generation so pages re-read with the new scope.
+                refreshGen.value = refreshGen.value + 1
+            }
+        }
+
         /** FAVORITED niche groups → pinned tabs (PLAN §7); BLOCKED feeds the filter. */
         val favoriteGroups: StateFlow<List<com.rjbiermann.giffyviewer.core.database.NicheGroupEntity>> =
             db.nicheGroupDao().all().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())

@@ -35,6 +35,7 @@ class SettingsRepository
             val PINNED_NICHES = stringSetPreferencesKey("pinned_niches")
             val PINNED_CREATORS = stringSetPreferencesKey("pinned_creators")
             val GRID_COLUMNS = intPreferencesKey("grid_columns")
+            val FORYOU_SCOPE = stringPreferencesKey("foryou_scope")
         }
 
         /** True once the user attested 18+. Emits false until then; survives restarts. */
@@ -110,6 +111,13 @@ class SettingsRepository
 
         suspend fun setGridColumns(columns: Int) {
             dataStore.edit { it[Keys.GRID_COLUMNS] = columns }
+        }
+
+        /** For You scope (§7 Creators · Niches · All, logged-in; default All). */
+        val forYouScope: Flow<String> = dataStore.data.map { it[Keys.FORYOU_SCOPE] ?: "all" }
+
+        suspend fun setForYouScope(scope: String) {
+            dataStore.edit { it[Keys.FORYOU_SCOPE] = scope }
         }
 
         /** Per-feed server sort (PLAN §8): dynamic keys "sort:<baseKey>", "" = default. */

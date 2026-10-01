@@ -30,6 +30,13 @@ Compose UI, navigation, platform shells. Spec: PLAN.md §3, §7–9.
   components and 10-foot contrast are different in kind from touch — a merged module
   would turn every screen into an `isTv` branch. TV shares all :core:* and :feature:*
   code; only the shell is TV-specific.
+- Decision (researched 2026-10-01, do not re-litigate): responsive UI handles **width**
+  (phone→tablet→foldable→desktop window); TV differs by **input modality** (D-pad/remote,
+  10-foot leanback) — Google's own guidance keeps them on separate tracks (adaptive-apps
+  hub = phones/tablets/foldables only; `/design/ui/tv/guides/foundations/design-for-tv` =
+  10-foot UI, D-pad, communal device; tv-material is a separate component set). Running
+  touch UI on TV via sideload compatibility mode is rejected as poor UX. One source of
+  truth = shared logic in :core:/:feature:, NOT shared screens.
 - `TvLazyRow`s: Trending · Explore · Top This Week · Continue Watching · Favorites · one row per favorited group · custom feeds.
 - Focus on username in now-playing → quick actions panel.
 - "Why did this get hidden" toast on filtered-item skip.
