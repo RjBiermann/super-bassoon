@@ -379,6 +379,8 @@ private fun PlayerPage(
     onRetry: () -> Unit,
     onSkip: () -> Unit,
 ) {
+    // React to the shared player's media swaps (attach gating below).
+    val playingId by player.currentGifId.collectAsStateWithLifecycle()
     var popAt by remember { mutableStateOf<Offset?>(null) }
     if (active) {
         // resume: stored position per gif, EXCEPT (a) auto-advance always starts
@@ -520,7 +522,10 @@ private fun PlayerPage(
                 }
             },
             update = { view ->
-                view.player = if (active) player else null
+                // Attach ONLY when the shared player is already (about to be)
+                // playing THIS page's gif — otherwise the new page renders the
+                // previous video's last frame for a beat (user report).
+                view.player = if (active && playingId == gif.id) player else null
             },
             modifier =
                 Modifier

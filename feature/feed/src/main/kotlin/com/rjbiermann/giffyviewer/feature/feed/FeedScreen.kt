@@ -155,9 +155,10 @@ fun FeedScreen(
                 // For You = server personalized feed, logged-in only (PLAN §7);
                 // anonymous client-side blend is spec'd but unscheduled.
                 val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle(false)
+                // Site home order: For You first when logged in (verified sweep).
                 listOf(
-                    FeedSource.Trending,
                     FeedSource.ForYou,
+                    FeedSource.Trending,
                     FeedSource.Favorites,
                     FeedSource.TopThisWeek,
                 ).filterNot { it is FeedSource.ForYou && !isLoggedIn }

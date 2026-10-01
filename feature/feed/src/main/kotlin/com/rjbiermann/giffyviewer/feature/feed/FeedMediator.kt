@@ -113,7 +113,13 @@ class FeedMediator(
                 )
             }
             is FeedSource.ForYou -> api.feedForYou(count = pageSize, page = page)
-            is FeedSource.Niche -> api.nicheGifs(nicheId = feed.id, count = pageSize, page = page)
+            is FeedSource.Niche ->
+                api.nicheGifs(
+                    nicheId = feed.id,
+                    count = pageSize,
+                    page = page,
+                    order = feed.sort.ifEmpty { "trending" },
+                )
             is FeedSource.Group -> {
                 // ponytail: page n maps to tag[(n-1) % n_tags]; a changed tag list
                 // shifts the mapping until the cache refreshes (same pattern as
@@ -131,7 +137,13 @@ class FeedMediator(
                     )
                 }
             }
-            is FeedSource.Creator -> api.userGifs(username = feed.username, count = pageSize, page = page)
+            is FeedSource.Creator ->
+                api.userGifs(
+                    username = feed.username,
+                    count = pageSize,
+                    page = page,
+                    order = feed.sort.ifEmpty { "trending" },
+                )
             is FeedSource.TopThisWeek -> api.trendingPopular(order = "top_week", count = pageSize, page = page)
             else -> api.trendingPopular(count = pageSize, page = page)
         }

@@ -8,6 +8,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.preload.DefaultPreloadManager
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.model.streamUrl
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * ExoPlayer wrapper (PLAN §5). [SimpleCache] is keyed by gif ID — passed as
@@ -18,12 +21,18 @@ class GiffyPlayer internal constructor(
     private val player: ExoPlayer,
     private val preloadManager: DefaultPreloadManager,
 ) : ExoPlayer by player {
+    /** Id of the gif this player is (about to be) playing — flips BEFORE the
+     *  media swaps so surfaces attach to the right content (no stale flash). */
+    private val mutableCurrentGifId = MutableStateFlow<String?>(null)
+    val currentGifId: StateFlow<String?> = mutableCurrentGifId.asStateFlow()
+
     fun playGif(
         gif: Gif,
         dataSaver: Boolean,
         resumeMs: Long = 0L,
     ) {
         val url = gif.streamUrl(dataSaver) ?: return
+        mutableCurrentGifId.value = gif.id
         val item =
             MediaItem
                 .Builder()

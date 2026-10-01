@@ -68,6 +68,20 @@ internal class FakeApi : upstreamApi {
         count: Int,
     ) = throw NotImplementedError()
 
+    override suspend fun createCollection(body: com.rjbiermann.giffyviewer.core.network.CreateCollectionBody) = throw NotImplementedError()
+
+    override suspend fun renameCollection(
+        id: String,
+        body: com.rjbiermann.giffyviewer.core.network.RenameCollectionBody,
+    ) = throw NotImplementedError()
+
+    override suspend fun deleteCollection(id: String) = throw NotImplementedError()
+
+    override suspend fun meCollections(
+        page: Int,
+        count: Int,
+    ) = throw NotImplementedError()
+
     override suspend fun nicheDetail(id: String) = throw NotImplementedError()
 
     override suspend fun nicheTopCreators(id: String) = throw NotImplementedError()
