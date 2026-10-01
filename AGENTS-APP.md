@@ -156,3 +156,25 @@ TV card-width rule). Pager restarts on pref change via `flatMapLatest` in `FeedR
 Server-backed sorts → distinct cache keys (`...:sort=top_week:p<n>`). Client-side-only ops
 (duration sort, shuffle, creator A→Z on group/custom) share the base key. Shuffle is
 per-session Fisher-Yates, stable across recomposition, reshuffle action available.
+
+## Pending-items completion (2026-10-01)
+- hasAudio 🔊 badge on grid tiles (know-before-tap); keep-screen-on while
+  the swipe player is up (window flag, disposed).
+- A11y closed: PIN pad keys carry real contentDescriptions ("Delete last
+  digit"/"Submit PIN"), dot row announces "N of 4 digits entered", like
+  button is a polite live region announcing the optimistic flip,
+  data-saver row is a whole-row toggleable switch.
+- Strict tags (§8 untagged-only) on group feeds: read-time filter —
+  non-empty tag set AND all tags within the group bundle (vacuous-all
+  would pass every untagged gif — live-proven). Mobile + TV share
+  FeedFilterDialog (now public, own file); TV source feeds get a Filter
+  chip writing the same feedprefs blob (pager restarts via the combined
+  orientation+prefs flow).
+- Date-range chips: the API ignores createdAfter/created_after/date/
+  dateFrom (future bound still returns 2019 gifs) — documented impossible.
+- **Paging lesson:** cachedPager had been dropping the orientation+prefs
+  params → FeedPagingSource ran on constructor defaults → ALL client-side
+  filters (duration/resolution/orientation/shuffle/untagged) were silent
+  no-ops while the blobs persisted — the earlier verifications only
+  proved storage, not filtering. Fixed by combine(orientationFilter,
+  feedPrefs) → flatMapLatest → params handed to the source.

@@ -19,10 +19,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -37,9 +39,10 @@ import androidx.paging.cachedIn
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
 import com.rjbiermann.giffyviewer.core.model.Gif
-import com.rjbiermann.giffyviewer.core.network.NicheDto
 import com.rjbiermann.giffyviewer.core.network.GifsApi
+import com.rjbiermann.giffyviewer.core.network.NicheDto
 import com.rjbiermann.giffyviewer.core.ui.giffyFocus
+import com.rjbiermann.giffyviewer.feature.feed.FeedFilterDialog
 import com.rjbiermann.giffyviewer.feature.feed.FeedRepository
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import com.rjbiermann.giffyviewer.feature.feed.title
@@ -202,11 +205,30 @@ fun TvSourceFeedScreen(
     val gifs = remember(source.keyBase) { viewModel.gifs(source) }.collectAsLazyPagingItems()
     // MENU quick actions (mobile QuickBlockSheet parity) — any pinned feed.
     var actionsFor by remember { mutableStateOf<Gif?>(null) }
+    // §8 per-feed filter (same feedprefs storage as mobile; the shared dialog
+    // is M3 and D-pad-focusable). Writing prefs restarts the pager.
+    val feedPrefs by feedViewModel
+        .feedPrefs(source.baseKey)
+        .collectAsState(
+            initial =
+                com.rjbiermann.giffyviewer.core.datastore
+                    .FeedPrefs(),
+        )
+    var showFilter by remember { mutableStateOf(false) }
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Text(
             text = source.title(),
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp),
+        )
+        androidx.compose.material3.FilterChip(
+            selected = showFilter,
+            onClick = { showFilter = true },
+            label = { Text("Filter") },
+            modifier =
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(end = 16.dp, top = 8.dp),
         )
         LazyVerticalGrid(
             columns = GridCells.Fixed(4),
@@ -226,6 +248,17 @@ fun TvSourceFeedScreen(
                 }
             }
         }
+    }
+    if (showFilter) {
+        FeedFilterDialog(
+            isGroup = source is FeedSource.Group,
+            prefs = feedPrefs,
+            onApply = { next ->
+                feedViewModel.setFeedPrefs(source.baseKey, next)
+                showFilter = false
+            },
+            onDismiss = { showFilter = false },
+        )
     }
     actionsFor?.let { gif ->
         TvQuickActionsDialog(

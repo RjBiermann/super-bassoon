@@ -9,6 +9,21 @@ import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.model.matchesOrientation
 import com.rjbiermann.giffyviewer.core.model.resolutionMatches
 
+/** §8 untagged-only (group feeds): tags must stay inside the group bundle. */
+internal fun untagged(
+    gif: Gif,
+    feed: FeedSource,
+    prefs: com.rjbiermann.giffyviewer.core.datastore.FeedPrefs,
+): Boolean =
+    if (prefs.untaggedOnly && feed is FeedSource.Group) {
+        // Non-empty required: an untagged gif carries no group signal at all
+        // (vacuous "all{}" would let every untagged gif through — live-proven).
+        val bundle = feed.tags.map { it.lowercase() }.toSet()
+        gif.tags.isNotEmpty() && gif.tags.all { it.lowercase() in bundle }
+    } else {
+        true
+    }
+
 /** How long the refresh load waits for the mediator's first write (first-launch race). */
 private const val CACHE_WAIT_MS = 20_000L
 
@@ -124,6 +139,7 @@ class FeedPagingSource(
                     // §8 range chips: client-side, read-time, AFTER the filter;
                     // not counted in hide counts — prefs, not blocks.
                     .filter { it.matchesOrientation(orientation) }
+                    .filter { untagged(it, feed, prefs) }
                     .filter { durationIn(it.durationSeconds, prefs.duration) }
                     .filter { it.resolutionMatches(prefs.resolution) }
                     // §8 shuffle: deterministic per-seed order — hashing every id

@@ -20,6 +20,15 @@ internal class FakeApi : GifsApi {
 
     override suspend fun temporaryToken(): TemporaryTokenDto = throw NotImplementedError()
 
+    override suspend fun searchDateProbe(
+        text: String,
+        createdAfter: String?,
+        created_after: String?,
+        date: String?,
+        dateFrom: String?,
+        count: Int,
+    ): GifsPageDto = throw NotImplementedError()
+
     override suspend fun search(
         searchText: String,
         order: String,

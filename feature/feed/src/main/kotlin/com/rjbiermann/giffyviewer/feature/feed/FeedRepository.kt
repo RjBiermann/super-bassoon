@@ -106,17 +106,27 @@ class FeedRepository
                     ).flow
                 }
             } else {
-                // Orientation + §8 per-feed pref changes restart the pager
-                // (fresh generation re-reads cached pages through the filters).
-                settings.feedPrefs(feed.baseKey).flatMapLatest { prefs ->
-                    cachedPager(feed, forceRefresh, prefs)
-                }
+                // Orientation (global) + §8 per-feed prefs BOTH restart the pager:
+                // combine them so either change re-reads cached pages through the
+                // fresh filters. The value must be HANDED to the source (captured
+                // in a lambda) — the source's constructor defaults are no-ops
+                // (live-proven 2026-10-01: prefs blob persisted but the grid ran
+                // unfiltered because cachedPager dropped both params).
+                kotlinx.coroutines.flow
+                    .combine(
+                        settings.orientationFilter,
+                        settings.feedPrefs(feed.baseKey),
+                    ) { o, p -> o to p }
+                    .flatMapLatest { (o, p) ->
+                        cachedPager(feed, forceRefresh, p, o)
+                    }
             }
 
         private fun cachedPager(
             feed: FeedSource,
             forceRefresh: Boolean,
             prefs: com.rjbiermann.giffyviewer.core.datastore.FeedPrefs,
+            orientation: String,
         ): Flow<PagingData<Gif>> =
             Pager(
                 config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = 10, enablePlaceholders = false),
@@ -149,6 +159,8 @@ class FeedRepository
                             PAGE_SIZE,
                             favorites = { db.contentPrefsDao().favoriteCreators() },
                         ),
+                        orientation = { orientation },
+                        prefs = { prefs },
                     )
                 },
             ).flow

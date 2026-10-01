@@ -74,6 +74,9 @@ import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.ui.GiffyColors
 import com.rjbiermann.giffyviewer.core.ui.RefreshFeedPill
 import com.rjbiermann.giffyviewer.core.ui.rememberScrollingUp
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -415,6 +418,7 @@ fun FeedScreen(
             }
             if (showFilter) {
                 FeedFilterDialog(
+                    isGroup = source is FeedSource.Group,
                     prefs = feedPrefs,
                     onApply = { next ->
                         viewModel.setFeedPrefs(source.baseKey, next)
@@ -551,7 +555,7 @@ fun FeedScreen(
 private const val SCROLL_PILL_THRESHOLD = 10
 
 /** PLAN §9 quick sheet: block creator / tags / keyword / don't block. */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalCoroutinesApi::class)
 @Composable
 internal fun QuickBlockSheet(
     gif: Gif,
@@ -566,6 +570,13 @@ internal fun QuickBlockSheet(
     // Hoisted for the AddToCustomFeedDialog scope below.
     val customFeeds by viewModel.customFeeds.collectAsState(initial = emptyList())
     var showAddToFeed by remember { mutableStateOf(false) }
+    // §8 infinite shuffle player: show the active seed (restore = the same seed
+    // re-derives the same global order from the pool).
+    val shuffleSeed by
+        viewModel.source
+            .flatMapLatest { viewModel.feedPrefs(it.baseKey) }
+            .map { it.shuffleSeed }
+            .collectAsState(initial = 0L)
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.padding(bottom = 24.dp)) {
             Text(
@@ -573,6 +584,14 @@ internal fun QuickBlockSheet(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
+            if (shuffleSeed != 0L) {
+                Text(
+                    text = "Shuffle seed $shuffleSeed",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GiffyColors.Lime,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
             if (showSpeed) {
                 // Continuous slider (0.25×–2×): the user asked for fine control
                 // beyond preset chips; applies on release to avoid player thrash.
@@ -832,91 +851,3 @@ private fun navBarDp(): androidx.compose.ui.unit.Dp =
     with(androidx.compose.ui.platform.LocalDensity.current) {
         WindowInsets.navigationBars.getBottom(this).toDp()
     }
-
-/** §8 per-feed filter dialog: duration / resolution / orientation chips. */
-@Composable
-private fun FeedFilterDialog(
-    prefs: com.rjbiermann.giffyviewer.core.datastore.FeedPrefs,
-    onApply: (com.rjbiermann.giffyviewer.core.datastore.FeedPrefs) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var duration by remember { mutableStateOf(prefs.duration) }
-    var resolution by remember { mutableStateOf(prefs.resolution) }
-    var orientation by remember { mutableStateOf(prefs.orientation) }
-    var shuffleSeed by remember { mutableStateOf(prefs.shuffleSeed) }
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Filter feed") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Duration", style = MaterialTheme.typography.titleSmall)
-                Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf(
-                        "Any" to "",
-                        "<10s" to "lt10",
-                        "10–30s" to "10-30",
-                        "30–60s" to "30-60",
-                        "1–5m" to "1-5m",
-                        ">5m" to "gt5m",
-                    ).forEach { (label, value) ->
-                        FilterChip(selected = duration == value, onClick = { duration = value }, label = { Text(label) })
-                    }
-                }
-                Text("Resolution", style = MaterialTheme.typography.titleSmall)
-                Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("Any" to "", "HD only" to "hd").forEach { (label, value) ->
-                        FilterChip(
-                            selected = resolution == value,
-                            onClick = { resolution = value },
-                            label = { Text(label) },
-                        )
-                    }
-                }
-                Text("Shuffle", style = MaterialTheme.typography.titleSmall)
-                Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    FilterChip(
-                        selected = shuffleSeed == 0L,
-                        onClick = { shuffleSeed = 0L },
-                        label = { Text("Off") },
-                    )
-                    FilterChip(
-                        selected = shuffleSeed != 0L,
-                        onClick = { if (shuffleSeed == 0L) shuffleSeed = System.currentTimeMillis() },
-                        label = { Text("On") },
-                    )
-                    if (shuffleSeed != 0L) {
-                        FilterChip(
-                            selected = false,
-                            onClick = { shuffleSeed = System.currentTimeMillis() },
-                            label = { Text("Reshuffle") },
-                        )
-                    }
-                }
-                Text("Orientation", style = MaterialTheme.typography.titleSmall)
-                Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf(
-                        "Global" to "",
-                        "Any" to "any",
-                        "Vertical" to "vertical",
-                        "Horizontal" to "horizontal",
-                    ).forEach { (label, value) ->
-                        FilterChip(selected = orientation == value, onClick = { orientation = value }, label = { Text(label) })
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            androidx.compose.material3.TextButton(onClick = {
-                onApply(
-                    com.rjbiermann.giffyviewer.core.datastore.FeedPrefs(
-                        duration = duration,
-                        resolution = resolution,
-                        orientation = orientation,
-                        shuffleSeed = shuffleSeed,
-                    ),
-                )
-            }) { Text("Apply") }
-        },
-        dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
-}

@@ -98,7 +98,10 @@ import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayer
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.ui.GiffyColors
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.max
@@ -115,7 +118,7 @@ import kotlin.math.roundToInt
  */
 private const val IDLE_HIDE_MS = 3_000L
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalCoroutinesApi::class)
 @Composable
 fun PlayerScreen(
     startIndex: Int,
@@ -128,6 +131,12 @@ fun PlayerScreen(
     db: GiffyDatabase,
 ) {
     val items = viewModel.gifs.collectAsLazyPagingItems()
+    // §8 shuffle player: read this feed's shuffle seed (random end-of-pool jumps).
+    val shuffleSeed by
+        viewModel.source
+            .flatMapLatest { viewModel.feedPrefs(it.baseKey) }
+            .map { it.shuffleSeed }
+            .collectAsStateWithLifecycle(0L)
     val pagerState =
         rememberPagerState(initialPage = startIndex.coerceAtLeast(0)) {
             items.itemCount.coerceAtLeast(1)
@@ -262,13 +271,26 @@ fun PlayerScreen(
                     ) == 0f
                 if (reduced) pagerState.scrollToPage(next) else pagerState.animateScrollToPage(next)
             }
-            (items.loadState.append as? androidx.paging.LoadState.NotLoading)?.endOfPaginationReached == true -> {
-                // truly no more pages: loop the last video (black ended frame
-                // otherwise)
-                pendingAdvance.value = false
-                player.seekTo(0)
-                player.play()
-            }
+            (items.loadState.append as? androidx.paging.LoadState.NotLoading)?.endOfPaginationReached == true ->
+                {
+                    pendingAdvance.value = false
+                    if (shuffleSeed != 0L && items.itemCount > 1) {
+                        // §8 infinite shuffle player: pool exhausted → jump to a
+                        // random item (loop-the-last is the unshuffled behavior;
+                        // the pager's APPEND keeps the pool growing while it lasts).
+                        val rnd = java.util.Random(System.nanoTime())
+                        var target = rnd.nextInt(items.itemCount)
+                        if (target == pagerState.currentPage) {
+                            target = (target + 1) % items.itemCount
+                        }
+                        pagerScope.launch { pagerState.scrollToPage(target) }
+                    } else {
+                        // truly no more pages: loop the last video (black ended
+                        // frame otherwise)
+                        player.seekTo(0)
+                        player.play()
+                    }
+                }
             else -> items.retry()
         }
     }

@@ -120,8 +120,9 @@ class SettingsRepository
          *  pref (orientation) or no filter (duration/resolution). */
         fun feedPrefs(baseKey: String): Flow<com.rjbiermann.giffyviewer.core.datastore.FeedPrefs> =
             dataStore.data.map {
-                it[stringPreferencesKey("feedprefs:$baseKey")]?.let { json ->
-                    runCatching { FeedPrefsJson.decodeFromString<FeedPrefs>(json) }.getOrNull()
+                val json = it[stringPreferencesKey("feedprefs:$baseKey")]
+                json?.let { j ->
+                    runCatching { FeedPrefsJson.decodeFromString<FeedPrefs>(j) }.getOrNull()
                 } ?: FeedPrefs()
             }
 
@@ -211,9 +212,14 @@ data class FeedPrefs(
     val duration: String = "", // "" | lt10 | 10-30 | 30-60 | 1-5m | gt5m
     val resolution: String = "", // "" | sd | hd
     val orientation: String = "", // "" (follow global) | any | vertical | horizontal
-    /** §8 shuffle: 0 = off; non-zero = per-session seed (Reshuffle regenerates). */
+    // §8 shuffle: 0 = off; non-zero = per-session seed (Reshuffle regenerates).
     val shuffleSeed: Long = 0L,
+    // §8 group feeds: keep only gifs whose tags stay inside the group bundle.
+    val untaggedOnly: Boolean = false,
 )
 
 private val FeedPrefsJson =
-    kotlinx.serialization.json.Json { ignoreUnknownKeys = true; encodeDefaults = true }
+    kotlinx.serialization.json.Json {
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+    }
