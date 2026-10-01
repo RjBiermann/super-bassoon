@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -41,6 +42,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -48,6 +50,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,6 +69,9 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.ui.GiffyColors
+import com.rjbiermann.giffyviewer.core.ui.RefreshFeedPill
+import com.rjbiermann.giffyviewer.core.ui.rememberScrollingUp
+import kotlinx.coroutines.launch
 
 /**
  * M3 (m3.material.io): Scaffold + small TopAppBar + FilterChip feed tabs +
@@ -88,6 +94,8 @@ fun FeedScreen(
     val source by viewModel.source.collectAsStateWithLifecycle()
     val items = viewModel.gifs.collectAsLazyPagingItems()
     val showBlockHint by viewModel.showBlockHint.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(showBlockHint) {
@@ -278,35 +286,74 @@ fun FeedScreen(
                     )
                 }
             } else {
-                LazyVerticalStaggeredGrid(
-                    columns = StaggeredGridCells.Fixed(gridColumns),
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(8.dp),
-                    verticalItemSpacing = 8.dp,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(count = items.itemCount, key = items.itemKey { it.id }) { index ->
-                        items[index]?.let { gif ->
-                            var sheetFor by remember { mutableStateOf<Gif?>(null) }
-                            GifTile(
-                                gif = gif,
-                                onClick = { onOpenPlayer(index) },
-                                onLongPress = { sheetFor = gif },
-                            )
-                            if (sheetFor != null) {
-                                QuickBlockSheet(
-                                    gif = gif,
-                                    onDismiss = { sheetFor = null },
-                                    viewModel = viewModel,
-                                )
+                // §9 Refresh-feed: pull-to-refresh (same path as TTL revalidate) +
+                // scroll-up "Refresh feed" pill = scroll-to-top + force revalidate.
+                val gridState = rememberLazyStaggeredGridState()
+                val showPill by rememberScrollingUp(gridState, SCROLL_PILL_THRESHOLD)
+                val reducedMotion =
+                    remember {
+                        android.provider.Settings.Global.getFloat(
+                            context.contentResolver,
+                            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+                            1f,
+                        ) == 0f
+                    }
+                Box(modifier = Modifier.fillMaxSize()) {
+                    PullToRefreshBox(
+                        isRefreshing = items.loadState.refresh is LoadState.Loading,
+                        onRefresh = { viewModel.forceRefresh() },
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        LazyVerticalStaggeredGrid(
+                            state = gridState,
+                            columns = StaggeredGridCells.Fixed(gridColumns),
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(8.dp),
+                            verticalItemSpacing = 8.dp,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            items(count = items.itemCount, key = items.itemKey { it.id }) { index ->
+                                items[index]?.let { gif ->
+                                    var sheetFor by remember { mutableStateOf<Gif?>(null) }
+                                    GifTile(
+                                        gif = gif,
+                                        onClick = { onOpenPlayer(index) },
+                                        onLongPress = { sheetFor = gif },
+                                    )
+                                    if (sheetFor != null) {
+                                        QuickBlockSheet(
+                                            gif = gif,
+                                            onDismiss = { sheetFor = null },
+                                            viewModel = viewModel,
+                                        )
+                                    }
+                                }
                             }
                         }
+                        // One action: scroll-to-top + force revalidate (PLAN §9).
+                        RefreshFeedPill(
+                            visible = showPill,
+                            onClick = {
+                                viewModel.forceRefresh()
+                                scope.launch {
+                                    if (reducedMotion) {
+                                        gridState.scrollToItem(0)
+                                    } else {
+                                        gridState.animateScrollToItem(0)
+                                    }
+                                }
+                            },
+                            modifier = Modifier.align(Alignment.BottomCenter),
+                        )
                     }
                 }
             }
         }
     }
 }
+
+/** Pill appears after ~10 items scrolled (PLAN §9). */
+private const val SCROLL_PILL_THRESHOLD = 10
 
 /** Airplane-mode cold start: cached rows render; only an empty cache shows this. */
 @Composable

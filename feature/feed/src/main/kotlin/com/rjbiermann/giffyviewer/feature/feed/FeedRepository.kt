@@ -25,7 +25,13 @@ class FeedRepository
         private val db: GiffyDatabase,
         private val contentFilter: ContentFilter,
     ) {
-        fun paging(feed: FeedSource): Flow<PagingData<Gif>> =
+        /** [forceRefresh] bypasses the REFRESH TTL once (pull-to-refresh /
+         *  "Refresh feed" pill — PLAN §9): the pager restart starts a fresh
+         *  generation whose REFRESH must hit the network even when cache is fresh. */
+        fun paging(
+            feed: FeedSource,
+            forceRefresh: Boolean = false,
+        ): Flow<PagingData<Gif>> =
             Pager(
                 config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = 10, enablePlaceholders = false),
                 initialKey = 1,
@@ -36,6 +42,7 @@ class FeedRepository
                         pageDao = db.feedPageDao(),
                         api = api,
                         pageSize = PAGE_SIZE,
+                        force = forceRefresh,
                         favorites = { db.contentPrefsDao().favoriteCreators() },
                     ),
                 pagingSourceFactory = { FeedPagingSource(db, feed, db.feedPageDao(), PAGE_SIZE, contentFilter) },

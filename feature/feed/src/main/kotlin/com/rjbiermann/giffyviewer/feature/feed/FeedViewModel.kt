@@ -20,9 +20,12 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
@@ -48,10 +51,29 @@ class FeedViewModel
         private val mutableSource = MutableStateFlow<FeedSource>(FeedSource.Trending)
         val source: StateFlow<FeedSource> = mutableSource.asStateFlow()
 
+        /** Bumped by pull-to-refresh / the "Refresh feed" pill: restarts the pager
+         *  (fresh REFRESH generation) with the one-shot TTL bypass (PLAN §9). */
+        private val refreshGen = MutableStateFlow(0)
+
+        /** The forced-refresh flag is consumed once per generation so a later
+         *  source switch doesn't inherit the bypass (stale-while-revalidate holds). */
+        private var consumedGen = -1
+
         val gifs: Flow<PagingData<Gif>> =
             mutableSource
-                .flatMapLatest { repository.paging(it) }
-                .cachedIn(viewModelScope)
+                .combine(refreshGen) { feed, gen -> feed to gen }
+                .flatMapLatest { (feed, gen) ->
+                    flow {
+                        val force = gen > 0 && consumedGen != gen
+                        consumedGen = gen
+                        emitAll(repository.paging(feed, forceRefresh = force))
+                    }
+                }.cachedIn(viewModelScope)
+
+        /** Pull-to-refresh / pill: bump the generation → fresh REFRESH, TTL bypassed. */
+        fun forceRefresh() {
+            refreshGen.value = refreshGen.value + 1
+        }
 
         fun open(feed: FeedSource) {
             viewModelScope.launch {

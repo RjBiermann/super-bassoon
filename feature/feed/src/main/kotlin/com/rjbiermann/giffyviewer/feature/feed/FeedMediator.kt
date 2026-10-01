@@ -26,6 +26,8 @@ class FeedMediator(
     private val pageDao: FeedPageDao,
     private val api: upstreamApi,
     private val pageSize: Int,
+    /** One-shot TTL bypass for this generation's REFRESH (PLAN §9 pull-to-refresh). */
+    private val force: Boolean = false,
     private val now: () -> Long = System::currentTimeMillis,
     private val favorites: suspend () -> List<String> = { emptyList() },
 ) : RemoteMediator<Int, com.rjbiermann.giffyviewer.core.model.Gif>() {
@@ -52,7 +54,7 @@ class FeedMediator(
         // Exception: a cached EMPTY Favorites page is only ever the "nothing favorited
         // yet" marker — treat it as always stale so the first favorite appears
         // immediately instead of after the TTL runs out.
-        if (loadType == LoadType.REFRESH) {
+        if (loadType == LoadType.REFRESH && !force) {
             val cached = pageDao.page(feedPageKey(feed, 1))
             val staleEmpty = cached != null && feed is FeedSource.Favorites && cached.gifIds.isEmpty()
             if (cached != null && now() - cached.fetchedAt < feed.ttlMs && !staleEmpty) {

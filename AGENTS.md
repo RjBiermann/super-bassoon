@@ -48,6 +48,7 @@ minSdk 24 (mobile) / 26 (TV) · targetSdk 35 · DB name `giffy.db`.
 | `AGENTS-PLAYER.md` | ExoPlayer, SimpleCache-by-ID, data-saver, resume | 5 |
 | `AGENTS-CONTENT-FILTER.md` | The single ContentFilter choke point, blocks, groups, collections, leak-zero | 6 |
 | `AGENTS-APP.md` | Mobile + TV UI, age gate, navigation, per-feed prefs display | 3, 7–9 |
+| `AGENTS-UX-PATTERNS.md` | Instagram/TikTok interaction practices mapped per device type — doc-only reference, no implementation | 7–9 |
 
 ## Verification gates (per phase, from PLAN §10)
 
