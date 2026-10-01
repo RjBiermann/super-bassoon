@@ -942,7 +942,7 @@ private fun shareGif(
     val intent =
         android.content.Intent(android.content.Intent.ACTION_SEND).apply {
             type = "text/plain"
-            putExtra(android.content.Intent.EXTRA_TEXT, "https://upstream-site.example/watch/${gif.id}")
+            putExtra(android.content.Intent.EXTRA_TEXT, com.rjbiermann.giffyviewer.core.model.Hosts.watch + gif.id)
         }
     context.startActivity(android.content.Intent.createChooser(intent, "Share"))
 }

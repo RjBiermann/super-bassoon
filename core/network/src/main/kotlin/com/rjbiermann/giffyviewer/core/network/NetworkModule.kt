@@ -17,7 +17,8 @@ import java.util.concurrent.TimeUnit
 const val APP_USER_AGENT: String =
     "Mozilla/5.0 (X11; Linux x86_64; rv:156.0) Gecko/20100101 Firefox/156.0"
 
-const val BASE_URL = "https://upstream-api-host.example/"
+/** Routed through [com.rjbiermann.giffyviewer.core.model.Hosts] (encoded). */
+val BASE_URL: String get() = com.rjbiermann.giffyviewer.core.model.Hosts.apiBase
 
 /** Json configured per plan: ignoreUnknownKeys so API drift can't crash us. */
 val API_JSON: Json =

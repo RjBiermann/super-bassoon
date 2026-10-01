@@ -128,8 +128,8 @@ class TokenStore(
 
         /** Public SPA client (azp claim of the Kinde token bundle — PLAN §2). */
         const val OAUTH_CLIENT_ID = "e06c34dac7654821bcb37e0393b54350"
-        const val OAUTH_TOKEN_URL = "https://upstream-auth-host.example/oauth2/token"
-        const val OAUTH_REDIRECT_URI = "https://upstream-site.example"
+        val OAUTH_TOKEN_URL: String get() = com.rjbiermann.giffyviewer.core.model.Hosts.oauthToken
+        val OAUTH_REDIRECT_URI: String get() = com.rjbiermann.giffyviewer.core.model.Hosts.site
 
         /** S256 PKCE material for the authorize request. */
         fun newPkce(): Pkce {
@@ -154,7 +154,7 @@ class TokenStore(
          * refresh token). Login form shown there when not signed in.
          */
         fun authorizeUrl(pkce: Pkce): String =
-            "https://upstream-auth-host.example/oauth2/auth" +
+            com.rjbiermann.giffyviewer.core.model.Hosts.oauthAuthorize +
                 "?client_id=$OAUTH_CLIENT_ID" +
                 "&redirect_uri=${URLEncoder.encode(OAUTH_REDIRECT_URI, "UTF-8")}" +
                 "&response_type=code" +

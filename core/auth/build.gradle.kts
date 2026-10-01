@@ -25,6 +25,7 @@ kotlin {
 
 dependencies {
     api(libs.kotlinx.coroutines.core)
+    api(project(":core:model"))
     implementation(libs.security.crypto)
     implementation(libs.kotlinx.serialization.json)
     testImplementation(libs.junit)

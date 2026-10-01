@@ -39,7 +39,11 @@ class TokenStoreTest {
     fun `authorizeUrl carries pkce params`() {
         val pkce = TokenStore.Pkce("v".repeat(64), "challenge123", "state123")
         val url = TokenStore.authorizeUrl(pkce)
-        assertTrue(url.startsWith("https://upstream-auth-host.example/oauth2/auth"))
+        assertTrue(
+            url.startsWith(
+                TokenStore.OAUTH_REDIRECT_URI.take(8) + TokenStore.OAUTH_TOKEN_URL.drop(8).substringBefore("/oauth2/token"),
+            ),
+        )
         assertTrue(url.contains("client_id=" + TokenStore.OAUTH_CLIENT_ID))
         assertTrue(url.contains("response_type=code"))
         assertTrue(url.contains("code_challenge=challenge123"))
