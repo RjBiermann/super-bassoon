@@ -78,3 +78,9 @@ see ContentPrefsBackup below; niche groups landed in DB v5).
 ## Live status (2026-09)
 - Niche groups: DB v5 (`niche_groups`), GroupsScreen live on both apps, BLOCKED groups feed stage 2.
 - Hide counts: single rolling 7-day counter (`hide_counts`), no per-reason split — matches PLAN §6.
+
+## Orientation filter (planned, decided 2026-10-01)
+NOT part of the ContentFilter pipeline — a global DataStore pref `orientation_filter`
+(`any`/`horizontal`/`vertical`, shared SettingsScreen) applied strictly AFTER ContentFilter
+at the read-time filter stage. See AGENTS-APP.md for wiring points. No hide counts, no toast:
+like promoted (stage 0), it's not user content-blocking.

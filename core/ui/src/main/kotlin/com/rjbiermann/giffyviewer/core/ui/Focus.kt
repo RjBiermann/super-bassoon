@@ -40,7 +40,10 @@ fun Modifier.giffyFocus(
         val interaction =
             interactionSource ?: remember { MutableInteractionSource() }
         val focused by interaction.collectIsFocusedAsState()
-        val border = if (focused) GiffyColors.BrandRed else Color.Transparent
+        val border by animateColorAsState(
+            if (focused) GiffyColors.BrandRed else Color.Transparent,
+            label = "giffyFocusBorder",
+        )
         val fill by animateColorAsState(
             if (focused) fillOnFocus ?: Color.Transparent else Color.Transparent,
             label = "giffyFocusFill",
@@ -48,7 +51,7 @@ fun Modifier.giffyFocus(
         this
             .then(if (interactionSource == null) Modifier.focusable() else Modifier)
             .background(fill, shape)
-            .border(6.dp, border, shape)
+            .border(3.dp, border, shape)
     }
 
 /**

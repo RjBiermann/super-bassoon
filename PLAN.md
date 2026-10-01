@@ -198,6 +198,8 @@ Offline: airplane-mode cold start renders from cache with no crash and zero netw
 
 Per-feed prefs (sort · date range · duration min/max · resolution · orientation · shuffle seed) persist in **DataStore** (`:core:datastore`), not Room — see §8; applied strictly after ContentFilter.
 
+**Orientation sequencing (decided 2026-10-01, research-only):** orientation ships first as a **global** DataStore setting `orientation_filter` (`any` default / `horizontal` / `vertical`) surfaced in the shared Settings screen (both apps) — not as the per-feed chip below. Rationale: users treat it as a device preference (TV = horizontal only, phone = vertical only) that must hold on every surface incl. the swipe player and search; per-feed `feed_prefs` storage doesn't exist yet. When the §8 filter chip row lands, orientation chips default to the global setting — nothing thrown away.
+
 ### ContentFilter pipeline (single choke point)
 Every data source — Paging remote load, Room cache read, search, group feeds, shuffle pool, "Surprise me", custom/For You blends — runs items through **one** interceptor before UI:
 
@@ -261,6 +263,8 @@ Feed identity extends to cache keys: sort/range changes produce distinct page st
 - **"Surprise me":** random gif from any cache-eligible source, excluding watched (`watch_history`)
 
 **Range chips per feed:** date range (today/week/month/year/custom pickers) · duration slider + chips (<10s, 10–30s, 30–60s, 1–5m, >5m) · resolution (SD/HD/any) · orientation (horizontal/vertical/any) · untagged-only toggle (group feeds). All persisted per feed in `feed_prefs` (DataStore), applied strictly **after** ContentFilter. Client-side filters (duration/resolution/orientation) apply over the loaded pool — no per-chip server params or sort-variant cache keys. Shuffle respects resume markers.
+
+Orientation note: until the chip row exists, orientation filtering is the global `orientation_filter` setting (§6 sequencing note) — applied read-time in `FeedPagingSource` after ContentFilter, plus `LikedNetworkPagingSource` and the TV Continue Watching row; NOT counted in hide counts and no "why hidden" toast (a pref, not a block); shuffle/Surprise-me must wire it when they land (leak-zero).
 
 ---
 

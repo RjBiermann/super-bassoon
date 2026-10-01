@@ -76,6 +76,17 @@ Compose UI, navigation, platform shells. Spec: PLAN.md §3, §7–9.
 Sort · date range · duration min/max · resolution · orientation · shuffle seed — persisted
 per feed (`feed_prefs` key), survive restart, applied strictly AFTER ContentFilter.
 
+## Orientation filter (decided 2026-10-01, not yet built)
+Global DataStore pref `orientation_filter` (`any` default / `horizontal` / `vertical`) in the
+shared SettingsScreen — one toggle covers both apps (TV: horizontal-only use case, mobile:
+vertical-only). Per-feed §6 orientation chips, when they land, default to this value.
+Applied read-time in `FeedPagingSource` AFTER ContentFilter; `LikedNetworkPagingSource` and
+the TV Continue Watching row need the same manual check (they bypass the paging choke point).
+NOT counted in hide counts, no "why hidden" toast — a pref, not a block. Shuffle /
+"Surprise me" must wire it when implemented (leak-zero). Predicate: `height > width`
+(`Gif.width/height` already on the model); 0×0 unknown → pass-through (same fallback as
+TV card-width rule). Pager restarts on pref change via `flatMapLatest` in `FeedRepository.paging`.
+
 ## Feeds (order in cache keys)
 Server-backed sorts → distinct cache keys (`...:sort=top_week:p<n>`). Client-side-only ops
 (duration sort, shuffle, creator A→Z on group/custom) share the base key. Shuffle is

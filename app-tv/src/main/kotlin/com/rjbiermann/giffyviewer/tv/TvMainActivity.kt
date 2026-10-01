@@ -80,7 +80,14 @@ class TvMainActivity : ComponentActivity() {
                 androidx.tv.material3.MaterialTheme(
                     colorScheme = giffyTvColors(composeColors),
                     typography = tvTypography(composeTypo),
-                ) { Root() }
+                ) {
+                    // tv-material has its OWN LocalContentColor whose default is
+                    // Color.Black — bare tv3 Texts outside tv Surfaces render
+                    // black-on-black. Provide the theme content color at the root.
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        androidx.tv.material3.LocalContentColor provides composeColors.onBackground,
+                    ) { Root() }
+                }
             }
         }
     }
