@@ -20,10 +20,22 @@ android {
         versionName = "0.2.0"
     }
 
+    signingConfigs {
+        create("release") {
+            // CI (Phase 10): the base64 keystore decodes to this file; secrets
+            // SIGNING_KEY (base64) + SIGNING_PASS drive the workflow.
+            storeFile = file(System.getenv("SIGNING_STORE_FILE") ?: "../keystore/release.keystore")
+            storePassword = System.getenv("SIGNING_PASS") ?: "giffy_local"
+            keyAlias = "giffy"
+            keyPassword = System.getenv("SIGNING_PASS") ?: "giffy_local"
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {

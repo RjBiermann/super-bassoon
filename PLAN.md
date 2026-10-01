@@ -338,3 +338,15 @@ Orientation note: until the chip row exists, orientation filtering is the global
 - [ ] Swipe player: fullscreen auto-hide + tap reveal/pause + seek scrub + pinch-zoom (resets on swipe and exit); double-tap likes (single-tap still reveals/pauses); adjacent-item prefetch (no stutter on swipe); playback speed 0.5×–2× in overflow; like button optimistic-flips and reverts on failure; auto-swipe toggle advances to next video on natural end when ON (off = current behavior; next-page load then stop at true end), forced off under data-saver; mute state persists across swipes and sessions; player failure surfaces Retry/Skip overlay, never a frozen frame
 - [ ] UI state (backstack, tab, swipe item + playhead, search query) survives process death alongside login
 - [ ] 30-min idle: no crash, no leak, behavior identical to fresh
+
+### Phase 10 release pipeline (built 2026-10-01; secrets pending)
+- `.github/workflows/release.yml`: tag `v*` → decode `SIGNING_KEY` (base64 keystore) →
+  signed `assembleRelease` (both apps) → signature check → GH Release with the two APKs.
+- Keystore generated once (`keystore/release.keystore`, alias `giffy`, local pass
+  `giffy_local`); gitignored. Ship to secrets: `SIGNING_KEY` = `base64 -w0
+  keystore/release.keystore`, `SIGNING_PASS` = the store password. NEVER regenerate —
+  a key change blocks updates.
+- R8: minify + shrinkResources + full keep rules (kotlinx-serialization official block
+  + DTO package keep + Retrofit). **Release smoke verified live 2026-10-01** (gate 1):
+  the R8-signed mobile release installs, launches, parses real API responses (6 live
+  creator tiles), zero crashes — serialization keep rules confirmed under R8.
