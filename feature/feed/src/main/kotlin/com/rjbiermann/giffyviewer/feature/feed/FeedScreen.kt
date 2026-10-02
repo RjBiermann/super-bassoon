@@ -340,6 +340,31 @@ fun FeedScreen(
                 }
             }
 
+            // Creator stats header (§7/§9): v1/users counts above a creator's tiles.
+            LaunchedEffect(source) {
+                viewModel.refreshCreatorStats((source as? FeedSource.Creator)?.username)
+            }
+            if (source is FeedSource.Creator) {
+                viewModel.creatorStats.collectAsStateWithLifecycle().value?.let { stats ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text =
+                                "%,d posts · %,d followers · %,d views".format(
+                                    java.util.Locale.US,
+                                    stats.gifs,
+                                    stats.followers,
+                                    stats.views,
+                                ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+
             // For You scope selector (§7 Creators·Niches·All — logged-in only).
             if (source is FeedSource.ForYou && isLoggedIn) {
                 val scope by viewModel.forYouScope.collectAsStateWithLifecycle("all")

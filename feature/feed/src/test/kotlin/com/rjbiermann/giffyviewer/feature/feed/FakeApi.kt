@@ -180,4 +180,6 @@ internal class FakeApi : GifsApi {
         gifId: String,
         body: NicheAddBody,
     ) = throw NotImplementedError()
+
+    override suspend fun userStats(username: String) = throw NotImplementedError()
 }

@@ -222,6 +222,13 @@ interface GifsApi {
         @Body body: NicheAddBody,
     )
 
+    /** Creator profile stats (live-verified 2026-10): the site profile's
+     *  counts; v2/user_profile 404s — this is the real profile read. */
+    @GET("v1/users/{username}")
+    suspend fun userStats(
+        @Path("username") username: String,
+    ): UserStatsDto
+
     /** Niche detail (live-verified 2026-10-01, anonymous OK): description,
      *  cover, counts, rules — the About tab source. `following` reflects the
      *  caller's auth state. */
@@ -316,6 +323,20 @@ data class CollectionGifBody(
 @Serializable
 data class NicheAddBody(
     val nicheId: String,
+)
+
+/** v1/users/{username} — the site profile read (v2/user_profile 404s). */
+@Serializable
+data class UserStatsDto(
+    val username: String = "",
+    val followers: Long = 0,
+    val following: Long = 0,
+    val gifs: Long = 0,
+    val likes: Long = 0,
+    val views: Long = 0,
+    val verified: Boolean = false,
+    @SerialName("profileImageUrl") val profileImageUrl: String? = null,
+    val description: String? = null,
 )
 
 @Serializable

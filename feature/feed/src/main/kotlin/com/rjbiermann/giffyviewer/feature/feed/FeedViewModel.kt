@@ -289,6 +289,23 @@ class FeedViewModel
             }
         }
 
+        /** Creator stats header (v1/users/{username}, verified): cleared for
+         *  non-creator sources; failure = no header (tiles carry the name). */
+        private val _creatorStats = MutableStateFlow<com.rjbiermann.giffyviewer.core.network.UserStatsDto?>(null)
+        val creatorStats: StateFlow<com.rjbiermann.giffyviewer.core.network.UserStatsDto?> = _creatorStats
+
+        fun refreshCreatorStats(username: String?) {
+            viewModelScope.launch {
+                if (username == null) {
+                    _creatorStats.value = null
+                    return@launch
+                }
+                runCatching { withContext(Dispatchers.IO) { api.userStats(username) } }
+                    .onSuccess { _creatorStats.value = it }
+                    .onFailure { _creatorStats.value = null }
+            }
+        }
+
         /** For You scope (§7 Creators·Niches·All, logged-in; default All). */
         val forYouScope: StateFlow<String> =
             settings.forYouScope

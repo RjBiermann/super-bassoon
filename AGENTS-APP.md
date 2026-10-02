@@ -267,11 +267,16 @@ architecture.
    List<String> TypeConverter (Entities.kt) — carrying names is a `gifs` schema change →
    explicit Migration per the repo rule, OR an id→name cache keyed off `v2/niches` reads
    (heavier, stale-prone — the payload already carries the name, migration is the honest path);
-   (b) render niche chips in the player cluster after the tags row, visually distinct from
-   tags (tags = lime outline; niches = tertiary/Info cyan, matching VerifiedTick's shared
-   Info usage);
-   (c) tap → `FeedSource.Niche(id, name)` — same open-callback plumbing as the @user link
-   slice (mobile player needs the callback; TV needs `onOpenCreator`-style parameter);
+   (b) style (user decision 2026-10-02, replaces the Info-cyan idea): **tags become simple
+   text links** — plain lime text, no pill border (they're numerous secondary topics; the
+   current outline pill goes), tap → tag feed;
+   **niches take the tag's existing pill style** (lime outlined chip) — one visual language,
+   no new color tokens, and the stronger affordance marks the bigger destination (a curated
+   niche feed vs a topic filter). Cap niches to ~3 to match the quick-sheet tag cap unless
+   the live watch-page check shows a different count;
+   (c) tap targets → `FeedSource.Niche(id, name)` / `FeedSource.Search(query = tag)` — same
+   open-callback plumbing as the @user link slice (mobile player needs the callback; TV needs
+   `onOpenCreator`-style parameter);
    (d) LIVE-CHECK FIRST: the lingo sweep recorded watch-page sections "Related Tags",
    "Suggested Niches"/"Suggested Creators" — it did NOT record a "this video's niches"
    section. Verify on the live watch page whether the gif's own niches are listed and what
@@ -460,6 +465,88 @@ The wait-in-line items from audit round 1 (a11y Low tier, OfflineNotice→EmptyS
 reuse, per-surface error branches) stay on top of #1–#3 — pick by user exposure,
 not file size.
 
+## UI/UX structure round 3 — simplification audit (2026-10-02, docs-only)
+Post-fix-batch rescan (after the round-3 batch + the Add-to-Collection/Niche commit).
+Simplification only — every feature stays; findings collapse implementation, not scope.
+Ranked by lines removed per risk, smallest diffs first. Threshold rule from round 2
+(consolidate at the 4th instance) applied where it now fires.
+
+1. **CreatorLabel convergence — 10 hand-rolled instances across 9 files.**
+   `Text("@user") + if (verified) VerifiedTick(...)` is written out in: FeedScreen tile
+   caption (×1 of 2), Explore/Following/NicheAbout rows, PlayerScreen cluster, QuickSheet
+   header, TvHomeScreen (×2), TvPlayerScreen cluster, TvQuickActions header — each with its
+   own padding/size/tint choices drifting independently (the 12dp/14dp/16dp/18dp tick
+   variety). One shared core:ui `CreatorLabel(username, verified, tint, style)` with tint
+   as a parameter (the only true per-surface difference) collapses all 10. Same n=10 as
+   the TopAppBar item below — do both in one touch.
+
+2. **GiffyScaffold — the Scaffold+TopAppBar+back-IconButton boilerplate renders 10×.**
+   Every list screen (Explore, Following, Collections, Groups, CustomFeeds, Niches,
+   NicheAbout, Search, Settings, player top bar) repeats
+   `Scaffold { TopAppBar(title, navigationIcon = IconButton(back), colors =
+   topAppBarColors(surface)) }`. A tiny core:ui `GiffyScaffold(title, onBack, content)`
+   cuts ~8 lines × 10 and — the real payoff — fixes the round-1 Low copy-drift item
+   ("back" vs "Back" contentDescription) in exactly one place instead of ten.
+
+3. **List-fetch state machine: the round-2 n=4 threshold is now CROSSED.**
+   Round 2 said "until a fourth list screen lands, three flat copies beat one
+   abstraction." Four have landed with three different idioms: NichesViewModel
+   (StateFlow machine, shared m+TV), FollowingViewModel (copy of it), ExploreScreen
+   (remember-vars machine), NicheAboutScreen (three inline `runCatching{}.onSuccess{}`s).
+   One shape — paged fetch + loadFailed + Retry + endReached — four divergent
+   implementations; Explore's dead-flag bug happened precisely because of this drift.
+   Cheapest convergence: make ExploreScreen + NicheAboutScreen consume a VM like the
+   other two (idiom consistency first, ~zero risk), then optionally extract the shared
+   `loadFailed`/paging skeleton once all four speak the same dialect.
+
+4. **Picker-dialog family: six implementations of one dialog shape.**
+   Add-to-Custom-Feed, Add-to-a-Collection, Add-to-a-Niche — each × mobile + TV = 6 near-
+   identical "list of options → tap → Cancel" dialogs (~820 lines across the two files).
+   The niche tag-matching ordering rule (`gifTags → matching → ordered`) is copy-pasted
+   VERBATIM in both niche dialogs. Consolidation: one shared M3 picker dialog in
+   feature:feed (platform-neutral — the shared FeedFilterDialog already runs on TV) + one
+   shared `orderNichesByTagMatch(gifTags, niches)` rule beside gifFeedRefs. TV caveat:
+   TvQuickActions rows carry the giffyFocus ring — a shared dialog either accepts default
+   M3 focus visuals (what the shared FeedFilterDialog's contents already do on TV) or
+   takes a per-row decoration parameter. Decide on device, don't guess; if the ring test
+   fails, keep only the ordering rule + custom-feed dialog shared and stop.
+
+5. **avgColorOr + AudioBadge duplicated ×2 — one-line moves.**
+   `avgColorOr` is the same private fun in FeedScreen.kt and TvHomeScreen.kt; the
+   black-translucent rounded `VolumeUp` badge Box is written twice (tile + card) with
+   padding differences only. Both are 10–15-liners → core:ui `avgColorOr` + `AudioBadge`.
+   Skipped a full shared GifThumb component on purpose: tile (aspect-ratio box) and card
+   (fixed 170dp row) layouts differ legitimately — flat-structure rule wins.
+
+6. **The load-bearing `"id|name"` string format deserves its two helpers.**
+   `entry.substringBefore('|') / substringAfter('|')` parsing of pinned refs is scattered
+   across ≥4 sites (TV pills, TV dropdown, FeedScreen pinnedNiches remember, custom-feed
+   ref parsing) — the stringly-typed packing format silently coordinates pinned pills,
+   quick actions and custom feeds across both shells. One `packNicheRef/parseNicheRef`
+   pair in feature:feed turns four parse sites into calls and gives the format a named
+   home (next to customRefSummary, which already labels these refs).
+
+7. **UX simplification (visual, not code): the FeedScreen chip pile-up.**
+   On a For-You niche/creator feed with options, the grid sits under up to five stacked
+   chrome rows — feed tabs · matching creators · For-You scope · sorts · Filter/Clear —
+   before the first tile (bad on a 360dp-wide phone in portrait). Suggestion when this
+   surface is touched: right-align the sort + Filter/Clear chips into ONE row (they're
+   both per-feed controls) — saves a row without cutting any control; scope selector
+   only ever coexists with For-You, leave it alone.
+
+Scanned-and-rejected (documented so the next audit doesn't re-derive them):
+- **QuickSheet vs TvQuickActions row idioms** (TextButton+ripple vs Button+giffyFocus) —
+  the touch/D-pad split is the module-map's stated reason to exist; not a merge.
+- **FeedScreen 32K / PlayerScreen 44K** — re-affirmed cohesive post-batch; private
+  PlayerPage/PlayerControls/ActionRail remain that player's own units.
+- **PlayerControls 24dp slot vs TvPlayerScreen always-on 3dp line** — different behavior
+  contracts (auto-hide vs 10-foot always-visible), not duplication.
+- **FeedViewModel vs TvHomeViewModel block/favorite creator functions** — TvHomeViewModel
+  duplicates toggleFavorite/blockCreator (~25 lines); REAL candidate but blocked on the
+  concurrent Add-to writes landing in the same VM — re-check after that settles.
+- **Two time formatters** (formatRemaining vs seekBy's fmt) — 6 lines each, different
+  shapes (remaining vs position); sharing saves nothing real.
+
 ## Site feature-parity audit (2026-10-02, live-verified — doc-only, no code)
 Consumption surfaces are a full mirror: home tabs, Explore, Niches (index + Feed/About + join),
 creator feed (tag chips, Follow), watch page, Saved Collections, Following, search
@@ -478,8 +565,11 @@ Real gaps (site has them, app doesn't) — **spec'd-not-scheduled, a user slice 
 - ~~Add to a Niche~~ — BUILT 2026-10-01: write probed live (PUT v2/gifs/{gifId}/niches
   {nicheId} → 202, reverted); AddToNicheDialog / TvAddToNicheDialog in the Add-to… pane —
   joined niches, tag-matching first (site popup parity), 8-row cap, empty hint.
-- **Followers page** — site `/followers` ("Accounts That Follow You", tabs
-  Following/Followers); API `GET /v2/me/followers` verified 200. No app UI (mobile or TV).
+- **Followers page** — BLOCKED on data shape (2026-10): both `GET /v2/me/followers`
+  and `GET /v1/me/followers/populated` return 200 but the test account has zero
+  followers — the row DTO is unverifiable, and building against a guessed shape
+  risks silent decode breakage (repo no-guess rule). Re-probe with an account
+  that has followers before wiring.
 - **Tags browse tab** — site search has a 4th **Tags** tab sourced from
   `GET /v2/tags/trending` (verified live); app search stops at GIFs/Creators/Niches.
 - **Niches suggest** — `GET /v2/niches/suggest` (tag-context niche suggestions, verified)
@@ -487,8 +577,10 @@ Real gaps (site has them, app doesn't) — **spec'd-not-scheduled, a user slice 
 - **Server search history** — `GET /v2/search/user-history` verified; site syncs history
   server-side, app keeps local Room history. Existing spec'd-not-scheduled fallback now has
   a verified endpoint to hang on.
-- **Creator stats header** — `GET /v1/users/{username}` (verified) gives posts/followers/views
-  counts the site profile shows; app creator feeds are tiles-only today.
+- ~~Creator stats header~~ — BUILT 2026-10-01: FeedViewModel.refreshCreatorStats +
+  creatorStats; mobile FeedScreen shows the counts row on Creator sources; TV
+  TvSourceFeedScreen shows it under the title (same shared VM state). Live-verified
+  on mobile (@lilymatrix → "154 posts · 121 followers · 200,599 views").
 
 Parked (not gaps): For You server blend is `v2/feeds/for-you` as-is (70% favorite-creator
 weighting was a local-blend idea, superseded by the server feed); search-history sync and

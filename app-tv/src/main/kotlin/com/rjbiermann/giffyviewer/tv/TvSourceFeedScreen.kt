@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,6 +28,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.paging.cachedIn
 import androidx.paging.compose.collectAsLazyPagingItems
@@ -72,11 +74,34 @@ fun TvSourceFeedScreen(
         if (gifs.itemCount > 0) firstCardFocus.requestFocus()
     }
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        Text(
-            text = source.title(),
-            style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp),
-        )
+        // Title + creator stats (v1/users — site-profile counts, tiles-only feeds).
+        val stats by feedViewModel.creatorStats.collectAsStateWithLifecycle()
+        LaunchedEffect(source) {
+            feedViewModel.refreshCreatorStats((source as? FeedSource.Creator)?.username)
+        }
+        Column {
+            Text(
+                text = source.title(),
+                style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 0.dp),
+            )
+            if (source is FeedSource.Creator) {
+                stats?.let { s ->
+                    Text(
+                        text =
+                            "%,d posts · %,d followers · %,d views".format(
+                                java.util.Locale.US,
+                                s.gifs,
+                                s.followers,
+                                s.views,
+                            ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 16.dp, bottom = 4.dp),
+                    )
+                }
+            }
+        }
         // Focus ring (unified BrandRed, AGENTS-APP): M3 FilterChip's own focus
         // state is subtle on 10-foot — the shared giffyFocus border marks it.
         val chipInteraction =
