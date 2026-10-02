@@ -10,6 +10,17 @@ Login, token storage, revocation (auth flows formerly PLAN.md §2). **REVISED 20
 - **The app's login path is therefore app-driven PKCE**: app generates verifier/challenge/state, opens the auth2 authorize URL in a WebView, intercepts the `?code=` redirect (`shouldOverrideUrlLoading`, before site JS runs), exchanges in-app. Verified end-to-end live (see below). Refresh grant: `grant_type=refresh_token&client_id=…` → 200, refresh_token is reusable/non-rotating.
 
 ## Token storage
+
+**Bearer contract (re-probed 2026-10-01 with a hard test token):** the content API accepts
+the **ID token** as `Authorization: Bearer` on every user endpoint (`/v2/likes`,
+`/v2/feeds/liked`, `/v2/feeds/for-you`, `/v1/me/follows`, `/v2/me/following`,
+`/v2/me/collections`, and the write actions — all probed live, all writes reverted).
+Kinde's **access_token is REJECTED** by the API (`BadTokenFormat: "must be a JWT with
+type=bearer"`; its payload also has `aud: []` vs the API's `https://api.redgifs.com`).
+TokenStore correctly stores the ID token; the hourly expiry + silent refresh stays.
+The refresh grant (form-urlencoded, public client) was re-verified live: 200,
+mints a fresh ID token + refresh token.
+
 - `EncryptedSharedPreferences`, key alias `giffy_auth` (security-crypto).
 - Login flow must survive process death.
 - Sign-out / re-login cycle must work end-to-end; verify after changes.

@@ -23,6 +23,7 @@ data class GifEntity(
     val sdUrl: String?,
     val hdUrl: String?,
     val posterUrl: String?,
+    val verified: Boolean,
     val fetchedAt: Long,
 )
 

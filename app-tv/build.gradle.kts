@@ -77,6 +77,7 @@ dependencies {
     implementation(libs.compose.foundation)
     implementation(libs.compose.material3)
     implementation(libs.material.icons)
+    implementation(libs.material.icons.extended)
     implementation(libs.tv.foundation)
     implementation(libs.tv.material)
     implementation(libs.kotlinx.coroutines.core)

@@ -6,11 +6,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -181,7 +183,7 @@ fun TvPlayerScreen(
                 modifier = Modifier.fillMaxSize(),
             )
             // Thin lime progress line (mobile parity).
-            var fraction by remember { mutableStateOf(0.3f) } // BISECT: fixed initial
+            var fraction by remember { mutableStateOf(0f) }
             LaunchedEffect(gif.id) {
                 while (true) {
                     kotlinx.coroutines.delay(500)
@@ -213,6 +215,37 @@ fun TvPlayerScreen(
                     color = Color.White,
                     modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
                 )
+            }
+            // Mobile-player parity (2026-10): creator + description cluster,
+            // bottom-left, above the progress line. Verified tick rides along.
+            Column(
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 24.dp, bottom = 24.dp, end = 96.dp),
+            ) {
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Text(
+                        text = "@${gif.userName}",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White,
+                    )
+                    if (gif.verified) {
+                        com.rjbiermann.giffyviewer.core.ui.VerifiedTick(
+                            tint = Color.White,
+                            modifier = Modifier.padding(start = 6.dp).size(18.dp),
+                        )
+                    }
+                }
+                gif.description?.takeIf { it.isNotBlank() }?.let { desc ->
+                    Text(
+                        text = desc,
+                        color = Color.White.copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 2,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }

@@ -109,16 +109,26 @@ fun CollectionsScreen(
     }
 
     if (showCreate) {
-        NameDialog(title = "Create New Collection", initial = "") { name ->
-            viewModel.create(name)
-            showCreate = false
-        }
+        NameDialog(
+            title = "Create New Collection",
+            initial = "",
+            onSubmit = { name ->
+                viewModel.create(name)
+                showCreate = false
+            },
+            onDismiss = { showCreate = false },
+        )
     }
     renameFor?.let { c ->
-        NameDialog(title = "Rename", initial = c.folderName ?: "") { name ->
-            viewModel.rename(c.folderId, name)
-            renameFor = null
-        }
+        NameDialog(
+            title = "Rename",
+            initial = c.folderName ?: "",
+            onSubmit = { name ->
+                viewModel.rename(c.folderId, name)
+                renameFor = null
+            },
+            onDismiss = { renameFor = null },
+        )
     }
     deleteFor?.let { c ->
         // Confirm-first: deleting a collection is unrecoverable.
@@ -142,10 +152,11 @@ private fun NameDialog(
     title: String,
     initial: String,
     onSubmit: (String) -> Unit,
+    onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf(initial) }
     AlertDialog(
-        onDismissRequest = { onSubmit("") },
+        onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
             Box {
@@ -160,6 +171,8 @@ private fun NameDialog(
         confirmButton = {
             TextButton(enabled = name.isNotBlank(), onClick = { onSubmit(name) }) { Text("Save") }
         },
-        dismissButton = { TextButton(onClick = { onSubmit("") }) { Text("Cancel") } },
+        // Bug fix (2026-10): Cancel/dismiss submitted "" — the create path then
+        // fired a blank "Create New Collection" POST. Dismiss ≠ submit.
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.VerticalPager
@@ -691,11 +692,19 @@ private fun PlayerPage(
                     }
                     Spacer(Modifier.height(6.dp))
                 }
-                Text(
-                    text = "@${gif.userName}",
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleMedium,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "@${gif.userName}",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    if (gif.verified) {
+                        com.rjbiermann.giffyviewer.core.ui.VerifiedTick(
+                            tint = Color.White,
+                            modifier = Modifier.padding(start = 4.dp).size(16.dp),
+                        )
+                    }
+                }
             }
         }
         // right action rail (PLAN §9): like / mute / share / overflow,

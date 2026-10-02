@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,6 +19,8 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -156,11 +159,18 @@ private fun CreatorRow(
                             contentDescription = "creator ${creator.username}",
                             modifier = Modifier.size(96.dp).clip(CircleShape),
                         )
-                        Text(
-                            "@${creator.username}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(top = 8.dp),
-                        )
+                        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            Text(
+                                "@${creator.username}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(top = 8.dp),
+                            )
+                            if (creator.verified) {
+                                com.rjbiermann.giffyviewer.core.ui.VerifiedTick(
+                                    modifier = Modifier.padding(start = 3.dp, top = 8.dp).size(12.dp),
+                                )
+                            }
+                        }
                         Text(
                             "${creator.followers} followers · ${creator.gifs} gifs",
                             style = MaterialTheme.typography.labelSmall,
@@ -301,13 +311,39 @@ internal fun GifCard(
                     // fixed landscape card (10-foot norm); portrait gifs crop — fine for browse
                     modifier = Modifier.fillMaxWidth().height(CARD_ROW_HEIGHT_DP),
                 )
+                // Audio-know-before-tap badge — mobile-tile parity (unified UI).
+                if (gif.hasAudio) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .align(androidx.compose.ui.Alignment.TopEnd)
+                                .padding(8.dp)
+                                .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 5.dp, vertical = 3.dp),
+                    ) {
+                        androidx.compose.material3.Icon(
+                            imageVector = Icons.Filled.VolumeUp,
+                            contentDescription = "has sound",
+                            tint = Color.White,
+                            modifier = Modifier.size(12.dp),
+                        )
+                    }
+                }
             }
-            Text(
-                text = "@${gif.userName}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
-            )
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Text(
+                    text = "@${gif.userName}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp, start = 4.dp),
+                )
+                if (gif.verified) {
+                    com.rjbiermann.giffyviewer.core.ui.VerifiedTick(
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 3.dp, top = 4.dp).size(12.dp),
+                    )
+                }
+            }
         }
     }
 }

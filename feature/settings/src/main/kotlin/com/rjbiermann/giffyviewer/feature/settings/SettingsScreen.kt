@@ -259,6 +259,32 @@ fun SettingsScreen(
                     }
                 }
             }
+            item(key = "verified-only") {
+                // Verified-only (2026-10): drop unverified-creator gifs everywhere
+                // (spam noise). Same row-toggle a11y pattern as data saver.
+                val verifiedOnly by viewModel.verifiedOnly.collectAsStateWithLifecycle(false)
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .toggleable(
+                                value = verifiedOnly,
+                                role = Role.Switch,
+                                onValueChange = { viewModel.setVerifiedOnly(it) },
+                            ),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Verified creators only", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            "Hide gifs from unverified accounts — filters spam",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = verifiedOnly, onCheckedChange = null)
+                }
+            }
             item(key = "video-fit") {
                 // §5 Video fit: Fit (default) · Crop · Stretch — both players.
                 val videoFit by viewModel.videoFit.collectAsStateWithLifecycle("fit")
@@ -279,22 +305,6 @@ fun SettingsScreen(
                             )
                         }
                     }
-                }
-            }
-            item(key = "data-saver") {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Data saver", style = MaterialTheme.typography.titleSmall)
-                        Text(
-                            "Prefer SD streams — lower bandwidth, faster start",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Switch(checked = dataSaver, onCheckedChange = null)
                 }
             }
             item(key = "data-saver-toggle") {

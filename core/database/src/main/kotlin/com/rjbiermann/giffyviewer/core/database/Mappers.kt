@@ -21,6 +21,7 @@ fun GifEntity.toModel(): Gif =
         hdUrl = hdUrl,
         posterUrl = posterUrl,
         niches = niches,
+        verified = verified,
     )
 
 fun Gif.toEntity(now: Long): GifEntity =
@@ -42,5 +43,6 @@ fun Gif.toEntity(now: Long): GifEntity =
         sdUrl = sdUrl,
         hdUrl = hdUrl,
         posterUrl = posterUrl,
+        verified = verified,
         fetchedAt = now,
     )

@@ -83,6 +83,7 @@ object AppModule {
                 GiffyDatabase.MIGRATION_4_5,
                 GiffyDatabase.MIGRATION_5_6,
                 GiffyDatabase.MIGRATION_6_7,
+                GiffyDatabase.MIGRATION_7_8,
             ).build()
 
     /**

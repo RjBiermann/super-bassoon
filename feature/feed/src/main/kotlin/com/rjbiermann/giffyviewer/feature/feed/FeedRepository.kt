@@ -75,6 +75,7 @@ class FeedRepository
 
         suspend fun refreshSurprise(): Boolean {
             val orientation = settings.orientationFilter.first()
+            val verifiedOnly = settings.verifiedOnly.first()
             contentFilter.refreshFrom(db.contentPrefsDao())
             contentFilter.refreshGroupTags(db.nicheGroupDao())
             val pool =
@@ -83,6 +84,7 @@ class FeedRepository
                     .randomUnwatched(PAGE_SIZE * 2)
                     .map { it.toModel() }
                     .filter { contentFilter.allow(it.userName, it.tags, it.description) }
+                    .filter { !verifiedOnly || it.verified }
                     .filter { it.matchesOrientation(orientation) }
             surprisePool.value = pool.ifEmpty { null }
             return pool.isNotEmpty()
@@ -99,12 +101,19 @@ class FeedRepository
                 ).flow
             } else if (feed is FeedSource.Liked) {
                 // Network-live, never cached (PLAN §7); no RemoteMediator, no Room.
-                settings.orientationFilter.flatMapLatest { orientation ->
-                    Pager(
-                        config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = 10, enablePlaceholders = false),
-                        pagingSourceFactory = { LikedNetworkPagingSource(api, contentFilter, PAGE_SIZE, orientation) },
-                    ).flow
-                }
+                kotlinx.coroutines.flow
+                    .combine(
+                        settings.orientationFilter,
+                        settings.verifiedOnly,
+                    ) { o, v -> o to v }
+                    .flatMapLatest { (o, v) ->
+                        Pager(
+                            config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = 10, enablePlaceholders = false),
+                            pagingSourceFactory = {
+                                LikedNetworkPagingSource(api, contentFilter, PAGE_SIZE, o, v)
+                            },
+                        ).flow
+                    }
             } else {
                 // Orientation (global) + §8 per-feed prefs BOTH restart the pager:
                 // combine them so either change re-reads cached pages through the
@@ -115,10 +124,11 @@ class FeedRepository
                 kotlinx.coroutines.flow
                     .combine(
                         settings.orientationFilter,
+                        settings.verifiedOnly,
                         settings.feedPrefs(feed.baseKey),
-                    ) { o, p -> o to p }
-                    .flatMapLatest { (o, p) ->
-                        cachedPager(feed, forceRefresh, p, o)
+                    ) { o, v, p -> Triple(o, v, p) }
+                    .flatMapLatest { (o, v, p) ->
+                        cachedPager(feed, forceRefresh, p, o, v)
                     }
             }
 
@@ -127,6 +137,7 @@ class FeedRepository
             forceRefresh: Boolean,
             prefs: com.rjbiermann.giffyviewer.core.datastore.FeedPrefs,
             orientation: String,
+            verifiedOnly: Boolean,
         ): Flow<PagingData<Gif>> =
             Pager(
                 config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = 10, enablePlaceholders = false),
@@ -160,6 +171,7 @@ class FeedRepository
                             favorites = { db.contentPrefsDao().favoriteCreators() },
                         ),
                         orientation = { orientation },
+                        verifiedOnly = { verifiedOnly },
                         prefs = { prefs },
                     )
                 },

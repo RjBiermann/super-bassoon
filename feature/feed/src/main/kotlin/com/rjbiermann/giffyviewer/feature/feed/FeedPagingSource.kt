@@ -56,6 +56,7 @@ class FeedPagingSource(
         },
     private val fetcher: FeedPageFetcher? = null,
     private val orientation: suspend () -> String = { "any" },
+    private val verifiedOnly: suspend () -> Boolean = { false },
     private val prefs: suspend () -> com.rjbiermann.giffyviewer.core.datastore.FeedPrefs =
         {
             com.rjbiermann.giffyviewer.core.datastore
@@ -140,9 +141,14 @@ class FeedPagingSource(
                 if (hidden > 0) {
                     db.contentPrefsDao().addHideCount(weekStartMs(System.currentTimeMillis()), hidden)
                 }
+                val verifiedOnly = verifiedOnly()
                 val pageGifs =
                     models
                         .filter { contentFilter.allow(it.userName, it.tags, it.description) }
+                        // Verified-only (2026-10): read-time pref AFTER the block
+                        // filter — NOT inside allow() above, or unverified rows
+                        // would inflate the "hidden this week" block counter.
+                        .filter { !verifiedOnly || it.verified }
                         .filter { favs == null || it.userName.lowercase() in favs }
                         // §8 range chips: client-side, read-time, AFTER the filter;
                         // not counted in hide counts — prefs, not blocks.

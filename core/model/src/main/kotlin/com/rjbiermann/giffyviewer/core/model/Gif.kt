@@ -20,6 +20,8 @@ data class Gif(
     val hdUrl: String?,
     val posterUrl: String?,
     val niches: List<String>,
+    /** Creator's verified badge (gif payload top-level `verified`, live 2026-10). */
+    val verified: Boolean = false,
 )
 
 /** Read-oriented resolution for the data-saver toggle: SD vs HD stream. */

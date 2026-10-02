@@ -22,6 +22,8 @@ dependencies {
     api(libs.compose.foundation)
     api(libs.compose.material3)
     api(libs.compose.material3.window.size)
+    implementation(libs.material.icons)
+    implementation(libs.material.icons.extended)
 }
 
 kotlin {

@@ -59,19 +59,31 @@ interface GifsApi {
         @Query("order") order: String? = null,
     ): GifsPageDto
 
-    /** Niches (live-verified 2026-09-30, anonymous OK): paginated taxonomy. */
+    /** Niches (live-verified 2026-09-30, anonymous OK): paginated taxonomy.
+     *  Live-verified 2026-10: category filter (one name from v2/niches/categories,
+     *  omit/empty for all) and order — accepted: posts, subscribers, best_match,
+     *  alphabetical_asc, alphabetical_desc, random (trending 400s BadOrder). */
     @GET("v2/niches")
     suspend fun niches(
         @Query("count") count: Int = 60,
         @Query("page") page: Int = 1,
+        @Query("category") category: String? = null,
+        @Query("order") order: String? = null,
     ): NichesPageDto
 
+    /** Niche category names for the filter chips (live-verified 2026-10, anonymous OK). */
+    @GET("v2/niches/categories")
+    suspend fun nicheCategories(): NicheCategoriesDto
+
+    /** Niches feed (live-verified 2026-10-01, anonymous OK). Live drift 2026-10:
+     *  the server now REJECTS order=trending (BadOrder — despite its own error
+     *  message listing it); omit the param for the default ordering. */
     @GET("v2/niches/{id}/gifs")
     suspend fun nicheGifs(
         @Path("id") nicheId: String,
         @Query("count") count: Int = 40,
         @Query("page") page: Int = 1,
-        @Query("order") order: String = "trending",
+        @Query("order") order: String? = null,
     ): GifsPageDto
 
     /** Verified-creator list (live-verified 2026-10-01, anonymous OK) — the
@@ -322,6 +334,11 @@ data class NicheDto(
 )
 
 @Serializable
+data class NicheCategoriesDto(
+    val categories: List<String> = emptyList(),
+)
+
+@Serializable
 data class NichesPageDto(
     val page: Int = 1,
     val pages: Int = 1,
@@ -344,6 +361,8 @@ data class CreatorSearchItemDto(
     val gifs: Int = 0,
     @SerialName("publishedCollections") val publishedCollections: Int = 0,
     @SerialName("profileImageUrl") val profileImageUrl: String? = null,
+    /** Creator verified badge (live 2026-10: `verified` on every creator object). */
+    val verified: Boolean = false,
 )
 
 @Serializable

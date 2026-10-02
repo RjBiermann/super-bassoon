@@ -73,9 +73,29 @@ prefs + the normative UI-lingo table below (formerly PLAN.md §3, §7–9).
 - Touch-coordinate scale: Phone34 thumbnails 540×1170 for a 1080×2400 screen = ×2.051,
   NOT ×2 — SAF dialog buttons at (958, 2215), Import button at (423, 810).
 
+## Verified tick + verified-only filter (built 2026-10, live-verified Phone34 + TV36)
+- Every gif payload carries top-level `verified` (creator's badge) — no verified-set
+  download needed; live-probed 2026-10 (`v2/gifs/search`, `v2/feeds/trending/popular`,
+  `v2/users/{u}/search` all include it; `users` array rows carry it too for following).
+- **VerifiedTick (core:ui)** renders next to every user-visible @username: mobile tiles,
+  player cluster, creator rows (Explore/Following/NicheAbout), feed creator chips,
+  quick sheets; TV cards, creator cards, quick-actions header, player cluster. Tint:
+  shared Info cyan on mobile dark, white on video overlays, onSurfaceVariant on TV cards.
+- **"Verified creators only"** — one global toggle in Settings (shared mobile/TV screen).
+  Read-time pref like orientation: `SettingsRepository.verifiedOnly` → pager restart via
+  `FeedRepository.paging` combine → `FeedPagingSource`/`LikedNetworkPagingSource`
+  filter + `refreshSurprise` + `ContinueWatchingViewModel`. Room: `gifs.verified`
+  (v8, MIGRATION_7_8). MUST stay OUTSIDE the hide-count increment (prefs are not blocks).
+
 ## UI/UX audit findings (2026-10, research-only — fixes unscheduled)
 Static review against mobile-accessibility / M3 / ui-ux-pro-max rules. Not a work order;
 a user slice picks from this list. Priority order within each tier.
+
+**Fixed in the 2026-10-01 session (verified live):** dead duplicate data-saver row
+removed (Settings); Collections NameDialog cancel/dismiss no longer submits "";
+NichesScreen initial fetch moved to LaunchedEffect; empty-Favorites hint now points at
+the player's ⋯ sheet (no tiles exist on an empty feed); TV speed label Locale.US;
+TvPlayerScreen progress fraction starts at 0 (stale BISECT probe removed).
 
 **Critical**
 - Dead control: CollectionsScreen share `IconButton(onClick = {})` — wire it or remove the icon (repo "no stubs" rule).
@@ -100,6 +120,13 @@ a user slice picks from this list. Priority order within each tier.
   same destructive class needs the same dialog or undo snackbar.
 - TV age gate has no initial-focus FocusRequester (home screen got that fix; the
   first screen a TV user sees didn't).
+  [FIXED same day: TvMainActivity.AgeGate has `gateFocus`; **2026-10 session also
+  wired initial focus on TvNichesScreen (first row) and TvSourceFeedScreen (first
+  grid card) — those lists sat unfocused on open: no ring, first CENTER did nothing.**
+  Focus-ring unification: M3 Buttons/FilterChips on TV draw nothing on D-pad focus —
+  every TV Button/chip takes an explicit `MutableInteractionSource` passed BOTH to the
+  component and to `Modifier.giffyFocus(is)`, giving the one BrandRed ring everywhere
+  (Niches rows, quick-action dialogs, source-feed Filter chip).]
 
 **Medium**
 - AuthScreen coaches the DevTools paste-token flow first; PKCE "Sign in with browser"
@@ -201,3 +228,84 @@ per-session Fisher-Yates, stable across recomposition, reshuffle action availabl
   Strict filters can therefore legitimately match zero tiles → FeedScreen
   shows "No videos match this filter / Clear or loosen the filter chips"
   instead of a blank grid. "Clear" refills (live-verified both ways).
+
+## Empty custom feeds + quick-add (audited 2026-10-01, deferred — doc-only)
+Quick-add is DONE (mobile: tile long-press → ⋯ → "Add to custom feed…" → picker
+dialog; TV parity in TvQuickActions; add is deduped + evicts `custom:<id>` pages).
+Empty creation is half-wired — intent documented, code contradicts itself. NOT
+implemented (no bug report, no user ask); pickup checklist:
+- `CustomFeedsScreen.kt` `save()` still guards `refs.isEmpty()` → silently no-ops,
+  while `canSave = name.isNotBlank()` (line ~119 comment: "Empty feed is valid")
+  enables the button. Drop the `refs.isEmpty()` guard — one line.
+- Empty-state gap: FeedScreen `EmptyState` fires only for Favorites/ForYou — an
+  empty custom feed opens to a BLANK SCREEN (same pattern the audit fixed for
+  Favorites). Add `FeedSource.Custom` to that condition; message points at the
+  tile long-press / player ⋯ "Add to custom feed…" path (no tiles exist on an
+  empty feed — same wording trap as the Favorites hint, audit Medium).
+- Update stale `FeedPageFetcher.kt` ponytail comment ("refs must be non-empty —
+  the builder enforces it"; empty is now valid, fetcher already returns an empty
+  page safely).
+- One test: save name-only → row with empty `sourcesJson`; quick-add lands a ref.
+- Pairs with the parked groups→custom-feeds merge (AGENTS-CONTENT-FILTER.md):
+  empty creation makes "group = custom feed with only tag refs" literal.
+
+## Ponytail audit — merge/simplify/split candidates (2026-10-01, deferred — doc-only)
+One-shot complexity audit; no bugs found in scope, repo is lean for its size. Ranked:
+
+- **delete:** `core/model/UiState.kt` (20 lines) — sealed Idle/Loading/Ready/Error
+  interface with ZERO usages; screens use StateFlow + inline states. Also unused
+  `typealias GifItem = Gif` (FeedSource.kt).
+- **merge:** `TvNichesViewModel` (TvNiches.kt:66) is a near-verbatim copy of the
+  paging logic mobile `NichesScreen` keeps inline in the composable (loadMore /
+  nextPage / loadFailed / pin toggle). Extract one shared `NichesViewModel` in
+  `feature:feed`; mobile gets the VM it should have had anyway, TV keeps its
+  tv-material UI. One paging path instead of two (~60 lines).
+- **dedupe:** mobile `AddToCustomFeedDialog` vs TV `TvQuickActions` feed-picker —
+  dialog chrome is rightly platform-specific, but the ref-building (creatorRef /
+  tagRefs from a Gif) is duplicated; ~10-line shared helper in `feature:feed`.
+- **split:** `TvSourceFeedScreen` + `TvNicheFeedViewModel` live inside TvNiches.kt
+  (lines ~210–322) — a feed screen in the niches file. Move to its own file
+  (zero logic change).
+- **judgment call (not a finding):** `AppModule` vs `TvAppModule` are 129
+  near-identical lines (only media-cache constant + logging flag differ); a shared
+  Hilt module could absorb the identical DB/Coil wiring, but the mirror is
+  documented as deliberate ("modules stay device-shaped").
+
+Clean: no single-implementation DI abstractions, GiffyPlayerFactory earns its
+keep, TvTheme is a real platform mapping, FeedSource→fetcher layering is Paging-3
+structure. Already tracked elsewhere: groups↔custom-feeds merge + empty-feed
+half-wiring (AGENTS-CONTENT-FILTER.md + above), OfflineNotice vs EmptyState
+(UI/UX audit Medium/Low), FeedScreen/PlayerScreen monoliths — splittable but
+churn-only.
+
+## TV parity gaps vs mobile (audited 2026-10-01, deferred — doc-only)
+Code-verified inventory. Ranked, biggest first:
+
+**Missing entirely on TV:**
+- **Search** — zero `api.search` calls, no search UI anywhere in app-tv. Mobile has
+  full search (tags/creators/suggestions). TV browsing = home rows + Niches +
+  pinned/custom feeds only.
+- **Groups management** — no GroupsScreen equivalent: create/favorite/BLOCK niche
+  groups unreachable on TV. Mobile's blockable group bundles are the macro-filter
+  path (leak-zero); TV only has per-item tag/creator quick-action blocks.
+- **Custom-feed management** — TV can open existing custom feeds (home ⋯ menu) and
+  add to them (quick actions), but create/rename/delete is mobile-only
+  (CustomFeedsScreen). Stacks with the empty-creation deferral above.
+- **Collections** — mobile-only screen (CollectionsScreen); nothing on TV.
+- **§8 shuffle** — no shuffle on TV source feeds (mobile: chips + reshuffle +
+  infinite-shuffle player). TV has the Filter chip only.
+
+**Broken on TV (own sections):** auto-swipe dead toggle + end-of-media parking +
+play-after-end (AGENTS-PLAYER.md), TvNichesViewModel copy-paste paging +
+TvSourceFeedScreen misplaced (ponytail audit below).
+
+**Inverse gap:** shared SettingsScreen renders mobile-only "Grid columns" row on
+TV; Export/Import SAF picker NOT verified under D-pad — manual check on TV36
+before trusting gate 7 on TV.
+
+**Minor:** no NicheAbout entry from TvNichesScreen (mobile-only); TV "Following"
+row is read-only — unverified whether a follow action exists anywhere on TV.
+
+**Parity OK (verified in code):** age gate, PIN lock, Settings/data saver/video
+fit/verified-only, per-feed prefs (same feedprefs blob + shared dialog),
+favorites/likes, watch history, quick actions, Surprise me, mute/speed.

@@ -38,6 +38,7 @@ class SettingsRepository
             val FORYOU_SCOPE = stringPreferencesKey("foryou_scope")
             val VIDEO_FIT = stringPreferencesKey("video_fit")
             val ORIENTATION_FILTER = stringPreferencesKey("orientation_filter")
+            val VERIFIED_ONLY = booleanPreferencesKey("verified_only")
         }
 
         /** True once the user attested 18+. Emits false until then; survives restarts. */
@@ -139,6 +140,14 @@ class SettingsRepository
 
         suspend fun setOrientationFilter(value: String) {
             dataStore.edit { it[Keys.ORIENTATION_FILTER] = value }
+        }
+
+        /** Verified-creators-only filter: drops gifs from unverified creators
+         *  (spam-account noise). Read-time pref like orientation — no hide counts. */
+        val verifiedOnly: Flow<Boolean> = dataStore.data.map { it[Keys.VERIFIED_ONLY] ?: false }
+
+        suspend fun setVerifiedOnly(enabled: Boolean) {
+            dataStore.edit { it[Keys.VERIFIED_ONLY] = enabled }
         }
 
         /** Video fit (§5): fit | crop | stretch — one shared setting, both players. */

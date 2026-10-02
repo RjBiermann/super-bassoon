@@ -10,6 +10,7 @@ import com.rjbiermann.giffyviewer.core.model.matchesOrientation
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -34,6 +35,7 @@ class ContinueWatchingViewModel
         val entries: StateFlow<List<Entry>> =
             settings.orientationFilter
                 .flatMapLatest { orientation ->
+                    val verifiedOnly = settings.verifiedOnly.first()
                     db
                         .watchHistoryDao()
                         .continueWatching(limit = 20)
@@ -47,6 +49,7 @@ class ContinueWatchingViewModel
                                     // counted at watch time — recount would double-count.
                                     // Orientation pref rides the same read (a pref, not a block).
                                     if (contentFilter.allow(gif.userName, gif.tags, gif.description) &&
+                                        (!verifiedOnly || gif.verified) &&
                                         gif.matchesOrientation(orientation)
                                     ) {
                                         Entry(gif, row.positionMs)

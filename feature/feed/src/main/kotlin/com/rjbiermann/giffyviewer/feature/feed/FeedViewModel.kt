@@ -289,6 +289,10 @@ class FeedViewModel
             }
         }
 
+        /** Verified-only (2026-10): drives the filtered-empty grid state. */
+        val verifiedOnly: StateFlow<Boolean> =
+            settings.verifiedOnly.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
         /** Matching creators above search results (§7); tap opens their feed. */
         @kotlinx.coroutines.ExperimentalCoroutinesApi
         val creatorResults: StateFlow<List<com.rjbiermann.giffyviewer.core.network.CreatorSearchItemDto>> =

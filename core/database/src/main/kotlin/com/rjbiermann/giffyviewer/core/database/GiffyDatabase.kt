@@ -25,7 +25,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         NicheGroupEntity::class,
         CustomFeedEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 @TypeConverters(ListConverters::class)
@@ -111,6 +111,14 @@ abstract class GiffyDatabase : RoomDatabase() {
                             "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
                             "`name` TEXT NOT NULL, `sourcesJson` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)",
                     )
+                }
+            }
+
+        /** v8: creator verified badge (gif payload `verified` — verified-only filter). */
+        val MIGRATION_7_8 =
+            object : Migration(7, 8) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE `gifs` ADD COLUMN `verified` INTEGER NOT NULL DEFAULT 0")
                 }
             }
 

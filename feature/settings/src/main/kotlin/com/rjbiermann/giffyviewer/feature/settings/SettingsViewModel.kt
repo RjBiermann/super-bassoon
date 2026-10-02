@@ -88,6 +88,14 @@ class SettingsViewModel
             viewModelScope.launch { settings.setDataSaver(enabled) }
         }
 
+        /** Verified-creators-only (2026-10): spam filter — read-time pref. */
+        val verifiedOnly: StateFlow<Boolean> =
+            settings.verifiedOnly.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+        fun setVerifiedOnly(enabled: Boolean) {
+            viewModelScope.launch { settings.setVerifiedOnly(enabled) }
+        }
+
         /** Orientation filter (§6): any | vertical | horizontal — read-time pref. */
         val orientationFilter: StateFlow<String> =
             settings.orientationFilter.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "any")

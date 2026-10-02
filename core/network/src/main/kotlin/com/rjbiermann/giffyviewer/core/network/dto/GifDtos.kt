@@ -30,6 +30,8 @@ data class GifDtoShell(
     val createDate: Long = 0,
     val published: Boolean = true,
     val avgColor: String? = null,
+    /** Creator verified badge (gif payload top-level, live 2026-10). */
+    val verified: Boolean = false,
     val urls: UrlsDto? = null,
     @Serializable(with = NicheListSerializer::class)
     val niches: List<NicheRefDto> = emptyList(),
@@ -125,6 +127,7 @@ fun GifDtoShell.toModel(): Gif =
         hdUrl = urls?.hd,
         posterUrl = urls?.poster,
         niches = niches.mapNotNull { it.id },
+        verified = verified,
     )
 
 fun GifsPageDto.toModels(): List<Gif> = gifs.map { it.toModel() }

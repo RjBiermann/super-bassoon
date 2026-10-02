@@ -73,7 +73,9 @@ class FeedPageFetcher(
                     nicheId = feed.id,
                     count = pageSize,
                     page = page,
-                    order = feed.sort.ifEmpty { "trending" },
+                    // Live drift 2026-10: "trending" is now a BadOrder — the
+                    // server's default ordering rides on an omitted param.
+                    order = feed.sort.ifEmpty { null },
                 )
             is FeedSource.Group -> {
                 // ponytail: page n maps to tag[(n-1) % n_tags]; a changed tag list
@@ -119,7 +121,6 @@ class FeedPageFetcher(
                                 nicheId = ref.removePrefix("niche:").substringBefore('|'),
                                 count = pageSize,
                                 page = inner,
-                                order = "trending",
                             )
                         else ->
                             api.search(

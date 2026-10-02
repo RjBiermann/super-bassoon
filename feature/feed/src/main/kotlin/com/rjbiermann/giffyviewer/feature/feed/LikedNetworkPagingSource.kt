@@ -18,6 +18,7 @@ class LikedNetworkPagingSource(
     private val contentFilter: ContentFilter,
     private val pageSize: Int,
     private val orientation: String = "any",
+    private val verifiedOnly: Boolean = false,
 ) : PagingSource<Int, Gif>() {
     override suspend fun load(params: LoadParams<Int>): PagingSource.LoadResult<Int, Gif> {
         val page = params.key ?: 1
@@ -27,6 +28,8 @@ class LikedNetworkPagingSource(
                 dto.gifs
                     .map { it.toModel() }
                     .filter { contentFilter.allow(it.userName, it.tags, it.description) }
+                    // Verified-only pref (2026-10): read-time, after the block filter.
+                    .filter { !verifiedOnly || it.verified }
                     // Orientation pref (§6): read-time, not a block.
                     .filter { it.matchesOrientation(orientation) }
             PagingSource.LoadResult.Page(

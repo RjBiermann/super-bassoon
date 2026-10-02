@@ -2,6 +2,7 @@ package com.rjbiermann.giffyviewer.tv
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,11 +10,13 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -26,6 +29,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -118,6 +123,13 @@ fun TvNichesScreen(
     }
     LaunchedEffect(Unit) { viewModel.loadMore() }
 
+    // Initial D-pad focus (AGENTS-APP pattern): without it the list sits
+    // unfocused — the first CENTER press did nothing and no focus ring showed.
+    val firstRowFocus = remember { FocusRequester() }
+    LaunchedEffect(niches.isNotEmpty()) {
+        if (niches.isNotEmpty()) firstRowFocus.requestFocus()
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         Text(
             text = "Niches",
@@ -139,6 +151,7 @@ fun TvNichesScreen(
                     modifier =
                         Modifier
                             .fillMaxWidth()
+                            .then(if (index == 0) Modifier.focusRequester(firstRowFocus) else Modifier)
                             .giffyFocus(rowInteraction, fillOnFocus = MaterialTheme.colorScheme.surfaceVariant)
                             .clickable(
                                 interactionSource = rowInteraction,
@@ -215,18 +228,30 @@ fun TvSourceFeedScreen(
                     .FeedPrefs(),
         )
     var showFilter by remember { mutableStateOf(false) }
+    // Initial D-pad focus (AGENTS-APP pattern): the grid's first card takes
+    // focus on open — no blind first press.
+    val firstCardFocus = remember { FocusRequester() }
+    LaunchedEffect(gifs.itemCount > 0) {
+        if (gifs.itemCount > 0) firstCardFocus.requestFocus()
+    }
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Text(
             text = source.title(),
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp),
         )
+        // Focus ring (unified BrandRed, AGENTS-APP): M3 FilterChip's own focus
+        // state is subtle on 10-foot — the shared giffyFocus border marks it.
+        val chipInteraction =
+            remember { MutableInteractionSource() }
         androidx.compose.material3.FilterChip(
             selected = showFilter,
             onClick = { showFilter = true },
+            interactionSource = chipInteraction,
             label = { Text("Filter") },
             modifier =
                 Modifier
+                    .giffyFocus(chipInteraction, shape = RoundedCornerShape(8.dp))
                     .align(Alignment.TopEnd)
                     .padding(end = 16.dp, top = 8.dp),
         )
@@ -241,7 +266,10 @@ fun TvSourceFeedScreen(
                 gifs[i]?.let { gif ->
                     GifCard(
                         gif = gif,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier =
+                            Modifier
+                                .then(if (i == 0) Modifier.focusRequester(firstCardFocus) else Modifier)
+                                .fillMaxWidth(),
                         onMenu = { actionsFor = gif },
                         onClick = { onOpenGif(snapshot(gifs), gifs.indexOf(gif.id)) },
                     )

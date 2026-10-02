@@ -79,6 +79,26 @@ see ContentPrefsBackup below; niche groups landed in DB v5).
 - Niche groups: DB v5 (`niche_groups`), GroupsScreen live on both apps, BLOCKED groups feed stage 2.
 - Hide counts: single rolling 7-day counter (`hide_counts`), no per-reason split — matches the spec.
 
+## Merging groups into custom feeds (considered, deferred 2026-10-01)
+
+Conceptually `niche_groups` is a special case of `custom_feeds` (an all-tag-refs feed), and the
+merge would generalize blocking to per-ref granularity (blockable `creator:` refs — not possible
+today; blocking a custom feed's `tag:` refs would map onto existing paths). NOT implemented:
+no bug, no user ask — cosmetic consolidation against real churn. Re-evaluate only if blockable
+creators become a want.
+
+If picked up later, the inventory:
+- Room migration: `niche_groups` rows → `custom_feeds` rows, `tagList` → refs (`tag:<t>` each); drop the table.
+- `custom_feeds` gains a `state` column (BLOCKED | FAVORITED | NEUTRAL, as `niche_groups` has today).
+- ContentFilter blocked-set derivation rewritten: a BLOCKED custom feed's refs become global block
+  sets (`tag:` → tag path, `creator:` → creator path, `niche:` blocked after fetcher expansion via its
+  tag list). Preserve pipeline order and the regression tests (`ContentFilterTest.kt`).
+- GroupsScreen folds into CustomFeedsScreen on mobile + TV (the `FeedScreen` "add to custom feed"
+  quick path is ref-based already, keeps working).
+- `ContentPrefsBackup` export format changes → versioned importer for old exports (round-trip gate 7).
+- `nicheGifs` page-mapping quirk stays (live API behavior, not ours to fix).
+- AGENTS-APP.md groups references updated.
+
 ## Orientation filter (planned, decided 2026-10-01)
 NOT part of the ContentFilter pipeline — a global DataStore pref `orientation_filter`
 (`any`/`horizontal`/`vertical`, shared SettingsScreen) applied strictly AFTER ContentFilter

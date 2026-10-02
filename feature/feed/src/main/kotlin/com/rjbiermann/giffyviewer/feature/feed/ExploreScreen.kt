@@ -109,7 +109,16 @@ fun ExploreScreen(
                             modifier = Modifier.size(40.dp).clip(CircleShape),
                         )
                     },
-                    headlineContent = { Text("@${creator.username}") },
+                    headlineContent = {
+                        androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            Text("@${creator.username}")
+                            if (creator.verified) {
+                                com.rjbiermann.giffyviewer.core.ui.VerifiedTick(
+                                    modifier = Modifier.padding(start = 4.dp).size(14.dp),
+                                )
+                            }
+                        }
+                    },
                     supportingContent = { Text("${creator.followers} followers · ${creator.gifs} gifs") },
                     modifier = Modifier.clickable { onOpenCreator(creator.username) },
                 )

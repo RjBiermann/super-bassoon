@@ -50,14 +50,19 @@ class ContentFilter
             mutex.withLock { groupTags = merged }
         }
 
-        /** Null = allow. Otherwise the reason: "creator" | "tag" | "group" | "keyword".
-         *  Keyword = case-insensitive substring over description + tags (PLAN §6:
-         *  title/description/tags — gif objects carry no title today). */
+        /** Null = allow. Otherwise the reason: "creator" | "tag" | "group" | "keyword"
+         *  | "unverified". Keyword = case-insensitive substring over description +
+         *  tags (PLAN §6: title/description/tags — gif objects carry no title today).
+         *  Verified-only is a read-time PREF like orientation — never a block, so
+         *  callers must not count its rejections in hide counts. */
         fun hideReason(
             userName: String,
             gifTags: List<String>,
             description: String? = null,
+            gifVerified: Boolean = false,
+            verifiedOnly: Boolean = false,
         ): String? {
+            if (verifiedOnly && !gifVerified) return "unverified"
             if (userName.lowercase() in creators) return "creator"
             if (gifTags.any { it.lowercase() in tags }) return "tag"
             if (gifTags.any { it.lowercase() in groupTags }) return "group"
@@ -70,7 +75,9 @@ class ContentFilter
             userName: String,
             gifTags: List<String>,
             description: String? = null,
-        ): Boolean = hideReason(userName, gifTags, description) == null
+            gifVerified: Boolean = false,
+            verifiedOnly: Boolean = false,
+        ): Boolean = hideReason(userName, gifTags, description, gifVerified, verifiedOnly) == null
     }
 
 /** Start of the 7-day bucket containing [nowEpochMs] (PLAN §6 rolling counter). */

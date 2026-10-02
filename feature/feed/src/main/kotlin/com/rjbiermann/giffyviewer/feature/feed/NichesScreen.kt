@@ -9,12 +9,15 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -44,6 +47,8 @@ import kotlinx.coroutines.launch
 /**
  * Niches browser (PLAN §7 groups groundwork): paginated taxonomy from
  * `v2/niches` (anonymous OK); tap opens the niche as a feed tab.
+ * Site-parity 2026-10: scrollable category filter chips (`v2/niches/categories`)
+ * and a Sort by menu (orders verified against the server's BadOrder message).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,13 +67,17 @@ fun NichesScreen(
     var nextPage by remember { mutableIntStateOf(1) }
     var loading by remember { mutableStateOf(false) }
     var loadFailed by remember { mutableStateOf(false) }
+    var category by remember { mutableStateOf<String?>(null) }
+    var categories by remember { mutableStateOf<List<String>>(emptyList()) }
+    var sort by remember { mutableStateOf("subscribers") }
+    var sortMenuOpen by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     fun loadMore() {
         if (loading || nextPage <= 0) return
         loading = true
         scope.launch {
-            runCatching { api.niches(page = nextPage) }
+            runCatching { api.niches(page = nextPage, category = category, order = sort) }
                 .onSuccess { pageDto ->
                     loadFailed = false
                     niches = niches + pageDto.niches
@@ -77,9 +86,16 @@ fun NichesScreen(
             loading = false
         }
     }
-    remember {
-        scope.launch { loadMore() }
-        true
+    LaunchedEffect(Unit) { loadMore() }
+    LaunchedEffect(category, sort) {
+        if (category == null && sort == "subscribers") return@LaunchedEffect // initial state
+        nextPage = 1
+        niches = emptyList()
+        loadFailed = false
+        loadMore()
+    }
+    LaunchedEffect(Unit) {
+        runCatching { api.nicheCategories() }.onSuccess { categories = it.categories }
     }
 
     Scaffold(
@@ -92,6 +108,33 @@ fun NichesScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
+                actions = {
+                    androidx.compose.material3.TextButton(onClick = { sortMenuOpen = true }) {
+                        Text(
+                            "Sort: ${sort.removeSuffix("_asc").removeSuffix("_desc").replaceFirstChar { it.uppercase() }}",
+                        )
+                    }
+                    androidx.compose.material3.DropdownMenu(
+                        expanded = sortMenuOpen,
+                        onDismissRequest = { sortMenuOpen = false },
+                    ) {
+                        listOf(
+                            "subscribers" to "Subscribers",
+                            "posts" to "Gifs",
+                            "alphabetical_asc" to "A–Z",
+                            "alphabetical_desc" to "Z–A",
+                            "random" to "Random",
+                        ).forEach { (value, label) ->
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text(label) },
+                                onClick = {
+                                    sort = value
+                                    sortMenuOpen = false
+                                },
+                            )
+                        }
+                    }
+                },
             )
         },
     ) { padding ->
@@ -102,6 +145,28 @@ fun NichesScreen(
                     .padding(padding)
                     .windowInsetsPadding(WindowInsets.navigationBars),
         ) {
+            // Site-parity filter chips: All + one chip per niche category.
+            item {
+                LazyRow(
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp),
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+                ) {
+                    item {
+                        FilterChip(
+                            selected = category == null,
+                            onClick = { category = null },
+                            label = { Text("All") },
+                        )
+                    }
+                    items(categories) { cat ->
+                        FilterChip(
+                            selected = category == cat,
+                            onClick = { category = if (category == cat) null else cat },
+                            label = { Text(cat) },
+                        )
+                    }
+                }
+            }
             items(niches.size, key = { niches[it].id }) { index ->
                 val niche = niches[index]
                 val scope2 = rememberCoroutineScope()

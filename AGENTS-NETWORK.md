@@ -8,7 +8,8 @@ Base URL: `https://upstream-api-host.example/`. Endpoints are undocumented; **ve
 
 - `GET /v2/auth/temporary` → anonymous token. **Dead: `POST /v2/auth` (authkey) and `DELETE /v2/auth` — 404 live; login is PKCE OAuth via `upstream-auth-host.example` (Kinde) — see AGENTS-AUTH.md.**
 - Content: `GET /v2/gifs/{id}` · `GET /v2/gifs/search` (tags, order, count) · `/v2/feeds/trending/popular` (accepts `order`, e.g. `top_week`) · `/v2/feeds/trending/established` · `/v2/feeds/liked` · `/v2/feeds/for-you` (logged-in)
-- Niches: `GET /v2/niches` · `/{id}` · `/{id}/gifs` (niche feed source, anonymous OK) · `/{id}/top-creators` · `/{id}/related` · `/v2/niches/categories` · `/v2/niches/following`
+- Niches: `GET /v2/niches` · `/{id}` · `/{id}/gifs` (niche feed source, anonymous OK; **live drift 2026-10: `order=trending` now 400s BadOrder — despite the server's own error text listing it. Omit the param for the default ordering; accepted orders: `hot` `oldest` `latest` `best`**) · `/{id}/top-creators` · `/{id}/related` · `/v2/niches/categories` · `/v2/niches/following`
+- Niches taxonomy params (live-verified 2026-10, anonymous OK): `GET /v2/niches/categories` → `{categories:[18 names]}`; `GET /v2/niches?category=<name>` filters (e.g. Animated → 34 niches); `GET /v2/niches?order=` accepts exactly **posts, subscribers, best_match, alphabetical_asc, alphabetical_desc, random** (server BadOrder message is the authoritative list; `subscribers` and `posts` verified, default = subscribers-ish popularity).
 - Creators/search: `GET /v2/creators/search` · `/v2/creators/verified` · `GET /v2/users/{username}/search` · `GET /v2/users/{username}/collections` (anonymous OK) · `GET /v2/search/suggest` · `GET /v1/tags/match`
 - Account reads: `GET /v2/me/following` · `GET /v1/me/follows` · `GET /v1/me/followers/populated` · `GET /v2/likes` · `GET /v2/me/collections` (unverified) · `GET /v2/search/user-history`
 

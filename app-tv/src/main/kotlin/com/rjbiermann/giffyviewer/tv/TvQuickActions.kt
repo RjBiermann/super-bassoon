@@ -1,11 +1,13 @@
 package com.rjbiermann.giffyviewer.tv
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -30,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rjbiermann.giffyviewer.core.model.Gif
+import com.rjbiermann.giffyviewer.core.ui.giffyFocus
 import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
 import androidx.compose.material3.Surface as M3Surface
 
@@ -76,11 +79,18 @@ fun TvQuickActionsDialog(
                 modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Text(
-                    text = "@${gif.userName}",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(bottom = 8.dp),
-                )
+                Row {
+                    Text(
+                        text = "@${gif.userName}",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                    if (gif.verified) {
+                        com.rjbiermann.giffyviewer.core.ui.VerifiedTick(
+                            modifier = Modifier.padding(start = 6.dp, bottom = 8.dp).size(16.dp),
+                        )
+                    }
+                }
                 val first = remember { FocusRequester() }
                 LaunchedEffect(Unit) { first.requestFocus() }
                 if (view == "tags") {
@@ -123,7 +133,9 @@ fun TvQuickActionsDialog(
                         )
                     }
                     QuickAction(
-                        text = "Speed %.2f× — tap to change".format(pa.speed),
+                        // Locale.US: comma-decimal locales read "0,50×" — and the
+                        // speed steps are 0.25, so 2 decimals is real precision.
+                        text = "Speed " + String.format(java.util.Locale.US, "%.2f", pa.speed) + "× — tap to change",
                         onClick = {
                             pa.onCycleSpeed()
                             onDismiss()
@@ -196,9 +208,16 @@ private fun QuickAction(
     first: FocusRequester? = null,
     onClick: () -> Unit,
 ) {
+    // Focus ring: M3 Buttons draw nothing on D-pad focus — the shared
+    // giffyFocus BrandRed border is the unified TV focus treatment.
+    val interaction = remember { MutableInteractionSource() }
     Button(
         onClick = onClick,
-        modifier = (first?.let { Modifier.focusRequester(it) } ?: Modifier).fillMaxWidth(),
+        interactionSource = interaction,
+        modifier =
+            (first?.let { Modifier.focusRequester(it) } ?: Modifier)
+                .fillMaxWidth()
+                .giffyFocus(interaction),
     ) { Text(text) }
 }
 
@@ -229,11 +248,15 @@ private fun TvAddToFeedDialog(
                 val first = remember { FocusRequester() }
                 LaunchedEffect(Unit) { first.requestFocus() }
                 customFeeds.forEach { def ->
+                    val src = remember { MutableInteractionSource() }
                     Row(
                         modifier =
-                            Modifier.fillMaxWidth().clickable {
-                                feedId = def.id
-                            },
+                            Modifier
+                                .fillMaxWidth()
+                                .giffyFocus(src)
+                                .clickable(interactionSource = src, indication = null) {
+                                    feedId = def.id
+                                },
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(selected = feedId == def.id, onClick = { feedId = def.id })
@@ -248,11 +271,15 @@ private fun TvAddToFeedDialog(
                             ref.startsWith("niche:") -> "Niche: ${ref.removePrefix("niche:").substringAfter('|')}"
                             else -> "#${ref.removePrefix("tag:")}"
                         }
+                    val src = remember { MutableInteractionSource() }
                     Row(
                         modifier =
-                            Modifier.fillMaxWidth().clickable {
-                                if (ref in selected) selected.remove(ref) else selected.add(ref)
-                            },
+                            Modifier
+                                .fillMaxWidth()
+                                .giffyFocus(src)
+                                .clickable(interactionSource = src, indication = null) {
+                                    if (ref in selected) selected.remove(ref) else selected.add(ref)
+                                },
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Checkbox(checked = ref in selected, onCheckedChange = { checked ->
@@ -261,14 +288,24 @@ private fun TvAddToFeedDialog(
                         Text(label)
                     }
                 }
+                val addSrc = remember { MutableInteractionSource() }
                 Button(
                     enabled = feedId != null && selected.isNotEmpty(),
                     onClick = { feedId?.let { id -> selected.forEach { ref -> onAdd(id, ref) } } },
-                    modifier = Modifier.fillMaxWidth(),
+                    interactionSource = addSrc,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .giffyFocus(addSrc),
                 ) { Text("Add") }
+                val cancelSrc = remember { MutableInteractionSource() }
                 Button(
                     onClick = onDismiss,
-                    modifier = Modifier.fillMaxWidth(),
+                    interactionSource = cancelSrc,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .giffyFocus(cancelSrc),
                 ) { Text("Cancel") }
             }
         }

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
@@ -24,6 +25,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -160,7 +162,6 @@ fun FeedScreen(
                 // FIXED set only — three primary tabs + a More menu (consolidated;
                 // pinned/custom grow unbounded and the row became unusable).
                 // For You = server personalized feed, logged-in only (PLAN §7).
-                val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle(false)
                 // Site home order: For You first when logged in (verified sweep).
                 listOf(
                     FeedSource.ForYou,
@@ -257,6 +258,9 @@ fun FeedScreen(
                                 onOpenGroups()
                             },
                         )
+                        // Always reachable: the builder is the ONLY way to create
+                        // a feed, so "New feed…" must not be gated on having any
+                        // (fresh install would otherwise never reach the screen).
                         if (customFeeds.isNotEmpty()) {
                             HorizontalDivider()
                             Text(
@@ -274,14 +278,14 @@ fun FeedScreen(
                                     },
                                 )
                             }
-                            DropdownMenuItem(
-                                text = { Text("New feed…") },
-                                onClick = {
-                                    moreOpen = false
-                                    onOpenCustomFeeds()
-                                },
-                            )
                         }
+                        DropdownMenuItem(
+                            text = { Text(if (customFeeds.isEmpty()) "New custom feed…" else "New feed…") },
+                            onClick = {
+                                moreOpen = false
+                                onOpenCustomFeeds()
+                            },
+                        )
                         val pinnedSection =
                             pinnedNiches.map { it as FeedSource } +
                                 favGroups.filter { it.state == "FAVORITED" }.map {
@@ -329,7 +333,14 @@ fun FeedScreen(
                         SuggestionChip(
                             onClick = { viewModel.open(FeedSource.Creator(username = creator.username)) },
                             label = {
-                                Text("@${creator.username} · ${creator.followers}⇡")
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("@${creator.username} · ${creator.followers}⇡")
+                                    if (creator.verified) {
+                                        com.rjbiermann.giffyviewer.core.ui.VerifiedTick(
+                                            modifier = Modifier.padding(start = 3.dp).size(14.dp),
+                                        )
+                                    }
+                                }
                             },
                         )
                     }
@@ -445,6 +456,7 @@ fun FeedScreen(
             }
 
             val refreshError = items.loadState.refresh is LoadState.Error
+            val verifiedOnlyPref by viewModel.verifiedOnly.collectAsStateWithLifecycle(false)
             if (items.itemCount == 0 && refreshError) {
                 com.rjbiermann.giffyviewer.core.ui.EmptyState(
                     message = "Nothing cached yet",
@@ -455,7 +467,8 @@ fun FeedScreen(
                 items.loadState.refresh is LoadState.NotLoading &&
                 (
                     listOf(feedPrefs.duration, feedPrefs.resolution, feedPrefs.orientation).any { it.isNotEmpty() } ||
-                        feedPrefs.untaggedOnly
+                        feedPrefs.untaggedOnly ||
+                        verifiedOnlyPref
                 )
             ) {
                 // Strict client filter (lt10 etc.) can legitimately match zero
@@ -479,7 +492,9 @@ fun FeedScreen(
                 val hint =
                     when {
                         source is FeedSource.ForYou -> "Follow creators and join niches to fill it"
-                        else -> "long-press a tile and choose “Favorite @creator”"
+                        // Audit fix: on an EMPTY feed there are no tiles to long-press —
+                        // point at the player's overflow sheet instead.
+                        else -> "open any video and use ⋯ → “Favorite @creator”"
                     }
                 com.rjbiermann.giffyviewer.core.ui
                     .EmptyState(modifier = Modifier.fillMaxSize(), message = msg, hint = hint)
@@ -599,6 +614,11 @@ internal fun QuickBlockSheet(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
+            if (gif.verified) {
+                com.rjbiermann.giffyviewer.core.ui.VerifiedTick(
+                    modifier = Modifier.padding(start = 16.dp).size(14.dp),
+                )
+            }
             if (shuffleSeed != 0L) {
                 Text(
                     text = "Shuffle seed $shuffleSeed",
@@ -826,6 +846,8 @@ private fun GifTile(
                 modifier = Modifier.fillMaxSize(),
             )
             // Audio-know-before-tap (PLAN §307): hasAudio badge on tiles.
+            // Vector icon, not an emoji glyph (skill rule: emoji-as-icons is
+            // an anti-pattern; consistent with the player rail's Sound icon).
             if (gif.hasAudio) {
                 Box(
                     modifier =
@@ -833,18 +855,32 @@ private fun GifTile(
                             .align(Alignment.TopEnd)
                             .padding(6.dp)
                             .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 5.dp, vertical = 2.dp),
+                            .padding(horizontal = 4.dp, vertical = 3.dp),
                 ) {
-                    Text("🔊", style = MaterialTheme.typography.labelSmall)
+                    androidx.compose.material3.Icon(
+                        imageVector = Icons.Filled.VolumeUp,
+                        contentDescription = "has sound",
+                        tint = Color.White,
+                        modifier = Modifier.size(12.dp),
+                    )
                 }
             }
         }
-        Text(
-            text = "@${gif.userName}",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(start = 4.dp, top = 2.dp, bottom = 4.dp),
-        )
+        ) {
+            Text(
+                text = "@${gif.userName}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (gif.verified) {
+                com.rjbiermann.giffyviewer.core.ui.VerifiedTick(
+                    modifier = Modifier.padding(start = 3.dp).size(14.dp),
+                )
+            }
+        }
     }
 }
 

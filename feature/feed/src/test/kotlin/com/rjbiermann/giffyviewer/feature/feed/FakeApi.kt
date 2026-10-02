@@ -59,13 +59,17 @@ internal class FakeApi : GifsApi {
     override suspend fun niches(
         count: Int,
         page: Int,
+        category: String?,
+        order: String?,
     ) = throw NotImplementedError()
+
+    override suspend fun nicheCategories() = throw NotImplementedError()
 
     override suspend fun nicheGifs(
         nicheId: String,
         count: Int,
         page: Int,
-        order: String,
+        order: String?,
     ): GifsPageDto {
         nicheGifsCalls++
         nicheGifsArgs.add(nicheId to page)

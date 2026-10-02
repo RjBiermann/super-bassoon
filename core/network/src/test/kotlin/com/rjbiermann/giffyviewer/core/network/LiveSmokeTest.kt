@@ -152,7 +152,10 @@ class LiveSmokeTest {
             for (cfg in listOf(40 to 5, 40 to 6, 100 to 2, 100 to 3, 20 to 10)) {
                 val r =
                     runCatching {
-                        net.api.search(searchText = "dance", count = cfg.first, page = cfg.second).gifs.size
+                        net.api
+                            .search(searchText = "dance", count = cfg.first, page = cfg.second)
+                            .gifs
+                            .size
                     }
                 println("PROBE cap count=${cfg.first} page=${cfg.second} -> ok=${r.getOrNull()} err=${r.exceptionOrNull()?.message}")
             }
@@ -172,7 +175,10 @@ class LiveSmokeTest {
             for (cfg in listOf(40 to 1, 40 to 2, 40 to 3, 40 to 4, 100 to 1)) {
                 val r =
                     runCatching {
-                        net.api.trendingPopular(count = cfg.first, page = cfg.second).gifs.size
+                        net.api
+                            .trendingPopular(count = cfg.first, page = cfg.second)
+                            .gifs
+                            .size
                     }
                 println("PROBE tcap count=${cfg.first} page=${cfg.second} -> ok=${r.getOrNull()} err=${r.exceptionOrNull()?.message}")
             }
