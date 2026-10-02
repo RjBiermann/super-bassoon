@@ -486,3 +486,8 @@ Compiled + ktlint + detekt + unit tests + lint green on all touched modules.
   Groups/Collections/custom-feed-mgmt screens (D-pad device work), UX-PATTERNS
   candidates (user-slice gated), player soak passes (emulator fragility), Gate 324
   (blocked on SIGNING_KEY secrets).
+- FeedRow filtered-empty hint ON-DEVICE VERIFIED (TV36, fresh profile): horizontal
+  pref over an all-portrait cache → the hint renders under the row title. Lesson
+  recorded in AGENTS-APP.md: the pager-restart → mediator-refresh → empty-walk
+  sequence takes ~15-30s; observe only at steady state (a suspended composition
+  freezes the pre-hint frame and looks like a missing hint).

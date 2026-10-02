@@ -815,7 +815,14 @@ D-pad only.
   Pickup: FeedRow shows a small "No videos match your filters — Settings →
   Orientation" hint when itemCount==0 && refresh NotLoading. [DONE 2026-10-01:
   FeedRow shows the hint; live-verified conditions in code, on-device check
-  pending a filtered-empty state.]
+  pending a filtered-empty state.] [ON-DEVICE VERIFY DONE 2026-10-02 (later
+  session, TV36, fresh profile): orientation Horizontal over an all-portrait
+  cache → Trending row renders the hint under the title (zoomed screenshot,
+  also in uiautomator once the recomposition settles). Verification lesson:
+  the flatMapLatest pager restart + mediator refresh + empty-walk takes ~15-30s,
+  and suspending an in-flight composition (debug breakpoint) freezes the
+  pre-hint frame — take the observation only at steady state, or the hint
+  looks missing when it isn't.]
 
 **Minor:** no NicheAbout entry from TvNichesScreen (mobile-only); TV "Following"
 row is read-only — unverified whether a follow action exists anywhere on TV.
