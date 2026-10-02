@@ -419,11 +419,16 @@ D-pad only.
   to the top-bar back button. Pickup: initial-focus FocusRequester on the
   first row + the established TV chip pattern (explicit MutableInteractionSource
   passed to both the chip and giffyFocus), TV-gated.
-- A stale global pref can blank home rows with zero explanation: orientation
-  filter "horizontal" + an all-portrait cache hid every Trending/Top-This-Week
-  tile behind the reserved empty strip (live-reproduced + fixed by restoring
-  Any). Pickup: FeedRow shows a small "No videos match your filters — Settings
-  → Orientation" hint when itemCount==0 && refresh NotLoading.
+- **Orientation filter is data-bound, not fetch-bound (probed 2026-10):** the
+  API has no orientation parameter, so the filter is client-side over whatever
+  pool the feed returns. Live trending pool = 99/99 portrait (0 landscape);
+  with the global filter "horizontal" the home rows legitimately show nothing
+  (the empty-homepage incident: a stale "horizontal" pref over an
+  all-portrait cache hid every Trending/Top-This-Week tile behind the
+  reserved empty strip — live-reproduced, fixed by restoring Any).
+  Horizontal-on-TV works only when a pool actually contains landscape gifs.
+  Pickup: FeedRow shows a small "No videos match your filters — Settings →
+  Orientation" hint when itemCount==0 && refresh NotLoading.
 
 **Minor:** no NicheAbout entry from TvNichesScreen (mobile-only); TV "Following"
 row is read-only — unverified whether a follow action exists anywhere on TV.
