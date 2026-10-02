@@ -79,6 +79,7 @@ fun TvHomeScreen(
     // Sign-in refreshes the Following row (Liked row rides its own token flow).
     LaunchedEffect(isLoggedIn) { if (isLoggedIn) followingVm.refresh() }
     val exploreCreators by homeViewModel.exploreCreators.collectAsStateWithLifecycle(initialValue = emptyList())
+    val exploreFailed by homeViewModel.exploreFailed.collectAsStateWithLifecycle(false)
     val continueEntries by continueViewModel.entries.collectAsStateWithLifecycle(initialValue = emptyList())
     val hasFavorites by homeViewModel.hasFavorites.collectAsStateWithLifecycle(initialValue = false)
 
@@ -98,7 +99,7 @@ fun TvHomeScreen(
         }
         item { FeedRow("Trending", trending, onOpenGif, onMenu = { actionsFor = it }) }
         // Explore = Top Creators (§9 lingo) — creators row, tap → creator feed.
-        item { CreatorRow("Explore", exploreCreators, onOpenCreator) }
+        item { CreatorRow("Explore", exploreCreators, onOpenCreator, failed = exploreFailed, onRetry = { homeViewModel.refreshExplore() }) }
         item { FeedRow("Top This Week", topThisWeek, onOpenGif, onMenu = { actionsFor = it }) }
         // Empty-state rule: no blank favorites row when nothing is favorited.
         if (hasFavorites) {
@@ -144,10 +145,25 @@ private fun CreatorRow(
     title: String,
     creators: List<com.rjbiermann.giffyviewer.core.network.CreatorSearchItemDto>,
     onOpenCreator: (String) -> Unit,
+    failed: Boolean = false,
+    onRetry: (() -> Unit)? = null,
 ) {
     // Same reservation rule as FeedRow: loading rows hold their space.
     Column(modifier = Modifier.padding(vertical = 8.dp).heightIn(min = ROW_RESERVED_HEIGHT)) {
         RowTitle(title)
+        if (creators.isEmpty() && failed) {
+            Text(
+                text = "Couldn't load $title",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 16.dp, top = 4.dp),
+            )
+            onRetry?.let {
+                androidx.compose.material3.TextButton(onClick = it, modifier = Modifier.padding(start = 8.dp)) {
+                    Text("Retry")
+                }
+            }
+        }
         androidx.compose.foundation.lazy.LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),

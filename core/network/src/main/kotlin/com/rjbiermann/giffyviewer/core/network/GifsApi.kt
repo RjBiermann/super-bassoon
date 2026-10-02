@@ -194,6 +194,34 @@ interface GifsApi {
         @Path("id") id: String,
     )
 
+    /** Add gif to a saved collection (live-probed 2026-10: POST {gifId} → 204;
+     *  remove = DELETE {gifId} → 204). */
+    @POST("v2/me/collections/{id}/gifs")
+    suspend fun addToCollection(
+        @Path("id") folderId: String,
+        @Body body: CollectionGifBody,
+    )
+
+    @HTTP(method = "DELETE", path = "v2/me/collections/{id}/gifs", hasBody = true)
+    suspend fun removeFromCollection(
+        @Path("id") folderId: String,
+        @Body body: CollectionGifBody,
+    )
+
+    /** Add a gif to a joined niche (live-probed 2026-10: PUT {nicheId} → 202;
+     *  remove = DELETE {nicheId} → 202). */
+    @HTTP(method = "PUT", path = "v2/gifs/{id}/niches", hasBody = true)
+    suspend fun addToNiche(
+        @Path("id") gifId: String,
+        @Body body: NicheAddBody,
+    )
+
+    @HTTP(method = "DELETE", path = "v2/gifs/{id}/niches", hasBody = true)
+    suspend fun removeFromNiche(
+        @Path("id") gifId: String,
+        @Body body: NicheAddBody,
+    )
+
     /** Niche detail (live-verified 2026-10-01, anonymous OK): description,
      *  cover, counts, rules — the About tab source. `following` reflects the
      *  caller's auth state. */
@@ -278,6 +306,16 @@ data class CreateCollectionBody(
 @Serializable
 data class RenameCollectionBody(
     @SerialName("folderName") val folderName: String,
+)
+
+@Serializable
+data class CollectionGifBody(
+    val gifId: String,
+)
+
+@Serializable
+data class NicheAddBody(
+    val nicheId: String,
 )
 
 @Serializable

@@ -145,11 +145,8 @@ TvPlayerScreen progress fraction starts at 0 (stale BISECT probe removed).
 - TvPlayerScreen pause/seek — closed: horizontal = ±10s seek with flash,
   hold-repeat progressive, CENTER = play/pause; TvSourceFeedScreen onMenu opens
   quick actions.
-- ~~Tile a11y noise~~ — CLOSED on mobile: image is decorative (`contentDescription = null`)
-  and the tile carries `onLongClickLabel = "Open quick actions"` (FeedScreen GifTile).
-  **TV instance still open:** TvHomeScreen `GifCard` image still says
-  `contentDescription = "Gif by @${gif.userName}"` next to the visible "@user" Text —
-  creator announced twice per card.
+- ~~Tile a11y noise~~ — CLOSED on mobile AND TV (GifCard image decorative;
+  the visible "@user" Text announces the creator).
 - ~~Search suggestions render a bare count~~ — CLOSED: rows now show `"%,d gifs"`
   (grouped + unit).
 
@@ -189,7 +186,7 @@ unscheduled — a user slice picks.
   `viewModel.open(...)` (creator chip, More ▾ item, search submit, Explore/Following/Niche
   hops) set no flag — back gesture finishes the activity. The doc's "no back stack" posture
   covers Settings, not this: from a creator feed the only escape is the Trending chip.
-  Consider a BackHandler that `viewModel.open(previous)` before letting back exit.
+  Minimal fix spec'd in the links audit below (FeedViewModel source history + BackHandler).
   [BUILT 2026-10-01: open() remembers the prior source; canGoBack StateFlow +
   FeedScreen BackHandler pops one level; verified compile + code-review.]
 
@@ -221,10 +218,92 @@ unscheduled — a user slice picks.
 - ~~SearchScreen rows <48dp~~ — CLOSED 2026-10-01: vertical padding 10→14dp.
 - contentDescription capitalization still mixed: "Back" ×1 vs "back" ×9, "Remove" ×1.
 - AuthSection signed-in state shows only "Signed in" — no @username (site shows the account).
-- RateLimitBus "cooling down" indicator — still spec'd in the Mobile bullet, zero UI
-  consumers anywhere (grep-verified). Mark spec'd-not-built or build it.
+- RateLimitBus "cooling down" indicator — decided 2026-10-01: **spec'd-not-built**
+  (marker only; no UI consumer — build when a user-visible failure trace demands it).
 - TV home "More ▾" DropdownMenuItems have no giffyFocus ring (M3 popup rows) — whether
   they show visible D-pad focus at all needs the skipped device check.
+
+## In-app links audit + navigation-library decision (2026-10-02, docs-only)
+Trigger: "creator/niche/tag etc. should be links so users can navigate". Audit of every
+user-visible entity reference × the surface that renders it. Destination plumbing already
+exists for ALL of them — `FeedSource` (Creator/Niche/Search/Group/Custom) + `FeedViewModel.open()`
+are the in-place link targets, and every screen that needs a hop already takes an
+`onOpenCreator`/`onOpenNiche` callback. No new screens required; this is wiring, not
+architecture.
+
+**Already linked (working today):**
+| Entity | Surface | Destination |
+|---|---|---|
+| Creator | FollowingScreen / ExploreScreen rows, NicheAbout top-creators | creator feed |
+| Niche | FollowingScreen rows, NichesScreen rows, NicheAbout related | niche feed |
+| Creator (search results) | FeedScreen creator-chips row (above search results) | creator feed |
+| Group / Custom feed / Pinned | chips, More ▾, TV pills + dropdown | their feeds |
+| Gif (tiles/cards) | mobile tiles + TV cards | player |
+
+**Missing links (spec'd but dead text today) — each row names its already-existing target:**
+1. **@username → creator feed** — dead text on: mobile GifTile caption, TV GifCard caption,
+   mobile player bottom cluster ("Tap username → profile-like view" is spec'd in the Mobile
+   section above but never built), TV player cluster, both quick-sheet headers. Target:
+   `FeedSource.Creator(userName)` via the surface's existing open callback (mobile tile/player
+   need the callback plumbed; TV needs an onOpenCreator parameter).
+2. **Player tag chips → tag feed** — comment in PlayerScreen says "tappable when tag feeds
+   land"; they landed as `FeedSource.Search(query = tag)` (search_text matches tags,
+   live-verified per FeedSource.kt). Same for TV (its Filter/tags path is quick-actions only).
+3. **Quick sheet "Open @user's feed" row** — neither QuickSheet main pane nor TvQuickActions
+   offers the most basic navigation act on a creator. One row each; on the sheet header the
+   @user Text itself can be the row's tap target. TV: the player's username focus already
+   opens quick actions — an "Open @user's feed" row there IS the D-pad link equivalent.
+4. **FollowingScreen niche rows** carry no About entry and TV has no NicheAbout at all
+   (existing "Minor" gap) — link exists, depth missing; unchanged here.
+5. **Gif niches → niche feed (round 2 of this audit, 2026-10-02)** — gif payloads DO carry
+   niches, but no surface renders them: the player cluster shows description + tags + @user
+   only; tiles/TV cards show @user; grep for `gif.niches` UI usage returns nothing. Twist
+   discovered in `GifDtos.kt`: the payload maps niches as objects `{id, name}` (some endpoints
+   plain slugs — `NicheListSerializer` normalizes both), but `toModel()` keeps
+   **ids only** (`niches = niches.mapNotNull { it.id }`) and **discards the name** — so a
+   niche chip in the player couldn't even be labeled today. Slice shape if picked:
+   (a) model change — keep the name alongside the id (a small `NicheRef(id, name)` on `Gif`;
+   VERIFIED not schema-free: Room's `gifs.niches` column stores the id list via a
+   List<String> TypeConverter (Entities.kt) — carrying names is a `gifs` schema change →
+   explicit Migration per the repo rule, OR an id→name cache keyed off `v2/niches` reads
+   (heavier, stale-prone — the payload already carries the name, migration is the honest path);
+   (b) render niche chips in the player cluster after the tags row, visually distinct from
+   tags (tags = lime outline; niches = tertiary/Info cyan, matching VerifiedTick's shared
+   Info usage);
+   (c) tap → `FeedSource.Niche(id, name)` — same open-callback plumbing as the @user link
+   slice (mobile player needs the callback; TV needs `onOpenCreator`-style parameter);
+   (d) LIVE-CHECK FIRST: the lingo sweep recorded watch-page sections "Related Tags",
+   "Suggested Niches"/"Suggested Creators" — it did NOT record a "this video's niches"
+   section. Verify on the live watch page whether the gif's own niches are listed and what
+   they're called before adopting any label; do not invent wording.
+6. **Possible gap to verify live:** the site watch page's "Suggested Niches / Suggested
+   Creators" + related "you might like" strip have no in-app counterpart (the swipe player
+   itself serves adjacent discovery; TV player has nothing). Verify against the live watch
+   page before spec'ing anything — add to the parity audit only if the strip is real.
+
+**Back-stack prerequisite (ties into round 3 High):** wiring @user links on mobile exposes the
+back problem immediately — open a creator feed from a tile and system back exits the app.
+Minimal standard fix BEFORE/with the link wiring: a small source history in FeedViewModel
+(`List<FeedSource>`; `open()` appends, a `BackHandler` inside FeedScreen pops it, disabled on
+home) — platform-native Compose mechanism, ~20 lines, no dependency.
+
+**Navigation library decision: NOT now (revisit on trigger).**
+Reasoning, ladder-style:
+- The links do not need it — `FeedSource` + `open()` already navigate; a nav library would
+  route the same hops through a controller with identical in-place semantics.
+- Deep links — the library's biggest freebie — are excluded by §0 (viewer-only, share-only).
+- The screen-shell flags (MainActivity/TvMainActivity) are confined and TV's BackHandler
+  already covers every state; the ONE back bug lives in FeedScreen's in-place source, which
+  a nav library wouldn't naturally own either (feeds are state, not destinations — the
+  chip-tab model).
+- New dependency cost is real: no navigation-compose today; adopting typed routes means
+  re-plumbing both shells + splitting FeedScreen into home vs source-feed destinations
+  (the TV's TvSourceFeedScreen shape) — a week-shaped restructure to fix one ~20-line bug.
+**Revisit triggers:** (a) a second multi-hop navigation pain appears (e.g. nested About →
+related-niche chains losing position), (b) screen arguments need serialization guarantees
+beyond `rememberSaveable` booleans, (c) the shells' flag lists keep growing. If adopted:
+Navigation Compose typed routes (kotlinx-serialization) in `:app-mobile` first; TV follows
+only if its shell grows (its leanback back behavior is already correct).
 
 **Feature audit (2026-10-02) — parity writes unchanged; corrections**
 - GifsApi has `POST v2/me/collections` (create) + `DELETE v2/me/collections/{id}` but NO
@@ -389,17 +468,16 @@ Data Dashboard, boost/live-cam/only-fans/ads modules, premium (see AGENTS-NETWOR
 galleries verified dead, `v2/feeds/modules` checklist fully covered).
 
 Real gaps (site has them, app doesn't) — **spec'd-not-scheduled, a user slice picks**:
-- **Report** — site watch-page ⋯ menu = Share · Add to a Niche · Add to a Collection · Report;
-  app's overflow sheet (QuickBlockSheet) has Share but NO Report (radio categories:
-  Underaged / Racist / Animals / Rape / Violence / Copyright / I Am In This Content / Other
-  → Next → follow-up text). Viewer-protective; needs its endpoint probed (shape unknown —
-  the site's write was not captured, do not guess).
-- **Add to a Collection** — CollectionsScreen can create/rename/delete but cannot ADD a gif
-  to one (site popup: picker + "Create a New Collection"); needs the collection-add write
-  probed before wiring (v2/me/collections write path unverified).
-- **Add to a Niche** — site popup "Add Content to a Niche" lists joined niches matching the
-  gif's tags (pre-checked ones disabled); app has add-to-custom-feed only. Niche-add write
-  endpoint unverified.
+- **Report** — UNPROBEABLE (2026-10): every plausible endpoint 404'd with the test
+  token (see AGENTS-NETWORK.md). Stays spec'd-not-scheduled; do not guess.
+- ~~Add to a Collection~~ — BUILT 2026-10-01: write probed live (POST
+  v2/me/collections/{id}/gifs {gifId} → 204, reverted), picker dialog in the Add-to…
+  pane on both apps (mobile AddToCollectionDialog, TV TvAddToCollectionDialog; empty
+  state points at Collections). In-app e2e not possible (emulator Keystore token
+  blocker); contract verified at API level.
+- ~~Add to a Niche~~ — BUILT 2026-10-01: write probed live (PUT v2/gifs/{gifId}/niches
+  {nicheId} → 202, reverted); AddToNicheDialog / TvAddToNicheDialog in the Add-to… pane —
+  joined niches, tag-matching first (site popup parity), 8-row cap, empty hint.
 - **Followers page** — site `/followers` ("Accounts That Follow You", tabs
   Following/Followers); API `GET /v2/me/followers` verified 200. No app UI (mobile or TV).
 - **Tags browse tab** — site search has a 4th **Tags** tab sourced from

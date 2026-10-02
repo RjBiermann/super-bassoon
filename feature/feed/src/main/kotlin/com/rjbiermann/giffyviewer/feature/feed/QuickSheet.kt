@@ -47,7 +47,11 @@ internal fun QuickBlockSheet(
 ) {
     // Hoisted for the AddToCustomFeedDialog scope below.
     val customFeeds by viewModel.customFeeds.collectAsState(initial = emptyList())
+    val collections by viewModel.collections.collectAsState(initial = emptyList())
+    val joinedNiches by viewModel.joinedNiches.collectAsState(initial = emptyList())
     var showAddToFeed by remember { mutableStateOf(false) }
+    var showAddToCollection by remember { mutableStateOf(false) }
+    var showAddToNiche by remember { mutableStateOf(false) }
     // §8 infinite shuffle player: show the active seed (restore = the same seed
     // re-derives the same global order from the pool).
     val shuffleSeed by
@@ -137,10 +141,16 @@ internal fun QuickBlockSheet(
                     listStyle("Close", onDismiss)
                 }
                 "addto" -> {
-                    // Picker dialog stays the second level (same depth as today);
-                    // spec'd Add-to-Niche / Add-to-Collection slot here when their
-                    // write paths are probed.
+                    // Picker dialogs stay the second level (same depth as today).
                     listStyle("Add to custom feed…") { showAddToFeed = true }
+                    listStyle("Add to a Collection…") {
+                        viewModel.refreshCollections()
+                        showAddToCollection = true
+                    }
+                    listStyle("Add to a Niche…") {
+                        viewModel.refreshJoinedNiches()
+                        showAddToNiche = true
+                    }
                     listStyle("‹ Back", { view = "main" })
                 }
                 "tags" -> {
@@ -186,6 +196,27 @@ internal fun QuickBlockSheet(
                     listStyle("‹ Back", { view = "main" })
                 }
             }
+        }
+        if (showAddToCollection) {
+            AddToCollectionDialog(
+                collections = collections,
+                onAdd = { folderId ->
+                    viewModel.addToCollection(folderId, gif.id)
+                    onDismiss()
+                },
+                onDismiss = { showAddToCollection = false },
+            )
+        }
+        if (showAddToNiche) {
+            AddToNicheDialog(
+                gif = gif,
+                niches = joinedNiches,
+                onAdd = { nicheId ->
+                    viewModel.addToNiche(gif.id, nicheId)
+                    onDismiss()
+                },
+                onDismiss = { showAddToNiche = false },
+            )
         }
         if (showAddToFeed) {
             AddToCustomFeedDialog(
@@ -268,4 +299,78 @@ private fun ColumnScope.listStyle(
     onClick: () -> Unit,
 ) {
     TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) { Text(text) }
+}
+
+/** Pick a saved collection for the gif (live-probed write: POST {gifId} → 204). */
+@Composable
+internal fun AddToCollectionDialog(
+    collections: List<com.rjbiermann.giffyviewer.core.network.CollectionDto>,
+    onAdd: (folderId: String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add to a Collection") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (collections.isEmpty()) {
+                    Text("No collections yet — create one in Collections.")
+                } else {
+                    collections.forEach { def ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clickable { onAdd(def.folderId) },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            androidx.compose.material3.RadioButton(
+                                selected = false,
+                                onClick = { onAdd(def.folderId) },
+                            )
+                            Text("${def.folderName ?: "Untitled"} (${def.contentCount})")
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+/** Pick a joined niche (site popup parity: joined niches matching the gif's tags first). */
+@Composable
+internal fun AddToNicheDialog(
+    gif: Gif,
+    niches: List<com.rjbiermann.giffyviewer.core.network.FollowedNicheDto>,
+    onAdd: (nicheId: String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val gifTags = gif.tags.map { it.lowercase().trim() }.toSet()
+    val matching = niches.filter { n -> n.tags.any { it.lowercase().trim() in gifTags } }
+    val ordered = matching + (niches - matching.toSet())
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add Content to a Niche") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (ordered.isEmpty()) {
+                    Text("No joined niches — join niches to add content to them.")
+                } else {
+                    ordered.take(8).forEach { n ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clickable { onAdd(n.id) },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            androidx.compose.material3.RadioButton(
+                                selected = false,
+                                onClick = { onAdd(n.id) },
+                            )
+                            Text(n.name ?: n.id)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }

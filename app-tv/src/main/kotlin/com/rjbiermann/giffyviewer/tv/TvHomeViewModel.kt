@@ -10,6 +10,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -42,16 +43,25 @@ class TvHomeViewModel
                 .map { it != null }
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
-        /** Explore row (§9: Top Creators) — first page of verified creators, anon OK. */
+        /** Explore row (§9: Top Creators) — first page of verified creators, anon OK.
+         *  Failure surfaces (audit round 3: no silent blank strips). */
+        private val _exploreFailed = kotlinx.coroutines.flow.MutableStateFlow(false)
+        val exploreFailed = _exploreFailed.asStateFlow()
         val exploreCreators =
             kotlinx.coroutines.flow.MutableStateFlow<List<com.rjbiermann.giffyviewer.core.network.CreatorSearchItemDto>>(
                 emptyList(),
             )
 
         init {
+            refreshExplore()
+        }
+
+        fun refreshExplore() {
             viewModelScope.launch {
+                _exploreFailed.value = false
                 runCatching { api.verifiedCreators() }
                     .onSuccess { exploreCreators.value = it.creators }
+                    .onFailure { _exploreFailed.value = true }
             }
         }
 

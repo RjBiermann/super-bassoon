@@ -68,9 +68,13 @@ fun TvQuickActionsDialog(
     playerActions: TvPlayerActions? = null,
 ) {
     var showAddToFeed by remember { mutableStateOf(false) }
+    var showAddToCollection by remember { mutableStateOf(false) }
+    var showAddToNiche by remember { mutableStateOf(false) }
     // Two views (user: "too many options"): main / tags submenu.
     var view by remember { mutableStateOf("main") }
     val customFeeds by feedViewModel.customFeeds.collectAsStateWithLifecycle(emptyList())
+    val collections by feedViewModel.collections.collectAsStateWithLifecycle(emptyList())
+    val joinedNiches by feedViewModel.joinedNiches.collectAsStateWithLifecycle(emptyList())
     Dialog(onDismissRequest = onDismiss) {
         M3Surface(
             shape = MaterialTheme.shapes.medium,
@@ -121,6 +125,14 @@ fun TvQuickActionsDialog(
                     }
                     "addto" -> {
                         QuickAction(text = "Add to custom feed…", first = first) { showAddToFeed = true }
+                        QuickAction(text = "Add to a Collection…") {
+                            feedViewModel.refreshCollections()
+                            showAddToCollection = true
+                        }
+                        QuickAction(text = "Add to a Niche…") {
+                            feedViewModel.refreshJoinedNiches()
+                            showAddToNiche = true
+                        }
                         QuickAction(text = "‹ Back") { view = "main" }
                         return@M3Surface
                     }
@@ -215,6 +227,27 @@ fun TvQuickActionsDialog(
                 QuickAction(text = "Close") { onDismiss() }
             }
         }
+    }
+    if (showAddToCollection) {
+        TvAddToCollectionDialog(
+            collections = collections,
+            onAdd = { folderId ->
+                feedViewModel.addToCollection(folderId, gif.id)
+                onDismiss()
+            },
+            onDismiss = { showAddToCollection = false },
+        )
+    }
+    if (showAddToNiche) {
+        TvAddToNicheDialog(
+            gif = gif,
+            niches = joinedNiches,
+            onAdd = { nicheId ->
+                feedViewModel.addToNiche(gif.id, nicheId)
+                onDismiss()
+            },
+            onDismiss = { showAddToNiche = false },
+        )
     }
     if (showAddToFeed) {
         TvAddToFeedDialog(
@@ -329,6 +362,84 @@ private fun TvAddToFeedDialog(
                             .fillMaxWidth()
                             .giffyFocus(cancelSrc),
                 ) { Text("Cancel") }
+            }
+        }
+    }
+}
+
+/** TV picker: saved collections (live-probed POST {gifId} → 204). */
+@Composable
+private fun TvAddToCollectionDialog(
+    collections: List<com.rjbiermann.giffyviewer.core.network.CollectionDto>,
+    onAdd: (folderId: String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        M3Surface(
+            shape = MaterialTheme.shapes.medium,
+            tonalElevation = 6.dp,
+            modifier = Modifier.width(420.dp),
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text("Add to a Collection", style = MaterialTheme.typography.titleMedium)
+                val first = remember { FocusRequester() }
+                LaunchedEffect(Unit) { first.requestFocus() }
+                if (collections.isEmpty()) {
+                    Text("No collections yet — create one in Collections.")
+                } else {
+                    collections.forEach { def ->
+                        QuickAction(
+                            text = "${def.folderName ?: "Untitled"} (${def.contentCount})",
+                            first = if (def === collections.first()) first else null,
+                            onClick = { onAdd(def.folderId) },
+                        )
+                    }
+                }
+                QuickAction(text = "Cancel", onClick = onDismiss)
+            }
+        }
+    }
+}
+
+/** TV picker: joined niches (site popup parity — tag-matching first). */
+@Composable
+private fun TvAddToNicheDialog(
+    gif: Gif,
+    niches: List<com.rjbiermann.giffyviewer.core.network.FollowedNicheDto>,
+    onAdd: (nicheId: String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val gifTags = gif.tags.map { it.lowercase().trim() }.toSet()
+    val matching = niches.filter { n -> n.tags.any { it.lowercase().trim() in gifTags } }
+    val ordered = (matching + (niches - matching.toSet())).take(8)
+    Dialog(onDismissRequest = onDismiss) {
+        M3Surface(
+            shape = MaterialTheme.shapes.medium,
+            tonalElevation = 6.dp,
+            modifier = Modifier.width(420.dp),
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text("Add Content to a Niche", style = MaterialTheme.typography.titleMedium)
+                val first = remember { FocusRequester() }
+                LaunchedEffect(Unit) { first.requestFocus() }
+                if (ordered.isEmpty()) {
+                    Text("No joined niches — join niches to add content to them.")
+                } else {
+                    ordered.forEach { n ->
+                        QuickAction(
+                            text = n.name ?: n.id,
+                            first = if (n === ordered.first()) first else null,
+                            onClick = { onAdd(n.id) },
+                        )
+                    }
+                }
+                QuickAction(text = "Cancel", onClick = onDismiss)
             }
         }
     }

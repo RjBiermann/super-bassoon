@@ -10,7 +10,11 @@ import com.rjbiermann.giffyviewer.core.database.KeywordBlockEntity
 import com.rjbiermann.giffyviewer.core.database.LikedIdsEntity
 import com.rjbiermann.giffyviewer.core.database.TagPrefEntity
 import com.rjbiermann.giffyviewer.core.model.Gif
+import com.rjbiermann.giffyviewer.core.network.CollectionDto
+import com.rjbiermann.giffyviewer.core.network.CollectionGifBody
+import com.rjbiermann.giffyviewer.core.network.FollowedNicheDto
 import com.rjbiermann.giffyviewer.core.network.GifsApi
+import com.rjbiermann.giffyviewer.core.network.NicheAddBody
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -236,6 +240,54 @@ class FeedViewModel
         val pinnedNiches: StateFlow<Set<String>> =
             settings.pinnedNiches
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+        /** Add-to pane sources (live-probed writes, 2026-10): saved collections
+         *  + joined niches; both token-gated reads, fetched on pane open. */
+        private val _collections = MutableStateFlow<List<CollectionDto>>(emptyList())
+        val collections: StateFlow<List<CollectionDto>> = _collections
+
+        fun refreshCollections() {
+            viewModelScope.launch {
+                if (tokenStore.tokenOrNull() == null) return@launch
+                runCatching { withContext(Dispatchers.IO) { api.meCollections() } }
+                    .onSuccess { _collections.value = it.collections }
+            }
+        }
+
+        private val _joinedNiches = MutableStateFlow<List<FollowedNicheDto>>(emptyList())
+        val joinedNiches: StateFlow<List<FollowedNicheDto>> = _joinedNiches
+
+        fun refreshJoinedNiches() {
+            viewModelScope.launch {
+                if (tokenStore.tokenOrNull() == null) return@launch
+                runCatching { withContext(Dispatchers.IO) { api.followedNiches() } }
+                    .onSuccess { _joinedNiches.value = it.niches }
+            }
+        }
+
+        /** POST v2/me/collections/{id}/gifs {gifId} → 204 (probed, reverted). */
+        fun addToCollection(
+            folderId: String,
+            gifId: String,
+        ) {
+            viewModelScope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) { api.addToCollection(folderId, CollectionGifBody(gifId)) }
+                }
+            }
+        }
+
+        /** PUT v2/gifs/{id}/niches {nicheId} → 202 (probed, reverted). */
+        fun addToNiche(
+            gifId: String,
+            nicheId: String,
+        ) {
+            viewModelScope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) { api.addToNiche(gifId, NicheAddBody(nicheId)) }
+                }
+            }
+        }
 
         /** For You scope (§7 Creators·Niches·All, logged-in; default All). */
         val forYouScope: StateFlow<String> =

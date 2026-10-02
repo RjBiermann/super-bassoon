@@ -1,10 +1,12 @@
 package com.rjbiermann.giffyviewer.feature.feed
 
+import com.rjbiermann.giffyviewer.core.network.CollectionGifBody
 import com.rjbiermann.giffyviewer.core.network.EmptyBody
 import com.rjbiermann.giffyviewer.core.network.FollowBody
 import com.rjbiermann.giffyviewer.core.network.FollowedNichesDto
 import com.rjbiermann.giffyviewer.core.network.GifsApi
 import com.rjbiermann.giffyviewer.core.network.LikeBody
+import com.rjbiermann.giffyviewer.core.network.NicheAddBody
 import com.rjbiermann.giffyviewer.core.network.dto.GifsPageDto
 import com.rjbiermann.giffyviewer.core.network.dto.TemporaryTokenDto
 
@@ -158,4 +160,24 @@ internal class FakeApi : GifsApi {
     ) = throw NotImplementedError()
 
     override suspend fun followedNiches(): FollowedNichesDto = throw NotImplementedError()
+
+    override suspend fun addToCollection(
+        folderId: String,
+        body: CollectionGifBody,
+    ) = throw NotImplementedError()
+
+    override suspend fun removeFromCollection(
+        folderId: String,
+        body: CollectionGifBody,
+    ) = throw NotImplementedError()
+
+    override suspend fun addToNiche(
+        gifId: String,
+        body: NicheAddBody,
+    ) = throw NotImplementedError()
+
+    override suspend fun removeFromNiche(
+        gifId: String,
+        body: NicheAddBody,
+    ) = throw NotImplementedError()
 }
