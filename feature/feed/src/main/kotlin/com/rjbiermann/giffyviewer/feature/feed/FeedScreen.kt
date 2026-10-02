@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
@@ -23,7 +22,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -34,13 +32,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -52,7 +47,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -65,7 +59,11 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.rjbiermann.giffyviewer.core.model.Gif
+import com.rjbiermann.giffyviewer.core.ui.AudioBadge
+import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
+import com.rjbiermann.giffyviewer.core.ui.GiffyScaffold
 import com.rjbiermann.giffyviewer.core.ui.RefreshFeedPill
+import com.rjbiermann.giffyviewer.core.ui.avgColorOr
 import com.rjbiermann.giffyviewer.core.ui.rememberScrollingUp
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -110,25 +108,18 @@ fun FeedScreen(
         }
     }
 
-    Scaffold(
+    GiffyScaffold(
+        title = source.title(),
+        onBack = null,
         modifier = modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = { Text(source.title()) },
-                actions = {
-                    IconButton(onClick = onOpenSearch) {
-                        Icon(Icons.Filled.Search, contentDescription = "search")
-                    }
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Outlined.Settings, contentDescription = "settings")
-                    }
-                },
-                colors =
-                    TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                    ),
-            )
+        actions = {
+            IconButton(onClick = onOpenSearch) {
+                Icon(Icons.Filled.Search, contentDescription = "search")
+            }
+            IconButton(onClick = onOpenSettings) {
+                Icon(Icons.Outlined.Settings, contentDescription = "settings")
+            }
         },
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
@@ -138,10 +129,7 @@ fun FeedScreen(
             val pinnedNiches =
                 remember(pinnedEntries) {
                     pinnedEntries.mapNotNull { entry ->
-                        entry
-                            .split('|', limit = 2)
-                            .takeIf { it.size == 2 }
-                            ?.let { (id, name) -> FeedSource.Niche(id, name) }
+                        parseNicheRef(entry)?.let { (id, name) -> FeedSource.Niche(id, name) }
                     }
                 }
             Row(
@@ -327,12 +315,8 @@ fun FeedScreen(
                             onClick = { viewModel.open(FeedSource.Creator(username = creator.username)) },
                             label = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("@${creator.username} · ${creator.followers}⇡")
-                                    if (creator.verified) {
-                                        com.rjbiermann.giffyviewer.core.ui.VerifiedTick(
-                                            modifier = Modifier.padding(start = 3.dp).size(14.dp),
-                                        )
-                                    }
+                                    CreatorLabel(creator.username, creator.verified)
+                                    Text(" · ${creator.followers}⇡")
                                 }
                             },
                         )
@@ -567,6 +551,9 @@ fun FeedScreen(
                                         gif = gif,
                                         onClick = { onOpenPlayer(index) },
                                         onLongPress = { sheetFor = gif },
+                                        onOpenCreator = {
+                                            viewModel.open(FeedSource.Creator(username = gif.userName))
+                                        },
                                     )
                                     if (sheetFor != null) {
                                         QuickBlockSheet(
@@ -574,7 +561,7 @@ fun FeedScreen(
                                             onDismiss = { sheetFor = null },
                                             viewModel = viewModel,
                                             addableFeedRef =
-                                                (source as? FeedSource.Niche)?.let { "niche:${it.id}|${it.name}" },
+                                                (source as? FeedSource.Niche)?.let { packNicheRef(it.id, it.name, prefixed = true) },
                                         )
                                     }
                                 }
@@ -610,6 +597,8 @@ private fun GifTile(
     gif: Gif,
     onClick: () -> Unit,
     onLongPress: () -> Unit,
+    /** Links audit #1: tile caption @user → creator feed (in-place nav). */
+    onOpenCreator: () -> Unit = {},
 ) {
     Column(
         modifier =
@@ -628,7 +617,7 @@ private fun GifTile(
                     .fillMaxWidth()
                     .aspectRatio(if (gif.width > 0 && gif.height > 0) gif.width.toFloat() / gif.height else 0.8f)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(avgColorOr(gif, MaterialTheme.colorScheme.surfaceVariant)),
+                    .background(avgColorOr(gif.avgColor, MaterialTheme.colorScheme.surfaceVariant)),
         ) {
             AsyncImage(
                 model =
@@ -647,52 +636,19 @@ private fun GifTile(
             // Vector icon, not an emoji glyph (skill rule: emoji-as-icons is
             // an anti-pattern; consistent with the player rail's Sound icon).
             if (gif.hasAudio) {
-                Box(
-                    modifier =
-                        Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(6.dp)
-                            .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 4.dp, vertical = 3.dp),
-                ) {
-                    androidx.compose.material3.Icon(
-                        imageVector = Icons.Filled.VolumeUp,
-                        contentDescription = "has sound",
-                        tint = Color.White,
-                        modifier = Modifier.size(12.dp),
-                    )
-                }
+                AudioBadge(modifier = Modifier.align(Alignment.TopEnd).padding(6.dp))
             }
         }
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        CreatorLabel(
+            gif.userName,
+            gif.verified,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelSmall,
             modifier = Modifier.padding(start = 4.dp, top = 2.dp, bottom = 4.dp),
-        ) {
-            Text(
-                text = "@${gif.userName}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (gif.verified) {
-                com.rjbiermann.giffyviewer.core.ui.VerifiedTick(
-                    modifier = Modifier.padding(start = 3.dp).size(14.dp),
-                )
-            }
-        }
+            onClick = onOpenCreator,
+        )
     }
 }
-
-/** avgColor is "#rrggbb"; fall back to theme surface on anything unexpected. */
-@Composable
-private fun avgColorOr(
-    gif: Gif,
-    fallback: Color,
-): Color =
-    try {
-        Color(android.graphics.Color.parseColor(gif.avgColor))
-    } catch (_: IllegalArgumentException) {
-        fallback
-    }
 
 /** System nav-bar inset as dp (density-based; the layout extension didn't resolve). */
 @Composable

@@ -42,6 +42,27 @@ minSdk 24 (mobile) / 26 (TV) · targetSdk 35 · DB name `giffy.db`.
 - `UiState` types are immutable data classes; expose `StateFlow`, never `MutableStateFlow` from VMs.
 - Room schema changes **always** via explicit `Migration`, never `fallbackToDestructiveMigration`.
 - Following someone: flat structure, minimal files, no speculative abstractions.
+- **Standard libraries over custom code.** Use popular, well-maintained, trusted
+  libraries (see Stack above — all are mainstream: OkHttp/Retrofit/Room/Paging/Hilt/
+  Coil/Media3/DataStore/security-crypto) and AndroidX/stdlib APIs for whatever they
+  cover. Write custom implementations only for behaviour no maintained library
+  provides (e.g. the app-specific ContentFilter, rate limiter, feed mediator).
+  Hand-rolled replacements for library/stdlib functionality are a bug, not a
+  feature — before writing a utility, check the version catalog + AndroidX first.
+- **Standard-library audit (2026-10, doc-only):** codebase scan found exactly two
+  shippable replacements: `Hosts.decodeBase64` (core/model) → `kotlin.io.encoding
+  .Base64` (stdlib, no API-level floor, the old java.util.Base64/API-26+ excuse
+  doesn't apply to the Kotlin API); delete `RateLimitBus` and publish directly on
+  its `MutableSharedFlow` (the class adds nothing). Everything else audited is
+  justified custom: rate limiter/breaker/retry (plan-specified policy, no Android
+  library equivalent), PKCE (AppAuth unusable — redirect_uri is the site root, not
+  an app scheme), `formatRemaining` (java.time is API 26+), UI components
+  (giffyFocus/PinLock/AgeGate/GiffyScaffold — no standard equivalent).
+  **APPLIED 2026-10-02:** both swaps landed (Hosts stdlib decode — live smoke on
+  Phone34; RateLimitBus → typealias on MutableSharedFlow + `publish` extension, API
+  shape unchanged). Bonus fix in the same sweep: TokenStore's PKCE challenge used
+  `java.util.Base64` (API 26+) — a real crash on minSdk 24/25 — swapped to
+  `Base64.UrlSafe.withPadding(ABSENT)`.
 - Non-trivial logic ships with one minimal self-check (small `test_*.py`-style unit test or `@Test`), not a framework suite.
 - rate-limit invariant: ≤10 requests in any rolling 5s window — own change must not break it.
 

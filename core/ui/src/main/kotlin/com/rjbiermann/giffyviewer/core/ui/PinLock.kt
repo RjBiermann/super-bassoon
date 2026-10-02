@@ -27,6 +27,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -49,6 +51,7 @@ fun PinLockScreen(
     var wrong by remember { mutableStateOf(false) }
     var fails by remember { mutableIntStateOf(0) }
     val firstKey = remember { FocusRequester() }
+    val haptics = LocalHapticFeedback.current
 
     LaunchedEffect(Unit) { firstKey.requestFocus() }
 
@@ -60,6 +63,7 @@ fun PinLockScreen(
             } else {
                 fails++
                 wrong = true
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 kotlinx.coroutines.delay(if (fails >= 3) 15_000L else 400L)
                 entry = ""
                 wrong = false
@@ -124,6 +128,7 @@ fun PinLockScreen(
                     keyIndex++
                     OutlinedButton(
                         onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.KeyboardTap)
                             when {
                                 key == '⌫' -> if (entry.isNotEmpty()) entry = entry.dropLast(1)
                                 // ✓ = submit now (audit: dead key); a 4th digit

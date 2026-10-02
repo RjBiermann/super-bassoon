@@ -6,6 +6,8 @@ import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.database.SearchHistoryEntity
 import com.rjbiermann.giffyviewer.core.network.GifsApi
 import com.rjbiermann.giffyviewer.core.network.SuggestDto
+import com.rjbiermann.giffyviewer.core.network.TrendingTagDto
+import com.rjbiermann.giffyviewer.core.network.TrendingTagsDto
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -16,6 +18,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
@@ -74,6 +77,15 @@ class SearchViewModel
                 .recent(HISTORY_CAP)
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+        /** Trending tags (site search's "Tags" tab source, live-verified endpoint).
+         *  One fetch per VM; failure degrades to an absent section (no UI break). */
+        val trendingTags: StateFlow<List<TrendingTagDto>> =
+            flow {
+                emit(api.trendingTags(count = TRENDING_TAGS_LIMIT))
+            }.catch { emit(TrendingTagsDto()) }
+                .map { it.tags }
+                .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
         fun setQuery(text: String) {
             query.value = text
         }
@@ -102,5 +114,6 @@ class SearchViewModel
             const val SUGGEST_DEBOUNCE = 300L
             const val SUGGEST_LIMIT = 8
             const val HISTORY_CAP = 50
+            const val TRENDING_TAGS_LIMIT = 12
         }
     }

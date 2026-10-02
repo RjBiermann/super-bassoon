@@ -94,6 +94,9 @@ fun SearchScreen(
             )
         }
 
+        // Hoisted reads (composable context): history-clear section + trending tags.
+        val trendingTags = viewModel.trendingTags.collectAsStateWithLifecycle().value
+
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             // Empty field → history only (no suggestions, no extra network — §7).
             if (query.isBlank()) {
@@ -125,7 +128,7 @@ fun SearchScreen(
                     }
                 }
             }
-            items(suggestions, key = { it.text }) { suggestion ->
+            items(suggestions, key = { "s:" + it.text }) { suggestion ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier =
@@ -146,6 +149,39 @@ fun SearchScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+            }
+            // Trending tags rows (hoisted read above; empty query only).
+            if (query.isBlank() && trendingTags.isNotEmpty()) {
+                item(key = "tags-header") {
+                    Text(
+                        "Trending tags",
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+                items(trendingTags, key = { "t:" + it.name }) { tag ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    submit(tag.name)
+                                }.padding(horizontal = 16.dp, vertical = 14.dp),
+                    ) {
+                        Text(
+                            text = "#${tag.name}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+                        )
+                        Text(
+                            text = "%,d gifs".format(tag.count),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }

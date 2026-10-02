@@ -16,14 +16,12 @@ sealed interface RateLimitEvent {
     data object Recovered : RateLimitEvent
 }
 
-/** Simple in-process event fan-out; UI collects this for the indicator. */
-class RateLimitBus {
-    private val mutableEvents = kotlinx.coroutines.flow.MutableSharedFlow<RateLimitEvent>(replay = 8, extraBufferCapacity = 16)
-    val events: kotlinx.coroutines.flow.SharedFlow<RateLimitEvent> = mutableEvents
+/** Simple in-process event fan-out; UI collects this for the indicator.
+ *  ponytail audit (2026-10): no wrapper class — the MutableSharedFlow IS the bus. */
+typealias RateLimitBus = kotlinx.coroutines.flow.MutableSharedFlow<RateLimitEvent>
 
-    fun publish(event: RateLimitEvent) {
-        mutableEvents.tryEmit(event)
-    }
+fun RateLimitBus.publish(event: RateLimitEvent) {
+    tryEmit(event)
 }
 
 /**

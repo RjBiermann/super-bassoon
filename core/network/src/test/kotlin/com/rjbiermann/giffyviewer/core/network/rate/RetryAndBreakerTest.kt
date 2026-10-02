@@ -30,7 +30,7 @@ class RetryAndBreakerTest {
         dispatcher.setFailFast(resp(404, body = "{\"error\":\"queue empty\"}"))
         server.dispatcher = dispatcher
         server.start()
-        bus = RateLimitBus()
+        bus = kotlinx.coroutines.flow.MutableSharedFlow(replay = 8, extraBufferCapacity = 16)
         limiter = RollingWindowRateLimiter(maxPerWindow = 100, windowMs = 5_000)
     }
 
@@ -95,7 +95,7 @@ class RetryAndBreakerTest {
             server.enqueue(resp(200))
             val response = client().newCall(get()).execute()
             assertEquals(200, response.code)
-            assertTrue(bus.events.first() is RateLimitEvent.CoolingDown)
+            assertTrue(bus.first() is RateLimitEvent.CoolingDown)
         }
 
     @Test

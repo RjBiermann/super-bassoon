@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
@@ -21,11 +20,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rjbiermann.giffyviewer.core.ui.GiffyScaffold
 
 /**
  * Saved Collections (PLAN §7, site wording verified 2026-10-01): header
@@ -54,22 +51,13 @@ fun CollectionsScreen(
     var deleteFor by remember { mutableStateOf<com.rjbiermann.giffyviewer.core.network.CollectionDto?>(null) }
     LaunchedEffect(Unit) { viewModel.refresh() }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Saved Collections") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "back")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { showCreate = true }) {
-                        Icon(Icons.Filled.Add, contentDescription = "create new collection")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
-            )
+    GiffyScaffold(
+        title = "Saved Collections",
+        onBack = onBack,
+        actions = {
+            IconButton(onClick = { showCreate = true }) {
+                Icon(Icons.Filled.Add, contentDescription = "create new collection")
+            }
         },
     ) { padding ->
         LazyColumn(

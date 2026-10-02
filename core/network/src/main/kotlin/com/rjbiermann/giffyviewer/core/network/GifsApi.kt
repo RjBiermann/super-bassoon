@@ -101,6 +101,12 @@ interface GifsApi {
         @Query("query") query: String,
     ): List<SuggestDto>
 
+    /** Trending tags (live-verified 2026-10-02): the site search "Tags" tab. */
+    @GET("v2/tags/trending")
+    suspend fun trendingTags(
+        @Query("count") count: Int = 20,
+    ): TrendingTagsDto
+
     /** Creator search (live-verified 2026-09-30, anonymous OK): paginated
      *  creator cards with follower/gif counts — results-row source. */
     @GET("v2/creators/search")
@@ -410,6 +416,20 @@ data class SuggestDto(
     val type: String = "tag",
     val text: String = "",
     val gifs: Int = 0,
+)
+
+/** /v2/tags/trending — the site search's 4th "Tags" tab source (live-verified
+ *  2026-10-02: `{tags: [{name, count}]}`). App parity: trending-tags section in
+ *  the search screen's empty state, tap = tag search feed. */
+@Serializable
+data class TrendingTagsDto(
+    val tags: List<TrendingTagDto> = emptyList(),
+)
+
+@Serializable
+data class TrendingTagDto(
+    val name: String = "",
+    val count: Int = 0,
 )
 
 /** /v2/creators/search item — username is the identity; counts for the row. */

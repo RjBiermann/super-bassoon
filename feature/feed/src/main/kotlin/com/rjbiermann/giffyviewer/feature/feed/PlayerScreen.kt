@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -98,6 +99,7 @@ import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayer
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
+import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
 import com.rjbiermann.giffyviewer.core.ui.GiffyColors
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -393,6 +395,14 @@ fun PlayerScreen(
                     },
                     onSkip = { playError = false },
                     videoFit = videoFit,
+                    onOpenCreator = {
+                        viewModel.open(FeedSource.Creator(username = gif.userName))
+                        onBack()
+                    },
+                    onOpenTag = { tag ->
+                        viewModel.open(FeedSource.Search(query = tag))
+                        onBack()
+                    },
                 )
             }
         }
@@ -410,6 +420,7 @@ fun PlayerScreen(
                 speed = newSpeed
                 player.setPlaybackSpeed(newSpeed)
             },
+            onOpenFeed = onBack,
         )
     }
 }
@@ -449,6 +460,9 @@ private fun PlayerPage(
     onRetry: () -> Unit,
     onSkip: () -> Unit,
     videoFit: String,
+    /** Links audit: cluster @user / tag chips navigate (player closes). */
+    onOpenCreator: () -> Unit = {},
+    onOpenTag: (String) -> Unit = {},
 ) {
     // React to the shared player's media swaps (attach gating below).
     val playingId by player.currentGifId.collectAsStateWithLifecycle()
@@ -675,6 +689,7 @@ private fun PlayerPage(
                                 .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
+                        // Links audit #2: tags are FeedSource.Search(query = tag).
                         gif.tags.take(6).forEach { tag ->
                             Text(
                                 text = tag,
@@ -682,7 +697,9 @@ private fun PlayerPage(
                                 style = MaterialTheme.typography.labelMedium,
                                 modifier =
                                     Modifier
-                                        .background(Color.Transparent, RoundedCornerShape(999.dp))
+                                        .clickable {
+                                            onOpenTag(tag)
+                                        }.background(Color.Transparent, RoundedCornerShape(999.dp))
                                         .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(999.dp))
                                         .padding(horizontal = 10.dp, vertical = 4.dp),
                             )
@@ -691,17 +708,15 @@ private fun PlayerPage(
                     Spacer(Modifier.height(6.dp))
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "@${gif.userName}",
-                        color = Color.White,
+                    CreatorLabel(
+                        gif.userName,
+                        gif.verified,
+                        tint = Color.White,
+                        tickTint = Color.White,
                         style = MaterialTheme.typography.titleMedium,
+                        tickSize = 16.dp,
+                        onClick = onOpenCreator,
                     )
-                    if (gif.verified) {
-                        com.rjbiermann.giffyviewer.core.ui.VerifiedTick(
-                            tint = Color.White,
-                            modifier = Modifier.padding(start = 4.dp).size(16.dp),
-                        )
-                    }
                 }
             }
         }

@@ -13,7 +13,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -23,9 +22,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -42,6 +39,7 @@ import com.rjbiermann.giffyviewer.core.database.CustomFeedEntity
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.database.NicheGroupEntity
 import com.rjbiermann.giffyviewer.core.model.Gif
+import com.rjbiermann.giffyviewer.core.ui.GiffyScaffold
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -98,9 +96,29 @@ class CustomFeedsViewModel
 public fun customRefSummary(ref: String): String =
     when {
         ref.startsWith("creator:") -> "@${ref.removePrefix("creator:")}"
-        ref.startsWith("niche:") -> "Niche: ${ref.removePrefix("niche:").substringAfter('|')}"
+        ref.startsWith("niche:") -> "Niche: ${parseNicheRef(ref)?.second ?: ""}"
         else -> "#${ref.removePrefix("tag:")}"
     }
+
+/** Niche "id|name" packing format — pins store bare "<id>|<name>", custom-feed
+ *  refs carry the "niche:" prefix. Both parse here; one named home for the
+ *  stringly-typed format (audit round-3 #6).
+ *
+ *  ponytail: pinned packing itself lives in core:datastore (togglePinnedNiche)
+ *  — core can't reach feature:feed, so the pack half stays inline there. */
+public fun packNicheRef(
+    id: String,
+    name: String,
+    prefixed: Boolean = false,
+): String = if (prefixed) "niche:$id|$name" else "$id|$name"
+
+/** (id, name) from either variant, or null when the ref isn't a niche pair. */
+public fun parseNicheRef(ref: String): Pair<String, String>? =
+    ref
+        .removePrefix("niche:")
+        .split('|', limit = 2)
+        .takeIf { it.size == 2 }
+        ?.let { (id, name) -> id to name }
 
 /** Refs a gif contributes to a custom feed (niche + creator + first 3 tags);
  *  builder refs are "creator:<username>" / "tag:<text>" / "niche:<id>|<name>". */
@@ -134,17 +152,9 @@ fun CustomFeedsScreen(
     // long-press "Add to custom feed…" quick action.
     val canSave = name.isNotBlank()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Custom feeds") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-            )
-        },
+    GiffyScaffold(
+        title = "Custom feeds",
+        onBack = onBack,
     ) { padding ->
         LazyColumn(
             modifier = Modifier.padding(padding).fillMaxWidth(),

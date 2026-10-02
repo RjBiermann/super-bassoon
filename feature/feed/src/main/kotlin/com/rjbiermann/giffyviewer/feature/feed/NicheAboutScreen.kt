@@ -10,7 +10,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -18,10 +17,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.rjbiermann.giffyviewer.core.network.GifsApi
+import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
+import com.rjbiermann.giffyviewer.core.ui.GiffyScaffold
 import kotlinx.coroutines.launch
 
 /**
@@ -90,22 +88,13 @@ fun NicheAboutScreen(
         loadAbout()
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(nicheName) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "back")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { share() }) {
-                        Icon(Icons.Filled.Share, contentDescription = "share")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
-            )
+    GiffyScaffold(
+        title = nicheName,
+        onBack = onBack,
+        actions = {
+            IconButton(onClick = { share() }) {
+                Icon(Icons.Filled.Share, contentDescription = "share")
+            }
         },
     ) { padding ->
         if (detailFailed) {
@@ -118,7 +107,7 @@ fun NicheAboutScreen(
                 onClick = { loadAbout() },
                 modifier = Modifier.padding(16.dp),
             ) { Text("Retry") }
-            return@Scaffold
+            return@GiffyScaffold
         }
         Column(modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
             detail?.let { d ->
@@ -172,14 +161,7 @@ fun NicheAboutScreen(
                             )
                         },
                         headlineContent = {
-                            androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                                Text("@${creator.username}")
-                                if (creator.verified) {
-                                    com.rjbiermann.giffyviewer.core.ui.VerifiedTick(
-                                        modifier = Modifier.padding(start = 4.dp).size(14.dp),
-                                    )
-                                }
-                            }
+                            CreatorLabel(creator.username, creator.verified)
                         },
                         supportingContent = { Text("${creator.followers} followers") },
                         modifier = Modifier.clickable { onOpenCreator(creator.username) },

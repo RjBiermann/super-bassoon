@@ -19,8 +19,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,7 +29,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -54,6 +51,9 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.rjbiermann.giffyviewer.core.model.Gif
+import com.rjbiermann.giffyviewer.core.ui.AudioBadge
+import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
+import com.rjbiermann.giffyviewer.core.ui.avgColorOr
 
 /**
  * 10-foot UI (PLAN §8 TV): vertical stack of rows, D-pad navigates rows and
@@ -135,6 +135,7 @@ fun TvHomeScreen(
             gif = gif,
             feedViewModel = quickVm,
             onDismiss = { actionsFor = null },
+            onOpenCreator = onOpenCreator,
         )
     }
 }
@@ -178,16 +179,12 @@ private fun CreatorRow(
                             modifier = Modifier.size(96.dp).clip(CircleShape),
                         )
                         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                            Text(
-                                "@${creator.username}",
-                                style = MaterialTheme.typography.bodyMedium,
+                            CreatorLabel(
+                                creator.username,
+                                creator.verified,
+                                tickSize = 12.dp,
                                 modifier = Modifier.padding(top = 8.dp),
                             )
-                            if (creator.verified) {
-                                com.rjbiermann.giffyviewer.core.ui.VerifiedTick(
-                                    modifier = Modifier.padding(start = 3.dp, top = 8.dp).size(12.dp),
-                                )
-                            }
                         }
                         Text(
                             "${creator.followers} followers · ${creator.gifs} gifs",
@@ -338,7 +335,7 @@ internal fun GifCard(
                         .fillMaxWidth()
                         .height(CARD_ROW_HEIGHT_DP)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(avgColorOr(gif, MaterialTheme.colorScheme.surfaceVariant)),
+                        .background(avgColorOr(gif.avgColor, MaterialTheme.colorScheme.surfaceVariant)),
             ) {
                 AsyncImage(
                     model =
@@ -356,49 +353,20 @@ internal fun GifCard(
                 )
                 // Audio-know-before-tap badge — mobile-tile parity (unified UI).
                 if (gif.hasAudio) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .align(androidx.compose.ui.Alignment.TopEnd)
-                                .padding(8.dp)
-                                .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(6.dp))
-                                .padding(horizontal = 5.dp, vertical = 3.dp),
-                    ) {
-                        androidx.compose.material3.Icon(
-                            imageVector = Icons.Filled.VolumeUp,
-                            contentDescription = "has sound",
-                            tint = Color.White,
-                            modifier = Modifier.size(12.dp),
-                        )
-                    }
+                    AudioBadge(modifier = Modifier.align(androidx.compose.ui.Alignment.TopEnd).padding(8.dp))
                 }
             }
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Text(
-                    text = "@${gif.userName}",
+                CreatorLabel(
+                    gif.userName,
+                    gif.verified,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tickTint = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tickSize = 12.dp,
                     modifier = Modifier.padding(top = 4.dp, start = 4.dp),
                 )
-                if (gif.verified) {
-                    com.rjbiermann.giffyviewer.core.ui.VerifiedTick(
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 3.dp, top = 4.dp).size(12.dp),
-                    )
-                }
             }
         }
     }
 }
-
-/** avgColor is "#rrggbb"; fall back to theme surface on anything unexpected. */
-@Composable
-private fun avgColorOr(
-    gif: Gif,
-    fallback: Color,
-): Color =
-    try {
-        Color(android.graphics.Color.parseColor(gif.avgColor))
-    } catch (_: IllegalArgumentException) {
-        fallback
-    }

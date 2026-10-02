@@ -12,7 +12,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.PushPin
@@ -22,11 +21,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rjbiermann.giffyviewer.core.ui.GiffyScaffold
 
 /**
  * Niches browser (PLAN §7 groups groundwork): paginated taxonomy from
@@ -65,44 +62,35 @@ fun NichesScreen(
     val loadFailed by viewModel.loadFailed.collectAsStateWithLifecycle()
     var sortMenuOpen by remember { mutableStateOf(false) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Niches") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
-                actions = {
-                    androidx.compose.material3.TextButton(onClick = { sortMenuOpen = true }) {
-                        Text(
-                            "Sort: ${sort.removeSuffix("_asc").removeSuffix("_desc").replaceFirstChar { it.uppercase() }}",
-                        )
-                    }
-                    androidx.compose.material3.DropdownMenu(
-                        expanded = sortMenuOpen,
-                        onDismissRequest = { sortMenuOpen = false },
-                    ) {
-                        listOf(
-                            "subscribers" to "Subscribers",
-                            "posts" to "Gifs",
-                            "alphabetical_asc" to "A–Z",
-                            "alphabetical_desc" to "Z–A",
-                            "random" to "Random",
-                        ).forEach { (value, label) ->
-                            androidx.compose.material3.DropdownMenuItem(
-                                text = { Text(label) },
-                                onClick = {
-                                    viewModel.resort(value)
-                                    sortMenuOpen = false
-                                },
-                            )
-                        }
-                    }
-                },
-            )
+    GiffyScaffold(
+        title = "Niches",
+        onBack = onBack,
+        actions = {
+            androidx.compose.material3.TextButton(onClick = { sortMenuOpen = true }) {
+                Text(
+                    "Sort: ${sort.removeSuffix("_asc").removeSuffix("_desc").replaceFirstChar { it.uppercase() }}",
+                )
+            }
+            androidx.compose.material3.DropdownMenu(
+                expanded = sortMenuOpen,
+                onDismissRequest = { sortMenuOpen = false },
+            ) {
+                listOf(
+                    "subscribers" to "Subscribers",
+                    "posts" to "Gifs",
+                    "alphabetical_asc" to "A–Z",
+                    "alphabetical_desc" to "Z–A",
+                    "random" to "Random",
+                ).forEach { (value, label) ->
+                    androidx.compose.material3.DropdownMenuItem(
+                        text = { Text(label) },
+                        onClick = {
+                            viewModel.resort(value)
+                            sortMenuOpen = false
+                        },
+                    )
+                }
+            }
         },
     ) { padding ->
         LazyColumn(

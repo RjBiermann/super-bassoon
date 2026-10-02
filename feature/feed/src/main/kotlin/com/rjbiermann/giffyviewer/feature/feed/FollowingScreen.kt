@@ -10,17 +10,10 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,6 +22,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
+import com.rjbiermann.giffyviewer.core.ui.GiffyScaffold
 
 /**
  * Following screen (PLAN §7): followed creators + joined niches; entries jump
@@ -46,18 +41,9 @@ fun FollowingScreen(
     val niches by viewModel.niches.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.refresh() }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Following") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
-            )
-        },
+    GiffyScaffold(
+        title = "Following",
+        onBack = onBack,
     ) { padding ->
         if (viewModel.loadFailed.collectAsStateWithLifecycle().value) {
             com.rjbiermann.giffyviewer.core.ui.EmptyState(
@@ -69,7 +55,7 @@ fun FollowingScreen(
                 onClick = { viewModel.refresh() },
                 modifier = Modifier.padding(16.dp),
             ) { Text("Retry") }
-            return@Scaffold
+            return@GiffyScaffold
         }
         if (creators.isEmpty() && niches.isEmpty()) {
             com.rjbiermann.giffyviewer.core.ui.EmptyState(
@@ -77,7 +63,7 @@ fun FollowingScreen(
                 hint = "Follow creators and join niches to fill this page",
                 modifier = Modifier.fillMaxSize().padding(padding),
             )
-            return@Scaffold
+            return@GiffyScaffold
         }
         LazyColumn(
             modifier =
@@ -103,14 +89,7 @@ fun FollowingScreen(
                         )
                     },
                     headlineContent = {
-                        androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                            Text("@${creator.username}")
-                            if (creator.verified) {
-                                com.rjbiermann.giffyviewer.core.ui.VerifiedTick(
-                                    modifier = Modifier.padding(start = 4.dp).size(14.dp),
-                                )
-                            }
-                        }
+                        CreatorLabel(creator.username, creator.verified)
                     },
                     supportingContent = { Text("${creator.followers} followers · ${creator.gifs} gifs") },
                     modifier = Modifier.clickable { onOpenCreator(creator.username) },

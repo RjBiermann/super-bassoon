@@ -50,7 +50,8 @@ fun buildNetwork(
     onUnauthorized: () -> Unit = {},
     enableLogging: Boolean = false,
 ): NetworkComponents {
-    val bus = RateLimitBus()
+    val bus: RateLimitBus =
+        kotlinx.coroutines.flow.MutableSharedFlow(replay = 8, extraBufferCapacity = 16)
     val limiter = RollingWindowRateLimiter()
     val breaker = CircuitBreaker()
 

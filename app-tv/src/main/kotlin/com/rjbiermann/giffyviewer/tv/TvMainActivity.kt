@@ -34,6 +34,7 @@ import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.ui.GiffyTheme
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
+import com.rjbiermann.giffyviewer.feature.feed.parseNicheRef
 import com.rjbiermann.giffyviewer.feature.settings.SettingsScreen
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -144,6 +145,7 @@ class TvMainActivity : ComponentActivity() {
                         db = db,
                         feedViewModel = hiltViewModel(),
                         onBack = { player = null },
+                        onOpenCreator = { username -> openFeed = FeedSource.Creator(username = username) },
                     )
                 }
                 openFeed != null -> {
@@ -199,9 +201,7 @@ class TvMainActivity : ComponentActivity() {
                                     modifier = Modifier.padding(6.dp),
                                 )
                             }
-                            items(pinnedNiches.toList()) { entry ->
-                                val id = entry.substringBefore('|')
-                                val name = entry.substringAfter('|')
+                            items(pinnedNiches.toList().mapNotNull { parseNicheRef(it) }) { (id, name) ->
                                 com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
                                     text = name,
                                     onClick = { openFeed = FeedSource.Niche(id, name) },
@@ -248,12 +248,8 @@ class TvMainActivity : ComponentActivity() {
                                             )
                                         }
                                         val pinnedEntries =
-                                            pinnedNiches.map { entry ->
-                                                Pair(
-                                                    entry.substringBefore('|'),
-                                                    entry.substringAfter('|'),
-                                                )
-                                            } + pinnedCreators.map { Pair("user:${it.lowercase()}", "@$it") }
+                                            pinnedNiches.mapNotNull { parseNicheRef(it) } +
+                                                pinnedCreators.map { Pair("user:${it.lowercase()}", "@$it") }
                                         if (pinnedEntries.isNotEmpty()) {
                                             androidx.compose.material3.HorizontalDivider()
                                             pinnedEntries.forEach { (ref, name) ->

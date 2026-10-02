@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -32,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rjbiermann.giffyviewer.core.model.Gif
+import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
 import com.rjbiermann.giffyviewer.core.ui.giffyFocus
 import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
 import com.rjbiermann.giffyviewer.feature.feed.customRefSummary
@@ -62,6 +62,8 @@ fun TvQuickActionsDialog(
     gif: Gif,
     feedViewModel: FeedViewModel,
     onDismiss: () -> Unit,
+    /** Links audit #3: the D-pad link equivalent — navigate to the creator feed. */
+    onOpenCreator: (String) -> Unit = {},
     /** The open feed itself as an addable ref (e.g. browsing a niche). */
     addableFeedRef: String? = null,
     /** Non-null in the player: adds Like/Mute/Speed/Auto-swipe rows. */
@@ -86,16 +88,13 @@ fun TvQuickActionsDialog(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Row {
-                    Text(
-                        text = "@${gif.userName}",
+                    CreatorLabel(
+                        gif.userName,
+                        gif.verified,
                         style = MaterialTheme.typography.titleMedium,
+                        tickSize = 16.dp,
                         modifier = Modifier.padding(bottom = 8.dp),
                     )
-                    if (gif.verified) {
-                        com.rjbiermann.giffyviewer.core.ui.VerifiedTick(
-                            modifier = Modifier.padding(start = 6.dp, bottom = 8.dp).size(16.dp),
-                        )
-                    }
                 }
                 val first = remember { FocusRequester() }
                 // Re-request per pane swap so a new pane's first row takes focus.
@@ -204,6 +203,13 @@ fun TvQuickActionsDialog(
                     },
                 )
                 val pinnedCreators by feedViewModel.pinnedCreators.collectAsStateWithLifecycle(emptySet())
+                // Links audit #3: the most basic navigation act on a creator.
+                // Caller decides navigation (home/source-feed open, player exits first —
+                // swapping the feed source under the live pager is the soak-crash class).
+                QuickAction(text = "Open @${gif.userName}'s feed") {
+                    onDismiss()
+                    onOpenCreator(gif.userName)
+                }
                 QuickAction(
                     text =
                         if (gif.userName.lowercase() in pinnedCreators) {

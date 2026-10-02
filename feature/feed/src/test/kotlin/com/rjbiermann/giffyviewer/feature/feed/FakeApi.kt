@@ -85,6 +85,8 @@ internal class FakeApi : GifsApi {
 
     override suspend fun suggest(query: String): List<com.rjbiermann.giffyviewer.core.network.SuggestDto> = throw NotImplementedError()
 
+    override suspend fun trendingTags(count: Int): com.rjbiermann.giffyviewer.core.network.TrendingTagsDto = throw NotImplementedError()
+
     override suspend fun creatorsSearch(
         query: String,
         count: Int,

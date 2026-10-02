@@ -119,7 +119,7 @@ class FeedPageFetcher(
                             api.userGifs(username = ref.removePrefix("creator:"), count = pageSize, page = inner)
                         ref.startsWith("niche:") ->
                             api.nicheGifs(
-                                nicheId = ref.removePrefix("niche:").substringBefore('|'),
+                                nicheId = parseNicheRef(ref)?.first ?: "",
                                 count = pageSize,
                                 page = inner,
                             )

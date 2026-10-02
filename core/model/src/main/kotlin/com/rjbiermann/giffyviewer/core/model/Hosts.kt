@@ -30,23 +30,9 @@ object Hosts {
     /** Public niche pages (share intent). */
     val niche: String get() = parts[5]
 
-    /** Minimal base64 decoder (pure Kotlin — java.util.Base64 is API 26+). */
-    private fun decodeBase64(s: String): String {
-        val alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-        val out = StringBuilder()
-        var bits = 0
-        var acc = 0
-        for (c in s) {
-            if (c == '=') break
-            val v = alphabet.indexOf(c)
-            if (v < 0) continue
-            acc = (acc shl 6) or v
-            bits += 6
-            if (bits >= 8) {
-                bits -= 8
-                out.append(((acc shr bits) and 0xFF).toChar())
-            }
-        }
-        return out.toString()
-    }
+    /** Base64 decode — kotlin.io.encoding stdlib (no API-level floor). */
+    private fun decodeBase64(s: String): String =
+        kotlin.io.encoding.Base64.Default
+            .decode(s)
+            .decodeToString()
 }

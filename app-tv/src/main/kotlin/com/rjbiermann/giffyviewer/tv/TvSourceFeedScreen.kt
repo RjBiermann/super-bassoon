@@ -38,6 +38,7 @@ import com.rjbiermann.giffyviewer.feature.feed.FeedFilterDialog
 import com.rjbiermann.giffyviewer.feature.feed.FeedRepository
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
+import com.rjbiermann.giffyviewer.feature.feed.packNicheRef
 import com.rjbiermann.giffyviewer.feature.feed.title
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -154,7 +155,7 @@ fun TvSourceFeedScreen(
         TvQuickActionsDialog(
             gif = gif,
             feedViewModel = feedViewModel,
-            addableFeedRef = (source as? FeedSource.Niche)?.let { "niche:${it.id}|${it.name}" },
+            addableFeedRef = (source as? FeedSource.Niche)?.let { packNicheRef(it.id, it.name, prefixed = true) },
             onDismiss = { actionsFor = null },
         )
     }

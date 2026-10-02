@@ -13,6 +13,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import kotlin.io.encoding.Base64
 
 /**
  * Stores the user's Kinde JWT under alias `giffy_auth` (PLAN §2 / AGENTS-AUTH.md).
@@ -141,10 +142,10 @@ class TokenStore(
                     .getInstance("SHA-256")
                     .digest(verifier.toByteArray(Charsets.US_ASCII))
             val challenge =
-                java.util.Base64
-                    .getUrlEncoder()
-                    .withoutPadding()
-                    .encodeToString(digest)
+                Base64
+                    .UrlSafe
+                    .withPadding(Base64.PaddingOption.ABSENT)
+                    .encode(digest)
             return Pkce(verifier, challenge, verifier.take(16))
         }
 

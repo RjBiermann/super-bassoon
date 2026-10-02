@@ -45,6 +45,7 @@ import com.rjbiermann.giffyviewer.core.database.WatchHistoryEntity
 import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
+import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
 import kotlinx.coroutines.launch
 
 /**
@@ -61,6 +62,9 @@ fun TvPlayerScreen(
     /** Shared quick-action model — MENU opens favorite/block/custom-feed. */
     feedViewModel: com.rjbiermann.giffyviewer.feature.feed.FeedViewModel,
     onBack: () -> Unit,
+    /** Links audit #3: "Open @user's feed" — exits the player, opens the creator feed
+     *  (swapping the source under the live pager is the soak-crash class). */
+    onOpenCreator: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -244,17 +248,14 @@ fun TvPlayerScreen(
                         .padding(start = 24.dp, bottom = 24.dp, end = 96.dp),
             ) {
                 Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    Text(
-                        text = "@${gif.userName}",
+                    CreatorLabel(
+                        gif.userName,
+                        gif.verified,
+                        tint = Color.White,
+                        tickTint = Color.White,
                         style = MaterialTheme.typography.titleMedium,
-                        color = Color.White,
+                        tickSize = 18.dp,
                     )
-                    if (gif.verified) {
-                        com.rjbiermann.giffyviewer.core.ui.VerifiedTick(
-                            tint = Color.White,
-                            modifier = Modifier.padding(start = 6.dp).size(18.dp),
-                        )
-                    }
                 }
                 gif.description?.takeIf { it.isNotBlank() }?.let { desc ->
                     Text(
@@ -338,6 +339,10 @@ fun TvPlayerScreen(
                     onToggleAutoSwipe = { scope.launch { settings.setAutoSwipe(!autoSwipeOn) } },
                 ),
             onDismiss = { actionsFor = null },
+            onOpenCreator = { username ->
+                onBack()
+                onOpenCreator(username)
+            },
         )
     }
 }

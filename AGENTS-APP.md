@@ -156,7 +156,8 @@ TvPlayerScreen progress fraction starts at 0 (stale BISECT probe removed).
 - Speed label precision — CLOSED with correction: both labels are `Locale.US` now, and the
   original "%.1f" claim was wrong — speed steps are 0.25, so 2 decimals is real precision
   (0.25×, 1.25×). Kept %.2f on both platforms.
-- PinLockScreen: no haptic on keypress / wrong-PIN shake.
+- PinLockScreen: keypress haptic DONE (KeyboardTap per key, LongPress on wrong PIN —
+  2026-10-02); wrong-PIN shake skipped (haptic covers the feedback; brief screen).
 - NichesScreen initial fetch inside `remember { scope.launch {} }` — should be
   LaunchedEffect(Unit) (same length, correct idiom).
 - contentDescription capitalization varies ("search" vs "Sound On") — copy consistency.
@@ -216,8 +217,12 @@ unscheduled — a user slice picks.
   contentDescription "pinned".
 - ~~TV media NEXT/PREV keys~~ — CLOSED 2026-10-01: handled (walk the list, up/down parity).
 - ~~SearchScreen rows <48dp~~ — CLOSED 2026-10-01: vertical padding 10→14dp.
-- contentDescription capitalization still mixed: "Back" ×1 vs "back" ×9, "Remove" ×1.
-- AuthSection signed-in state shows only "Signed in" — no @username (site shows the account).
+- contentDescription capitalization — CLOSED 2026-10-02: the "Back"×1 drift went with
+  GiffyScaffold; "remove"-prefixed descriptions verified lowercase everywhere.
+- AuthSection signed-in state shows only "Signed in" — no @username. BLOCKED (2026-10-02):
+  no username is stored and no verified "who am I" source exists (v2/user_profile 404'd;
+  `v1/users/{username}` needs the username) — decoding an unverified JWT claim would be
+  guessing per the no-guess rule. Revisit when a verified claim/endpoint surfaces.
 - RateLimitBus "cooling down" indicator — decided 2026-10-01: **spec'd-not-built**
   (marker only; no UI consumer — build when a user-visible failure trace demands it).
 - TV home "More ▾" DropdownMenuItems have no giffyFocus ring (M3 popup rows) — whether
@@ -240,19 +245,20 @@ architecture.
 | Group / Custom feed / Pinned | chips, More ▾, TV pills + dropdown | their feeds |
 | Gif (tiles/cards) | mobile tiles + TV cards | player |
 
-**Missing links (spec'd but dead text today) — each row names its already-existing target:**
-1. **@username → creator feed** — dead text on: mobile GifTile caption, TV GifCard caption,
-   mobile player bottom cluster ("Tap username → profile-like view" is spec'd in the Mobile
-   section above but never built), TV player cluster, both quick-sheet headers. Target:
-   `FeedSource.Creator(userName)` via the surface's existing open callback (mobile tile/player
-   need the callback plumbed; TV needs an onOpenCreator parameter).
-2. **Player tag chips → tag feed** — comment in PlayerScreen says "tappable when tag feeds
-   land"; they landed as `FeedSource.Search(query = tag)` (search_text matches tags,
-   live-verified per FeedSource.kt). Same for TV (its Filter/tags path is quick-actions only).
-3. **Quick sheet "Open @user's feed" row** — neither QuickSheet main pane nor TvQuickActions
-   offers the most basic navigation act on a creator. One row each; on the sheet header the
-   @user Text itself can be the row's tap target. TV: the player's username focus already
-   opens quick actions — an "Open @user's feed" row there IS the D-pad link equivalent.
+**Missing links — status 2026-10-02:**
+1. **@username → creator feed — BUILT (mobile):** CreatorLabel gained an optional
+   `onClick`; wired on the mobile tile caption (in-place `viewModel.open`), the player
+   bottom cluster (open + close the player — the feed behind has swapped, like TikTok
+   leaving the player on a hashtag) and the quick-sheet row (#3). TV captions
+   deliberately stay non-tappable: a clickable inside a focusable Card steals D-pad
+   focus; the TV link equivalent is the "Open @user's feed" row in TvQuickActions
+   (built same day).
+2. **Player tag chips → tag feed — BUILT (mobile):** chips call
+   `FeedSource.Search(query = tag)` + close the player. TV keeps its quick-actions
+   tags pane as the equivalent.
+3. **Quick sheet "Open @user's feed" row — BUILT 2026-10-02:** QuickSheet main pane
+   (after Favorite) + TvQuickActions main pane; both `viewModel.open(FeedSource.Creator(...))`
+   + dismiss.
 4. **FollowingScreen niche rows** carry no About entry and TV has no NicheAbout at all
    (existing "Minor" gap) — link exists, depth missing; unchanged here.
 5. **Gif niches → niche feed (round 2 of this audit, 2026-10-02)** — gif payloads DO carry
@@ -471,22 +477,20 @@ Simplification only — every feature stays; findings collapse implementation, n
 Ranked by lines removed per risk, smallest diffs first. Threshold rule from round 2
 (consolidate at the 4th instance) applied where it now fires.
 
-1. **CreatorLabel convergence — 10 hand-rolled instances across 9 files.**
-   `Text("@user") + if (verified) VerifiedTick(...)` is written out in: FeedScreen tile
-   caption (×1 of 2), Explore/Following/NicheAbout rows, PlayerScreen cluster, QuickSheet
-   header, TvHomeScreen (×2), TvPlayerScreen cluster, TvQuickActions header — each with its
-   own padding/size/tint choices drifting independently (the 12dp/14dp/16dp/18dp tick
-   variety). One shared core:ui `CreatorLabel(username, verified, tint, style)` with tint
-   as a parameter (the only true per-surface difference) collapses all 10. Same n=10 as
-   the TopAppBar item below — do both in one touch.
+1. **CreatorLabel convergence — DONE (2026-10-02):** core:ui `CreatorLabel(username,
+   verified, tint, style, tickTint, tickSize, onClick)` replaced all 10 hand-rolled
+   copies (FeedScreen tile caption + creator chip, Explore/Following/NicheAbout rows,
+   PlayerScreen cluster, QuickSheet header, TvHomeScreen ×2, TvPlayerScreen cluster,
+   TvQuickActions header). Tick size follows the label (14dp default, 12dp TV cards,
+   16–18dp player clusters); tint colors text, tickTint the tick (Info cyan fallback).
+   Optional `onClick` powers the links-audit @user wiring.
 
-2. **GiffyScaffold — the Scaffold+TopAppBar+back-IconButton boilerplate renders 10×.**
-   Every list screen (Explore, Following, Collections, Groups, CustomFeeds, Niches,
-   NicheAbout, Search, Settings, player top bar) repeats
-   `Scaffold { TopAppBar(title, navigationIcon = IconButton(back), colors =
-   topAppBarColors(surface)) }`. A tiny core:ui `GiffyScaffold(title, onBack, content)`
-   cuts ~8 lines × 10 and — the real payoff — fixes the round-1 Low copy-drift item
-   ("back" vs "Back" contentDescription) in exactly one place instead of ten.
+2. **GiffyScaffold — DONE (2026-10-02):** core:ui `GiffyScaffold(title, onBack, modifier,
+   backIcon, backDescription, actions, snackbarHost, content)` replaces the boilerplate in
+   Explore, Following, Collections, Groups, CustomFeeds, Niches, NicheAbout, Settings
+   (Close icon variant) and FeedScreen (onBack = null, home surface). PlayerScreen's top
+   bar is a bare TopAppBar inside AnimatedVisibility — not a Scaffold site, left alone.
+   "Back"→"back" copy drift (CustomFeeds) fixed as the side effect.
 
 3. **List-fetch state machine: the round-2 n=4 threshold is now CROSSED.**
    Round 2 said "until a fourth list screen lands, three flat copies beat one
@@ -511,20 +515,16 @@ Ranked by lines removed per risk, smallest diffs first. Threshold rule from roun
    takes a per-row decoration parameter. Decide on device, don't guess; if the ring test
    fails, keep only the ordering rule + custom-feed dialog shared and stop.
 
-5. **avgColorOr + AudioBadge duplicated ×2 — one-line moves.**
-   `avgColorOr` is the same private fun in FeedScreen.kt and TvHomeScreen.kt; the
-   black-translucent rounded `VolumeUp` badge Box is written twice (tile + card) with
-   padding differences only. Both are 10–15-liners → core:ui `avgColorOr` + `AudioBadge`.
-   Skipped a full shared GifThumb component on purpose: tile (aspect-ratio box) and card
-   (fixed 170dp row) layouts differ legitimately — flat-structure rule wins.
+5. **avgColorOr + AudioBadge — DONE (2026-10-02):** both moved to core:ui
+   (`AudioBadge.kt`); the two call sites consume them (tile/card badge padding drift
+   collapsed to 4dp inner). Full shared GifThumb stays skipped on purpose.
 
-6. **The load-bearing `"id|name"` string format deserves its two helpers.**
-   `entry.substringBefore('|') / substringAfter('|')` parsing of pinned refs is scattered
-   across ≥4 sites (TV pills, TV dropdown, FeedScreen pinnedNiches remember, custom-feed
-   ref parsing) — the stringly-typed packing format silently coordinates pinned pills,
-   quick actions and custom feeds across both shells. One `packNicheRef/parseNicheRef`
-   pair in feature:feed turns four parse sites into calls and gives the format a named
-   home (next to customRefSummary, which already labels these refs).
+6. **packNicheRef/parseNicheRef — DONE (2026-10-02):** both helpers live in
+   CustomFeedsScreen.kt beside `customRefSummary`; all four parse sites (TV pills, TV
+   dropdown, FeedScreen pinnedNiches, FeedPageFetcher, CustomFeedsScreen summary) and the
+   two prefixed pack sites (FeedScreen, TvSourceFeedScreen) call them.
+   `NicheRefTest` covers both variants + round-trip. Pin packing in core:datastore
+   (`togglePinnedNiche`) stays inline — core can't reach feature:feed.
 
 7. **UX simplification (visual, not code): the FeedScreen chip pile-up.**
    On a For-You niche/creator feed with options, the grid sits under up to five stacked
@@ -570,8 +570,12 @@ Real gaps (site has them, app doesn't) — **spec'd-not-scheduled, a user slice 
   followers — the row DTO is unverifiable, and building against a guessed shape
   risks silent decode breakage (repo no-guess rule). Re-probe with an account
   that has followers before wiring.
-- **Tags browse tab** — site search has a 4th **Tags** tab sourced from
-  `GET /v2/tags/trending` (verified live); app search stops at GIFs/Creators/Niches.
+- ~~Tags browse tab~~ — BUILT 2026-10-02 (section form): `GET /v2/tags/trending` wired
+  (GifsApi.trendingTags + TrendingTagsDto/TrendingTagDto); SearchScreen's empty-query
+  state gains a "Trending tags" section (#name + "N gifs", tap = the tag search feed via
+  the existing submit path — records history like any search). Fails silently to an
+  absent section. Note: the site renders it as a 4th TAB on the search results page; the
+  app renders it in the search empty state — same content, no new surface.
 - **Niches suggest** — `GET /v2/niches/suggest` (tag-context niche suggestions, verified)
   un-wired; would power a niche-search tab properly.
 - **Server search history** — `GET /v2/search/user-history` verified; site syncs history
@@ -693,3 +697,29 @@ row is read-only — unverified whether a follow action exists anywhere on TV.
 **Parity OK (verified in code):** age gate, PIN lock, Settings/data saver/video
 fit/verified-only, per-feed prefs (same feedprefs blob + shared dialog),
 favorites/likes, watch history, quick actions, Surprise me, mute/speed.
+
+## Pending backlog batch (2026-10-02 — executed from the parked/deferred items)
+Worked off the doc'd pending lists (round-3 simplification winners, links audit #1–#3,
+residual Low a11y, Tags parity gap). Compiled + ktlint + detekt + unit tests green on
+all touched modules (:core:ui/:core:network/:feature:feed/:feature:search/:feature:settings/
+:feature:auth/:app-tv/:app-mobile). What landed:
+- core:ui `CreatorLabel` (10 sites), `GiffyScaffold` (9 sites), `AudioBadge`+`avgColorOr`
+  (2 sites each), feature:feed `packNicheRef`/`parseNicheRef` (+ `NicheRefTest`).
+- Mobile links: tile-caption @user → creator feed (in-place open), player cluster
+  @user + tag chips → creator/tag feed (player closes — feed behind swaps),
+  quick-sheet "Open @user's feed" row; TV parity via the TvQuickActions row.
+- Tags parity: `GET /v2/tags/trending` wired as a "Trending tags" section in the
+  search empty state (endpoint was live-verified 2026-10-02; new call = 1 request on
+  search open, rate-limit-safe; silent degradation to an absent section).
+- PIN pad: keypress KeyboardTap haptic + LongPress haptic on wrong PIN.
+Deliberately NOT built this batch (still parked, with reasons):
+- Picker-dialog family merge (#4) — needs the on-device giffyFocus ring check the doc
+  itself demands before deciding how much to share.
+- List-fetch state-machine VM convergence (#3) — Explore's failure path now works;
+  idiom-consistency conversion is optional churn until a shared skeleton is wanted.
+- AuthSection @username — blocked on a verified "who am I" source (no stored username,
+  v2/user_profile 404'd; not guessing a JWT claim).
+- TV parity gaps (Search/Groups/custom-feed mgmt/Collections screens) and the TV
+  chip-skip traversal — D-pad device work, must be built with emulator verification.
+- UX-PATTERNS candidates (hold-for-speed, minimised player, TV preview-on-focus) —
+  still user-slice gated per that doc's graduation rule.

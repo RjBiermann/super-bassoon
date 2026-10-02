@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -27,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.rjbiermann.giffyviewer.core.model.Gif
+import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
 import com.rjbiermann.giffyviewer.core.ui.GiffyColors
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flatMapLatest
@@ -44,6 +44,10 @@ internal fun QuickBlockSheet(
     onSpeedChange: (Float) -> Unit = {},
     /** Surfaced when the OPEN feed itself is addable (e.g. a niche). */
     addableFeedRef: String? = null,
+    /** Links audit #3: "Open @user's feed" — player entry must exit the player first
+     *  (swapping the source under the live pager is the soak-crash class); grid entry
+     *  navigates in place. */
+    onOpenFeed: () -> Unit = {},
 ) {
     // Hoisted for the AddToCustomFeedDialog scope below.
     val customFeeds by viewModel.customFeeds.collectAsState(initial = emptyList())
@@ -61,16 +65,12 @@ internal fun QuickBlockSheet(
             .collectAsState(initial = 0L)
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.padding(bottom = 24.dp)) {
-            Text(
-                "@${gif.userName}",
+            CreatorLabel(
+                gif.userName,
+                gif.verified,
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
-            if (gif.verified) {
-                com.rjbiermann.giffyviewer.core.ui.VerifiedTick(
-                    modifier = Modifier.padding(start = 16.dp).size(14.dp),
-                )
-            }
             if (shuffleSeed != 0L) {
                 Text(
                     text = "Shuffle seed $shuffleSeed",
@@ -119,6 +119,12 @@ internal fun QuickBlockSheet(
                     listStyle(if (favState == "FAVORITED") "Unfavorite @${gif.userName}" else "Favorite @${gif.userName}") {
                         viewModel.toggleFavoriteCreator(gif.userName)
                         onDismiss()
+                    }
+                    // Links audit #3: the most basic navigation act on a creator.
+                    listStyle("Open @${gif.userName}'s feed") {
+                        viewModel.open(FeedSource.Creator(username = gif.userName))
+                        onDismiss()
+                        onOpenFeed()
                     }
                     val pinnedCreators by viewModel.pinnedCreators.collectAsState(initial = emptySet())
                     listStyle(

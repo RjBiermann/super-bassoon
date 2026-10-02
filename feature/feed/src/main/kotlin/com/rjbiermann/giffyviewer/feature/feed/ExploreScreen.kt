@@ -11,18 +11,11 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.rjbiermann.giffyviewer.core.network.CreatorSearchItemDto
 import com.rjbiermann.giffyviewer.core.network.GifsApi
+import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
+import com.rjbiermann.giffyviewer.core.ui.GiffyScaffold
 import kotlinx.coroutines.launch
 
 /**
@@ -84,18 +79,9 @@ fun ExploreScreen(
         if (!loadFailed) loadMore()
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Explore") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
-            )
-        },
+    GiffyScaffold(
+        title = "Explore",
+        onBack = onBack,
     ) { padding ->
         LazyColumn(
             modifier =
@@ -114,14 +100,7 @@ fun ExploreScreen(
                         )
                     },
                     headlineContent = {
-                        androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                            Text("@${creator.username}")
-                            if (creator.verified) {
-                                com.rjbiermann.giffyviewer.core.ui.VerifiedTick(
-                                    modifier = Modifier.padding(start = 4.dp).size(14.dp),
-                                )
-                            }
-                        }
+                        CreatorLabel(creator.username, creator.verified)
                     },
                     supportingContent = { Text("${creator.followers} followers · ${creator.gifs} gifs") },
                     modifier = Modifier.clickable { onOpenCreator(creator.username) },
