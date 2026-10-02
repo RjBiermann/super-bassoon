@@ -10,10 +10,6 @@
 -keepclasseswithmembers class com.rjbiermann.giffyviewer.** {
     kotlinx.serialization.KSerializer serializer(...);
 }
-# @Serializable DTOs: keep fields/constructors so reflection-free codecs stay intact
-# after R8 (the release smoke test gates this — never remove without re-running it).
--keep,includedescriptorclasses class com.rjbiermann.giffyviewer.core.network.dto.** { *; }
-
 # --- Retrofit / OkHttp ---
 -keepattributes RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations
 -keepclassmembers,allowshrinking,allowobfuscation interface * {

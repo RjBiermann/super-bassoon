@@ -96,6 +96,13 @@ class TvMainActivity : ComponentActivity() {
         var player: Pair<List<Gif>, Int>? by remember { mutableStateOf(null) }
         var showSettings by remember { mutableStateOf(false) }
         var showNiches by remember { mutableStateOf(false) }
+        // TV parity gaps closed (AGENTS-APP.md): shared :feature:* screens hosted
+        // the same way Settings/Auth already are.
+        var showSearch by remember { mutableStateOf(false) }
+        var showCollections by remember { mutableStateOf(false) }
+        var showGroups by remember { mutableStateOf(false) }
+        var showCustomFeeds by remember { mutableStateOf(false) }
+        var nicheAbout: FeedSource.Niche? by remember { mutableStateOf(null) }
         var openFeed: FeedSource? by remember { mutableStateOf(null) }
         val pinnedNiches by settings.pinnedNiches.collectAsStateWithLifecycle(initialValue = emptySet())
         val pinnedCreators by settings.pinnedCreators.collectAsStateWithLifecycle(initialValue = emptySet())
@@ -106,12 +113,27 @@ class TvMainActivity : ComponentActivity() {
             .collectAsStateWithLifecycle(initialValue = emptyList())
 
         // D-pad BACK pops the top screen instead of exiting the activity
+        val screenOpen =
+            player != null ||
+                showSettings ||
+                showNiches ||
+                openFeed != null ||
+                showSearch ||
+                showCollections ||
+                showGroups ||
+                showCustomFeeds ||
+                nicheAbout != null
         androidx.activity.compose.BackHandler(
-            enabled = player != null || showSettings || showNiches || openFeed != null,
+            enabled = screenOpen,
         ) {
             when {
                 player != null -> player = null
                 openFeed != null -> openFeed = null
+                showSearch -> showSearch = false
+                showCollections -> showCollections = false
+                showGroups -> showGroups = false
+                showCustomFeeds -> showCustomFeeds = false
+                nicheAbout != null -> nicheAbout = null
                 showNiches -> showNiches = false
                 showSettings -> showSettings = false
                 else -> showSettings = false
@@ -162,11 +184,72 @@ class TvMainActivity : ComponentActivity() {
                         )
                     }
                 }
+                nicheAbout != null -> {
+                    val about = nicheAbout
+                    if (about != null) {
+                        com.rjbiermann.giffyviewer.feature.feed.NicheAboutScreen(
+                            nicheId = about.id,
+                            nicheName = about.name,
+                            onBack = { nicheAbout = null },
+                            onOpenCreator = { username ->
+                                nicheAbout = null
+                                openFeed = FeedSource.Creator(username = username)
+                            },
+                            onOpenNiche = { niche ->
+                                nicheAbout = null
+                                openFeed = niche
+                            },
+                            viewModel = hiltViewModel(),
+                            joinViewModel = hiltViewModel(),
+                        )
+                    }
+                }
                 showNiches -> {
                     TvNichesScreen(
                         onOpenNiche = { niche -> openFeed = niche },
+                        onOpenNicheAbout = { id, name -> nicheAbout = FeedSource.Niche(id, name) },
                     )
                 }
+                showSearch ->
+                    com.rjbiermann.giffyviewer.search.SearchScreen(
+                        onBack = { showSearch = false },
+                        onSubmit = { q ->
+                            showSearch = false
+                            openFeed = FeedSource.Search(query = q)
+                        },
+                        onOpenCreator = { username ->
+                            showSearch = false
+                            openFeed = FeedSource.Creator(username = username)
+                        },
+                        onOpenNiche = { id, name ->
+                            showSearch = false
+                            openFeed = FeedSource.Niche(id, name)
+                        },
+                        viewModel = hiltViewModel(),
+                    )
+                showCollections ->
+                    com.rjbiermann.giffyviewer.feature.feed.CollectionsScreen(
+                        onBack = { showCollections = false },
+                        viewModel = hiltViewModel(),
+                    )
+                showGroups ->
+                    com.rjbiermann.giffyviewer.feature.feed.GroupsScreen(
+                        onBack = { showGroups = false },
+                        onOpenGroup = { group ->
+                            showGroups = false
+                            openFeed = group
+                        },
+                        viewModel = hiltViewModel(),
+                    )
+                showCustomFeeds ->
+                    com.rjbiermann.giffyviewer.feature.feed.CustomFeedsScreen(
+                        onBack = { showCustomFeeds = false },
+                        onOpenFeed = { feed ->
+                            showCustomFeeds = false
+                            openFeed = feed
+                        },
+                        viewModel = hiltViewModel(),
+                    )
                 showSettings ->
                     SettingsScreen(
                         onBack = { showSettings = false },
@@ -202,6 +285,13 @@ class TvMainActivity : ComponentActivity() {
                                     modifier = Modifier.padding(6.dp),
                                 )
                             }
+                            item {
+                                com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
+                                    text = "Search",
+                                    onClick = { showSearch = true },
+                                    modifier = Modifier.padding(6.dp),
+                                )
+                            }
                             items(pinnedNiches.toList().mapNotNull { parseNicheRef(it) }) { (id, name) ->
                                 com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
                                     text = name,
@@ -232,6 +322,28 @@ class TvMainActivity : ComponentActivity() {
                                                     val ok = repository.refreshSurprise()
                                                     if (ok) openFeed = FeedSource.Surprise
                                                 }
+                                            },
+                                        )
+                                        androidx.compose.material3.HorizontalDivider()
+                                        androidx.compose.material3.DropdownMenuItem(
+                                            text = { androidx.compose.material3.Text("My feeds") },
+                                            onClick = {
+                                                moreOpen = false
+                                                showCustomFeeds = true
+                                            },
+                                        )
+                                        androidx.compose.material3.DropdownMenuItem(
+                                            text = { androidx.compose.material3.Text("Groups") },
+                                            onClick = {
+                                                moreOpen = false
+                                                showGroups = true
+                                            },
+                                        )
+                                        androidx.compose.material3.DropdownMenuItem(
+                                            text = { androidx.compose.material3.Text("Collections") },
+                                            onClick = {
+                                                moreOpen = false
+                                                showCollections = true
                                             },
                                         )
                                         customFeeds.toList().forEach { def ->

@@ -47,6 +47,7 @@ import com.rjbiermann.giffyviewer.feature.feed.NichesViewModel
 @Composable
 fun TvNichesScreen(
     onOpenNiche: (FeedSource.Niche) -> Unit,
+    onOpenNicheAbout: (id: String, name: String) -> Unit = { _, _ -> },
     viewModel: NichesViewModel = hiltViewModel(),
 ) {
     val niches by viewModel.niches.collectAsStateWithLifecycle()
@@ -84,42 +85,56 @@ fun TvNichesScreen(
                         androidx.compose.foundation.interaction
                             .MutableInteractionSource()
                     }
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .then(if (index == 0) Modifier.focusRequester(firstRowFocus) else Modifier)
-                            .giffyFocus(rowInteraction, fillOnFocus = MaterialTheme.colorScheme.surfaceVariant)
-                            .clickable(
-                                interactionSource = rowInteraction,
-                                indication = androidx.compose.material3.ripple(),
-                            ) { onOpenNiche(FeedSource.Niche(niche.id, niche.name)) }
-                            .onPreviewKeyEvent { event ->
-                                // MENU toggles the home pin (creator-quick-action pattern).
-                                if (event.type == KeyEventType.KeyUp && event.key == Key.Menu) {
-                                    viewModel.togglePin(niche)
-                                    true
-                                } else {
-                                    false
-                                }
-                            }.padding(horizontal = 16.dp, vertical = 8.dp),
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = niche.name, style = MaterialTheme.typography.titleMedium)
-                        if (isPinned) {
-                            // Vector pin (emoji-prefix anti-pattern; announced oddly).
-                            androidx.compose.material3.Icon(
-                                imageVector = androidx.compose.material.icons.Icons.Filled.PushPin,
-                                contentDescription = "pinned",
-                                modifier = Modifier.padding(start = 6.dp).size(14.dp),
-                            )
+                    // Name block = one D-pad focusable (open feed); About sits
+                    // beside it as the second focusable — RIGHT moves to it,
+                    // DOWN moves rows. The old full-row focusable swallowed
+                    // the inner button (directional search never entered it).
+                    Column(
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .then(if (index == 0) Modifier.focusRequester(firstRowFocus) else Modifier)
+                                .giffyFocus(rowInteraction, fillOnFocus = MaterialTheme.colorScheme.surfaceVariant)
+                                .clickable(
+                                    interactionSource = rowInteraction,
+                                    indication = androidx.compose.material3.ripple(),
+                                ) { onOpenNiche(FeedSource.Niche(niche.id, niche.name)) }
+                                .onPreviewKeyEvent { event ->
+                                    // MENU toggles the home pin (creator-quick-action pattern).
+                                    if (event.type == KeyEventType.KeyUp && event.key == Key.Menu) {
+                                        viewModel.togglePin(niche)
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                }.padding(vertical = 8.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = niche.name, style = MaterialTheme.typography.titleMedium)
+                            if (isPinned) {
+                                // Vector pin (emoji-prefix anti-pattern; announced oddly).
+                                androidx.compose.material3.Icon(
+                                    imageVector = androidx.compose.material.icons.Icons.Filled.PushPin,
+                                    contentDescription = "pinned",
+                                    modifier = Modifier.padding(start = 6.dp).size(14.dp),
+                                )
+                            }
                         }
+                        Text(
+                            text = "${niche.gifs} gifs · ${niche.subscribers} subscribers",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
-                    Text(
-                        text = "${niche.gifs} gifs · ${niche.subscribers} subscribers",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    // Parity: mobile opens niche About from the player cluster;
+                    // TV gets an explicit About focusable (D-pad has no tap).
+                    TextButton(onClick = { onOpenNicheAbout(niche.id, niche.name) }) {
+                        Text("About")
+                    }
                 }
             }
             if (loadFailed) {

@@ -732,6 +732,9 @@ wording ("Add to…", "Tags", "Block…", "Block creator", "Block keyword").
 Code-verified inventory. Ranked, biggest first:
 
 **Missing entirely on TV:**
+[Search / Groups management / Custom-feed management / Collections — ALL BUILT
+2026-10-02 batch 12: shared :feature:* screens hosted from TvMainActivity (home
+pill + More ▾ menu), D-pad-verified on TV36. See AGENTS.md batch 12 for detail.]
 - **Player text auto-hide** (reported 2026-10, doc-only spec): the mobile player
   clears creator/description/tags after 3s idle (playing && not scrubbing only,
   `IDLE_HIDE_MS`) and keeps just the thin progress line; `TvPlayerScreen` shows
@@ -755,16 +758,15 @@ Code-verified inventory. Ranked, biggest first:
   [D-pad verify DONE 2026-10-02 (later session, TV36): player entry → 3s+ idle →
   uiautomator dump has NO text nodes (cluster left composition); any key (LEFT)
   re-revealed it (@creator visible); idle again → gone. Both directions verified.]]
-- **Search** — zero `api.search` calls, no search UI anywhere in app-tv. Mobile search is
-  multi-type (GIFs/Images/Creators/Niches tabs + tag suggestions — see "Full-scope
-  search"). TV browsing = home rows + Niches + pinned/custom feeds only.
-- **Groups management** — no GroupsScreen equivalent: create/favorite/BLOCK niche
+- **Search** — ~~zero `api.search` calls~~ BUILT 2026-10-02 batch 12: home "Search"
+  pill → shared SearchScreen (feature:search dep added to app-tv); submit opens
+  `FeedSource.Search` via TvSourceFeedScreen. D-pad-verified on TV36.
+- **Groups management** — ~~no GroupsScreen equivalent~~ BUILT batch 12: create/favorite/BLOCK niche
   groups unreachable on TV. Mobile's blockable group bundles are the macro-filter
   path (leak-zero); TV only has per-item tag/creator quick-action blocks.
-- **Custom-feed management** — TV can open existing custom feeds (home ⋯ menu) and
-  add to them (quick actions), but create/rename/delete is mobile-only
-  (CustomFeedsScreen). Stacks with the empty-creation deferral above.
-- **Collections** — mobile-only screen (CollectionsScreen); nothing on TV.
+- **Custom-feed management** — ~~create/rename/delete is mobile-only~~ BUILT batch 12
+  (More ▾ → My feeds → shared CustomFeedsScreen).
+- **Collections** — ~~mobile-only~~ BUILT batch 12 (More ▾ → Collections).
 - **§8 shuffle** — ~~no shuffle on TV source feeds~~ CLOSED round 3: TvSourceFeedScreen
   renders the shared FeedFilterDialog (Shuffle/Off/Reshuffle) over the same feedprefs blob;
   shuffle applies via the shared FeedRepository path. Mobile parity holds.
@@ -824,7 +826,8 @@ D-pad only.
   pre-hint frame — take the observation only at steady state, or the hint
   looks missing when it isn't.]
 
-**Minor:** no NicheAbout entry from TvNichesScreen (mobile-only); TV "Following"
+**Minor:** ~~no NicheAbout entry from TvNichesScreen~~ CLOSED batch 12 (About
+focusable per row → shared NicheAboutScreen, D-pad-verified); TV "Following"
 row is read-only — unverified whether a follow action exists anywhere on TV.
 
 **Parity OK (verified in code):** age gate, PIN lock, Settings/data saver/video

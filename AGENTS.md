@@ -395,7 +395,7 @@ Compiled + ktlint + detekt + unit tests + lint green on all touched modules.
 - Biggest external keep: tink-android 246 items (library rules, not actionable).
 - Baseline recorded for future comparison: Optimization/Obfuscation/Shrinking 98.2%.
 
-### Session 2026-10-02 batch 10 (doc-only — edge-to-edge/insets audit via edge-to-edge skill; no code changes)
+### Session 2026-10-02 batch 10 (edge-to-edge/insets audit via edge-to-edge skill — both findings BUILT + device-verified batch 12)
 - Static audit per the skill's playbook (both activities, both apps). Prereqs met:
   Compose + targetSdk 35; `enableEdgeToEdge()` before `setContent` in
   MainActivity + TvMainActivity ✓.
@@ -491,3 +491,49 @@ Compiled + ktlint + detekt + unit tests + lint green on all touched modules.
   recorded in AGENTS-APP.md: the pager-restart → mediator-refresh → empty-walk
   sequence takes ~15-30s; observe only at steady state (a suspended composition
   freezes the pre-hint frame and looks like a missing hint).
+
+### Session 2026-10-02 batch 12 (pending-items sweep — parked/deferred items implemented; code + device-verified)
+Worked the doc'd pending lists (batches 10/11 audit findings, TV parity gaps, R8 batch-9
+refinement candidate). Compile + ktlint + detekt + unit tests green on all touched
+modules (:core:ui/:feature:feed/:feature:search/:app-tv/:app-mobile). What landed:
+- **Edge-to-edge batch-10 findings FIXED + device-verified (Medium_Phone):**
+  double nav-bar padding removed on Explore/Following/Collections/Groups/Niches
+  (dropped the extra `windowInsetsPadding(WindowInsets.navigationBars)` after
+  GiffyScaffold's innerPadding — last Explore row now ends exactly at the nav-bar
+  top, dump-verified); `adjustResize` added to BOTH manifests + `imePadding()` on
+  the SearchScreen root column — IME shown + window resized above keyboard
+  (contentTopInsets 1436), field and results reachable.
+- **Adaptive batch-11 finding 1 CLOSED:** dead `LayoutHint.pageMargin` deleted
+  (never consumed; the `tablet` flag + Dp import went with it).
+- **R8 batch-9 refinement CLOSED:** the hand-rolled
+  `-keep,includedescriptorclasses class ...core.network.dto.** { *; }` rule (257 kept
+  items) REMOVED from both apps' proguard files — the official kotlinx-serialization
+  rules above it suffice (compile-time codecs, no reflection). Gate re-run green:
+  both release APKs built, installed fresh, live smoke passed on Medium_Phone
+  (age gate → Trending grid renders) and TV36 (age gate → home rows populate).
+- **TV parity gaps BUILT + D-pad-verified (TV36):** the shared `:feature:*` screens
+  are now hosted on TV the same way Settings/Auth already were:
+  - **Search** — `:feature:search` added to app-tv; home pill "Search" opens the
+    shared SearchScreen (live typing via IME, suggestions populate); submit →
+    `FeedSource.Search` through TvSourceFeedScreen (grid + Filter verified).
+  - **Groups** — More ▾ → Groups (shared GroupsScreen; render verified).
+  - **Collections** — More ▾ → Collections (signed-out state verified; authed
+    rows reuse the same screen).
+  - **Custom-feed management** — More ▾ → My feeds (shared CustomFeedsScreen;
+    render verified — create/rename/delete no longer mobile-only).
+  - **Niches About entry (minor gap)** — TvNichesScreen rows restructured into
+    two D-pad focusables (name block + About TextButton); About → shared
+    NicheAboutScreen (detail/tags/top-creators verified; back returns to Niches).
+    Lesson: an About button INSIDE a full-row focusable is unreachable (directional
+    search never enters the row's own bounds) — side-by-side focusables it is.
+  - BackHandler extended for the new screens (each pops in reverse stack order).
+Still parked/blocked (unchanged, reasons stand):
+- Groups→custom-feeds merge — its own re-evaluation condition (blockable creators
+  become a want) is still unmet; cosmetic consolidation against real churn.
+- Followers page — row shape still unprovable (items=[], no-guess rule).
+- Report (unprobeable), server search-history sync / server collections / niches
+  suggest (user-slice-gated fallbacks), UX-PATTERNS candidates (user-slice gated),
+  player soak passes (emulator fragility), Gate 324 (blocked on SIGNING secrets).
+- RateLimitBus indicator (decided spec'd-not-built 2026-10-01), vertical-video TV
+  fullscreen-fill (option; pool is ~all-portrait live — honest empty state covers it),
+  FormFactorPreviews (FeedScreen needs VM fakes; preview-only value).

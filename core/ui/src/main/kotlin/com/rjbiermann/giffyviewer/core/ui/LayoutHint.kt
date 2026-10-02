@@ -2,8 +2,6 @@ package com.rjbiermann.giffyviewer.core.ui
 
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 
 /**
  * The one adaptive-layout seam (PLAN §9 phone+tablet bullet): the app shell
@@ -14,8 +12,6 @@ import androidx.compose.ui.unit.dp
 data class LayoutHint(
     /** Feed grid column count (§6 Grid columns: 2 phone / 3 tablet+, overrideable). */
     val gridColumns: Int,
-    /** Page margin (borrowed site breakpoints: 16dp phone / 24dp tablet). */
-    val pageMargin: Dp,
 )
 
 @Composable
@@ -31,9 +27,7 @@ fun layoutHint(
             WindowWidthSizeClass.Medium -> 2
             else -> 3
         }
-    val tablet = widthSizeClass != WindowWidthSizeClass.Compact
     return LayoutHint(
         gridColumns = if (userOverride > 0) userOverride else auto,
-        pageMargin = if (tablet) 24.dp else 16.dp,
     )
 }
