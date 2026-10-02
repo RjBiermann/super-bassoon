@@ -1,6 +1,9 @@
 # Giffy Viewer — Agent Guidance (root)
 
-Unofficial upstream Android client. Pure viewer, GitHub-Releases-only distribution.
+Unofficial RedGifs client. Pure viewer and gif organizer — browsing/viewing and
+organizing (labels, favorites, feeds, filters) work whether the person is signed in or
+using in-app-only features, and watching gifs on the TV is a first-class use case, not
+an afterthought. GitHub-Releases-only distribution.
 The **AGENTS-*.md files are the full spec** (PLAN.md is deleted; its content was
 merged into these files — historic `former-PLAN spec §N` comments in code refer to it, the
 section numbers no longer map, AGENTS docs are current).
@@ -225,3 +228,33 @@ Compiled + ktlint + detekt + unit tests + lint green on all touched modules.
   TV Search/Groups/Collections screens + chip-skip traversal (D-pad device
   work), UX-PATTERNS candidates (user-slice gated), inline feed autoplay
   (spec'd; live-site check first), player soak passes (emulator).
+
+### Session 2026-10-02 batch 3 (pending-items sweep — two pending items closed)
+- **Inline feed autoplay BUILT** (was spec'd + gated on a live-site check):
+  check run first via Playwright @ 390×844 — the site's own 1-col feed runs
+  ONE shared `<video>` (muted:true, loop:true) on the settled tile. Gate
+  closed, spec mirrored. See AGENTS-PLAYER.md "Inline feed autoplay": shared
+  GiffyPlayer (volume 0, REPEAT_MODE_ONE), staggered-grid settle rule
+  (first item ≥50% visible, 150ms grace, `isSettled` + `InlineSettleTest`),
+  per-tile PlayerView surface, no watch-history writes, data-saver forces
+  static posters, app-only pref "Autoplay in feed" (feed_autoplay, default
+  on, under the Grid columns block on Settings). Device-verified on
+  Medium_Phone: settle → codec live, scroll-swap → decoder reconfig,
+  watch_history unchanged, pref OFF → zero codec activity.
+- **AuthSection @username UNBLOCKED + BUILT** (was blocked on a verified
+  who-am-I): user supplied a fresh token bundle; id_token `preferred_username`
+  live-verified against `v1/users/{username}` (200, username == claim).
+  `TokenStore.usernameFromJwt` + `AuthViewModel.username` + AuthSection
+  "Signed in as @<username>"; `TokenStoreTest` covers the parser.
+- **Followers page re-probed and still blocked:** `v2/me/followers` rows still
+  `[]` with the fresh real token (0 followers) — row DTO remains unverifiable,
+  no-guess rule holds.
+- Compile + ktlint + detekt + unit tests green on all touched modules
+  (:core:auth/:core:datastore/:feature:auth/:feature:feed/:feature:settings/
+  :app-mobile/:app-tv).
+- Still parked/blocked (unchanged): Groups→custom-feeds merge (no user ask),
+  Followers page (row shape), server search-history sync + server collections
+  (fallbacks), TV Search/Groups/Collections screens + chip-skip traversal +
+  TvPlayerScreen niche pills (D-pad device work), picker-dialog family merge
+  (device ring check), UX-PATTERNS candidates (user-slice gated), player soak
+  passes (emulator).

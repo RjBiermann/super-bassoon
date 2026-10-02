@@ -22,14 +22,19 @@ Media3/ExoPlayer + SimpleCache (cache-first rules formerly PLAN.md §5).
 ## Playback
 - Resume positions read/write `watch_history` (Room) — feed "Continue Watching" and "Surprise me" exclusion.
 - Data-saver toggle: prefer SD stream when on.
-- **Inline feed autoplay** (1-column mobile feed, spec'd 2026-10-02, NOT built): see
-  the "Inline feed autoplay" section above — one shared player, muted+looped
+- **Inline feed autoplay** (1-column mobile feed, BUILT 2026-10-02): see
+  the "Inline feed autoplay" section below — one shared player, muted+looped
   (`REPEAT_MODE_ONE`), no watch_history writes, data-saver forces off.
 - **Video fit:** user setting Fit / Crop / Stretch →
   `PlayerView.resizeMode` = `RESIZE_MODE_FIT` / `RESIZE_MODE_ZOOM` / `RESIZE_MODE_FILL`
   (default Fit). One shared DataStore pref consumed by both `PlayerScreen.kt` (mobile,
   currently sets FIT explicitly) and `TvPlayerScreen.kt` (TV, currently default FIT).
   Crop/Stretch apply before any pinch-zoom (`graphicsLayer` scale multiplies on top).
+  - **TV note (2026-10-02, user decision):** TV default stays **Fit** — for vertical
+  gifs the fullscreen-fill alternative (`RESIZE_MODE_ZOOM`, fill width on a 16:9
+  panel) shows more screen but crops ~9:16 content heavily; it works as a user
+  choice via this pref, not as a TV-forced default. Keep it available to pick on TV
+  (the shared SettingsScreen already covers both apps).
 
 ## Verified end-to-end (emulator, 2026-09)
 - Feed tile → PlayerScreen → ExoPlayer playback → 5s position sample → `watch_history` row
@@ -41,31 +46,54 @@ Media3/ExoPlayer + SimpleCache (cache-first rules formerly PLAN.md §5).
   Phase 7 settings screen.
 - "Continue Watching" is a TV row (AGENTS.md shell-agnostic rule); mobile has no such row.
 
-## Inline feed autoplay (SPEC'D 2026-10-02 — doc only, not built)
-When the feed grid is **1-column** (`LayoutHint.gridColumns == 1`, compact phone),
+## Inline feed autoplay (BUILT 2026-10-02 — live-parity check passed first)
+When the feed grid is **1-column** (`gridColumns == 1`, compact phone),
 the tile settled in view plays **inline: muted + looped**, tapping it opens the
 existing PlayerScreen. Decision recorded after weighing vs a scroll-gesture
 takeover into the swipe player — takeover rejected (hijacks a browsing gesture,
 back-stack ambiguity, no mainstream or site precedent).
-- **Player:** ONE shared `GiffyPlayer` (existing `GiffyPlayerFactory`/SimpleCache)
-  attaches to the first gif ≥50% visible after ~150ms settle (skip hover-bys);
-  detaches past 100% out of view. No per-tile instances. Threshold = calibration
-  knob, tune once live.
-- **Loop:** `REPEAT_MODE_ONE` (simpler than the ended-listener route — inline
-  never auto-swipes, so no auto-swipe interaction).
+
+**Live-site gate (CLOSED 2026-10-02, Playwright @ 390×844):** the upstream site's
+own 1-col feed DOES autoplay inline — exactly ONE `<video>` element for the whole
+feed (shared player, same shape as our spec), `muted:true`, `loop:true`, playing
+the settled tile (time advanced across scrolls while the single element
+persisted). Spec mirrored its behavior; no threshold deviation to mirror beyond
+that (desktop browser allowed unmuted autoplay; mobile policy = muted-first,
+which is what we ship).
+
+Implementation (FeedScreen + GifTile):
+- **Player:** ONE shared `GiffyPlayer` (`playerFactory.create`) created only when
+  `gridColumns == 1 && feedAutoplay && !dataSaver && playerFactory != null`;
+  released via DisposableEffect on toggle-off/player-open. `volume = 0f`,
+  `repeatMode = REPEAT_MODE_ONE`.
+- **Settle:** `snapshotFlow` over the staggered-grid visible items → first item
+  ≥50% main-axis visible (`isSettled`, pure + unit-tested `InlineSettleTest`) →
+  pause, set `inlineIndex`, 150ms settle grace (`INLINE_SETTLE_MS` knob),
+  re-check `isScrollInProgress`, then `playGif(gif, dataSaver = false)` —
+  one stream fetch per settled tile, never mid-fling (rate-limit invariant).
+  Settled null / scroll → pause. Adjacent prefetch NOT run inline (preview only;
+  PlayerScreen keeps its own preload).
+- **Surface:** each tile hosts an `AndroidView(PlayerView)` (controller off,
+  non-clickable so tile tap/long-press keep working) only while
+  `inlineIndex == index`; the poster AsyncImage stays underneath.
 - **Tap → `onOpenPlayer(index)`** as today; inline view is a preview, not a
   feature-complete player (controls/sound/like/speed/all live in PlayerScreen).
+  FeedScreen leaves composition under PlayerScreen (MainActivity else-chain) →
+  inline player released.
 - **Watch history: inline plays write NOTHING** — Continue Watching would fill
   with 2-second drive-bys; sampling stays solely in PlayerScreen.
 - **Data saver forces inline off** (static poster), same rule the player uses.
-- **Rate-limit invariant:** one stream fetch per settled tile, no extra calls;
-  `preloadNeighbors` only when scroll stops, never mid-fling.
 - **Gating:** 2/3-col grids keep static posters (inline players in masonry =
-  scroll-perf + data disaster). New app-only pref "Autoplay in feed"
-  (wording per AGENTS-APP.md app-only table), default on in 1-col.
-- **Open before build:** live-site check — does the upstream site itself
-  autoplay inline in its 1-col feed? (AGENTS.md verify-against-live rule.) If
-  yes, mirror its threshold/sound behavior; if no, this stays app-only wording.
+  scroll-perf + data disaster). App-only pref **"Autoplay in feed"**
+  (`feed_autoplay`, default on; SettingsRepository + SettingsScreen row under
+  the grid-columns block, TV hidden with it).
+- **Device-verified on Medium_Phone (2026-10-02):** 1-col feed settles →
+  h264 decoder live on the tile; scroll settle → decoder reconfig (gif swap);
+  `watch_history` count unchanged across 20s+ of inline playback (no writes);
+  Settings "Autoplay in feed" OFF → zero codec activity (pref path works).
+  Note: a stale `grid_columns=3` override silently kept the feature off until
+  the setting was reset to Auto — expected behavior, worth remembering when
+  a "autoplay not working" report comes in.
 
 ## TV player (Phase 6, verified on TV36 emulator 2026-09)
 - D-pad: down/right = next gif, up/left = previous, BACK = exit (BackHandler in Root).

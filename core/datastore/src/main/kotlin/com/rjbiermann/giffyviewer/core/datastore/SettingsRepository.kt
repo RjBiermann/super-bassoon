@@ -39,6 +39,7 @@ class SettingsRepository
             val VIDEO_FIT = stringPreferencesKey("video_fit")
             val ORIENTATION_FILTER = stringPreferencesKey("orientation_filter")
             val VERIFIED_ONLY = booleanPreferencesKey("verified_only")
+            val FEED_AUTOPLAY = booleanPreferencesKey("feed_autoplay")
         }
 
         /** True once the user attested 18+. Emits false until then; survives restarts. */
@@ -148,6 +149,14 @@ class SettingsRepository
 
         suspend fun setVerifiedOnly(enabled: Boolean) {
             dataStore.edit { it[Keys.VERIFIED_ONLY] = enabled }
+        }
+
+        /** Inline feed autoplay (AGENTS-PLAYER.md, live-parity verified 2026-10-02):
+         *  1-column feed's settled tile plays muted+looped. App-only pref, default on. */
+        val feedAutoplay: Flow<Boolean> = dataStore.data.map { it[Keys.FEED_AUTOPLAY] ?: true }
+
+        suspend fun setFeedAutoplay(enabled: Boolean) {
+            dataStore.edit { it[Keys.FEED_AUTOPLAY] = enabled }
         }
 
         /** Video fit (§5): fit | crop | stretch — one shared setting, both players. */

@@ -379,6 +379,13 @@ class FeedViewModel
         val verifiedOnly: StateFlow<Boolean> =
             settings.verifiedOnly.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+        /** Inline feed autoplay (AGENTS-PLAYER spec): 1-col feed muted preview; data-saver forces off. */
+        val feedAutoplay: StateFlow<Boolean> =
+            settings.feedAutoplay.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
+        val dataSaver: StateFlow<Boolean> =
+            settings.dataSaver.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
         /** Matching creators above search results (§7); tap opens their feed. */
         @kotlinx.coroutines.ExperimentalCoroutinesApi
         val creatorResults: StateFlow<List<com.rjbiermann.giffyviewer.core.network.CreatorSearchItemDto>> =

@@ -120,6 +120,14 @@ class SettingsViewModel
             viewModelScope.launch { settings.setGridColumns(columns) }
         }
 
+        /** Inline feed autoplay (app-only, AGENTS-PLAYER spec) — 1-col feed preview. */
+        val feedAutoplay: StateFlow<Boolean> =
+            settings.feedAutoplay.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
+        fun setFeedAutoplay(enabled: Boolean) {
+            viewModelScope.launch { settings.setFeedAutoplay(enabled) }
+        }
+
         /** PLAN §9 theme options. */
         val amoled: StateFlow<Boolean> =
             settings.amoled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)

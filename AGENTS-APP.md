@@ -17,12 +17,15 @@ prefs + the normative UI-lingo table below (formerly PLAN.md §3, §7–9).
   derived layout hint passed down (column counts, margins) — no scattered width checks.
   No separate tablet screens or codepaths.
 - Masonry width-derived columns (`Auto`: compact 1 / medium 2 / expanded 3, user-overridable ), Paging 3.
-- **Inline feed autoplay (spec'd 2026-10-02, NOT built):** in 1-column mode the
-  settled tile plays inline, muted + looped; tap opens the swipe player as
-  today. Full policy lives in AGENTS-PLAYER.md ("Inline feed autoplay") —
-  shared-player, no-history-write, data-saver-off rules are normative there.
-  Settings surface: app-only pref **"Autoplay in feed"** (the "autoplay
-  toggle" wording already reserved in the app-only label list above).
+- **Inline feed autoplay (BUILT 2026-10-02, live-parity checked):** in 1-column
+  mode the settled tile plays inline, muted + looped; tap opens the swipe
+  player as today. Full policy lives in AGENTS-PLAYER.md ("Inline feed
+  autoplay") — shared-player, no-history-write, data-saver-off rules are
+  normative there. Settings surface: app-only pref **"Autoplay in feed"**
+  (whole-row switch, under the Grid columns block; TV keeps none — the pref
+  only affects the 1-col grid). Live-site check that gated the build
+  PASSED: the site's own 1-col feed runs ONE shared `<video>` (muted:true,
+  loop:true) on the settled tile — observed via Playwright at 390×844.
 - TikTok-style swipe player.
 - Long-press (tile or player) quick sheet: four panes per the restructure spec
   (BUILT 2026-10-01, live-verified both apps): main = Favorite · Pin · Add to… ·
@@ -225,10 +228,13 @@ unscheduled — a user slice picks.
 - ~~SearchScreen rows <48dp~~ — CLOSED 2026-10-01: vertical padding 10→14dp.
 - contentDescription capitalization — CLOSED 2026-10-02: the "Back"×1 drift went with
   GiffyScaffold; "remove"-prefixed descriptions verified lowercase everywhere.
-- AuthSection signed-in state shows only "Signed in" — no @username. BLOCKED (2026-10-02):
-  no username is stored and no verified "who am I" source exists (v2/user_profile 404'd;
-  `v1/users/{username}` needs the username) — decoding an unverified JWT claim would be
-  guessing per the no-guess rule. Revisit when a verified claim/endpoint surfaces.
+- AuthSection signed-in state shows only "Signed in" — no @username. ~~BLOCKED~~ —
+  **CLOSED 2026-10-02 batch 3:** the user supplied a fresh token bundle; the id_token's
+  `preferred_username` (standard OIDC claim) was live-verified as the account username
+  (`v1/users/{claim}` → 200, response username == claim). `TokenStore.usernameFromJwt`
+  (stdlib Base64Url payload decode, no guessing) + `AuthViewModel.username` → AuthSection
+  now shows "Signed in as @<username>" ("Signed in" fallback if the claim is absent).
+  Unit-tested in `TokenStoreTest`.
 - RateLimitBus "cooling down" indicator — decided 2026-10-01: **spec'd-not-built**
   (marker only; no UI consumer — build when a user-visible failure trace demands it).
 - TV home "More ▾" DropdownMenuItems have no giffyFocus ring (M3 popup rows) — whether
@@ -336,6 +342,18 @@ Sort · date range · duration min/max · resolution · orientation · shuffle s
 per feed (`feed_prefs` key), survive restart, applied strictly AFTER ContentFilter.
 
 ## Orientation filter (built 2026-10, live-verified: pref write + pager restart)
+- **TV intent (2026-10-02, user decision): the horizontal filter is a must-work-well
+  use case on TV** — the TV grid is a shared 10-foot screen, vertical/portrait tiles
+  waste it, so filtering to horizontal is the primary TV orientation behavior and any
+  future filter-path change must not regress TV (TV bypass notes above apply:
+  `LikedNetworkPagingSource` + the TV Continue Watching row). Vertical-only on TV is
+  accepted as a dead end, not a target: portrait tiles letterbox against the row
+  height and waste the screen.
+- **Vertical video on TV (option, not built): fullscreen-fill the width**
+  (`RESIZE_MODE_ZOOM`) so the image spans the 16:9 panel — acceptable live picture,
+  but ~9:16 content crops heavily top/bottom; only viable when the user explicitly
+  wants filled-screen over whole-frame. Keep TV default FIT; Fill is a shared-plug
+  user choice via the existing Fit/Crop/Stretch pref, not a TV-forced default.
 
 ## §8 range chips + shuffle (built 2026-10, live-verified on Trending: chips, shuffle on/off, reshuffle)
 Client-side per-feed filters: duration (<10s/10–30s/30–60s/1–5m/>5m) · resolution (HD only) ·
@@ -676,6 +694,10 @@ D-pad only.
   all-portrait cache hid every Trending/Top-This-Week tile behind the
   reserved empty strip — live-reproduced, fixed by restoring Any).
   Horizontal-on-TV works only when a pool actually contains landscape gifs.
+  User decision (2026-10-02): this is accepted as the pool's shape, not a defect
+  to pave over — on TV horizontal is the wanted filter (see the Orientation
+  filter section above), and when a pool is all-portrait the empty-state hint is
+  the honest answer, not a silent Any-fallback.
   Pickup: FeedRow shows a small "No videos match your filters — Settings →
   Orientation" hint when itemCount==0 && refresh NotLoading. [DONE 2026-10-01:
   FeedRow shows the hint; live-verified conditions in code, on-device check

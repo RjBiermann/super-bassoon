@@ -244,6 +244,7 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier.fillMaxSize(),
                 gridColumns = hint.gridColumns,
                 onOpenPlayer = { index -> playerStartIndex = index },
+                playerFactory = playerFactory,
                 onOpenSettings = { showSettings = true },
                 onOpenSearch = { showSearch = true },
                 onOpenNiches = { showNiches = true },

@@ -33,6 +33,7 @@ fun AuthSection(
     firstButtonModifier: Modifier = Modifier,
 ) {
     val token by viewModel.token.collectAsStateWithLifecycle()
+    val username by viewModel.username.collectAsStateWithLifecycle()
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -55,7 +56,10 @@ fun AuthSection(
                 Text("Sign in with browser")
             }
         } else {
-            Text("Signed in", style = MaterialTheme.typography.titleMedium)
+            Text(
+                if (username != null) "Signed in as @$username" else "Signed in",
+                style = MaterialTheme.typography.titleMedium,
+            )
             Spacer(Modifier.height(8.dp))
             Text(
                 "Your favorites, follows and likes sync to your account.",

@@ -88,4 +88,27 @@ class TokenStoreTest {
         val bundle = TokenStore.parseTokenBundle("""{"id_token":"a.b.c"}""")!!
         assertNull(bundle.refreshToken)
     }
+
+    /** Fabricated payload (base64url unpadded) — mirrors the live id_token shape. */
+    private val payloadB64 =
+        TokenStore
+            .newPkce()
+            .let { _ ->
+                kotlin.io.encoding.Base64
+                    .UrlSafe
+                    .withPadding(kotlin.io.encoding.Base64.PaddingOption.ABSENT)
+                    .encode("""{"preferred_username":"testuser","sub":"kp_x"}""".encodeToByteArray())
+            }
+
+    @Test
+    fun `usernameFromJwt reads the live-verified preferred_username claim`() {
+        assertEquals("testuser", TokenStore.usernameFromJwt("h.$payloadB64.sig"))
+        assertNull(TokenStore.usernameFromJwt("h." +
+            kotlin.io.encoding.Base64
+                .UrlSafe
+                .withPadding(kotlin.io.encoding.Base64.PaddingOption.ABSENT)
+                .encode("""{"sub":"kp_x"}""".encodeToByteArray()) + ".sig"))
+        assertNull(TokenStore.usernameFromJwt("garbage"))
+        assertNull(TokenStore.usernameFromJwt("a." + "".padEnd(4, 'x') + ".c"))
+    }
 }

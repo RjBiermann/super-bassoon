@@ -38,20 +38,26 @@ import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.common.Player
+import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.ui.PlayerView
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
@@ -59,6 +65,8 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.rjbiermann.giffyviewer.core.model.Gif
+import com.rjbiermann.giffyviewer.core.player.GiffyPlayer
+import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.ui.AudioBadge
 import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
 import com.rjbiermann.giffyviewer.core.ui.GiffyScaffold
@@ -66,6 +74,8 @@ import com.rjbiermann.giffyviewer.core.ui.RefreshFeedPill
 import com.rjbiermann.giffyviewer.core.ui.avgColorOr
 import com.rjbiermann.giffyviewer.core.ui.rememberScrollingUp
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -87,11 +97,16 @@ fun FeedScreen(
     onOpenFollowing: () -> Unit = {},
     onOpenCollections: () -> Unit = {},
     onOpenCustomFeeds: () -> Unit = {},
+    /** Inline feed autoplay (AGENTS-PLAYER spec): the 1-column feed's settled
+     *  tile plays a muted+looped preview. Null factory = no inline preview. */
+    playerFactory: GiffyPlayerFactory? = null,
     viewModel: FeedViewModel = hiltViewModel(),
 ) {
     val source by viewModel.source.collectAsStateWithLifecycle()
     val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle(false)
     val items = viewModel.gifs.collectAsLazyPagingItems()
+    val feedAutoplay by viewModel.feedAutoplay.collectAsStateWithLifecycle(true)
+    val dataSaver by viewModel.dataSaver.collectAsStateWithLifecycle(false)
     val showBlockHint by viewModel.showBlockHint.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -522,6 +537,47 @@ fun FeedScreen(
                             1f,
                         ) == 0f
                     }
+                // Inline feed autoplay (AGENTS-PLAYER spec; live-parity verified
+                // 2026-10-02 — the site's own 1-col feed runs ONE shared muted+
+                // looped <video> on the settled tile): one shared player, first
+                // tile ≥50% visible after a 150ms settle, paused on scroll/
+                // off-view. Data-saver forces static posters; NO watch-history
+                // writes (sampling stays in PlayerScreen); 1 stream fetch per
+                // settled tile (rate-limit invariant).
+                val autoplayOn = gridColumns == 1 && feedAutoplay && !dataSaver
+                val inlinePlayer =
+                    if (autoplayOn && playerFactory != null) {
+                        remember(playerFactory) { playerFactory?.create(context) }
+                    } else {
+                        null
+                    }
+                DisposableEffect(inlinePlayer) {
+                    onDispose { inlinePlayer?.release() }
+                }
+                var inlineIndex by remember { mutableStateOf<Int?>(null) }
+                if (inlinePlayer != null) {
+                    LaunchedEffect(inlinePlayer, gridState, items.itemCount) {
+                        inlinePlayer.volume = 0f // muted preview, tap = full player
+                        inlinePlayer.repeatMode = Player.REPEAT_MODE_ONE
+                        snapshotFlow {
+                            val info = gridState.layoutInfo
+                            info.visibleItemsInfo
+                                .firstOrNull {
+                                    isSettled(it.offset.y, it.size.height, info.viewportSize.height)
+                                }?.index
+                        }.distinctUntilChanged().collect { settled ->
+                            inlinePlayer.pause()
+                            inlineIndex = settled
+                            if (settled != null) {
+                                delay(INLINE_SETTLE_MS) // settle grace — skip hover-bys
+                                val gif = items[settled]
+                                if (!gridState.isScrollInProgress) {
+                                    gif?.let { inlinePlayer.playGif(it, dataSaver = false) }
+                                }
+                            }
+                        }
+                    }
+                }
                 Box(modifier = Modifier.fillMaxSize()) {
                     PullToRefreshBox(
                         isRefreshing = items.loadState.refresh is LoadState.Loading,
@@ -554,6 +610,8 @@ fun FeedScreen(
                                         onOpenCreator = {
                                             viewModel.open(FeedSource.Creator(username = gif.userName))
                                         },
+                                        inlinePlayer = inlinePlayer,
+                                        inlineAttached = inlineIndex == index,
                                     )
                                     if (sheetFor != null) {
                                         QuickBlockSheet(
@@ -592,6 +650,23 @@ fun FeedScreen(
 /** Pill appears after ~10 items scrolled (PLAN §9). */
 private const val SCROLL_PILL_THRESHOLD = 10
 
+/** Inline-preview settle grace before playback starts (AGENTS-PLAYER spec
+ *  calibration knob — the site's threshold observed at ~a frame; 150ms skips
+ *  hover-bys without feeling laggy). */
+private const val INLINE_SETTLE_MS = 150L
+
+/** Inline autoplay settle test (pure, unit-tested): an item counts when ≥50%
+ *  of its main-axis height is inside the viewport. */
+internal fun isSettled(
+    offset: Int,
+    size: Int,
+    viewport: Int,
+): Boolean {
+    if (size <= 0) return false
+    val visible = minOf(offset + size, viewport) - maxOf(offset, 0)
+    return visible * 2 >= size
+}
+
 @Composable
 private fun GifTile(
     gif: Gif,
@@ -599,6 +674,10 @@ private fun GifTile(
     onLongPress: () -> Unit,
     /** Links audit #1: tile caption @user → creator feed (in-place nav). */
     onOpenCreator: () -> Unit = {},
+    /** Inline feed autoplay (AGENTS-PLAYER spec): shared muted preview player. */
+    inlinePlayer: GiffyPlayer? = null,
+    /** This tile is the settled one — hosts the shared player's surface. */
+    inlineAttached: Boolean = false,
 ) {
     Column(
         modifier =
@@ -632,6 +711,24 @@ private fun GifTile(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
+            if (inlinePlayer != null && inlineAttached) {
+                // Inline preview surface (AGENTS-PLAYER spec): the shared muted
+                // player on the settled tile; poster stays underneath until the
+                // first frame. PlayerView consumes no touches (controller off)
+                // so the tile's tap/long-press keep working.
+                AndroidView(
+                    factory = { ctx ->
+                        PlayerView(ctx).apply {
+                            useController = false
+                            isClickable = false
+                            isFocusable = false
+                            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                        }
+                    },
+                    update = { view -> view.player = inlinePlayer },
+                    modifier = Modifier.matchParentSize(),
+                )
+            }
             // Audio-know-before-tap (PLAN §307): hasAudio badge on tiles.
             // Vector icon, not an emoji glyph (skill rule: emoji-as-icons is
             // an anti-pattern; consistent with the player rail's Sound icon).

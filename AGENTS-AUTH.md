@@ -56,6 +56,12 @@ Flow (all live-verified against upstream-auth-host.example with a real account):
 
 Verified live on the API-33 emulator (Medium_Phone): user logged in with email + OTP code inside the WebView → code captured on redirect → exchange → "Signed in" → **force-stop → relaunch → still Signed in** → feed requests authenticated, zero Auth401s.
 
+**Signed-in @username (2026-10-02):** the id_token's `preferred_username` claim
+(standard OIDC) is the account username — live-verified (`v1/users/{claim}` → 200,
+username == claim). `TokenStore.usernameFromJwt` decodes it (stdlib Base64Url,
+no guessing), `AuthViewModel.username` exposes it, AuthSection shows
+"Signed in as @<username>".
+
 `TokenStore` helpers (`newPkce`, `authorizeUrl`, `extractCode`, `parseTokenBundle`) are unit-tested in `TokenStoreTest` (9 tests). `refreshBlocking()` uses the same token endpoint; the refresh grant itself verified live via curl (200, full bundle, non-rotating refresh_token). The in-app on-401 refresh fires when the 1h id_token expires.
 
 Gone: the earlier `localStorage.auth_data` polling capture — the real site never writes it (wrong assumption, killed by the Playwright observation above).

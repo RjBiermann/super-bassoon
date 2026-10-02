@@ -6,6 +6,8 @@ import com.rjbiermann.giffyviewer.core.auth.TokenStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -19,6 +21,13 @@ class AuthViewModel
         private val store: TokenStore,
     ) : ViewModel() {
         val token: StateFlow<String?> = store.token
+
+        /** Signed-in @username — id_token `preferred_username` claim
+         *  (live-verified 2026-10-02 against `v1/users/{username}`). */
+        val username: StateFlow<String?> =
+            store.token
+                .map { t -> t?.let(TokenStore::usernameFromJwt) }
+                .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000), null)
 
         /** PKCE material for the in-flight WebView login, kept until consumed. */
         private var pkce: TokenStore.Pkce? = null

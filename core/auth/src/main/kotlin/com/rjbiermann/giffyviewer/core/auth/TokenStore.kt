@@ -181,6 +181,26 @@ class TokenStore(
             return params["code"]?.takeIf { it.isNotEmpty() }
         }
 
+        /**
+         * Signed-in @username from the id_token's `preferred_username` claim
+         * (standard OIDC claim). Live-verified 2026-10-02: the claim equals the
+         * account username (`v1/users/{claim}` → 200, response username matches
+         * the claim) — no guessing. Null on malformed/claimless tokens.
+         */
+        fun usernameFromJwt(token: String): String? =
+            runCatching {
+                val payload = token.split('.')[1]
+                val json =
+                    Json.parseToJsonElement(
+                        Base64
+                            .UrlSafe
+                            .withPadding(Base64.PaddingOption.ABSENT)
+                            .decode(payload)
+                            .decodeToString(),
+                    ).jsonObject
+                json["preferred_username"]?.jsonPrimitive?.content?.takeIf { it.isNotEmpty() }
+            }.getOrNull()
+
         fun looksLikeJwt(token: String): Boolean {
             val parts = token.split('.')
             if (parts.size != 3) return false
