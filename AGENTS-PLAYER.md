@@ -73,26 +73,15 @@ every few minutes on this host, so a 10-min soak keeps getting interrupted.
   overflow sheet → distinct `watch_history.gifId` growth is the advance
   observable (grid tile dumps are unreliable this session).
 
-## TV end-of-media (audited 2026-10-01, deferred — doc-only)
-TvPlayerScreen has NO end-of-media handling: no Player.Listener, no STATE_ENDED
-branch, no repeatMode anywhere. ExoPlayer default REPEAT_MODE_OFF → a finished
-gif PARKS on the black/ended frame in BOTH auto-swipe states; only manual
-D-pad next/prev moves on. Three concrete gaps:
+## TV end-of-media (IMPLEMENTED 2026-10-01, session 3 — mirror of mobile's ended-block)
+TvPlayerScreen now has one Player.Listener: STATE_ENDED → auto-swipe on (and not
+ data-saver) → advance to the next gif, looping the last; off → loop (seekTo(0)+play).
+CENTER/PLAY and media keys route through `playOrRestart()` at the ended frame (a
+bare playWhenReady toggle re-ends instantly, staying parked — root cause of
+"press play does nothing at end"). Not yet live-soaked through end-of-media on
+TV36 (needs a video actually ending; emulator session pending).
 
-- **Dead toggle:** the MENU quick actions show "Auto-swipe next: ON/OFF" and
-  write the shared pref (TvQuickActions.kt:145 → settings.autoSwipe), but
-  `autoSwipeOn` is only ever read for the label — nothing on TV consumes it.
-  Same silent-no-op class as the bare-lambda bug above, one layer up (missing
-  listener instead of discarded lambda). Pref only takes effect on mobile.
-- **No loop / no advance:** mobile's ended-block (PlayerScreen:222) is the
-  reference: auto-swipe off → loop (seekTo(0)+play, user request 2026-09-30);
-  on → advance. TV has neither behavior.
-- **Play-after-end does nothing:** TV CENTER/PLAY toggles playWhenReady
-  directly; at STATE_ENDED that re-"plays" from the end position and instantly
-  re-ends, staying parked. `GiffyPlayer.playOrRestart()` exists for exactly
-  this and TV doesn't call it.
-
-Lazy fix (one listener in TvPlayerScreen, mirror mobile's ended-block):
-STATE_ENDED → auto-swipe on: index+1 (loop at list end); off: seekTo(0)+play();
-CENTER/PLAY routes through playOrRestart() when ended. Verify on TV36 both
-toggle states through end-of-media.
+Former deferred notes (all closed by the listener above):
+- **Dead toggle:** MENU "Auto-swipe next" pref was write-only on TV — now consumed.
+- **No loop / no advance:** both behaviors implemented (mobile PlayerScreen:222 reference).
+- **Play-after-end:** routes through `GiffyPlayer.playOrRestart()`.

@@ -53,6 +53,8 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    /** TV has a fixed grid — hide the mobile-only Grid columns row. */
+    showGridColumns: Boolean = true,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val blocked by viewModel.blocked.collectAsStateWithLifecycle()
@@ -214,26 +216,28 @@ fun SettingsScreen(
                     }
                 }
             }
-            item(key = "grid-columns") {
-                // §6 Grid columns responsive-first: Auto = width-derived ladder.
-                val cols by viewModel.gridColumns.collectAsStateWithLifecycle(0)
-                Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
-                    Text("Grid columns", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        "Auto follows window width (1 phone · 2 medium · 3 wide)",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
-                        listOf(1, 2, 3).forEach { n ->
-                            FilterChip(
-                                selected = cols == n,
-                                onClick = { viewModel.setGridColumns(n) },
-                                label = { Text("$n") },
-                                modifier = Modifier.padding(end = 6.dp),
-                            )
+            if (showGridColumns) {
+                item(key = "grid-columns") {
+                    // §6 Grid columns responsive-first: Auto = width-derived ladder.
+                    val cols by viewModel.gridColumns.collectAsStateWithLifecycle(0)
+                    Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+                        Text("Grid columns", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            "Auto follows window width (1 phone · 2 medium · 3 wide)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+                            listOf(1, 2, 3).forEach { n ->
+                                FilterChip(
+                                    selected = cols == n,
+                                    onClick = { viewModel.setGridColumns(n) },
+                                    label = { Text("$n") },
+                                    modifier = Modifier.padding(end = 6.dp),
+                                )
+                            }
+                            TextButton(onClick = { viewModel.setGridColumns(0) }) { Text("Auto") }
                         }
-                        TextButton(onClick = { viewModel.setGridColumns(0) }) { Text("Auto") }
                     }
                 }
             }

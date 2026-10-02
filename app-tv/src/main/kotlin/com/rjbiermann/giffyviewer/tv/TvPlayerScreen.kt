@@ -37,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.common.Player
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
@@ -127,7 +128,11 @@ fun TvPlayerScreen(
                         android.view.KeyEvent.KEYCODE_MEDIA_PLAY,
                         android.view.KeyEvent.KEYCODE_MEDIA_PAUSE,
                         -> {
-                            player.playWhenReady = !(player.playWhenReady)
+                            if (player.playbackState == Player.STATE_ENDED) {
+                                player.playOrRestart()
+                            } else {
+                                player.playWhenReady = !(player.playWhenReady)
+                            }
                             true
                         }
                         android.view.KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
@@ -156,9 +161,14 @@ fun TvPlayerScreen(
                             seekBy(player, -10_000L) { seekFlash = it }
                             true
                         }
-                        // CENTER = play/pause (audit: "can't pause on TV").
+                        // CENTER = play/pause (audit: "can't pause on TV");
+                        // at the ended frame restarts (playOrRestart).
                         Key.DirectionCenter -> {
-                            player.playWhenReady = !(player.playWhenReady)
+                            if (player.playbackState == Player.STATE_ENDED) {
+                                player.playOrRestart()
+                            } else {
+                                player.playWhenReady = !(player.playWhenReady)
+                            }
                             true
                         }
                         // MENU = quick actions for the on-screen gif (parity
@@ -273,6 +283,26 @@ fun TvPlayerScreen(
     }
     val muted by settings.muted.collectAsStateWithLifecycle(false)
     val autoSwipeOn by settings.autoSwipe.collectAsStateWithLifecycle(false)
+    // End-of-media (AGENTS-PLAYER): mobile's ended-block parity. Auto-swipe
+    // off (or data-saver on) → loop the gif; on → advance to the next item,
+    // looping the last one. CENTER/PLAY routes through playOrRestart() so a
+    // press at the ended frame restarts instead of instantly re-ending.
+    DisposableEffect(player, autoSwipeOn, dataSaver) {
+        val listener =
+            object : Player.Listener {
+                override fun onPlaybackStateChanged(state: Int) {
+                    if (state != Player.STATE_ENDED) return
+                    if (!(autoSwipeOn && !dataSaver) || index >= gifs.size - 1) {
+                        player.seekTo(0)
+                        player.play()
+                        return
+                    }
+                    index++
+                }
+            }
+        player.addListener(listener)
+        onDispose { player.removeListener(listener) }
+    }
     actionsFor?.let { sheetGif ->
         TvQuickActionsDialog(
             gif = sheetGif,

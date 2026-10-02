@@ -28,6 +28,8 @@ conventions* are fine; its *retention playbook* is not.
 | Reduced-motion honored — animations collapse to instant | implemented in AGENTS-APP.md |
 | 48dp targets, tap zones sized to thumb reach (mobile bare-thumb ergonomics) | implemented in AGENTS-APP.md |
 
+| Quick-sheet sub-panes — flatten-to-group (YouTube long-press "save to playlist" submenu pattern): destructive blocks separated, main pane capped at everyday toggles + entries | spec'd (not built) in AGENTS-APP.md "Quick actions — submenu restructure" |
+
 ## Candidates (not scheduled — mapped per device)
 
 ### Phone / compact window

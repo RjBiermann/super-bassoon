@@ -163,7 +163,7 @@ class TvMainActivity : ComponentActivity() {
                         onOpenNiche = { niche -> openFeed = niche },
                     )
                 }
-                showSettings -> SettingsScreen(onBack = { showSettings = false })
+                showSettings -> SettingsScreen(onBack = { showSettings = false }, showGridColumns = false)
                 else -> {
                     val home: TvHomeViewModel = hiltViewModel()
                     val continueVm: ContinueWatchingViewModel = hiltViewModel()

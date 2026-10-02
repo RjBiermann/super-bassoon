@@ -18,7 +18,7 @@ prefs + the normative UI-lingo table below (formerly PLAN.md §3, §7–9).
   No separate tablet screens or codepaths.
 - Masonry width-derived columns (`Auto`: compact 1 / medium 2 / expanded 3, user-overridable ), Paging 3.
 - TikTok-style swipe player.
-- Long-press (tile or player) quick sheet: **Like / Unlike** · Block creator · Favorite creator · Block tag `<tag>` · Block all tags on this gif · Block this keyword · Don't block.
+- Long-press (tile or player) quick sheet: **Like / Unlike** · Block creator · Favorite creator · Block tag `<tag>` · Block all tags on this gif · Block this keyword · Don't block. (Structure moving to sub-panes — spec'd 2026-10-02, not yet built: see **Quick actions — submenu restructure** below.)
 - Creator profile: Follow/Unfollow (server-backed, `v1/me/follows`; button states Follow ↔ Following per site); niche cards show Join/Leave state (site wording "Join Niche / Leave Niche", API `v2/niches/{id}/subscription`).
 - Tap username → profile-like view (follow/block/manage lists).
 - Feeds: Trending / Explore / Top(day…all), group feeds, custom feeds, For You, Search, Favorites, Groups, Settings.
@@ -256,6 +256,132 @@ Findings now applied:
   into `TvSourceFeedScreen.kt` (zero logic change).
 - Judgment call stands: AppModule/TvAppModule stay device-shaped mirrors.
 
+## UI/UX structure round 2 — merge/split/simplify candidates (2026-10-02, scan-only, docs-only)
+Bounded scan of feature:*/app-*/core:ui composables only. Adds to the executed
+2026-10-01 ponytail audit; overlaps deliberately avoided. Ranked, smallest first:
+
+1. **SPLIT — QuickBlockSheet + AddToCustomFeedDialog out of FeedScreen.kt.**
+   The shared quick sheet (both `PlayerScreen.kt` ⋯-overflow and grid long-press
+   call it) plus its picker dialog and `listStyle` helper live inside the grid
+   screen's file — shared surface, wrong home. Move to `QuickSheet.kt` in
+   feature:feed, zero logic change (same move pattern as the TvSourceFeedScreen
+   split). ~200 lines, trivial review.
+2. **SMALL MERGE — AgeGate lives twice.** `mobile/MainActivity.kt` and
+   `TvMainActivity.kt` each define a private `AgeGate` composable — same copy,
+   "I am 18 or older — Enter" / "Exit (leaves app)", same confirm flow; only
+   TV's initial-focus `gateFocus` FocusRequester differs (TV audit fix). Lift to
+   core:ui with the focus modifier as an optional param; both shells keep their
+   own nav/host. Text is normative (age-gate section) so one definition can't
+   drift from the other.
+3. **PONYSAIL-ONLY — list-screen skeleta converge at the 4th instance.**
+   NichesScreen / ExploreScreen / FollowingScreen are three hand-rolled
+   "paged rows" skeleta (VM + `remember`-ish fetch state machine + error/empty
+   branch). Two audits already caught the cost (NichesScreen
+   `remember{}`-fetch bug, each surface's missing error branch per the critical
+   audit item). `ponytail:` consolidation threshold n=4: until a fourth list
+   screen lands, three flat copies beat one abstraction nobody has tuned.
+
+Scanned-and-rejected (documented so the next audit doesn't re-derive them):
+- **FeedScreen.kt 42K / PlayerScreen.kt 44K** — large but cohesive (one surface;
+   private `PlayerPage`/`PlayerControls`/`ActionRail` are that player's units).
+   Flat-structure rule wins; only candidate here is #1's extraction, not a
+   general split.
+- **FeedFilterDialog vs Settings content prefs** — different jobs (per-feed
+   duration/resolution/shuffle/strict/orientation vs global blocks/likes);
+   not a merge.
+- **Age-gate copy shared, gate screens not** — TV keeps its own shell per the
+   input-modality split decision; #2 shares only the widget, never the nav.
+- **TvMainActivity 16K** = activity + nav host + AgeGate + ThemeHost in one
+   file, only 4 top-level funs — thin-shell shape; no split without eating the
+   file apart for zero reuse.
+- **WebViewLoginScreen** — the live PKCE path (intercepts the redirect code,
+   verified 2026-09-30); NOT dead after the paste-token removal.
+- **SettingsScreen (shared, 22K)** — one screen both platforms consume; that is
+   the goal state for Settings, not bloat.
+
+The wait-in-line items from audit round 1 (a11y Low tier, OfflineNotice→EmptyState
+reuse, per-surface error branches) stay on top of #1–#3 — pick by user exposure,
+not file size.
+
+## Site feature-parity audit (2026-10-02, live-verified — doc-only, no code)
+Consumption surfaces are a full mirror: home tabs, Explore, Niches (index + Feed/About + join),
+creator feed (tag chips, Follow), watch page, Saved Collections, Following, search
+(GIFs/Creators/Niches), settings. Deliberately excluded per §0: upload/creator tools,
+Data Dashboard, boost/live-cam/only-fans/ads modules, premium (see AGENTS-NETWORK.md —
+galleries verified dead, `v2/feeds/modules` checklist fully covered).
+
+Real gaps (site has them, app doesn't) — **spec'd-not-scheduled, a user slice picks**:
+- **Report** — site watch-page ⋯ menu = Share · Add to a Niche · Add to a Collection · Report;
+  app's overflow sheet (QuickBlockSheet) has Share but NO Report (radio categories:
+  Underaged / Racist / Animals / Rape / Violence / Copyright / I Am In This Content / Other
+  → Next → follow-up text). Viewer-protective; needs its endpoint probed (shape unknown —
+  the site's write was not captured, do not guess).
+- **Add to a Collection** — CollectionsScreen can create/rename/delete but cannot ADD a gif
+  to one (site popup: picker + "Create a New Collection"); needs the collection-add write
+  probed before wiring (v2/me/collections write path unverified).
+- **Add to a Niche** — site popup "Add Content to a Niche" lists joined niches matching the
+  gif's tags (pre-checked ones disabled); app has add-to-custom-feed only. Niche-add write
+  endpoint unverified.
+- **Followers page** — site `/followers` ("Accounts That Follow You", tabs
+  Following/Followers); API `GET /v2/me/followers` verified 200. No app UI (mobile or TV).
+- **Tags browse tab** — site search has a 4th **Tags** tab sourced from
+  `GET /v2/tags/trending` (verified live); app search stops at GIFs/Creators/Niches.
+- **Niches suggest** — `GET /v2/niches/suggest` (tag-context niche suggestions, verified)
+  un-wired; would power a niche-search tab properly.
+- **Server search history** — `GET /v2/search/user-history` verified; site syncs history
+  server-side, app keeps local Room history. Existing spec'd-not-scheduled fallback now has
+  a verified endpoint to hang on.
+- **Creator stats header** — `GET /v1/users/{username}` (verified) gives posts/followers/views
+  counts the site profile shows; app creator feeds are tiles-only today.
+
+Parked (not gaps): For You server blend is `v2/feeds/for-you` as-is (70% favorite-creator
+weighting was a local-blend idea, superseded by the server feed); search-history sync and
+server collections remain spec'd-not-scheduled fallbacks per AGENTS-NETWORK.md.
+
+## Quick actions — submenu restructure (SPEC'D 2026-10-02, docs-only — not yet built)
+Quick sheets must stop growing flat rows. Two more sheet items already land this
+window (Report, Add to a Collection — see the parity audit below); a flat main
+pane would be ~10 rows. Spec: generalize the mechanism QuickBlockSheet already
+has (`var view by remember` — "main"/"tags" today) into four panes, identical
+shape on mobile + TV. No new component, no navigation — in-place content swap.
+
+**Main pane** (everyday toggles + pane entries only):
+- Favorite/Unfavorite @creator — state-aware toggle (both platforms).
+- Like/Unlike + Mute — **TV card dialog only** (mobile has these on the rail /
+double-tap / mute button; TV player keeps its own cluster).
+- "Add to…" ›  · "Tags…" › (only when the gif has tags)  · "Block…" ›
+- Close / ‹ Cancel.
+
+**"Add to…" pane:** Add to custom feed… (existing picker stays as the second
+level — same depth as today). When the spec'd parity writes land, **Add to a
+Niche / Add to a Collection** slot here, NOT as new main rows. "Speed
+<n>× — tap to change" stays a main pane row (TV; mobile keeps the slider) —
+live tuning, not a destination.
+
+**"Tags…" pane:** unchanged — per tag (top 3): Favorite/Unfavorite tag, Block
+tag; ‹ Back.
+
+**"Block…" pane:** every hide action in one place — Block creator · Block
+keyword "<first tag>" · per-tag Block tag reusing the existing tag state rows.
+Instant as today, no confirm dialog; grouping is separation, not a guard.
+
+Per-surface deltas:
+- **Mobile QuickBlockSheet** (both entry points: tile long-press + player ⋯
+  overflow): moves `Block creator` + `Block keyword` out of main → Block…;
+  `Add to custom feed…` → Add to…; `Tags…` becomes one of three equal panes.
+  Speed slider (`showSpeed=true`, player entry) stays on main. Header
+  (@user + VerifiedTick + shuffle-seed line) unchanged. Main pane drops
+  7 rows → 5 incl. Close.
+- **TV TvQuickActions** (MENU on focused card; also player username focus):
+  same panes as in-place swap (the AddToFeed swap already proves the pattern);
+  no Pin row (no pinned rows on TV). ‹ Back is the last focusable row of each
+  pane; MutableInteractionSource + giffyFocus ring pattern applies to any new
+  focusable consumers.
+
+Hard caps: pane depth 2 (main → pane → existing picker dialog/screen, same as
+today); no labels outside the site-lingo table — pane titles reuse existing
+wording ("Add to…", "Tags", "Block…", "Block creator", "Block keyword").
+
 ## TV parity gaps vs mobile (audited 2026-10-01, deferred — doc-only)
 Code-verified inventory. Ranked, biggest first:
 
@@ -277,9 +403,27 @@ Code-verified inventory. Ranked, biggest first:
 play-after-end (AGENTS-PLAYER.md), TvNichesViewModel copy-paste paging +
 TvSourceFeedScreen misplaced (ponytail audit below).
 
-**Inverse gap:** shared SettingsScreen renders mobile-only "Grid columns" row on
-TV; Export/Import SAF picker NOT verified under D-pad — manual check on TV36
-before trusting gate 7 on TV.
+**Inverse gap:** [CLOSED 2026-10: SettingsScreen now takes showGridColumns=false
+on TV — the mobile-only Grid columns row no longer renders.] Export/Import SAF
+picker CANNOT be D-pad-verified on any available TV image — AOSP-TV system
+images ship **no DocumentsUI** (`pm list packages` has no com.android.documentsui,
+verified on Television_AOSP and Television_1080p, API 36); CREATE_DOCUMENT
+launches silently no-op and the app stays alive (no crash, graceful no-op).
+Gate 7 stands on mobile (DocumentsUI present). When a picker-equipped TV image
+or real leanback device appears, re-run: Settings → Export → drive dialog with
+D-pad only.
+
+**Found during the empty-homepage incident (2026-10, doc-only next steps):**
+- TV SettingsScreen D-pad traversal is messy: no initial focus on entry, and
+  directional searches skip chip rows (Orientation/Video-fit chips) or escape
+  to the top-bar back button. Pickup: initial-focus FocusRequester on the
+  first row + the established TV chip pattern (explicit MutableInteractionSource
+  passed to both the chip and giffyFocus), TV-gated.
+- A stale global pref can blank home rows with zero explanation: orientation
+  filter "horizontal" + an all-portrait cache hid every Trending/Top-This-Week
+  tile behind the reserved empty strip (live-reproduced + fixed by restoring
+  Any). Pickup: FeedRow shows a small "No videos match your filters — Settings
+  → Orientation" hint when itemCount==0 && refresh NotLoading.
 
 **Minor:** no NicheAbout entry from TvNichesScreen (mobile-only); TV "Following"
 row is read-only — unverified whether a follow action exists anywhere on TV.
