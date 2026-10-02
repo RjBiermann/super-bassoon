@@ -18,7 +18,9 @@ prefs + the normative UI-lingo table below (formerly PLAN.md §3, §7–9).
   No separate tablet screens or codepaths.
 - Masonry width-derived columns (`Auto`: compact 1 / medium 2 / expanded 3, user-overridable ), Paging 3.
 - TikTok-style swipe player.
-- Long-press (tile or player) quick sheet: **Like / Unlike** · Block creator · Favorite creator · Block tag `<tag>` · Block all tags on this gif · Block this keyword · Don't block. (Structure moving to sub-panes — spec'd 2026-10-02, not yet built: see **Quick actions — submenu restructure** below.)
+- Long-press (tile or player) quick sheet: four panes per the restructure spec
+  (BUILT 2026-10-01, live-verified both apps): main = Favorite · Pin · Add to… ·
+  Tags… · Block… · Close; panes are in-place swaps.
 - Creator profile: Follow/Unfollow (server-backed, `v1/me/follows`; button states Follow ↔ Following per site); niche cards show Join/Leave state (site wording "Join Niche / Leave Niche", API `v2/niches/{id}/subscription`).
 - Tap username → profile-like view (follow/block/manage lists).
 - Feeds: Trending / Explore / Top(day…all), group feeds, custom feeds, For You, Search, Favorites, Groups, Settings.
@@ -260,19 +262,13 @@ Findings now applied:
 Bounded scan of feature:*/app-*/core:ui composables only. Adds to the executed
 2026-10-01 ponytail audit; overlaps deliberately avoided. Ranked, smallest first:
 
-1. **SPLIT — QuickBlockSheet + AddToCustomFeedDialog out of FeedScreen.kt.**
-   The shared quick sheet (both `PlayerScreen.kt` ⋯-overflow and grid long-press
-   call it) plus its picker dialog and `listStyle` helper live inside the grid
-   screen's file — shared surface, wrong home. Move to `QuickSheet.kt` in
-   feature:feed, zero logic change (same move pattern as the TvSourceFeedScreen
-   split). ~200 lines, trivial review.
-2. **SMALL MERGE — AgeGate lives twice.** `mobile/MainActivity.kt` and
-   `TvMainActivity.kt` each define a private `AgeGate` composable — same copy,
-   "I am 18 or older — Enter" / "Exit (leaves app)", same confirm flow; only
-   TV's initial-focus `gateFocus` FocusRequester differs (TV audit fix). Lift to
-   core:ui with the focus modifier as an optional param; both shells keep their
-   own nav/host. Text is normative (age-gate section) so one definition can't
-   drift from the other.
+1. **SPLIT — DONE (2026-10-01):** QuickBlockSheet + AddToCustomFeedDialog +
+   listStyle moved to `QuickSheet.kt` (feature:feed), zero logic change.
+2. **SMALL MERGE — DONE (2026-10-01):** shared `AgeGate` in core:ui
+   (onConfirmed suspend, onExit, requestInitialFocus flag replaces TV's
+   gateFocus); both shells consume it; TV layout now shares the centered one
+   (visual change on TV: centered instead of top-160, pill button instead of
+   plain M3 Button).
 3. **PONYSAIL-ONLY — list-screen skeleta converge at the 4th instance.**
    NichesScreen / ExploreScreen / FollowingScreen are three hand-rolled
    "paged rows" skeleta (VM + `remember`-ish fetch state machine + error/empty
@@ -338,12 +334,17 @@ Parked (not gaps): For You server blend is `v2/feeds/for-you` as-is (70% favorit
 weighting was a local-blend idea, superseded by the server feed); search-history sync and
 server collections remain spec'd-not-scheduled fallbacks per AGENTS-NETWORK.md.
 
-## Quick actions — submenu restructure (SPEC'D 2026-10-02, docs-only — not yet built)
+## Quick actions — submenu restructure (BUILT 2026-10-01; was spec'd 2026-10-02)
 Quick sheets must stop growing flat rows. Two more sheet items already land this
 window (Report, Add to a Collection — see the parity audit below); a flat main
 pane would be ~10 rows. Spec: generalize the mechanism QuickBlockSheet already
 has (`var view by remember` — "main"/"tags" today) into four panes, identical
 shape on mobile + TV. No new component, no navigation — in-place content swap.
+BUILT: QuickSheet.kt (extracted from FeedScreen.kt) + TvQuickActions — main /
+addto / tags / block panes; TV re-requests pane-first-row focus on swap
+(LaunchedEffect(view)). DEVIATION (deliberate): the spec omitted the Pin row
+and claimed TV has no pinned rows — both are wrong (pinned creators feed the
+home top-row pills on BOTH apps), so Pin/Unpin stays on main on both.
 
 **Main pane** (everyday toggles + pane entries only):
 - Favorite/Unfavorite @creator — state-aware toggle (both platforms).
@@ -414,11 +415,12 @@ or real leanback device appears, re-run: Settings → Export → drive dialog wi
 D-pad only.
 
 **Found during the empty-homepage incident (2026-10, doc-only next steps):**
-- TV SettingsScreen D-pad traversal is messy: no initial focus on entry, and
-  directional searches skip chip rows (Orientation/Video-fit chips) or escape
-  to the top-bar back button. Pickup: initial-focus FocusRequester on the
-  first row + the established TV chip pattern (explicit MutableInteractionSource
-  passed to both the chip and giffyFocus), TV-gated.
+- TV SettingsScreen D-pad traversal is messy: directional searches skip chip
+  rows (Orientation/Video-fit chips) or escape to the top-bar back button.
+  [Initial focus on entry FIXED 2026-10-01: SettingsScreen takes
+  requestInitialFocus — AuthSection's first button carries the FocusRequester
+  (new firstButtonModifier param); TV passes true.] The chip-skip traversal
+  itself is still open.
 - **Orientation filter is data-bound, not fetch-bound (probed 2026-10):** the
   API has no orientation parameter, so the filter is client-side over whatever
   pool the feed returns. Live trending pool = 99/99 portrait (0 landscape);
@@ -428,7 +430,9 @@ D-pad only.
   reserved empty strip — live-reproduced, fixed by restoring Any).
   Horizontal-on-TV works only when a pool actually contains landscape gifs.
   Pickup: FeedRow shows a small "No videos match your filters — Settings →
-  Orientation" hint when itemCount==0 && refresh NotLoading.
+  Orientation" hint when itemCount==0 && refresh NotLoading. [DONE 2026-10-01:
+  FeedRow shows the hint; live-verified conditions in code, on-device check
+  pending a filtered-empty state.]
 
 **Minor:** no NicheAbout entry from TvNichesScreen (mobile-only); TV "Following"
 row is read-only — unverified whether a follow action exists anywhere on TV.

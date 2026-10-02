@@ -32,6 +32,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,6 +40,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -55,6 +57,8 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     /** TV has a fixed grid — hide the mobile-only Grid columns row. */
     showGridColumns: Boolean = true,
+    /** TV: the first row takes D-pad focus on entry (mobile touch doesn't need it). */
+    requestInitialFocus: Boolean = false,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val blocked by viewModel.blocked.collectAsStateWithLifecycle()
@@ -148,6 +152,12 @@ fun SettingsScreen(
             )
         },
     ) { padding ->
+        val firstFocus =
+            remember {
+                androidx.compose.ui.focus
+                    .FocusRequester()
+            }
+        LaunchedEffect(Unit) { if (requestInitialFocus) firstFocus.requestFocus() }
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(16.dp),
@@ -161,6 +171,12 @@ fun SettingsScreen(
                         viewModel = authViewModel,
                         onOpenWebView = { webLogin = it },
                         modifier = Modifier.padding(top = 4.dp),
+                        firstButtonModifier =
+                            if (requestInitialFocus) {
+                                Modifier.focusRequester(firstFocus)
+                            } else {
+                                Modifier
+                            },
                     )
                 }
             }

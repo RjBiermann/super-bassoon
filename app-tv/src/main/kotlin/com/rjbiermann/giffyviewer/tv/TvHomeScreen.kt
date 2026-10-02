@@ -43,6 +43,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.tv.material3.Card
@@ -192,8 +193,18 @@ private fun FeedRow(
 ) {
     // Reserve the row's space while paging loads — a zero-height row that pops
     // to full height shoves every row below (homepage UI drift, user report).
+    // A strict global pref (orientation "horizontal" over an all-portrait pool,
+    // live-proven) can empty a row entirely — never a silent blank strip.
     Column(modifier = Modifier.padding(vertical = 8.dp).heightIn(min = ROW_RESERVED_HEIGHT)) {
         RowTitle(title)
+        if (gifs.itemCount == 0 && gifs.loadState.refresh is LoadState.NotLoading) {
+            Text(
+                text = "No videos match your filters — Settings → Orientation",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 16.dp, top = 4.dp),
+            )
+        }
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),

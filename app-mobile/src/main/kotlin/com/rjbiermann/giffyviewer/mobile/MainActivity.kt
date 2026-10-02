@@ -4,33 +4,21 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
+import com.rjbiermann.giffyviewer.core.ui.AgeGate
 import com.rjbiermann.giffyviewer.core.ui.GiffyTheme
 import com.rjbiermann.giffyviewer.core.ui.LayoutHint
 import com.rjbiermann.giffyviewer.core.ui.PinLockScreen
@@ -55,7 +43,6 @@ import com.rjbiermann.giffyviewer.feature.settings.SettingsScreen
 import com.rjbiermann.giffyviewer.search.SearchScreen
 import com.rjbiermann.giffyviewer.search.SearchViewModel
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -269,50 +256,10 @@ class MainActivity : ComponentActivity() {
                 onOpenCollections = { showCollections = true },
             )
         } else {
-            val scope = rememberCoroutineScope()
             AgeGate(
-                onConfirmed = { scope.launch { settings.confirmAge() } },
+                onConfirmed = { settings.confirmAge() },
                 onExit = ::finishAffinity,
             )
-        }
-    }
-}
-
-/**
- * PLAN §3: one-time full-screen attestation; start destination until confirmed;
- * no content loads before confirmation — FeedScreen isn't even composed here.
- */
-@Composable
-private fun AgeGate(
-    onConfirmed: () -> Unit,
-    onExit: () -> Unit,
-) {
-    val scope = rememberCoroutineScope()
-    androidx.compose.material3.Surface(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Text(
-                text = "Giffy Viewer",
-                style = MaterialTheme.typography.headlineLarge,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text =
-                    "This app shows adult content. You must be 18 or older. " +
-                        "Not affiliated with or endorsed by upstream.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(24.dp))
-            androidx.compose.material3.Button(onClick = { scope.launch { onConfirmed() } }) {
-                Text("I am 18 or older — Enter")
-            }
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(onClick = onExit) { Text("Exit (leaves app)") }
         }
     }
 }

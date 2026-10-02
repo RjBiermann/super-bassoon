@@ -29,6 +29,8 @@ fun AuthSection(
     /** Full-screen WebView render is the host's job (overlay, not inline). */
     onOpenWebView: (TokenStore.Pkce) -> Unit,
     modifier: Modifier = Modifier,
+    /** Modifier for the pane's first button (TV initial D-pad focus hook). */
+    firstButtonModifier: Modifier = Modifier,
 ) {
     val token by viewModel.token.collectAsStateWithLifecycle()
 
@@ -46,7 +48,10 @@ fun AuthSection(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(24.dp))
-            Button(onClick = { onOpenWebView(viewModel.currentPkce()) }, modifier = Modifier.fillMaxWidth()) {
+            Button(
+                onClick = { onOpenWebView(viewModel.currentPkce()) },
+                modifier = firstButtonModifier.fillMaxWidth(),
+            ) {
                 Text("Sign in with browser")
             }
         } else {
@@ -58,7 +63,7 @@ fun AuthSection(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(24.dp))
-            Button(onClick = viewModel::signOut, modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = viewModel::signOut, modifier = firstButtonModifier.fillMaxWidth()) {
                 Text("Sign out")
             }
         }

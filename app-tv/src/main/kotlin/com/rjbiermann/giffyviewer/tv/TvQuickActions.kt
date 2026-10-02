@@ -94,26 +94,55 @@ fun TvQuickActionsDialog(
                     }
                 }
                 val first = remember { FocusRequester() }
-                LaunchedEffect(Unit) { first.requestFocus() }
-                if (view == "tags") {
-                    gif.tags.take(3).forEach { tag ->
-                        val tagState by feedViewModel
-                            .tagState(tag)
-                            .collectAsStateWithLifecycle(initialValue = null)
-                        QuickAction(
-                            text = if (tagState == "FAVORITED") "Unfavorite tag “$tag”" else "Favorite tag “$tag”",
-                            onClick = {
-                                feedViewModel.toggleFavoriteTag(tag)
+                // Re-request per pane swap so a new pane's first row takes focus.
+                LaunchedEffect(view) { first.requestFocus() }
+                // Four panes (AGENTS-APP submenu restructure spec) — in-place
+                // swap; ‹ Back is the last focusable row of each pane.
+                when (view) {
+                    "tags" -> {
+                        gif.tags.take(3).forEach { tag ->
+                            val tagState by feedViewModel
+                                .tagState(tag)
+                                .collectAsStateWithLifecycle(initialValue = null)
+                            QuickAction(
+                                text = if (tagState == "FAVORITED") "Unfavorite tag “$tag”" else "Favorite tag “$tag”",
+                                onClick = {
+                                    feedViewModel.toggleFavoriteTag(tag)
+                                    onDismiss()
+                                },
+                            )
+                            QuickAction(text = "Block tag “$tag”") {
+                                feedViewModel.blockTag(tag)
                                 onDismiss()
-                            },
-                        )
-                        QuickAction(text = "Block tag “$tag”") {
-                            feedViewModel.blockTag(tag)
+                            }
+                        }
+                        QuickAction(text = "‹ Back") { view = "main" }
+                        return@M3Surface
+                    }
+                    "addto" -> {
+                        QuickAction(text = "Add to custom feed…", first = first) { showAddToFeed = true }
+                        QuickAction(text = "‹ Back") { view = "main" }
+                        return@M3Surface
+                    }
+                    "block" -> {
+                        QuickAction(text = "Block creator", first = first) {
+                            feedViewModel.blockCreator(gif.userName)
                             onDismiss()
                         }
+                        QuickAction(text = "Block keyword “${gif.tags.firstOrNull() ?: gif.userName}”") {
+                            feedViewModel.blockKeyword(gif.tags.firstOrNull() ?: gif.userName)
+                            onDismiss()
+                        }
+                        gif.tags.take(3).forEach { tag ->
+                            QuickAction(text = "Block tag “$tag”") {
+                                feedViewModel.blockTag(tag)
+                                onDismiss()
+                            }
+                        }
+                        QuickAction(text = "‹ Back") { view = "main" }
+                        return@M3Surface
                     }
-                    QuickAction(text = "‹ Back") { view = "main" }
-                    return@M3Surface
+                    else -> {}
                 }
                 playerActions?.let { pa ->
                     HorizontalDivider()
@@ -175,17 +204,14 @@ fun TvQuickActionsDialog(
                         onDismiss()
                     },
                 )
-                QuickAction(text = "Block creator") {
-                    feedViewModel.blockCreator(gif.userName)
-                    onDismiss()
-                }
                 if (customFeeds.isNotEmpty()) {
                     HorizontalDivider()
-                    QuickAction(text = "Add to custom feed…") { showAddToFeed = true }
+                    QuickAction(text = "Add to…") { view = "addto" }
                 }
                 if (gif.tags.isNotEmpty()) {
                     QuickAction(text = "Tags…") { view = "tags" }
                 }
+                QuickAction(text = "Block…") { view = "block" }
                 QuickAction(text = "Close") { onDismiss() }
             }
         }

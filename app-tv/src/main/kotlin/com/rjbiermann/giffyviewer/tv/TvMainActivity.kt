@@ -7,14 +7,11 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,7 +21,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -132,7 +128,12 @@ class TvMainActivity : ComponentActivity() {
                         onUnlock = { unlocked = true },
                         verifyPin = { settings.verifyPin(it) },
                     )
-                !confirmed -> AgeGate(onConfirmed = { settings.confirmAge() })
+                !confirmed ->
+                    com.rjbiermann.giffyviewer.core.ui.AgeGate(
+                        onConfirmed = { settings.confirmAge() },
+                        onExit = ::finishAffinity,
+                        requestInitialFocus = true,
+                    )
                 player != null -> {
                     val (gifs, start) = player ?: listOf<Gif>() to 0
                     TvPlayerScreen(
@@ -163,7 +164,12 @@ class TvMainActivity : ComponentActivity() {
                         onOpenNiche = { niche -> openFeed = niche },
                     )
                 }
-                showSettings -> SettingsScreen(onBack = { showSettings = false }, showGridColumns = false)
+                showSettings ->
+                    SettingsScreen(
+                        onBack = { showSettings = false },
+                        showGridColumns = false,
+                        requestInitialFocus = true,
+                    )
                 else -> {
                     val home: TvHomeViewModel = hiltViewModel()
                     val continueVm: ContinueWatchingViewModel = hiltViewModel()
@@ -277,36 +283,6 @@ class TvMainActivity : ComponentActivity() {
                         )
                     }
                 }
-            }
-        }
-    }
-
-    /** PLAN §3: one-time blocking attestation; D-pad focusable buttons. */
-    @Composable
-    private fun AgeGate(onConfirmed: suspend () -> Unit) {
-        val scope = rememberCoroutineScope()
-        val gateFocus = remember { FocusRequester() }
-        LaunchedEffect(Unit) { gateFocus.requestFocus() }
-        Surface(modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Spacer(Modifier.height(160.dp))
-                Text("Giffy Viewer", style = MaterialTheme.typography.headlineLarge)
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "This app shows adult content. You must be 18 or older. " +
-                        "Not affiliated with or endorsed by upstream.",
-                )
-                Spacer(Modifier.height(24.dp))
-                com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
-                    text = "I am 18 or older — Enter",
-                    onClick = { scope.launch { onConfirmed() } },
-                    modifier = Modifier.focusRequester(gateFocus),
-                )
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(onClick = ::finishAffinity) { Text("Exit (leaves app)") }
             }
         }
     }
