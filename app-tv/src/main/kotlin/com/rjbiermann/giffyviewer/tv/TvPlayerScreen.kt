@@ -4,6 +4,8 @@ package com.rjbiermann.giffyviewer.tv
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,8 +15,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -46,6 +50,8 @@ import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
+import com.rjbiermann.giffyviewer.core.ui.giffyFocus
+import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import kotlinx.coroutines.launch
 
 /**
@@ -65,6 +71,8 @@ fun TvPlayerScreen(
     /** Links audit #3: "Open @user's feed" — exits the player, opens the creator feed
      *  (swapping the source under the live pager is the soak-crash class). */
     onOpenCreator: (String) -> Unit = {},
+    /** Links audit #5 TV parity: niche pill → niche feed (same swap semantics). */
+    onOpenNiche: (FeedSource.Niche) -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -106,6 +114,9 @@ fun TvPlayerScreen(
     // Playback speed (MENU panel cycles 0.5 → 1 → 1.5 → 2).
     var speed by remember { mutableStateOf(1f) }
 
+    // Player text auto-hide state — declared before the key-event Column.
+    var textVisible by remember { mutableStateOf(true) }
+
     // D-pad events only reach onPreviewKeyEvent via a FOCUSED node inside the
     // hierarchy — the PlayerView never takes focus, so grab it on entry.
     val playerFocus =
@@ -122,6 +133,8 @@ fun TvPlayerScreen(
                 .focusable()
                 .focusRequester(playerFocus)
                 .onPreviewKeyEvent { e ->
+                    // Player text auto-hide: any key re-reveals the cluster.
+                    if (e.type == KeyEventType.KeyUp) textVisible = true
                     if (e.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
                     // AGENTS-UX-PATTERNS TV keymap: horizontal = time (±10s,
                     // hold-repeat = progressive seek), vertical = items,
@@ -241,30 +254,69 @@ fun TvPlayerScreen(
             }
             // Mobile-player parity (2026-10): creator + description cluster,
             // bottom-left, above the progress line. Verified tick rides along.
-            Column(
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(start = 24.dp, bottom = 24.dp, end = 96.dp),
-            ) {
-                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    CreatorLabel(
-                        gif.userName,
-                        gif.verified,
-                        tint = Color.White,
-                        tickTint = Color.White,
-                        style = MaterialTheme.typography.titleMedium,
-                        tickSize = 18.dp,
-                    )
+            // Player text auto-hide (AGENTS-APP TV spec): playing && not seeking
+            // → 3s fade; any key re-reveals; hidden cluster (incl. pills) leaves
+            // composition so no invisible focus targets; progress line always-on.
+            LaunchedEffect(gif.id, textVisible) {
+                if (textVisible && player.playbackState != Player.STATE_ENDED) {
+                    kotlinx.coroutines.delay(3_000)
+                    textVisible = false
                 }
-                gif.description?.takeIf { it.isNotBlank() }?.let { desc ->
-                    Text(
-                        text = desc,
-                        color = Color.White.copy(alpha = 0.7f),
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 2,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    )
+            }
+            androidx.compose.animation.AnimatedVisibility(visible = textVisible) {
+                Column(
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(start = 24.dp, bottom = 24.dp, end = 96.dp),
+                ) {
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        CreatorLabel(
+                            gif.userName,
+                            gif.verified,
+                            tint = Color.White,
+                            tickTint = Color.White,
+                            style = MaterialTheme.typography.titleMedium,
+                            tickSize = 18.dp,
+                        )
+                    }
+                    gif.description?.takeIf { it.isNotBlank() }?.let { desc ->
+                        Text(
+                            text = desc,
+                            color = Color.White.copy(alpha = 0.7f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 2,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        )
+                    }
+                    // Niche pills (mobile-player parity, links audit #5): ≤3 payload
+                    // names; a pill opens the niche feed. D-pad: pills use the same
+                    // giffyFocus ring pattern as TvQuickActions rows; DOWN from the
+                    // player body walks into the row, CENTER presses, UP returns to
+                    // the player body (vertical = items per the keymap rules).
+                    if (gif.niches.isNotEmpty()) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            gif.niches.take(3).forEach { niche ->
+                                val interaction = remember { MutableInteractionSource() }
+                                TextButton(
+                                    onClick = { onOpenNiche(FeedSource.Niche(niche.id, niche.name)) },
+                                    modifier =
+                                        Modifier
+                                            .giffyFocus(
+                                                interactionSource = interaction,
+                                                fillOnFocus = com.rjbiermann.giffyviewer.core.ui.GiffyColors.BrandRed,
+                                            ),
+                                    interactionSource = interaction,
+                                    colors =
+                                        ButtonDefaults.textButtonColors(
+                                            contentColor = com.rjbiermann.giffyviewer.core.ui.GiffyColors.Lime,
+                                        ),
+                                ) {
+                                    Text(niche.name, style = MaterialTheme.typography.labelMedium)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

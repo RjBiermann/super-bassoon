@@ -281,8 +281,17 @@ architecture.
    fallback for pre-v9 cache rows), tap → `FeedSource.Niche(id, name)` + player close;
    tags went plain lime text (style decision (b)) — no section heading is rendered, so
    no new wording was invented (the (d) watch-page label check still applies IF a
-   labelled section is ever added). TV equivalent still needs the `onOpenCreator`-style
-   callback param on TvPlayerScreen — D-pad device work, stays parked.
+   labelled section is ever added). TV equivalent — **BUILT 2026-10-02:** TvPlayerScreen
+   gained the same ≤3-pill row (labels = payload name) + `onOpenNiche(FeedSource.Niche)`
+   callback wired in TvMainActivity (`openFeed = niche`, same swap semantics as
+   onOpenCreator). Pills use the TvQuickActions row pattern (M3 TextButton + shared
+   giffyFocus ring + interactionSource); pill row only composes when `gif.niches`
+   is non-empty. Compose-cluster pill render + the niche-gif composition path were
+   breakpoint-verified on TV36 (pill-row line hit with a 5-niche gif); the visible
+   D-pad focus ring cannot be verified on this image — the shared-dialog ring check
+   ran the same day and FAILED (see round-3 #4), so the pills inherit the same
+   limitation as every other in-dialog focusable on TV (MENU quick actions remain
+   the reliable link path). Parked residue: none for the wiring itself.
 6. **Possible gap to verify live:** the site watch page's "Suggested Niches / Suggested
    Creators" + related "you might like" strip have no in-app counterpart (the swipe player
    itself serves adjacent discovery; TV player has nothing). Verify against the live watch
@@ -509,7 +518,7 @@ Ranked by lines removed per risk, smallest diffs first. Threshold rule from roun
    skeleton extraction stays parked (four flat VMs beat one abstraction until real reuse
    shows).
 
-4. **Picker-dialog family: six implementations of one dialog shape.**
+4. **Picker-dialog family: six implementations of one dialog shape — CLOSED (2026-10-02, device check ran, ring test FAILED).**
    Add-to-Custom-Feed, Add-to-a-Collection, Add-to-a-Niche — each × mobile + TV = 6 near-
    identical "list of options → tap → Cancel" dialogs (~820 lines across the two files).
    The niche tag-matching ordering rule (`gifTags → matching → ordered`) is copy-pasted
@@ -520,6 +529,13 @@ Ranked by lines removed per risk, smallest diffs first. Threshold rule from roun
    M3 focus visuals (what the shared FeedFilterDialog's contents already do on TV) or
    takes a per-row decoration parameter. Decide on device, don't guess; if the ring test
    fails, keep only the ordering rule + custom-feed dialog shared and stop.
+   **RAN THE DEVICE CHECK (TV36, 2026-10-02):** drove D-pad into the shared FeedFilterDialog's
+   chip rows on the niche source feed — the focused "HD only" chip (`focused="true"` in the
+   uiautomator dump) renders with NO visible focus treatment (default M3 outline only,
+   zoomed screenshot). Ring test FAILED ⇒ per this item's own stop rule the merge stops:
+   the shared ordering rule landed (batch 2), the dialog merge does NOT proceed. A TV
+   picker screen either needs giffyFocus per row (per-row decoration parameter) or
+   tv-material components — same conclusion the TvQuickActions rows already prove.
 
 5. **avgColorOr + AudioBadge — DONE (2026-10-02):** both moved to core:ui
    (`AudioBadge.kt`); the two call sites consume them (tile/card badge padding drift
@@ -532,13 +548,13 @@ Ranked by lines removed per risk, smallest diffs first. Threshold rule from roun
    `NicheRefTest` covers both variants + round-trip. Pin packing in core:datastore
    (`togglePinnedNiche`) stays inline — core can't reach feature:feed.
 
-7. **UX simplification (visual, not code): the FeedScreen chip pile-up.**
-   On a For-You niche/creator feed with options, the grid sits under up to five stacked
+7. **UX simplification (visual, not code): the FeedScreen chip pile-up — BUILT (2026-10-02).**
+   On a For-You niche/creator feed with options, the grid sat under up to five stacked
    chrome rows — feed tabs · matching creators · For-You scope · sorts · Filter/Clear —
-   before the first tile (bad on a 360dp-wide phone in portrait). Suggestion when this
-   surface is touched: right-align the sort + Filter/Clear chips into ONE row (they're
-   both per-feed controls) — saves a row without cutting any control; scope selector
-   only ever coexists with For-You, leave it alone.
+   before the first tile (bad on a 360dp-wide phone in portrait). Landed: sort chips +
+   Filter ▾ + Clear merged into ONE row — sorts scroll left under a fixed right-aligned
+   Filter/Clear pair (weight(1f) scrollable inner row); both remain per-feed controls,
+   scope selector untouched. Compile + ktlint + detekt + unit tests green on :feature:feed.
 
 Scanned-and-rejected (documented so the next audit doesn't re-derive them):
 - **QuickSheet vs TvQuickActions row idioms** (TextButton+ripple vs Button+giffyFocus) —
@@ -546,7 +562,10 @@ Scanned-and-rejected (documented so the next audit doesn't re-derive them):
 - **FeedScreen 32K / PlayerScreen 44K** — re-affirmed cohesive post-batch; private
   PlayerPage/PlayerControls/ActionRail remain that player's own units.
 - **PlayerControls 24dp slot vs TvPlayerScreen always-on 3dp line** — different behavior
-  contracts (auto-hide vs 10-foot always-visible), not duplication.
+  contracts (auto-hide vs 10-foot always-visible), not duplication. Scope narrowed
+  2026-10: "always-visible" is the PROGRESS LINE only — the text layer (creator /
+  description / niche pills) follows the mobile idle-hide rule (player text auto-hide,
+  TV parity gaps below).
 - **FeedViewModel vs TvHomeViewModel block/favorite creator functions** — RESOLVED
   2026-10-02 (re-check ran; the Add-to writes had settled in FeedViewModel): the TV
   quick actions already route through a fresh shared FeedViewModel, so TvHomeViewModel's
@@ -651,6 +670,26 @@ wording ("Add to…", "Tags", "Block…", "Block creator", "Block keyword").
 Code-verified inventory. Ranked, biggest first:
 
 **Missing entirely on TV:**
+- **Player text auto-hide** (reported 2026-10, doc-only spec): the mobile player
+  clears creator/description/tags after 3s idle (playing && not scrubbing only,
+  `IDLE_HIDE_MS`) and keeps just the thin progress line; `TvPlayerScreen` shows
+  creator + description + niche pills statically while playing. Spec for the TV
+  slice (D-pad device work, parked with the other TV items):
+  - Same idle rule as mobile: playing && not seeking → after 3s fade the whole
+    text cluster; paused or mid-seek → visible. Progress line stays always-on
+    (that contract above is unchanged).
+  - Any D-pad key press (seek / center / play-pause) resets the timer and
+    re-reveals — the 10-foot standard is "text hides while watching", not
+    "text is unreachable".
+  - When hidden the niche pills leave focus traversal entirely — invisible
+    focus targets are a D-pad trap; first DOWN re-reveals the cluster instead
+    of landing on an unseen pill.
+  - MENU quick actions keep working regardless of visibility state.
+  [BUILT 2026-10-02 batch 5 — one LaunchedEffect per gif (playbackState!=IDLE &&
+  playing && !seekFlash → 3s → visible=false); any onPreviewKeyEvent sets visible=true;
+  hidden cluster (incl. pills) leaves composition so focus traversal stays clean;
+  progress line + seekFlash outside the AnimatedVisibility. D-pad visual verify
+  still pending (emulator).]
 - **Search** — zero `api.search` calls, no search UI anywhere in app-tv. Mobile has
   full search (tags/creators/suggestions). TV browsing = home rows + Niches +
   pinned/custom feeds only.

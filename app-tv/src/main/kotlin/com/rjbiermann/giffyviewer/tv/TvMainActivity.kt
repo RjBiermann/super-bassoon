@@ -146,6 +146,7 @@ class TvMainActivity : ComponentActivity() {
                         feedViewModel = hiltViewModel(),
                         onBack = { player = null },
                         onOpenCreator = { username -> openFeed = FeedSource.Creator(username = username) },
+                        onOpenNiche = { niche -> openFeed = niche },
                     )
                 }
                 openFeed != null -> {

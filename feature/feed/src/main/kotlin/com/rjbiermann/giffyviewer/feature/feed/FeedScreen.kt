@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -73,9 +74,9 @@ import com.rjbiermann.giffyviewer.core.ui.GiffyScaffold
 import com.rjbiermann.giffyviewer.core.ui.RefreshFeedPill
 import com.rjbiermann.giffyviewer.core.ui.avgColorOr
 import com.rjbiermann.giffyviewer.core.ui.rememberScrollingUp
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -385,52 +386,54 @@ fun FeedScreen(
                 }
             }
 
-            // Per-feed server sort chips (§8) — only verified orders surface.
-            val sortOptions = source.sortOptions()
-            if (sortOptions.isNotEmpty()) {
-                val savedSort by remember(source.baseKey) { viewModel.sortFor(source.baseKey) }
-                    .collectAsStateWithLifecycle("")
-                val activeSort = source.activeSort.ifEmpty { savedSort }
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 12.dp, vertical = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    sortOptions.forEach { (label, order) ->
-                        FilterChip(
-                            selected = activeSort == order,
-                            onClick = { viewModel.setSort(source, order) },
-                            label = { Text(label) },
-                        )
-                    }
-                }
-            }
-
-            // §8 range chips (client-side per-feed filters): Filter ▾ entry →
-            // dialog with duration / resolution / orientation chip groups.
-            // Orientation "" follows the global §6 pref (Settings).
+            // Per-feed server sort chips (§8) + Filter/Clear — ONE row (round-3
+            // audit #7: five stacked chrome rows starved the grid on a 360dp
+            // phone; sorts scroll under the fixed right-aligned Filter pair).
             var showFilter by remember { mutableStateOf(false) }
             val feedPrefs by remember(source.baseKey) { viewModel.feedPrefs(source.baseKey) }
                 .collectAsStateWithLifecycle(
                     com.rjbiermann.giffyviewer.core.datastore
                         .FeedPrefs(),
                 )
+            val filtersActive =
+                listOf(feedPrefs.duration, feedPrefs.resolution, feedPrefs.orientation).any { it.isNotEmpty() }
             Row(
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp, vertical = 2.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
+                val sortOptions = source.sortOptions()
+                if (sortOptions.isNotEmpty()) {
+                    val savedSort by remember(source.baseKey) { viewModel.sortFor(source.baseKey) }
+                        .collectAsStateWithLifecycle("")
+                    val activeSort = source.activeSort.ifEmpty { savedSort }
+                    Row(
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        sortOptions.forEach { (label, order) ->
+                            FilterChip(
+                                selected = activeSort == order,
+                                onClick = { viewModel.setSort(source, order) },
+                                label = { Text(label) },
+                            )
+                        }
+                    }
+                } else {
+                    Spacer(Modifier.weight(1f))
+                }
                 FilterChip(
-                    selected = listOf(feedPrefs.duration, feedPrefs.resolution, feedPrefs.orientation).any { it.isNotEmpty() },
+                    selected = filtersActive,
                     onClick = { showFilter = true },
                     label = { Text("Filter ▾") },
                 )
-                if (listOf(feedPrefs.duration, feedPrefs.resolution, feedPrefs.orientation).any { it.isNotEmpty() }) {
+                if (filtersActive) {
                     FilterChip(
                         selected = false,
                         onClick = {

@@ -258,3 +258,40 @@ Compiled + ktlint + detekt + unit tests + lint green on all touched modules.
   TvPlayerScreen niche pills (D-pad device work), picker-dialog family merge
   (device ring check), UX-PATTERNS candidates (user-slice gated), player soak
   passes (emulator).
+
+### Session 2026-10-02 batch 4 (doc-only — no code landed)
+- **TV player text auto-hide spec'd** (user report: TvPlayerScreen text doesn't
+  auto-hide like mobile): TvPlayerScreen shows creator/description/niche pills
+  statically while playing; mobile clears them after 3s idle. Spec written in
+  AGENTS-APP.md "TV parity gaps" — same idle rule (playing && not seeking → 3s
+  fade; progress line always-on stays), any D-pad key re-reveals, hidden pills
+  leave focus traversal, MENU quick actions unaffected. D-pad device work,
+  parked with the other TV items.
+
+### Session 2026-10-02 batch 5 (pending-items sweep — three pending items closed)
+- **TvPlayerScreen niche pills BUILT** (links audit #5 TV equivalent; was parked):
+  same ≤3-pill row as the mobile player cluster + `onOpenNiche(FeedSource.Niche)`
+  callback wired in TvMainActivity (same swap semantics as onOpenCreator). Pills
+  use the TvQuickActions focus pattern (TextButton + shared giffyFocus ring +
+  interactionSource); row composes only when the gif has niches. Niche-gif
+  composition breakpoint-verified on TV36 (pill-row bp hit with a 5-niche gif).
+- **Player text auto-hide TV slice BUILT + device-verified on TV36** (the batch-4
+  spec): playing && not seeking → 3s → whole text cluster fades (AnimatedVisibility,
+  leaves composition — no invisible focus targets); any key re-reveals; progress
+  line + seekFlash always-on outside the visibility wrapper. Verified: cluster
+  visible on entry, gone after 3s playback, LEFT re-seek re-revealed it.
+- **FeedScreen chip-row merge BUILT + device-verified on Medium_Phone** (round-3
+  #7): sort chips + Filter ▾ + Clear in ONE row — sorts scroll under a fixed
+  right-aligned Filter pair; niche feed chrome went 3 rows → 2.
+- **Picker-dialog family merge CLOSED (ring test FAILED)** (round-3 #4): drove
+  D-pad into the shared FeedFilterDialog's chip rows on TV36 — the focused
+  "HD only" chip renders with no visible focus treatment (hierarchy confirmed
+  focused=true, zoomed screenshot). Per that item's own stop rule: ordering rule
+  stays shared (batch 2), the dialog merge does not proceed.
+- Compile + ktlint + detekt + unit tests green on all touched modules
+  (:app-tv/:feature:feed/:core:network). Temp probe code stripped from the tree.
+- Still parked/blocked (unchanged): Groups→custom-feeds merge (no user ask),
+  Followers page (row shape — no-guess rule), Report (unprobeable), server
+  search-history sync + server collections + niches suggest (spec'd-not-scheduled
+  fallbacks), UX-PATTERNS candidates (user-slice gated), player soak passes
+  (emulator fragility), Gate 324 (blocked on SIGNING_KEY secrets).
