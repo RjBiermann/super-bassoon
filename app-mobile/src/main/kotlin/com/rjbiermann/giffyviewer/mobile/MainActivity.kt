@@ -251,8 +251,6 @@ class MainActivity : ComponentActivity() {
                     feedViewModel.open(niche)
                 },
                 onOpenAbout = { id, name -> aboutNiche = id to name },
-                api = api,
-                settings = settings,
             )
         } else if (confirmed && showSettings) {
             SettingsScreen(onBack = { showSettings = false })

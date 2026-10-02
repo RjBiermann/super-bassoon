@@ -30,25 +30,20 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
-import com.rjbiermann.giffyviewer.core.network.GifsApi
-import com.rjbiermann.giffyviewer.core.network.NicheDto
-import kotlinx.coroutines.launch
 
 /**
  * Niches browser (PLAN §7 groups groundwork): paginated taxonomy from
  * `v2/niches` (anonymous OK); tap opens the niche as a feed tab.
  * Site-parity 2026-10: scrollable category filter chips (`v2/niches/categories`)
  * and a Sort by menu (orders verified against the server's BadOrder message).
+ * Paging state lives in the shared NichesViewModel (mobile + TV one path).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,47 +51,19 @@ fun NichesScreen(
     onBack: () -> Unit,
     onOpenNiche: (FeedSource.Niche) -> Unit,
     onOpenAbout: (id: String, name: String) -> Unit,
-    api: GifsApi,
-    settings: SettingsRepository,
     joinViewModel: NicheJoinViewModel = hiltViewModel(),
+    viewModel: NichesViewModel = hiltViewModel(),
 ) {
     val joined by joinViewModel.joined.collectAsStateWithLifecycle(initialValue = emptySet())
     LaunchedEffect(Unit) { joinViewModel.refresh() }
-    var niches by remember { mutableStateOf<List<NicheDto>>(emptyList()) }
-    val pinned by settings.pinnedNiches.collectAsStateWithLifecycle(initialValue = emptySet())
-    var nextPage by remember { mutableIntStateOf(1) }
-    var loading by remember { mutableStateOf(false) }
-    var loadFailed by remember { mutableStateOf(false) }
-    var category by remember { mutableStateOf<String?>(null) }
-    var categories by remember { mutableStateOf<List<String>>(emptyList()) }
-    var sort by remember { mutableStateOf("subscribers") }
+    val niches by viewModel.niches.collectAsStateWithLifecycle()
+    val pinned by viewModel.settings.pinnedNiches.collectAsStateWithLifecycle(initialValue = emptySet())
+    val category by viewModel.category.collectAsStateWithLifecycle()
+    val categories by viewModel.categories.collectAsStateWithLifecycle()
+    val sort by viewModel.sort.collectAsStateWithLifecycle()
+    val endReached by viewModel.endReached.collectAsStateWithLifecycle()
+    val loadFailed by viewModel.loadFailed.collectAsStateWithLifecycle()
     var sortMenuOpen by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-
-    fun loadMore() {
-        if (loading || nextPage <= 0) return
-        loading = true
-        scope.launch {
-            runCatching { api.niches(page = nextPage, category = category, order = sort) }
-                .onSuccess { pageDto ->
-                    loadFailed = false
-                    niches = niches + pageDto.niches
-                    nextPage = if (pageDto.page < pageDto.pages) pageDto.page + 1 else 0
-                }.onFailure { loadFailed = true }
-            loading = false
-        }
-    }
-    LaunchedEffect(Unit) { loadMore() }
-    LaunchedEffect(category, sort) {
-        if (category == null && sort == "subscribers") return@LaunchedEffect // initial state
-        nextPage = 1
-        niches = emptyList()
-        loadFailed = false
-        loadMore()
-    }
-    LaunchedEffect(Unit) {
-        runCatching { api.nicheCategories() }.onSuccess { categories = it.categories }
-    }
 
     Scaffold(
         topBar = {
@@ -128,7 +95,7 @@ fun NichesScreen(
                             androidx.compose.material3.DropdownMenuItem(
                                 text = { Text(label) },
                                 onClick = {
-                                    sort = value
+                                    viewModel.resort(value)
                                     sortMenuOpen = false
                                 },
                             )
@@ -148,20 +115,24 @@ fun NichesScreen(
             // Site-parity filter chips: All + one chip per niche category.
             item {
                 LazyRow(
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp),
-                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+                    contentPadding =
+                        androidx.compose.foundation.layout
+                            .PaddingValues(horizontal = 12.dp),
+                    horizontalArrangement =
+                        androidx.compose.foundation.layout.Arrangement
+                            .spacedBy(8.dp),
                 ) {
                     item {
                         FilterChip(
                             selected = category == null,
-                            onClick = { category = null },
+                            onClick = { viewModel.selectCategory(null) },
                             label = { Text("All") },
                         )
                     }
                     items(categories) { cat ->
                         FilterChip(
                             selected = category == cat,
-                            onClick = { category = if (category == cat) null else cat },
+                            onClick = { viewModel.selectCategory(if (category == cat) null else cat) },
                             label = { Text(cat) },
                         )
                     }
@@ -169,7 +140,6 @@ fun NichesScreen(
             }
             items(niches.size, key = { niches[it].id }) { index ->
                 val niche = niches[index]
-                val scope2 = rememberCoroutineScope()
                 ListItem(
                     headlineContent = { Text(niche.name) },
                     supportingContent = { Text("${niche.gifs} gifs · ${niche.subscribers} subscribers") },
@@ -184,7 +154,7 @@ fun NichesScreen(
                             IconButton(onClick = { onOpenAbout(niche.id, niche.name) }) {
                                 Icon(Icons.Outlined.Info, contentDescription = "about ${niche.name}")
                             }
-                            IconButton(onClick = { scope2.launch { settings.togglePinnedNiche(niche.id, niche.name) } }) {
+                            IconButton(onClick = { viewModel.togglePin(niche) }) {
                                 Icon(
                                     imageVector =
                                         if (pinned.any { it.startsWith("${niche.id}|") }) {
@@ -208,17 +178,17 @@ fun NichesScreen(
                         modifier = Modifier.fillMaxWidth().padding(16.dp),
                     )
                     TextButton(
-                        onClick = { loadMore() },
+                        onClick = { viewModel.loadMore() },
                         modifier = Modifier.padding(16.dp),
                     ) { Text("Retry") }
                 }
             }
-            if (nextPage > 0) {
+            if (!endReached) {
                 item(key = "load-more") {
                     TextButton(
-                        onClick = { loadMore() },
+                        onClick = { viewModel.loadMore() },
                         modifier = Modifier.padding(16.dp),
-                    ) { Text(if (loading) "Loading…" else "Load more") }
+                    ) { Text("Load more") }
                 }
             } else {
                 item(key = "end") {

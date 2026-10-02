@@ -34,6 +34,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.ui.giffyFocus
 import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
+import com.rjbiermann.giffyviewer.feature.feed.customRefSummary
+import com.rjbiermann.giffyviewer.feature.feed.gifFeedRefs
 import androidx.compose.material3.Surface as M3Surface
 
 /** Player-only panel rows (mobile overflow parity): Like · Mute · Speed · Auto-swipe. */
@@ -231,9 +233,8 @@ private fun TvAddToFeedDialog(
     addableFeedRef: String? = null,
 ) {
     var feedId by remember { mutableStateOf(customFeeds.firstOrNull()?.id) }
-    val creatorRef = "creator:${gif.userName.lowercase().trim()}"
-    val tagRefs = gif.tags.take(3).map { "tag:${it.lowercase().trim()}" }
-    val selected = remember { mutableStateListOf(creatorRef) }
+    val refs = gifFeedRefs(gif, addableFeedRef)
+    val selected = remember { mutableStateListOf(refs.first { it.startsWith("creator:") }) }
     Dialog(onDismissRequest = onDismiss) {
         M3Surface(
             shape = MaterialTheme.shapes.medium,
@@ -264,13 +265,8 @@ private fun TvAddToFeedDialog(
                     }
                 }
                 HorizontalDivider()
-                (listOfNotNull(addableFeedRef, creatorRef) + tagRefs).forEach { ref ->
-                    val label =
-                        when {
-                            ref.startsWith("creator:") -> "@${ref.removePrefix("creator:")}"
-                            ref.startsWith("niche:") -> "Niche: ${ref.removePrefix("niche:").substringAfter('|')}"
-                            else -> "#${ref.removePrefix("tag:")}"
-                        }
+                refs.forEach { ref ->
+                    val label = customRefSummary(ref)
                     val src = remember { MutableInteractionSource() }
                     Row(
                         modifier =

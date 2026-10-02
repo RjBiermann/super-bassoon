@@ -1,7 +1,5 @@
 package com.rjbiermann.giffyviewer.feature.feed
 
-import com.rjbiermann.giffyviewer.core.model.Gif
-
 /**
  * Feed identity = cache key base (PLAN §7). Sort/range changes produce distinct
  * bases ("trend:v2:pop:sort=top_week"), client-side ops don't.
@@ -140,8 +138,6 @@ fun FeedSource.title(): String =
         is FeedSource.Favorites -> "Favorites"
         is FeedSource.Surprise -> "Surprise me"
     }
-
-typealias GifItem = Gif
 
 /** Active server sort of this source ("" = the surface's default). */
 val FeedSource.activeSort: String

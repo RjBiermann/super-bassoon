@@ -51,7 +51,10 @@ prefs + the normative UI-lingo table below (formerly PLAN.md §3, §7–9).
   truth = shared logic in :core:/:feature:, NOT shared screens.
 - `TvLazyRow`s: Trending · Explore · Top This Week · Continue Watching · Favorites · one row per favorited group · custom feeds.
 - Focus on username in now-playing → quick actions panel.
-- "Why did this get hidden" toast on filtered-item skip.
+- "Why did this get hidden" toast on filtered-item skip: **obsoleted 2026-10-01** —
+  filtering happens upstream (ContentFilter in the paging sources), so the player
+  never encounters a hidden item; surfacing one to explain it would punch through
+  the leak-zero choke point. "Hidden this week" count in Settings covers the need.
 
 ## Favorite creator (Phase 7 slice 4, verified live on Phone34)
 - Mobile: "Favorites" FilterChip in the feed tab row; helpful empty state when nothing
@@ -108,18 +111,14 @@ TvPlayerScreen progress fraction starts at 0 (stale BISECT probe removed).
   slowdown (3+ wrong → 15s wait) shipped. NO recovery affordance — deliberate
   (user decision 2026-10: forgotten PIN = clear app data, keeps the lock opaque).
 
-**High (a11y / destructive actions)**
-- GiffyPillButton rest state: BrandRed #D70003 text on near-black ≈ 3.5:1 < 4.5:1 AA
-  (14sp text) — this is the TV age-gate + all header pills. Fix: lighter red for
-  text-on-black or primaryContainer fill at rest (border can stay, it's decorative).
-- Player bottom text cluster (description/tags/@user) + action rail + Retry/Skip overlay
-  sit directly on video with no gradient scrim — unreadable on bright content.
-- Player Retry/Skip are bare Text+clickable ≈ 36dp tall < 48dp target (error state =
-  imprecise tapping); use TextButton or 48dp min-height.
-- Delete confirm inconsistency: Collections delete confirms, Groups delete is instant —
-  same destructive class needs the same dialog or undo snackbar.
-- TV age gate has no initial-focus FocusRequester (home screen got that fix; the
-  first screen a TV user sees didn't).
+**High (a11y / destructive actions) — all closed 2026-10**
+- Player Retry/Skip are ≥48dp TextButtons (audit H6 closed).
+- Player bottom text cluster + action rail sit on a bottom gradient scrim
+  (audit H5 closed); GiffyPillButton rest state is container-fill + TextHigh
+  (contrast closed).
+- Delete confirm inconsistency: closed — Groups delete now confirms first
+  (same destructive class as Collections).
+- TV age gate initial-focus FocusRequester:
   [FIXED same day: TvMainActivity.AgeGate has `gateFocus`; **2026-10 session also
   wired initial focus on TvNichesScreen (first row) and TvSourceFeedScreen (first
   grid card) — those lists sat unfocused on open: no ring, first CENTER did nothing.**
@@ -129,17 +128,17 @@ TvPlayerScreen progress fraction starts at 0 (stale BISECT probe removed).
   (Niches rows, quick-action dialogs, source-feed Filter chip).]
 
 **Medium**
-- AuthScreen coaches the DevTools paste-token flow first; PKCE "Sign in with browser"
-  (AGENTS-AUTH primary path) is a secondary button. Invert the hierarchy.
+- AuthScreen hierarchy — closed: paste-token removed (2026-10 user decision);
+  PKCE "Sign in with browser" is the only path.
 - Settings Switch rows: whole row should be `Modifier.toggleable(role = Role.Switch)`
-  (target size + TalkBack state announcement), not Switch-only hit area.
-- FeedScreen empty-Favorites hint says "long-press a tile and choose Favorite" — no tiles
-  exist on an empty feed, and the sheet item is creator-favorite. Wording needs a fix.
-- Double-tap like toggles unlike on an already-liked gif (AGENTS-APP semantics: double-tap
-  = like); only the rail heart should toggle.
-- TvPlayerScreen has no pause/seek/position at all (D-pad walks + back only) — documented
-  Phase-6 slice limit, but "can't pause on TV" is a real gap. TvSourceFeedScreen
-  `onMenu = {}` is another dead control.
+  (target size + TalkBack state announcement), not Switch-only hit area — data-saver
+  row closed; remaining switch rows (verified-only, AMOLED, dynamic color) could
+  reuse the same pattern.
+- FeedScreen empty-Favorites hint — closed (points at the player's ⋯ sheet now).
+- Double-tap like — closed: double-tap = LIKE (never unlike), rail heart toggles.
+- TvPlayerScreen pause/seek — closed: horizontal = ±10s seek with flash,
+  hold-repeat progressive, CENTER = play/pause; TvSourceFeedScreen onMenu opens
+  quick actions.
 - Tile a11y noise: image contentDescription "Gif by @user" + visible "@user" Text = creator
   announced twice per tile; make the image decorative or mergeDescendants. Long-press
   affordance unannounced (add onLongClickLabel semantics).
@@ -229,54 +228,33 @@ per-session Fisher-Yates, stable across recomposition, reshuffle action availabl
   shows "No videos match this filter / Clear or loosen the filter chips"
   instead of a blank grid. "Clear" refills (live-verified both ways).
 
-## Empty custom feeds + quick-add (audited 2026-10-01, deferred — doc-only)
+## Empty custom feeds + quick-add (IMPLEMENTED 2026-10-01, session 2)
 Quick-add is DONE (mobile: tile long-press → ⋯ → "Add to custom feed…" → picker
 dialog; TV parity in TvQuickActions; add is deduped + evicts `custom:<id>` pages).
-Empty creation is half-wired — intent documented, code contradicts itself. NOT
-implemented (no bug report, no user ask); pickup checklist:
-- `CustomFeedsScreen.kt` `save()` still guards `refs.isEmpty()` → silently no-ops,
-  while `canSave = name.isNotBlank()` (line ~119 comment: "Empty feed is valid")
-  enables the button. Drop the `refs.isEmpty()` guard — one line.
-- Empty-state gap: FeedScreen `EmptyState` fires only for Favorites/ForYou — an
-  empty custom feed opens to a BLANK SCREEN (same pattern the audit fixed for
-  Favorites). Add `FeedSource.Custom` to that condition; message points at the
-  tile long-press / player ⋯ "Add to custom feed…" path (no tiles exist on an
-  empty feed — same wording trap as the Favorites hint, audit Medium).
-- Update stale `FeedPageFetcher.kt` ponytail comment ("refs must be non-empty —
-  the builder enforces it"; empty is now valid, fetcher already returns an empty
-  page safely).
-- One test: save name-only → row with empty `sourcesJson`; quick-add lands a ref.
-- Pairs with the parked groups→custom-feeds merge (AGENTS-CONTENT-FILTER.md):
-  empty creation makes "group = custom feed with only tag refs" literal.
+Empty creation now wired (was half-wired — intent documented, code contradicted):
+- `CustomFeedsScreen.kt` `save()` no longer guards `refs.isEmpty()` — a name-only
+  definition saves with empty `sourcesJson` (matches `canSave = name.isNotBlank()`).
+- FeedScreen `EmptyState` now also fires for `FeedSource.Custom` — an empty custom
+  feed shows "This feed is empty / long-press a tile or use ⋯ in the player →
+  “Add to custom feed…”" instead of a blank grid.
+- Stale `FeedPageFetcher.kt` ponytail comment replaced (empty feeds valid; the
+  fetcher returns an empty page safely — mediator test already covered it).
+- Test: `GifFeedRefsTest` covers the shared `gifFeedRefs` helper (creator first,
+  3-tag cap, niche-ref prepend).
+- Groups→custom-feeds merge (AGENTS-CONTENT-FILTER.md) stays parked.
 
-## Ponytail audit — merge/simplify/split candidates (2026-10-01, deferred — doc-only)
-One-shot complexity audit; no bugs found in scope, repo is lean for its size. Ranked:
-
-- **delete:** `core/model/UiState.kt` (20 lines) — sealed Idle/Loading/Ready/Error
-  interface with ZERO usages; screens use StateFlow + inline states. Also unused
+## Ponytail audit — merge/simplify/split candidates (EXECUTED 2026-10-01, session 2)
+Findings now applied:
+- **deleted:** `core/model/UiState.kt` (zero usages) and the unused
   `typealias GifItem = Gif` (FeedSource.kt).
-- **merge:** `TvNichesViewModel` (TvNiches.kt:66) is a near-verbatim copy of the
-  paging logic mobile `NichesScreen` keeps inline in the composable (loadMore /
-  nextPage / loadFailed / pin toggle). Extract one shared `NichesViewModel` in
-  `feature:feed`; mobile gets the VM it should have had anyway, TV keeps its
-  tv-material UI. One paging path instead of two (~60 lines).
-- **dedupe:** mobile `AddToCustomFeedDialog` vs TV `TvQuickActions` feed-picker —
-  dialog chrome is rightly platform-specific, but the ref-building (creatorRef /
-  tagRefs from a Gif) is duplicated; ~10-line shared helper in `feature:feed`.
-- **split:** `TvSourceFeedScreen` + `TvNicheFeedViewModel` live inside TvNiches.kt
-  (lines ~210–322) — a feed screen in the niches file. Move to its own file
-  (zero logic change).
-- **judgment call (not a finding):** `AppModule` vs `TvAppModule` are 129
-  near-identical lines (only media-cache constant + logging flag differ); a shared
-  Hilt module could absorb the identical DB/Coil wiring, but the mirror is
-  documented as deliberate ("modules stay device-shaped").
-
-Clean: no single-implementation DI abstractions, GiffyPlayerFactory earns its
-keep, TvTheme is a real platform mapping, FeedSource→fetcher layering is Paging-3
-structure. Already tracked elsewhere: groups↔custom-feeds merge + empty-feed
-half-wiring (AGENTS-CONTENT-FILTER.md + above), OfflineNotice vs EmptyState
-(UI/UX audit Medium/Low), FeedScreen/PlayerScreen monoliths — splittable but
-churn-only.
+- **merged:** TvNichesViewModel deleted; shared `NichesViewModel` lives in
+  `feature:feed` (paging + category/sort/pin); mobile NichesScreen and TV
+  TvNichesScreen both consume it — one paging path instead of two.
+- **deduped:** `gifFeedRefs` + `customRefSummary` (with the niche branch) in
+  `feature:feed`; mobile AddToCustomFeedDialog and TV TvAddToFeedDialog share them.
+- **split:** TvSourceFeedScreen + TvNicheFeedViewModel moved out of TvNiches.kt
+  into `TvSourceFeedScreen.kt` (zero logic change).
+- Judgment call stands: AppModule/TvAppModule stay device-shaped mirrors.
 
 ## TV parity gaps vs mobile (audited 2026-10-01, deferred — doc-only)
 Code-verified inventory. Ranked, biggest first:

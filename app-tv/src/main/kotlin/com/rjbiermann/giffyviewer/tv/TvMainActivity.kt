@@ -159,10 +159,8 @@ class TvMainActivity : ComponentActivity() {
                     }
                 }
                 showNiches -> {
-                    val nichesVm: TvNichesViewModel = hiltViewModel()
                     TvNichesScreen(
                         onOpenNiche = { niche -> openFeed = niche },
-                        viewModel = nichesVm,
                     )
                 }
                 showSettings -> SettingsScreen(onBack = { showSettings = false })

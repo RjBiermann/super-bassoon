@@ -481,12 +481,13 @@ fun FeedScreen(
                 )
             } else if (items.itemCount == 0 &&
                 items.loadState.refresh is LoadState.NotLoading &&
-                (source is FeedSource.Favorites || source is FeedSource.ForYou)
+                (source is FeedSource.Favorites || source is FeedSource.ForYou || source is FeedSource.Custom)
             ) {
                 // UX: helpful empty state, never a blank screen (shared EmptyState).
                 val msg =
                     when {
                         source is FeedSource.ForYou -> "Your For You feed is empty"
+                        source is FeedSource.Custom -> "This feed is empty"
                         else -> "No favorites yet"
                     }
                 val hint =
@@ -494,6 +495,8 @@ fun FeedScreen(
                         source is FeedSource.ForYou -> "Follow creators and join niches to fill it"
                         // Audit fix: on an EMPTY feed there are no tiles to long-press —
                         // point at the player's overflow sheet instead.
+                        source is FeedSource.Custom ->
+                            "long-press a tile or use ⋯ in the player → “Add to custom feed…”"
                         else -> "open any video and use ⋯ → “Favorite @creator”"
                     }
                 com.rjbiermann.giffyviewer.core.ui
@@ -743,10 +746,9 @@ private fun AddToCustomFeedDialog(
     addableFeedRef: String? = null,
 ) {
     var feedId by remember { mutableStateOf(customFeeds.firstOrNull()?.id) }
-    val creatorRef = "creator:${gif.userName.lowercase().trim()}"
-    val tagRefs = gif.tags.take(3).map { "tag:${it.lowercase().trim()}" }
-    val nicheRef = addableFeedRef
-    val selected = remember { mutableStateListOf(creatorRef) }
+    val refs = gifFeedRefs(gif, addableFeedRef)
+    val selected = remember { mutableStateListOf(refs.first { it.startsWith("creator:") }) }
+
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Add to custom feed") },
@@ -765,13 +767,8 @@ private fun AddToCustomFeedDialog(
                     }
                 }
                 HorizontalDivider()
-                (listOfNotNull(nicheRef, creatorRef) + tagRefs).forEach { ref ->
-                    val label =
-                        when {
-                            ref.startsWith("creator:") -> "@${ref.removePrefix("creator:")}"
-                            ref.startsWith("niche:") -> "Niche: ${ref.removePrefix("niche:").substringAfter('|')}"
-                            else -> "#${ref.removePrefix("tag:")}"
-                        }
+                refs.forEach { ref ->
+                    val label = customRefSummary(ref)
                     Row(
                         modifier =
                             Modifier.fillMaxWidth().clickable {

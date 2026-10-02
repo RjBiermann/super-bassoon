@@ -41,6 +41,7 @@ import androidx.lifecycle.viewModelScope
 import com.rjbiermann.giffyviewer.core.database.CustomFeedEntity
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.database.NicheGroupEntity
+import com.rjbiermann.giffyviewer.core.model.Gif
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -66,7 +67,9 @@ class CustomFeedsViewModel
             name: String,
             refs: List<String>,
         ) {
-            if (name.isBlank() || refs.isEmpty()) return
+            // Empty feed is valid: name-only definitions are created to be
+            // filled later via tile long-press / player ⋯ "Add to custom feed…".
+            if (name.isBlank()) return
             viewModelScope.launch {
                 db
                     .customFeedDao()
@@ -91,12 +94,22 @@ class CustomFeedsViewModel
         }
     }
 
-/** Refs the builder produces: "creator:<username>" or "tag:<text>" (groups expand). */
-internal fun customRefSummary(ref: String): String =
+/** Short label for a custom-feed ref (picker chips + builder pills). */
+public fun customRefSummary(ref: String): String =
     when {
         ref.startsWith("creator:") -> "@${ref.removePrefix("creator:")}"
+        ref.startsWith("niche:") -> "Niche: ${ref.removePrefix("niche:").substringAfter('|')}"
         else -> "#${ref.removePrefix("tag:")}"
     }
+
+/** Refs a gif contributes to a custom feed (niche + creator + first 3 tags);
+ *  builder refs are "creator:<username>" / "tag:<text>" / "niche:<id>|<name>". */
+public fun gifFeedRefs(
+    gif: Gif,
+    nicheRef: String? = null,
+): List<String> =
+    listOfNotNull(nicheRef, "creator:${gif.userName.lowercase().trim()}") +
+        gif.tags.take(3).map { "tag:${it.lowercase().trim()}" }
 
 internal fun parseCustomRefs(sourcesJson: String): List<String> = sourcesJson.split(',').filter { it.isNotBlank() }
 

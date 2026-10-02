@@ -72,8 +72,9 @@ on a fresh install (acceptance criterion). No server, no backup API — local fi
 - Mobile round-trip verified: favorite @sweetiefox → Favorites chip shows their gifs →
   `creator_prefs` row `sweetiefox|FAVORITED` → Settings unfavorite → empty state text.
 
-Not yet: favorite tag, collections, hide-count Settings display (Import/Export landed —
-see ContentPrefsBackup below; niche groups landed in DB v5).
+Closed since: favorite tag (quick sheet + tag_prefs FAVORITED), collections
+(CollectionsScreen, both apps), hide-count Settings display ("Hidden this week").
+Import/Export landed — see ContentPrefsBackup below; niche groups landed in DB v5.
 
 ## Live status (2026-09)
 - Niche groups: DB v5 (`niche_groups`), GroupsScreen live on both apps, BLOCKED groups feed stage 2.

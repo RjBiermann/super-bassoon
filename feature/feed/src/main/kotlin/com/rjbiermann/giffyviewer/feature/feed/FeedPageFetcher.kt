@@ -106,7 +106,8 @@ class FeedPageFetcher(
                 // "tag:<text>" / "niche:<id>|<name>"; groups are expanded to
                 // their tags by the builder). Refs never shrink mid-generation
                 // (definitions are edited in the builder), so the mapping is
-                // stable. ponytail: refs must be non-empty — the builder enforces it.
+                // stable. Empty feeds are valid (filled later via quick-add)
+                // and land an empty page here.
                 val refs = feed.refs
                 if (refs.isEmpty()) {
                     GifsPageDto()

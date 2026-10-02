@@ -8,8 +8,8 @@ complexity:
     active: false
   TooManyFunctions:
     active: true
-    thresholdInInterfaces: 30 # one wide data-access surface per file is by design (ContentPrefsDao, GifsApi)
-    thresholdInClasses: 30 # wide data-access fakes (ContentPrefsDao, GifsApi fakes) are one class by design
+    thresholdInInterfaces: 32 # one wide data-access surface per file is by design (ContentPrefsDao, GifsApi)
+    thresholdInClasses: 32 # wide data-access fakes (ContentPrefsDao, GifsApi fakes) are one class by design
 style:
   MagicNumber:
     active: false
