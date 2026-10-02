@@ -106,11 +106,11 @@ jump on YouTube only — nicety, not a convention worth copying.
 | Tap pause | Center = play/pause | shipped (audit gap closed) |
 | Swipe next/prev | Down/Up = next/prev | shipped |
 | Overflow quick sheet | MENU = quick-actions panel | shipped (partial parity) |
-| Playback speed 0.5–2× | MENU panel item (submenu or cycling row) | gap |
-| Like / double-tap like | MENU panel Like (no double-tap binding — see rules) | gap |
-| Mute rail (Sound On/Off) | MENU panel Mute, `hasAudio`-aware per §9 | gap |
-| Auto-swipe toggle | MENU panel toggle; reduced-motion + data-saver rules already in prefs | gap |
-| Progress line | Left/Right = ±10s (press = one step, hold = repeat); show position while seeking | gap |
+| Playback speed 0.5–2× | MENU panel item (cycling row 0.5→1→1.5→2) | shipped (verified in TvPlayerScreen 2026-10-02) |
+| Like / double-tap like | MENU panel Like (no double-tap binding — see rules) | shipped 2026-10-02 |
+| Mute rail (Sound On/Off) | MENU panel Mute, `hasAudio`-aware per §9 | shipped 2026-10-02 |
+| Auto-swipe toggle | MENU panel toggle; reduced-motion + data-saver rules already in prefs | shipped 2026-10-02 |
+| Progress line | Left/Right = ±10s; show position while seeking | shipped; hold-repeat FIXED 2026-10-02 (see AGENTS-APP.md) |
 | Hold-for-2× (player only) | skip — hold Right (progressive FF) is the TV idiom for the same need | candidate, low priority |
 | Share sheet | skip — no established TV share convention | skip |
 | Pinch zoom | skip — no D-pad analog, mobile-only gesture | skip |
@@ -121,7 +121,8 @@ Player: Center play/pause · Down/Up prev/next · Left/Right ±10s (+hold repeat
 MENU quick-actions panel (Like · Mute · Speed · Auto-swipe · Block/Favorite set it already
 has) · BACK dismiss panel then exit · handle `KEYCODE_MEDIA_PLAY_PAUSE/FF/REW` to the same
 actions. Home: unchanged (MENU on card, focus-up into search already implemented).
-Fix-with-touch: `TvSourceFeedScreen` `onMenu = {}` dead control (audit finding).
+Fix-with-touch: ~~`TvSourceFeedScreen` `onMenu = {}` dead control~~ CLOSED (onMenu
+opens quick actions; verified in TvSourceFeedScreen 2026-10-02).
 
 ### Anti-confusion rules (the whole point)
 1. **Spatial honesty:** horizontal = time, vertical = items — never swap meanings per screen.

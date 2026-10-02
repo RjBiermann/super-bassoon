@@ -153,7 +153,12 @@ TvPlayerScreen progress fraction starts at 0 (stale BISECT probe removed).
 - Double-tap like — closed: double-tap = LIKE (never unlike), rail heart toggles.
 - TvPlayerScreen pause/seek — closed: horizontal = ±10s seek with flash,
   hold-repeat progressive, CENTER = play/pause; TvSourceFeedScreen onMenu opens
-  quick actions.
+  quick actions. [CORRECTED 2026-10-02 batch 13: the handler was KeyUp-only —
+  a held Right gave ONE step, not the documented hold-repeat. Fixed: seek keys
+  (Left/Right + MEDIA_FF/REW) act on KeyDown so OS key-repeat yields progressive
+  steps; KeyUp just consumes (no double-step). Item-walk Down/Up stays KeyUp-only
+  on purpose — a held Down would churn the decoder across gifs. Device-verified
+  TV36: single press steps + flash + clamp at duration, no crash.]
 - ~~Tile a11y noise~~ — CLOSED on mobile AND TV (GifCard image decorative;
   the visible "@user" Text announces the creator).
 - ~~Search suggestions render a bare count~~ — CLOSED: rows now show `"%,d gifs"`

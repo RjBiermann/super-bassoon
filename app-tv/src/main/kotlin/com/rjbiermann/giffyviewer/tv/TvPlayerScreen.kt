@@ -135,6 +135,36 @@ fun TvPlayerScreen(
                 .onPreviewKeyEvent { e ->
                     // Player text auto-hide: any key re-reveals the cluster.
                     if (e.type == KeyEventType.KeyUp) textVisible = true
+                    // Keymap rule 4: hold repeats its own key's action. Seek keys
+                    // act on KeyDown so the OS key-repeat (held key) yields
+                    // progressive ±10s steps; everything else stays KeyUp-only
+                    // (a held Down would churn the decoder across gifs).
+                    if (e.type == KeyEventType.KeyDown) {
+                        when (e.nativeKeyEvent.keyCode) {
+                            android.view.KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                                seekBy(player, +10_000L) { seekFlash = it }
+                                true
+                            }
+                            android.view.KeyEvent.KEYCODE_MEDIA_REWIND -> {
+                                seekBy(player, -10_000L) { seekFlash = it }
+                                true
+                            }
+                            else ->
+                                when (e.key) {
+                                    Key.DirectionRight -> {
+                                        seekBy(player, +10_000L) { seekFlash = it }
+                                        true
+                                    }
+                                    Key.DirectionLeft -> {
+                                        seekBy(player, -10_000L) { seekFlash = it }
+                                        true
+                                    }
+                                    else -> false
+                                }
+                        }.let { consumed -> if (consumed) return@onPreviewKeyEvent true }
+                        // Unconsumed Down falls through to the KeyUp table below
+                        // (CENTER etc. must not double-fire there).
+                    }
                     if (e.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
                     // AGENTS-UX-PATTERNS TV keymap: horizontal = time (±10s,
                     // hold-repeat = progressive seek), vertical = items,
@@ -150,24 +180,17 @@ fun TvPlayerScreen(
                             } else {
                                 player.playWhenReady = !(player.playWhenReady)
                             }
-                            true
                         }
-                        android.view.KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
-                            seekBy(player, +10_000L) { seekFlash = it }
-                            true
-                        }
-                        android.view.KeyEvent.KEYCODE_MEDIA_REWIND -> {
-                            seekBy(player, -10_000L) { seekFlash = it }
-                            true
-                        }
+                        // Fired on KeyDown (hold-repeat); KeyUp just consumes.
+                        android.view.KeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
+                        android.view.KeyEvent.KEYCODE_MEDIA_REWIND,
+                        -> Unit
                         // Media-key remotes: next/prev walk the list (up/down parity).
                         android.view.KeyEvent.KEYCODE_MEDIA_NEXT -> {
                             if (index < gifs.size - 1) index++
-                            true
                         }
                         android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
                             if (index > 0) index--
-                            true
                         }
                     }
                     when (e.key) {
@@ -179,14 +202,11 @@ fun TvPlayerScreen(
                             if (index > 0) index--
                             true
                         }
-                        Key.DirectionRight -> {
-                            seekBy(player, +10_000L) { seekFlash = it }
-                            true
-                        }
-                        Key.DirectionLeft -> {
-                            seekBy(player, -10_000L) { seekFlash = it }
-                            true
-                        }
+                        // Fired on KeyDown (hold-repeat progressive seek);
+                        // KeyUp just consumes so the press doesn't double-step.
+                        Key.DirectionRight,
+                        Key.DirectionLeft,
+                        -> true
                         // CENTER = play/pause (audit: "can't pause on TV");
                         // at the ended frame restarts (playOrRestart).
                         Key.DirectionCenter -> {
