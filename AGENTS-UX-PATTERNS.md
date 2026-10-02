@@ -19,6 +19,7 @@ conventions* are fine; its *retention playbook* is not.
 | Double-tap to like + heart pop (TikTok/Reels) | implemented in AGENTS-APP.md |
 | Auto-hiding player chrome, tap to reveal / pause | implemented in AGENTS-APP.md |
 | Mute default with persistent mute state (silent-first autoplay convention) | implemented in AGENTS-APP.md |
+| **Inline grid autoplay — muted+looped playback in the 1-column feed tile** (TikTok grid/Shorts convention), tap-through to the full player | **SPEC'D 2026-10-02** in AGENTS-PLAYER.md "Inline feed autoplay" (not built) — scroll-takeover variant (scroll gesture morphs the grid into the swipe player) considered and **rejected** (gesture hijack, back-stack ambiguity, no site/mainstream precedent) |
 | Auto-advance on video end + loop-off toggle (TikTok autoplay) | implemented in AGENTS-APP.md |
 | Instagram "New posts" scroll-top + refresh pill, pull-to-refresh | implemented in AGENTS-APP.md |
 | Bottom bar ≤5 items, everything else as in-Home chips (both apps' nav discipline) | implemented in AGENTS-APP.md |

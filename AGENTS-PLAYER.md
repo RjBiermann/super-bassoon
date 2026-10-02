@@ -22,6 +22,9 @@ Media3/ExoPlayer + SimpleCache (cache-first rules formerly PLAN.md §5).
 ## Playback
 - Resume positions read/write `watch_history` (Room) — feed "Continue Watching" and "Surprise me" exclusion.
 - Data-saver toggle: prefer SD stream when on.
+- **Inline feed autoplay** (1-column mobile feed, spec'd 2026-10-02, NOT built): see
+  the "Inline feed autoplay" section above — one shared player, muted+looped
+  (`REPEAT_MODE_ONE`), no watch_history writes, data-saver forces off.
 - **Video fit:** user setting Fit / Crop / Stretch →
   `PlayerView.resizeMode` = `RESIZE_MODE_FIT` / `RESIZE_MODE_ZOOM` / `RESIZE_MODE_FILL`
   (default Fit). One shared DataStore pref consumed by both `PlayerScreen.kt` (mobile,
@@ -37,6 +40,32 @@ Media3/ExoPlayer + SimpleCache (cache-first rules formerly PLAN.md §5).
   covered by `StreamUrlTest` (:core:model). Toggle UI intentionally deferred to the
   Phase 7 settings screen.
 - "Continue Watching" is a TV row (AGENTS.md shell-agnostic rule); mobile has no such row.
+
+## Inline feed autoplay (SPEC'D 2026-10-02 — doc only, not built)
+When the feed grid is **1-column** (`LayoutHint.gridColumns == 1`, compact phone),
+the tile settled in view plays **inline: muted + looped**, tapping it opens the
+existing PlayerScreen. Decision recorded after weighing vs a scroll-gesture
+takeover into the swipe player — takeover rejected (hijacks a browsing gesture,
+back-stack ambiguity, no mainstream or site precedent).
+- **Player:** ONE shared `GiffyPlayer` (existing `GiffyPlayerFactory`/SimpleCache)
+  attaches to the first gif ≥50% visible after ~150ms settle (skip hover-bys);
+  detaches past 100% out of view. No per-tile instances. Threshold = calibration
+  knob, tune once live.
+- **Loop:** `REPEAT_MODE_ONE` (simpler than the ended-listener route — inline
+  never auto-swipes, so no auto-swipe interaction).
+- **Tap → `onOpenPlayer(index)`** as today; inline view is a preview, not a
+  feature-complete player (controls/sound/like/speed/all live in PlayerScreen).
+- **Watch history: inline plays write NOTHING** — Continue Watching would fill
+  with 2-second drive-bys; sampling stays solely in PlayerScreen.
+- **Data saver forces inline off** (static poster), same rule the player uses.
+- **Rate-limit invariant:** one stream fetch per settled tile, no extra calls;
+  `preloadNeighbors` only when scroll stops, never mid-fling.
+- **Gating:** 2/3-col grids keep static posters (inline players in masonry =
+  scroll-perf + data disaster). New app-only pref "Autoplay in feed"
+  (wording per AGENTS-APP.md app-only table), default on in 1-col.
+- **Open before build:** live-site check — does the upstream site itself
+  autoplay inline in its 1-col feed? (AGENTS.md verify-against-live rule.) If
+  yes, mirror its threshold/sound behavior; if no, this stays app-only wording.
 
 ## TV player (Phase 6, verified on TV36 emulator 2026-09)
 - D-pad: down/right = next gif, up/left = previous, BACK = exit (BackHandler in Root).

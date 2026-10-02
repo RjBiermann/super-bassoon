@@ -21,20 +21,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
-import com.rjbiermann.giffyviewer.core.network.GifsApi
 import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
 import com.rjbiermann.giffyviewer.core.ui.GiffyScaffold
-import kotlinx.coroutines.launch
 
 /**
  * Niche About page (PLAN §7 — site niche anatomy verified 2026-10-01):
@@ -50,17 +44,14 @@ fun NicheAboutScreen(
     onBack: () -> Unit,
     onOpenCreator: (String) -> Unit,
     onOpenNiche: (FeedSource.Niche) -> Unit,
-    api: GifsApi,
+    viewModel: NicheAboutViewModel,
     joinViewModel: NicheJoinViewModel,
 ) {
-    var detail by remember { mutableStateOf<com.rjbiermann.giffyviewer.core.network.NicheDetail?>(null) }
-    var topCreators by remember { mutableStateOf<List<com.rjbiermann.giffyviewer.core.network.CreatorSearchItemDto>>(emptyList()) }
-    var related by remember { mutableStateOf<List<com.rjbiermann.giffyviewer.core.network.FollowedNicheDto>>(emptyList()) }
-    // Audit: failures must surface — detail failure = full-screen error + retry;
-    // the two section fetches degrade to empty sections.
-    var detailFailed by remember { mutableStateOf(false) }
+    val detail by viewModel.detail.collectAsStateWithLifecycle()
+    val topCreators by viewModel.topCreators.collectAsStateWithLifecycle()
+    val related by viewModel.related.collectAsStateWithLifecycle()
+    val detailFailed by viewModel.detailFailed.collectAsStateWithLifecycle()
     val joined by joinViewModel.joined.collectAsStateWithLifecycle(initialValue = emptySet())
-    val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
     fun share() {
@@ -72,20 +63,9 @@ fun NicheAboutScreen(
         context.startActivity(android.content.Intent.createChooser(intent, "Share $nicheName"))
     }
 
-    fun loadAbout() {
-        scope.launch {
-            detailFailed = false
-            runCatching { api.nicheDetail(nicheId) }
-                .onSuccess { detail = it.niche }
-                .onFailure { if (detail == null) detailFailed = true }
-            runCatching { api.nicheTopCreators(nicheId) }.onSuccess { topCreators = it.creators }
-            runCatching { api.nicheRelated(nicheId) }.onSuccess { related = it.niches }
-        }
-    }
-
     LaunchedEffect(nicheId) {
         joinViewModel.refresh()
-        loadAbout()
+        viewModel.load(nicheId)
     }
 
     GiffyScaffold(
@@ -104,7 +84,7 @@ fun NicheAboutScreen(
                 modifier = Modifier.fillMaxSize().padding(padding),
             )
             androidx.compose.material3.TextButton(
-                onClick = { loadAbout() },
+                onClick = { viewModel.load(nicheId) },
                 modifier = Modifier.padding(16.dp),
             ) { Text("Retry") }
             return@GiffyScaffold

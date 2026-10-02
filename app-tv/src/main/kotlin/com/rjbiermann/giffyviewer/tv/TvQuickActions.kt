@@ -36,6 +36,7 @@ import com.rjbiermann.giffyviewer.core.ui.giffyFocus
 import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
 import com.rjbiermann.giffyviewer.feature.feed.customRefSummary
 import com.rjbiermann.giffyviewer.feature.feed.gifFeedRefs
+import com.rjbiermann.giffyviewer.feature.feed.orderNichesByTagMatch
 import androidx.compose.material3.Surface as M3Surface
 
 /** Player-only panel rows (mobile overflow parity): Like · Mute · Speed · Auto-swipe. */
@@ -418,9 +419,7 @@ private fun TvAddToNicheDialog(
     onAdd: (nicheId: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val gifTags = gif.tags.map { it.lowercase().trim() }.toSet()
-    val matching = niches.filter { n -> n.tags.any { it.lowercase().trim() in gifTags } }
-    val ordered = (matching + (niches - matching.toSet())).take(8)
+    val ordered = orderNichesByTagMatch(gif.tags, niches)
     Dialog(onDismissRequest = onDismiss) {
         M3Surface(
             shape = MaterialTheme.shapes.medium,
@@ -437,7 +436,7 @@ private fun TvAddToNicheDialog(
                 if (ordered.isEmpty()) {
                     Text("No joined niches — join niches to add content to them.")
                 } else {
-                    ordered.forEach { n ->
+                    ordered.take(8).forEach { n ->
                         QuickAction(
                             text = n.name ?: n.id,
                             first = if (n === ordered.first()) first else null,

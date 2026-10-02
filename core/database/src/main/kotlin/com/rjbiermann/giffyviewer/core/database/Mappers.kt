@@ -1,6 +1,7 @@
 package com.rjbiermann.giffyviewer.core.database
 
 import com.rjbiermann.giffyviewer.core.model.Gif
+import com.rjbiermann.giffyviewer.core.model.NicheRef
 
 fun GifEntity.toModel(): Gif =
     Gif(
@@ -20,7 +21,7 @@ fun GifEntity.toModel(): Gif =
         sdUrl = sdUrl,
         hdUrl = hdUrl,
         posterUrl = posterUrl,
-        niches = niches,
+        niches = niches.map { NicheRef(id = it, name = nicheNames[it] ?: it) },
         verified = verified,
     )
 
@@ -30,7 +31,8 @@ fun Gif.toEntity(now: Long): GifEntity =
         userName = userName,
         description = description,
         tags = tags,
-        niches = niches,
+        niches = niches.map { it.id },
+        nicheNames = niches.associate { it.id to it.name },
         likes = likes,
         views = views,
         durationSeconds = durationSeconds,

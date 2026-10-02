@@ -191,3 +191,37 @@ When unsure: check the matching AGENTS doc first, then ask. Don't invent endpoin
 - Post-obfuscation release smoke re-run green (R8 + Hosts decode + dead-end fix).
 - Only open gate: 324 (tagged release) — blocked on user adding SIGNING_KEY/
   SIGNING_PASS secrets, then tag v0.2.0.
+
+### Session 2026-10-02 (doc-only — no code landed)
+- Decision recorded: **inline feed autoplay** for the 1-column mobile feed
+  (settled tile plays muted + looped, tap → swipe player). Spec written in
+  AGENTS-PLAYER.md; the scroll-gesture takeover alternative was rejected.
+  Open before build: live-site check whether the upstream 1-col feed autoplays
+  inline (mirrors its threshold/sound behavior if it does).
+
+### Session 2026-10-02 batch 2 (pending-items sweep — code landed)
+Worked the doc'd pending lists again (links audit #5, round-2/3 structure items).
+Compiled + ktlint + detekt + unit tests + lint green on all touched modules.
+- **Links #5 (mobile):** `Gif.niches` carries names (`NicheRef`) — DB v9
+  (`nicheNames` map, MIGRATION_8_9); player cluster niche pills (≤3) tap → niche
+  feed; player tags went plain lime text (no pill). TV equivalent parked (D-pad).
+- **Round-3 #3:** ExploreScreen + NicheAboutScreen on Hilt VMs; MainActivity's
+  standalone `api` injection removed.
+- **Round-3 re-check:** TvHomeViewModel's duplicated pref functions + unused
+  pinnedCreators were dead (quick actions already use the shared FeedViewModel)
+  — deleted.
+- **Picker family (#4), partial:** shared `orderNichesByTagMatch` rule beside
+  `gifFeedRefs` (the verbatim-duplicated tag-matching ordering); `gifFeedRefs`
+  now also packs the gif's own niches (≤3) — add-to-custom-feed on both apps
+  picks niche refs by name. Full dialog merge still parked on the device ring check.
+- **Lint batch:** fixed the pre-existing FlowOperatorInvokedInComposition ×4
+  (PlayerScreen/QuickSheet shuffleSeed chains → remember{}) and
+  StateFlowValueCalledInComposition ×1 (TvPlayerScreen likedIds) — all real
+  recomposition-observation bugs, same fix shape.
+- Collections empty-state copy reworded (add-write shipped 2026-10-01).
+- Still parked/blocked (unchanged, with reasons): Groups→custom-feeds merge
+  (no user ask), AuthSection @username (no verified who-am-I), Followers page
+  (data shape), server search-history sync + server collections (fallbacks),
+  TV Search/Groups/Collections screens + chip-skip traversal (D-pad device
+  work), UX-PATTERNS candidates (user-slice gated), inline feed autoplay
+  (spec'd; live-site check first), player soak passes (emulator).

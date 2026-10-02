@@ -86,7 +86,7 @@ fun CollectionsScreen(
             if (collections.isEmpty()) {
                 item(key = "empty") {
                     Text(
-                        "No collections yet — Create New Collection bundles gifs from your watch page.",
+                        "No collections yet — Create New Collection, then long-press a tile → ⋯ → Add to a Collection.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(16.dp),

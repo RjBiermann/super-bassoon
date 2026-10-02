@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
 import com.rjbiermann.giffyviewer.core.ui.GiffyColors
+import com.rjbiermann.giffyviewer.feature.feed.orderNichesByTagMatch
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
@@ -58,11 +59,14 @@ internal fun QuickBlockSheet(
     var showAddToNiche by remember { mutableStateOf(false) }
     // §8 infinite shuffle player: show the active seed (restore = the same seed
     // re-derives the same global order from the pool).
-    val shuffleSeed by
-        viewModel.source
-            .flatMapLatest { viewModel.feedPrefs(it.baseKey) }
-            .map { it.shuffleSeed }
-            .collectAsState(initial = 0L)
+    // remember: Flow operators must not re-run per recomposition (lint).
+    val shuffleSeedFlow =
+        remember(viewModel.source) {
+            viewModel.source
+                .flatMapLatest { viewModel.feedPrefs(it.baseKey) }
+                .map { it.shuffleSeed }
+        }
+    val shuffleSeed by shuffleSeedFlow.collectAsState(initial = 0L)
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.padding(bottom = 24.dp)) {
             CreatorLabel(
@@ -350,9 +354,7 @@ internal fun AddToNicheDialog(
     onAdd: (nicheId: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val gifTags = gif.tags.map { it.lowercase().trim() }.toSet()
-    val matching = niches.filter { n -> n.tags.any { it.lowercase().trim() in gifTags } }
-    val ordered = matching + (niches - matching.toSet())
+    val ordered = orderNichesByTagMatch(gif.tags, niches)
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Add Content to a Niche") },

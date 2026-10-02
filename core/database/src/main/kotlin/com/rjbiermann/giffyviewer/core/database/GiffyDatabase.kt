@@ -25,10 +25,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         NicheGroupEntity::class,
         CustomFeedEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
-@TypeConverters(ListConverters::class)
+@TypeConverters(ListConverters::class, MapStringStringConverter::class)
 abstract class GiffyDatabase : RoomDatabase() {
     abstract fun gifDao(): GifDao
 
@@ -111,6 +111,15 @@ abstract class GiffyDatabase : RoomDatabase() {
                             "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
                             "`name` TEXT NOT NULL, `sourcesJson` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)",
                     )
+                }
+            }
+
+        /** v9: niche names beside niche ids (picker + player chip labels — the
+         *  payload already carries the names; the ids column keeps its format). */
+        val MIGRATION_8_9 =
+            object : Migration(8, 9) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE `gifs` ADD COLUMN `nicheNames` TEXT NOT NULL DEFAULT '{}'")
                 }
             }
 

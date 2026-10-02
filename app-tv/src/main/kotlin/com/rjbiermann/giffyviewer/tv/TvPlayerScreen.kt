@@ -314,12 +314,14 @@ fun TvPlayerScreen(
         onDispose { player.removeListener(listener) }
     }
     actionsFor?.let { sheetGif ->
+        // collectAsStateWithLifecycle: .value in composition never observes changes.
+        val likedIds by feedViewModel.likedIds.collectAsStateWithLifecycle(emptySet())
         TvQuickActionsDialog(
             gif = sheetGif,
             feedViewModel = feedViewModel,
             playerActions =
                 TvPlayerActions(
-                    liked = sheetGif.id in feedViewModel.likedIds.value,
+                    liked = sheetGif.id in likedIds,
                     muted = muted,
                     speed = speed,
                     hasAudio = sheetGif.hasAudio,

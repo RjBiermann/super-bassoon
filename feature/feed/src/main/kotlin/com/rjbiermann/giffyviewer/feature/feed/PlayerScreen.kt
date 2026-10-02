@@ -135,11 +135,14 @@ fun PlayerScreen(
 ) {
     val items = viewModel.gifs.collectAsLazyPagingItems()
     // §8 shuffle player: read this feed's shuffle seed (random end-of-pool jumps).
-    val shuffleSeed by
-        viewModel.source
-            .flatMapLatest { viewModel.feedPrefs(it.baseKey) }
-            .map { it.shuffleSeed }
-            .collectAsStateWithLifecycle(0L)
+    // remember: Flow operators must not re-run per recomposition (lint).
+    val shuffleSeedFlow =
+        remember(viewModel.source) {
+            viewModel.source
+                .flatMapLatest { viewModel.feedPrefs(it.baseKey) }
+                .map { it.shuffleSeed }
+        }
+    val shuffleSeed by shuffleSeedFlow.collectAsStateWithLifecycle(0L)
     val pagerState =
         rememberPagerState(initialPage = startIndex.coerceAtLeast(0)) {
             items.itemCount.coerceAtLeast(1)
@@ -403,6 +406,10 @@ fun PlayerScreen(
                         viewModel.open(FeedSource.Search(query = tag))
                         onBack()
                     },
+                    onOpenNiche = { id, name ->
+                        viewModel.open(FeedSource.Niche(id = id, name = name))
+                        onBack()
+                    },
                 )
             }
         }
@@ -463,6 +470,8 @@ private fun PlayerPage(
     /** Links audit: cluster @user / tag chips navigate (player closes). */
     onOpenCreator: () -> Unit = {},
     onOpenTag: (String) -> Unit = {},
+    /** Links audit #5: cluster niche pills navigate to the niche feed. */
+    onOpenNiche: (id: String, name: String) -> Unit = { _, _ -> },
 ) {
     // React to the shared player's media swaps (attach gating below).
     val playingId by player.currentGifId.collectAsStateWithLifecycle()
@@ -681,7 +690,7 @@ private fun PlayerPage(
                     )
                     Spacer(Modifier.height(6.dp))
                 }
-                if (gif.tags.isNotEmpty()) {
+                if (gif.tags.isNotEmpty() || gif.niches.isNotEmpty()) {
                     Row(
                         modifier =
                             Modifier
@@ -689,7 +698,24 @@ private fun PlayerPage(
                                 .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        // Links audit #2: tags are FeedSource.Search(query = tag).
+                        // Niche chips first (curated, bigger destination); names come
+                        // with the payload (NicheRef) — fall back to the id.
+                        gif.niches.take(3).forEach { niche ->
+                            Text(
+                                text = niche.name,
+                                color = GiffyColors.Lime,
+                                style = MaterialTheme.typography.labelMedium,
+                                modifier =
+                                    Modifier
+                                        .clickable {
+                                            onOpenNiche(niche.id, niche.name)
+                                        }.background(Color.Transparent, RoundedCornerShape(999.dp))
+                                        .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(999.dp))
+                                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                            )
+                        }
+                        // Links audit #2 + style decision 2026-10-02: tags are plain
+                        // lime text (secondary topics); niches keep the pill.
                         gif.tags.take(6).forEach { tag ->
                             Text(
                                 text = tag,
@@ -699,9 +725,7 @@ private fun PlayerPage(
                                     Modifier
                                         .clickable {
                                             onOpenTag(tag)
-                                        }.background(Color.Transparent, RoundedCornerShape(999.dp))
-                                        .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(999.dp))
-                                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                                        },
                             )
                         }
                     }

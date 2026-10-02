@@ -17,6 +17,12 @@ prefs + the normative UI-lingo table below (formerly PLAN.md §3, §7–9).
   derived layout hint passed down (column counts, margins) — no scattered width checks.
   No separate tablet screens or codepaths.
 - Masonry width-derived columns (`Auto`: compact 1 / medium 2 / expanded 3, user-overridable ), Paging 3.
+- **Inline feed autoplay (spec'd 2026-10-02, NOT built):** in 1-column mode the
+  settled tile plays inline, muted + looped; tap opens the swipe player as
+  today. Full policy lives in AGENTS-PLAYER.md ("Inline feed autoplay") —
+  shared-player, no-history-write, data-saver-off rules are normative there.
+  Settings surface: app-only pref **"Autoplay in feed"** (the "autoplay
+  toggle" wording already reserved in the app-only label list above).
 - TikTok-style swipe player.
 - Long-press (tile or player) quick sheet: four panes per the restructure spec
   (BUILT 2026-10-01, live-verified both apps): main = Favorite · Pin · Add to… ·
@@ -261,32 +267,16 @@ architecture.
    + dismiss.
 4. **FollowingScreen niche rows** carry no About entry and TV has no NicheAbout at all
    (existing "Minor" gap) — link exists, depth missing; unchanged here.
-5. **Gif niches → niche feed (round 2 of this audit, 2026-10-02)** — gif payloads DO carry
-   niches, but no surface renders them: the player cluster shows description + tags + @user
-   only; tiles/TV cards show @user; grep for `gif.niches` UI usage returns nothing. Twist
-   discovered in `GifDtos.kt`: the payload maps niches as objects `{id, name}` (some endpoints
-   plain slugs — `NicheListSerializer` normalizes both), but `toModel()` keeps
-   **ids only** (`niches = niches.mapNotNull { it.id }`) and **discards the name** — so a
-   niche chip in the player couldn't even be labeled today. Slice shape if picked:
-   (a) model change — keep the name alongside the id (a small `NicheRef(id, name)` on `Gif`;
-   VERIFIED not schema-free: Room's `gifs.niches` column stores the id list via a
-   List<String> TypeConverter (Entities.kt) — carrying names is a `gifs` schema change →
-   explicit Migration per the repo rule, OR an id→name cache keyed off `v2/niches` reads
-   (heavier, stale-prone — the payload already carries the name, migration is the honest path);
-   (b) style (user decision 2026-10-02, replaces the Info-cyan idea): **tags become simple
-   text links** — plain lime text, no pill border (they're numerous secondary topics; the
-   current outline pill goes), tap → tag feed;
-   **niches take the tag's existing pill style** (lime outlined chip) — one visual language,
-   no new color tokens, and the stronger affordance marks the bigger destination (a curated
-   niche feed vs a topic filter). Cap niches to ~3 to match the quick-sheet tag cap unless
-   the live watch-page check shows a different count;
-   (c) tap targets → `FeedSource.Niche(id, name)` / `FeedSource.Search(query = tag)` — same
-   open-callback plumbing as the @user link slice (mobile player needs the callback; TV needs
-   `onOpenCreator`-style parameter);
-   (d) LIVE-CHECK FIRST: the lingo sweep recorded watch-page sections "Related Tags",
-   "Suggested Niches"/"Suggested Creators" — it did NOT record a "this video's niches"
-   section. Verify on the live watch page whether the gif's own niches are listed and what
-   they're called before adopting any label; do not invent wording.
+5. **Gif niches → niche feed — MOBILE BUILT 2026-10-02 (slice a–c; the live-check
+   caveat did not block it):** the model keeps the payload's name (`Gif.niches:
+   List<NicheRef>` — NicheRef(id, name); Room `gifs` gained a `nicheNames` map via
+   MIGRATION_8_9, ids column untouched, round-trips through cache). The mobile player
+   cluster renders up to 3 niche pills BEFORE the tags (labels = payload name, id
+   fallback for pre-v9 cache rows), tap → `FeedSource.Niche(id, name)` + player close;
+   tags went plain lime text (style decision (b)) — no section heading is rendered, so
+   no new wording was invented (the (d) watch-page label check still applies IF a
+   labelled section is ever added). TV equivalent still needs the `onOpenCreator`-style
+   callback param on TvPlayerScreen — D-pad device work, stays parked.
 6. **Possible gap to verify live:** the site watch page's "Suggested Niches / Suggested
    Creators" + related "you might like" strip have no in-app counterpart (the swipe player
    itself serves adjacent discovery; TV player has nothing). Verify against the live watch
@@ -322,9 +312,9 @@ only if its shell grows (its leanback back behavior is already correct).
   tab; no niches/suggest. All eight round-1 parity gaps stand (Report · Add to a Collection ·
   Add to a Niche · Followers page · Tags browse tab · Niches suggest · server search history ·
   creator stats header).
-- Collections empty-state copy misleads: "Create New Collection bundles gifs from your watch
-  page" — the app cannot ADD gifs to a collection at all (that's the parity gap). Reword until
-  the add-write ships.
+- Collections empty-state copy — FIXED 2026-10-02 (the add-write shipped
+  2026-10-01): now points at the real path ("Create New Collection, then
+  long-press a tile → ⋯ → Add to a Collection").
 - TV parity list correction: **§8 shuffle on TV is CLOSED** — TvSourceFeedScreen renders the
   shared FeedFilterDialog (Shuffle/Off/Reshuffle chips) over the same feedprefs blob +
   shared FeedRepository.paging path. The "TV has the Filter chip only" line above was stale;
@@ -492,16 +482,14 @@ Ranked by lines removed per risk, smallest diffs first. Threshold rule from roun
    bar is a bare TopAppBar inside AnimatedVisibility — not a Scaffold site, left alone.
    "Back"→"back" copy drift (CustomFeeds) fixed as the side effect.
 
-3. **List-fetch state machine: the round-2 n=4 threshold is now CROSSED.**
-   Round 2 said "until a fourth list screen lands, three flat copies beat one
-   abstraction." Four have landed with three different idioms: NichesViewModel
-   (StateFlow machine, shared m+TV), FollowingViewModel (copy of it), ExploreScreen
-   (remember-vars machine), NicheAboutScreen (three inline `runCatching{}.onSuccess{}`s).
-   One shape — paged fetch + loadFailed + Retry + endReached — four divergent
-   implementations; Explore's dead-flag bug happened precisely because of this drift.
-   Cheapest convergence: make ExploreScreen + NicheAboutScreen consume a VM like the
-   other two (idiom consistency first, ~zero risk), then optionally extract the shared
-   `loadFailed`/paging skeleton once all four speak the same dialect.
+3. **List-fetch state machine: the round-2 n=4 threshold is now CROSSED — CONVERGED 2026-10-02.**
+   ExploreScreen + NicheAboutScreen converted to Hilt VMs (`ExploreViewModel`,
+   `NicheAboutViewModel`) with the same StateFlow machine as Niches/Following; MainActivity's
+   standalone `api` injection died with the `api=` composable params. All four list screens
+   now speak one dialect — the loadFailed/Retry shape is consistent, the drift class (a
+   remember-vars machine silently losing its error branch) is closed. A further shared
+   skeleton extraction stays parked (four flat VMs beat one abstraction until real reuse
+   shows).
 
 4. **Picker-dialog family: six implementations of one dialog shape.**
    Add-to-Custom-Feed, Add-to-a-Collection, Add-to-a-Niche — each × mobile + TV = 6 near-
@@ -541,9 +529,11 @@ Scanned-and-rejected (documented so the next audit doesn't re-derive them):
   PlayerPage/PlayerControls/ActionRail remain that player's own units.
 - **PlayerControls 24dp slot vs TvPlayerScreen always-on 3dp line** — different behavior
   contracts (auto-hide vs 10-foot always-visible), not duplication.
-- **FeedViewModel vs TvHomeViewModel block/favorite creator functions** — TvHomeViewModel
-  duplicates toggleFavorite/blockCreator (~25 lines); REAL candidate but blocked on the
-  concurrent Add-to writes landing in the same VM — re-check after that settles.
+- **FeedViewModel vs TvHomeViewModel block/favorite creator functions** — RESOLVED
+  2026-10-02 (re-check ran; the Add-to writes had settled in FeedViewModel): the TV
+  quick actions already route through a fresh shared FeedViewModel, so TvHomeViewModel's
+  toggleFavoriteCreator/blockCreator/creatorState/togglePinnedCreator/pinnedCreators
+  were dead — deleted (~35 lines), not merged.
 - **Two time formatters** (formatRemaining vs seekBy's fmt) — 6 lines each, different
   shapes (remaining vs position); sharing saves nothing real.
 

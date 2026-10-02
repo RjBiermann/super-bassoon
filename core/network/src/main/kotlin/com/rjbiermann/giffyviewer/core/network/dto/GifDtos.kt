@@ -1,6 +1,7 @@
 package com.rjbiermann.giffyviewer.core.network.dto
 
 import com.rjbiermann.giffyviewer.core.model.Gif
+import com.rjbiermann.giffyviewer.core.model.NicheRef
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
@@ -126,8 +127,10 @@ fun GifDtoShell.toModel(): Gif =
         sdUrl = urls?.sd,
         hdUrl = urls?.hd,
         posterUrl = urls?.poster,
-        niches = niches.mapNotNull { it.id },
+        niches = niches.mapNotNull { it.toNicheRef() },
         verified = verified,
     )
 
 fun GifsPageDto.toModels(): List<Gif> = gifs.map { it.toModel() }
+
+private fun NicheRefDto.toNicheRef(): NicheRef? = id?.let { id -> NicheRef(id, name ?: id) }

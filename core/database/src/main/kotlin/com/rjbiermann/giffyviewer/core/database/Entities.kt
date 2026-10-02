@@ -11,6 +11,8 @@ data class GifEntity(
     val description: String?,
     val tags: List<String>,
     val niches: List<String>,
+    /** Niche names keyed by id (payload carries them; Room column, DB v9). */
+    val nicheNames: Map<String, String> = emptyMap(),
     val likes: Long,
     val views: Long,
     val durationSeconds: Double,

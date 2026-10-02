@@ -1,5 +1,12 @@
 package com.rjbiermann.giffyviewer.core.model
 
+/** Niche membership on a gif: id for routing, name for the chip label
+ *  (payload carries both; Room stores ids + a name map — DB v9). */
+data class NicheRef(
+    val id: String,
+    val name: String,
+)
+
 /** A single upstream gif — everything the UI needs, nothing it doesn't. */
 data class Gif(
     val id: String,
@@ -19,7 +26,7 @@ data class Gif(
     val sdUrl: String?,
     val hdUrl: String?,
     val posterUrl: String?,
-    val niches: List<String>,
+    val niches: List<NicheRef>,
     /** Creator's verified badge (gif payload top-level `verified`, live 2026-10). */
     val verified: Boolean = false,
 )

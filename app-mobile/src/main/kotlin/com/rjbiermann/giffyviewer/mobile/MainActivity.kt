@@ -53,8 +53,6 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var db: GiffyDatabase
 
-    @Inject lateinit var api: com.rjbiermann.giffyviewer.core.network.GifsApi
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -154,7 +152,7 @@ class MainActivity : ComponentActivity() {
                     showExplore = false
                     feedViewModel.open(FeedSource.Creator(username = username))
                 },
-                api = api,
+                viewModel = hiltViewModel(),
             )
         } else if (confirmed && showCollections) {
             val collectionsVm: CollectionsViewModel = hiltViewModel()
@@ -178,7 +176,7 @@ class MainActivity : ComponentActivity() {
                     aboutNiche = null
                     aboutFeedVm.open(niche)
                 },
-                api = api,
+                viewModel = hiltViewModel(),
                 joinViewModel = joinVm,
             )
         } else if (confirmed && showFollowing) {

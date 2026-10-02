@@ -120,16 +120,32 @@ public fun parseNicheRef(ref: String): Pair<String, String>? =
         .takeIf { it.size == 2 }
         ?.let { (id, name) -> id to name }
 
-/** Refs a gif contributes to a custom feed (niche + creator + first 3 tags);
- *  builder refs are "creator:<username>" / "tag:<text>" / "niche:<id>|<name>". */
+/** Refs a gif contributes to a custom feed (its niches + creator + first 3 tags);
+ *  builder refs are "creator:<username>" / "tag:<text>" / "niche:<id>|<name>".
+ *  Niche caps: the gif's own niches ≤3 (quick-sheet tag cap), optionally one
+ *  extra for the open feed itself. */
 public fun gifFeedRefs(
     gif: Gif,
     nicheRef: String? = null,
 ): List<String> =
     listOfNotNull(nicheRef, "creator:${gif.userName.lowercase().trim()}") +
+        gif.niches.take(3).map { packNicheRef(it.id, it.name, prefixed = true) } +
         gif.tags.take(3).map { "tag:${it.lowercase().trim()}" }
 
 internal fun parseCustomRefs(sourcesJson: String): List<String> = sourcesJson.split(',').filter { it.isNotBlank() }
+
+/** Pick a joined niche (site popup parity: joined niches matching the gif's
+ *  tags first) — shared rule so both dialogs (mobile M3, TV giffyFocus) agree.
+ *  Extracting the dialogs themselves needs the TV ring check the audit demands;
+ *  the ordering rule is the part that was verbatim-duplicated. */
+public fun orderNichesByTagMatch(
+    gifTags: List<String>,
+    niches: List<com.rjbiermann.giffyviewer.core.network.FollowedNicheDto>,
+): List<com.rjbiermann.giffyviewer.core.network.FollowedNicheDto> {
+    val gifTags = gifTags.map { it.lowercase().trim() }.toSet()
+    val matching = niches.filter { n -> n.tags.any { it.lowercase().trim() in gifTags } }
+    return matching + (niches - matching.toSet())
+}
 
 /** Custom feed builder (PLAN §7): named blend of creators + tags (+ groups expanded). */
 @OptIn(ExperimentalMaterial3Api::class)
