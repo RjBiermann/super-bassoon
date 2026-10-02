@@ -36,6 +36,7 @@ internal class FakeApi : GifsApi {
         order: String,
         count: Int,
         page: Int,
+        type: String?,
     ): GifsPageDto {
         searchCalls++
         searchArgs.add(searchText to page)
@@ -57,6 +58,22 @@ internal class FakeApi : GifsApi {
         page: Int,
         order: String?,
     ): GifsPageDto = throw NotImplementedError()
+
+    override suspend fun creatorSearchPreviews(
+        query: String,
+        order: String,
+        count: Int,
+        page: Int,
+    ) = throw NotImplementedError()
+
+    override suspend fun nicheSearchPreviews(
+        query: String,
+        order: String,
+        count: Int,
+        page: Int,
+    ) = throw NotImplementedError()
+
+    override suspend fun tagsMatch(query: String): List<String> = throw NotImplementedError()
 
     override suspend fun niches(
         count: Int,

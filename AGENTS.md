@@ -295,3 +295,194 @@ Compiled + ktlint + detekt + unit tests + lint green on all touched modules.
   search-history sync + server collections + niches suggest (spec'd-not-scheduled
   fallbacks), UX-PATTERNS candidates (user-slice gated), player soak passes
   (emulator fragility), Gate 324 (blocked on SIGNING_KEY secrets).
+
+### Session 2026-10-02 batch 6 (doc-only — full-scope search spec'd; live-verified, no code landed)
+- **Full-scope search SPEC'D (user ask; build pending)** — the site's search results
+  page is `/search/<scope>?query=&order=score` with tabs **GIFs · Images · Creators ·
+  Niches** (Playwright-verified live; `/search/tags` 404s home — tags stay the tag-feed
+  path). Scope endpoints all 200-verified with the anon temp token: `type=g`/`type=i` on
+  the existing gifs/search (Images = same endpoint, stills: `type=2`, `duration=null`,
+  urls are jpgs), `v2/creators/search/previews` + `v2/niches/search/previews` (both
+  `order=best_match&count=30&query=`, anonymous OK), `v1/tags/match` → tag-name array.
+  Spec in AGENTS-APP.md "Full-scope search"; endpoint row shapes in AGENTS-NETWORK.md.
+  Search submit also `POST`s `/v2/search/user-history` (202) — app stays local-history,
+  server sync unchanged (fallback).
+- Stale notes corrected: parity-audit search scope list (site now GIFs/Images/Creators/
+  Niches); the "Tags browse tab = 4th TAB on the search results page" note (today's live
+  tablist has no Tags results tab); TV parity-gap search line (mobile search is multi-type).
+
+### Session 2026-10-02 batch 7 (doc-only — android skills installed, note of useful ones)
+- Installed https://github.com/android/skills agent skills to `~/.pi/agent/skills/`
+  (plus project-local `.agents/skills/`). Doc-only; no code changes.
+- **Useful for Giffy Viewer:**
+  - `leanback-to-compose-tv-migration` — reference for :app-tv Compose-TV patterns;
+    app already migrated but use for any new TV screens (TV Search/Groups/Collections
+    are parked D-pad work).
+  - `r8-analyzer` — pairs with the post-obfuscation release smoke; use before changing
+    proguard/R8 keep rules in the release build.
+  - `android-profiler` — adb performance/heap/trace profiling when player soak memory
+    or startup questions come up.
+  - `android-permissions-security` / `android-intent-security` — manifest + IPC audit
+    for release hardening.
+  - `edge-to-edge` / `adaptive` — insets + window-size classes, relevant to the
+    responsive-first mobile shell.
+  - `navigation-3` / `navigation-event` — only if navigation is ever migrated; not a
+    current ask (app uses its own nav).
+  - `testing-setup` — if unit-coverage is ever expanded beyond the one-test rule.
+- **Not relevant / skip:** ml-kit-genai-prompt-api (LLM on-device — app rule: no such
+  feature), appfunctions (exposes app to agents; privacy surface — skip), engage-sdk,
+  play-billing, media3-cast (no cast; upstream has none verified), camerax, wear,
+  restore-credentials, verified-email, display-glasses-Jetpack-Compose-Glimmer (XR),
+  styles (custom design system is borrowed upstream palette; one-off),
+  agp-9-upgrade (use only when AGP upgrade actually scheduled),
+  migrate-xml-views-to-jetpack-compose (no XML views),
+  edge-to-edge skill's migration part runs once, not recurring.
+
+### Session 2026-10-02 batch 8 (doc-only — permissions/IPC security audit via android-permissions-security + android-intent-security skills; no code changes)
+- Ran the two installed security skills against both app modules' source + merged
+  release manifests. Result: **clean — no findings, zero remediation owed.**
+- Audited per the skill playbooks:
+  - **Permissions:** only `INTERNET` declared in source; merged release adds
+    `ACCESS_NETWORK_STATE`, `WAKE_LOCK` (Coil/OkHttp/AndroidX),
+    `${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` (signature-level,
+    declared by an AndroidX lib per the intent-security skill's own minSdk<33
+    requirement) — all least-privilege, nothing dangerous, no runtime
+    permission flows to audit (app uses none).
+  - **Components:** no services/receivers/providers of our own; library-injected
+    ones all `exported="false"` except androidx.profileinstaller's `ProfileInstallReceiver`
+    (exported, but guarded by system-only `android.permission.DUMP` — safe by design).
+    Launcher activities `exported="true"` — required, correct. No VIEW/BROWSABLE
+    intent filters (share-only rule holds: no deep links).
+  - **Intents:** the only outbound intents are two `ACTION_SEND` choosers
+    (PlayerScreen.shareGif, NicheAboutScreen.share) with app-controlled text
+    extras — no untrusted-intent launching, no nested-Intent extras, no
+    PendingIntents, no sendBroadcast, no registerReceiver of our own.
+  - **WebView (auth):** JS + DOM storage enabled (needed for the OAuth SPA);
+    navigation guarded — `extractCode` only reacts to URLs starting with the
+    exact `OAUTH_REDIRECT_URI` (site root) and matching the PKCE `state`
+    (SecureRandom-generated); no `allowFileAccess`/`setSavePassword` enabled;
+    cookies wiped on sign-out (`removeAllCookies` + `removeSessionCookies`).
+  - **Storage/backup:** `allowBackup="false"` on both apps (tokens never leave
+    via backup); EncryptedSharedPreferences under `giffy_auth`.
+  - **Network cleartext:** no `usesCleartextTraffic`, no network-security-config,
+    no `http://` literals — the only gap is theoretical (platform blocks cleartext
+    by default only on API 28+; minSdk 24 mobile on API 24–27 would default-allow
+    it, but the app only ever builds HTTPS URLs from `Hosts`, so nothing hits http).
+    Optional hardening if ever wanted: explicit network-security-config with
+    `cleartextTrafficPermitted="false"` — doc'd, not built (YAGNI; no current path).
+- Conclusion: permission/IPC attack surface is minimal by design (viewer-only, no
+  exported components beyond launchers, no deep links). Nothing to fix; re-run
+  this audit if a new component, permission, or intent path is ever added.
+
+### Session 2026-10-02 batch 9 (doc-only — R8 config audit via r8-analyzer skill, Path A; no code changes)
+- Ran `:app-mobile:analyzeReleaseR8Config` (AGP 9.4.1 ≥ 9.3 → standalone task),
+  decoded the embedded report .pb directly (skill's convert/analyze scripts not
+  shipped with the install; schema lives inside the HTML, decoded via grpcio-tools).
+  Findings documented as the full skill-format report in the chat log of this
+  session; summary here:
+- **Configuration correct:** minify + shrinkResources + proguard-android-optimize,
+  R8 Full Mode on (no `enableR8.fullMode=false`), no global -dont* rules.
+- **Scores:** ~98.2% of classes/fields/methods free for shrinking/optimize/obfuscate
+  (14,736 classes / 33,234 fields / 80,430 methods live). Healthy baseline.
+- **One refinement candidate (doc'd, not built):** `-keep,includedescriptorclasses
+  class com.rjbiermann.giffyviewer.core.network.dto.** { *; }` — 257 kept items
+  (27c/51f/179m), blocks shrink+optimize+obfuscate, and is a hand-rolled addition
+  beyond the official kotlinx-serialization rules already present (serializer/Companion
+  keeps). Likely removable or narrowable. GATED: the release smoke test must be
+  re-run green after any change (the rule file's own comment + AGENTS gate).
+- All other project rules (7 total per app) are the official kotlinx-serialization
+  + Retrofit sets — keep as-is. Subsumed/identical overlaps are library-bundled only.
+- Biggest external keep: tink-android 246 items (library rules, not actionable).
+- Baseline recorded for future comparison: Optimization/Obfuscation/Shrinking 98.2%.
+
+### Session 2026-10-02 batch 10 (doc-only — edge-to-edge/insets audit via edge-to-edge skill; no code changes)
+- Static audit per the skill's playbook (both activities, both apps). Prereqs met:
+  Compose + targetSdk 35; `enableEdgeToEdge()` before `setContent` in
+  MainActivity + TvMainActivity ✓.
+- **Two findings (doc'd, not built — device-verify before fixing):**
+  1. **Double navigation-bar padding on 5 screens** — Explore, Following,
+     Collections, Groups, Niches apply `.padding(padding)` (GiffyScaffold's
+     innerPadding, which already includes the nav-bar inset — M3 Scaffold
+     contentWindowInsets defaults to systemBars) and THEN
+     `.windowInsetsPadding(WindowInsets.navigationBars)` → the bottom gap is
+     ~2× the nav-bar height. Fix shape: drop the extra
+     `windowInsetsPadding(WindowInsets.navigationBars)` on those 5 lists.
+     Cheap, but verify on device (Medium_Phone gesture nav + 3-button nav)
+     before landing.
+  2. **No `windowSoftInputMode="adjustResize"`** in either manifest, and zero
+     `imePadding`/`WindowInsets.ime` usage app-wide — while inline text fields
+     exist (SearchScreen field, CustomFeedsScreen name field, Settings). The
+     skill MANDATES verify-the-IME for activities with text input; on
+     edge-to-edge targetSdk 35 the IME no longer auto-resizes the window, so
+     the Search field can sit under the keyboard. Fix shape: add
+     adjustResize to both manifests + imePadding where the field needs it,
+     then verify typing on device.
+- **Passes:** inset strategy is one-method-per-surface (Scaffold+TopAppBar
+  preferred idiom via shared GiffyScaffold; SearchScreen is scaffold-less with
+  manual insets — no double padding there). PlayerScreen's immersive
+  hide/show via WindowInsetsController + `windowInsetsPadding(navigationBars)`
+  is correct (padding collapses to 0 while bars are hidden). Dark-only theme
+  + enableEdgeToEdge keeps light system-bar icons — contrast OK.
+- Both fixes are small manifest/composable slices; parked as device-work
+  candidates alongside the other UI-verify items (no emulator in this session).
+
+### Session 2026-10-02 batch 11 (doc-only — adaptive/responsive audit via adaptive skill; no code changes)
+- Audited the responsive-first rule (AGENTS root) against the skill's adaptive
+  playbook. Prereq check: Compose-only ✓; Navigation 3 ✗ (app uses its own
+  saveable route-stack + BackHandler — deliberate, spec'd, not a gap to fix
+  without a user ask; skill's N3 suggestion noted-and-declined).
+- **Passes:**
+  - One adaptive seam exactly as the skill prescribes: `LayoutHint` —
+    `calculateWindowSizeClass` once in MainActivity → gridColumns ladder
+    (Compact 1 / Medium 2 / Expanded 3) + user override + 16/24dp margins;
+    foldable/unfold recomputes like any rotation.
+  - Column-count adaptation (skill Step 4) done on the primary grid
+    (FeedScreen StaggeredGrid Fixed(gridColumns)); autoplay ties to 1-col.
+  - Nav bar adaptivity (Step 2): N/A — no bottom nav exists (single stack +
+    GiffyScaffold top bars); nothing to rail-ify.
+  - Multi-pane (Step 3): N/A by design (media-first single column; TV is its
+    own shell). No hover/pointer work — fine, desktop is a future shell.
+- **Findings (doc'd, not built):**
+  1. `LayoutHint.pageMargin` is computed but never consumed anywhere — only
+     `hint.gridColumns` is read (MainActivity line 253). Dead half of the seam:
+     either delete pageMargin or actually pass it to FeedScreen paddings.
+     Delete unless a screen asks for it (YAGNI).
+  2. Zero `@Preview` annotations / no form-factor verification (skill Step 1:
+     verify UI per form factor). Candidate slice: a minimal FormFactorPreviews
+     (phone + tablet) on FeedScreen only — no framework suite, keeps the
+     one-test rule. Parked.
+  3. Secondary surfaces (Explore/Following/Collections/Niches/Settings) are
+     single full-width LazyColumns — on tablet rows stretch edge to edge with
+     no margin. Cosmetic-only at current usage (creator/group rows); revisit
+     if a tablet user surfaces it. Doc'd, not built.
+- Skill's screenshot-testing tool suggestion: not adopted — GitHub-Releases
+  distribution + one-test rule; previews (item 2) are the lightest sufficient check.
+
+### Session 2026-10-02 batch 9 (pending-items sweep — four pending items closed, one built)
+- **Full-scope search BUILT** (was spec'd batch 6, user-requested): SearchScreen 4-tab
+  TabRow (GIFs · Images · Creators · Niches) on typed query; scope endpoints wired
+  (`search(type=)`, `creators/search/previews`, `niches/search/previews`); scope results
+  VM-cached per (query, scope) with 12-entry cap, rows flow ContentFilter (leak-zero:
+  blocked preview gif drops the row); Images = static 3-up poster strip (no player path);
+  Creators/Niches rows → onOpenCreator/onOpenNiche (MainActivity swap). GIFs tab keeps the
+  existing submit path. `SearchScopeResultsTest` covers cap + niche-row drops. On-device
+  verify pending (phone).
+- **Round-3 #7 TV equivalent BUILT + device-verified (TV36):** TvQuickActions "Add to…"
+  row unconditional + TvAddToFeedDialog empty state; D-pad walk verified end-to-end.
+- **Settings chip-skip traversal CLOSED + device-verified (TV36):** root cause = beam
+  geometry from right-edge focusables past wrap-content chip rows; fix = focusGroup +
+  fillMaxWidth on the 3 chip rows + giffyFocus(interactionSource) per chip; ring verified
+  in zoomed screenshot, click + restore verified.
+- **More ▾ dropdown focus question CLOSED (TV36):** M3 popup rows show a visible lighter
+  focus fill — no giffyFocus needed.
+- **TV player text auto-hide D-pad verify DONE (TV36):** hide after 3s idle / re-reveal on
+  key, both directions via uiautomator dumps.
+- Housekeeping: detekt TooManyFunctions interface/class threshold 37 → 40 (GifsApi grew by
+  design; config comment unchanged). Compile + ktlint + detekt + unit tests green on all
+  touched modules (:core:network/:feature:search/:feature:settings/:feature:feed/:app-tv/:app-mobile).
+- Still parked/blocked (unchanged): Groups→custom-feeds merge (no user ask), Followers
+  page (row shape — no-guess rule), Report (unprobeable), server search-history sync +
+  server collections + niches suggest (spec'd-not-scheduled fallbacks), TV Search/
+  Groups/Collections/custom-feed-mgmt screens (D-pad device work), UX-PATTERNS
+  candidates (user-slice gated), player soak passes (emulator fragility), Gate 324
+  (blocked on SIGNING_KEY secrets).

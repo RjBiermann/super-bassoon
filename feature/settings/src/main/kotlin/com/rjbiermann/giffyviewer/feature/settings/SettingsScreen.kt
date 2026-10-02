@@ -3,6 +3,8 @@ package com.rjbiermann.giffyviewer.feature.settings
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -231,13 +233,28 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            // focusGroup + fillMaxWidth: same chip-skip fix.
+                            modifier =
+                                Modifier
+                                    .focusGroup()
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp),
+                        ) {
                             listOf(1, 2, 3).forEach { n ->
+                                val src = remember { MutableInteractionSource() }
                                 FilterChip(
                                     selected = cols == n,
                                     onClick = { viewModel.setGridColumns(n) },
                                     label = { Text("$n") },
-                                    modifier = Modifier.padding(end = 6.dp),
+                                    interactionSource = src,
+                                    // giffyFocus ring: M3 chips draw nothing on
+                                    // D-pad focus (ring-test lesson, AGENTS-APP).
+                                    modifier =
+                                        Modifier
+                                            .giffyFocus(src)
+                                            .padding(end = 6.dp),
                                 )
                             }
                             TextButton(onClick = { viewModel.setGridColumns(0) }) { Text("Auto") }
@@ -282,13 +299,30 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Row(modifier = Modifier.padding(top = 8.dp)) {
+                    Row(
+                        // focusGroup: D-pad DOWN enters the chip row instead of
+                        // skipping past it (Settings chip-skip bug, 2026-10 probe).
+                        // fillMaxWidth: the group's focus rect must span the beam
+                        // — from right-edge buttons the wrap-content rect loses
+                        // the directional search to the full-width row below.
+                        modifier =
+                            Modifier
+                                .focusGroup()
+                                .fillMaxWidth()
+                                .padding(top = 8.dp),
+                    ) {
                         listOf("Any" to "any", "Vertical" to "vertical", "Horizontal" to "horizontal").forEach { (label, value) ->
+                            val src = remember { MutableInteractionSource() }
                             FilterChip(
                                 selected = orientationPref == value,
                                 onClick = { viewModel.setOrientationFilter(value) },
                                 label = { Text(label) },
-                                modifier = Modifier.padding(end = 6.dp),
+                                interactionSource = src,
+                                // giffyFocus ring: M3 chips draw nothing on D-pad focus.
+                                modifier =
+                                    Modifier
+                                        .giffyFocus(src)
+                                        .padding(end = 6.dp),
                             )
                         }
                     }
@@ -330,13 +364,25 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Row(modifier = Modifier.padding(top = 8.dp)) {
+                    Row(
+                        modifier =
+                            Modifier
+                                .focusGroup()
+                                .fillMaxWidth()
+                                .padding(top = 8.dp),
+                    ) {
                         listOf("Fit" to "fit", "Crop" to "crop", "Stretch" to "stretch").forEach { (label, value) ->
+                            val src = remember { MutableInteractionSource() }
                             FilterChip(
                                 selected = videoFit == value,
                                 onClick = { viewModel.setVideoFit(value) },
                                 label = { Text(label) },
-                                modifier = Modifier.padding(end = 6.dp),
+                                interactionSource = src,
+                                // giffyFocus ring: M3 chips draw nothing on D-pad focus.
+                                modifier =
+                                    Modifier
+                                        .giffyFocus(src)
+                                        .padding(end = 6.dp),
                             )
                         }
                     }

@@ -124,6 +124,8 @@ fun TvQuickActionsDialog(
                         return@M3Surface
                     }
                     "addto" -> {
+                        // Always listed — with no custom feeds yet the empty
+                        // picker says so (parity with Add to a Collection).
                         QuickAction(text = "Add to custom feed…", first = first) { showAddToFeed = true }
                         QuickAction(text = "Add to a Collection…") {
                             feedViewModel.refreshCollections()
@@ -223,10 +225,11 @@ fun TvQuickActionsDialog(
                         onDismiss()
                     },
                 )
-                if (customFeeds.isNotEmpty()) {
-                    HorizontalDivider()
-                    QuickAction(text = "Add to…") { view = "addto" }
-                }
+                // Round-3 #7 TV equivalent: Add to… always reachable (empty
+                // custom-feeds path = the picker's own empty state), main pane
+                // no longer depends on prefilled state.
+                HorizontalDivider()
+                QuickAction(text = "Add to…") { view = "addto" }
                 if (gif.tags.isNotEmpty()) {
                     QuickAction(text = "Tags…") { view = "tags" }
                 }
@@ -314,40 +317,44 @@ private fun TvAddToFeedDialog(
                 Text("Add to custom feed", style = MaterialTheme.typography.titleMedium)
                 val first = remember { FocusRequester() }
                 LaunchedEffect(Unit) { first.requestFocus() }
-                customFeeds.forEach { def ->
-                    val src = remember { MutableInteractionSource() }
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .giffyFocus(src)
-                                .clickable(interactionSource = src, indication = null) {
-                                    feedId = def.id
-                                },
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(selected = feedId == def.id, onClick = { feedId = def.id })
-                        Text(def.name)
+                if (customFeeds.isEmpty()) {
+                    Text("No custom feeds yet — create one on the phone (“Custom feeds”).")
+                } else {
+                    customFeeds.forEach { def ->
+                        val src = remember { MutableInteractionSource() }
+                        Row(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .giffyFocus(src)
+                                    .clickable(interactionSource = src, indication = null) {
+                                        feedId = def.id
+                                    },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = feedId == def.id, onClick = { feedId = def.id })
+                            Text(def.name)
+                        }
                     }
-                }
-                HorizontalDivider()
-                refs.forEach { ref ->
-                    val label = customRefSummary(ref)
-                    val src = remember { MutableInteractionSource() }
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .giffyFocus(src)
-                                .clickable(interactionSource = src, indication = null) {
-                                    if (ref in selected) selected.remove(ref) else selected.add(ref)
-                                },
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Checkbox(checked = ref in selected, onCheckedChange = { checked ->
-                            if (checked) selected.add(ref) else selected.remove(ref)
-                        })
-                        Text(label)
+                    HorizontalDivider()
+                    refs.forEach { ref ->
+                        val label = customRefSummary(ref)
+                        val src = remember { MutableInteractionSource() }
+                        Row(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .giffyFocus(src)
+                                    .clickable(interactionSource = src, indication = null) {
+                                        if (ref in selected) selected.remove(ref) else selected.add(ref)
+                                    },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Checkbox(checked = ref in selected, onCheckedChange = { checked ->
+                                if (checked) selected.add(ref) else selected.remove(ref)
+                            })
+                            Text(label)
+                        }
                     }
                 }
                 val addSrc = remember { MutableInteractionSource() }

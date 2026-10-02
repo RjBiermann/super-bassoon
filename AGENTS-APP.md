@@ -239,6 +239,9 @@ unscheduled — a user slice picks.
   (marker only; no UI consumer — build when a user-visible failure trace demands it).
 - TV home "More ▾" DropdownMenuItems have no giffyFocus ring (M3 popup rows) — whether
   they show visible D-pad focus at all needs the skipped device check.
+  ~~Still open~~ — **CLOSED 2026-10-02 (later session, TV36):** M3 popup rows DO show
+  visible D-pad focus (a lighter fill on the focused row — zoomed screenshot on the
+  fresh-profile single-row menu). No giffyFocus needed for dropdown items.
 
 ## In-app links audit + navigation-library decision (2026-10-02, docs-only)
 Trigger: "creator/niche/tag etc. should be links so users can navigate". Audit of every
@@ -536,6 +539,13 @@ Ranked by lines removed per risk, smallest diffs first. Threshold rule from roun
    the shared ordering rule landed (batch 2), the dialog merge does NOT proceed. A TV
    picker screen either needs giffyFocus per row (per-row decoration parameter) or
    tv-material components — same conclusion the TvQuickActions rows already prove.
+   **TV equivalent DONE (2026-10-02, later session — no mobile-side changes):**
+   TvQuickActions' "Add to…" row is now unconditional (divider + row always render —
+   the no-custom-feeds state reaches the picker instead of the row disappearing), and
+   TvAddToFeedDialog gained the Collection-style empty state ("No custom feeds yet —
+   create one on the phone (“Custom feeds)."). Device-verified on TV36: main pane
+   shows "Add to…" with zero custom feeds; pane swap → picker renders title + empty
+   hint + disabled Add + Cancel.
 
 5. **avgColorOr + AudioBadge — DONE (2026-10-02):** both moved to core:ui
    (`AudioBadge.kt`); the two call sites consume them (tile/card badge padding drift
@@ -577,7 +587,7 @@ Scanned-and-rejected (documented so the next audit doesn't re-derive them):
 ## Site feature-parity audit (2026-10-02, live-verified — doc-only, no code)
 Consumption surfaces are a full mirror: home tabs, Explore, Niches (index + Feed/About + join),
 creator feed (tag chips, Follow), watch page, Saved Collections, Following, search
-(GIFs/Creators/Niches), settings. Deliberately excluded per §0: upload/creator tools,
+(GIFs/Images/Creators/Niches tabs + Tags scope — see "Full-scope search" below), settings. Deliberately excluded per §0: upload/creator tools,
 Data Dashboard, boost/live-cam/only-fans/ads modules, premium (see AGENTS-NETWORK.md —
 galleries verified dead, `v2/feeds/modules` checklist fully covered).
 
@@ -601,10 +611,13 @@ Real gaps (site has them, app doesn't) — **spec'd-not-scheduled, a user slice 
   (GifsApi.trendingTags + TrendingTagsDto/TrendingTagDto); SearchScreen's empty-query
   state gains a "Trending tags" section (#name + "N gifs", tap = the tag search feed via
   the existing submit path — records history like any search). Fails silently to an
-  absent section. Note: the site renders it as a 4th TAB on the search results page; the
-  app renders it in the search empty state — same content, no new surface.
+  absent section. Note correction (2026-10-02, live): the site's search results-page tabs
+  are GIFs/Images/Creators/Niches — there is no Tags results tab (`/search/tags` 404s home);
+  trending tags live in the header search dropdown ("Trending Searches", links → tag feeds).
+  The app's empty-state section remains the equivalent surface.
 - **Niches suggest** — `GET /v2/niches/suggest` (tag-context niche suggestions, verified)
-  un-wired; would power a niche-search tab properly.
+  un-wired; independent of the full-scope search spec (the Niches search tab uses
+  `niches/search/previews`, not suggest) — stays a fallback.
 - **Server search history** — `GET /v2/search/user-history` verified; site syncs history
   server-side, app keeps local Room history. Existing spec'd-not-scheduled fallback now has
   a verified endpoint to hang on.
@@ -616,6 +629,55 @@ Real gaps (site has them, app doesn't) — **spec'd-not-scheduled, a user slice 
 Parked (not gaps): For You server blend is `v2/feeds/for-you` as-is (70% favorite-creator
 weighting was a local-blend idea, superseded by the server feed); search-history sync and
 server collections remain spec'd-not-scheduled fallbacks per AGENTS-NETWORK.md.
+
+## Full-scope search (spec'd 2026-10-02 — BUILT same day, mobile; on-device verify pending)
+The site's search results page (Playwright-verified live, desktop, `query=feet`):
+`/search/<scope>?query=&order=score` with result tabs **GIFs · Images · Creators · Niches**.
+`/search/tags` 404s home — tags have no results page; the header search box's Tags scope
+routes tag matches to the tag feed (`/gifs/<slug>`). App spec: SearchScreen gains the same
+tab row; the GIFs tab keeps the existing `FeedSource.Search` feed path unchanged.
+
+Scope → endpoint (all 200-verified 2026-10-02 with the anonymous temp token; row shapes in
+AGENTS-NETWORK.md):
+- **GIFs** — existing `GET /v2/gifs/search`; the site sends `type=g` explicitly (default `g`).
+- **Images** — same endpoint, `type=i`. Same response envelope + GifDto rows, but rows are
+  stills (`type=2`, `duration=null`, `hls=false`, `urls.sd/hd` are jpgs). Render as a
+  static-poster grid — **no player path** (nothing to play, no watch-history write).
+- **Creators** — `GET /v2/creators/search/previews?order=best_match&page=1&count=30&query=`
+  → `{gifs:[…]}`, one preview gif per matched creator (dedupe by `gif.userName`);
+  tap → `FeedSource.Creator` (existing destination plumbing).
+- **Niches** — `GET /v2/niches/search/previews?order=best_match&page=1&count=30&query=`
+  → `{previews:[{niche, gif, user}]}` (niche object + preview gif + owner);
+  tap → `FeedSource.Niche` (existing destination plumbing).
+- **Tags** — `GET /v1/tags/match?query=` → tag-name array (`["Feet"]`); renders as
+  suggestion rows in the search empty/suggestion state, tap = the tag feed via the existing
+  submit path (alongside the existing Trending-tags section — one list, no new screen).
+
+**BUILT (2026-10-02, later session):** SearchScreen shows the 4-tab TabRow whenever a query
+is typed (GIFs default — keeps the existing submit path untouched; switching tabs fires the
+scope's single request). SearchViewModel injects ContentFilter and caches per-scope results
+keyed by trimmed query (maps capped at 12; `cappedInsert`/`nicheRows` extracted + unit-tested
+in `SearchScopeResultsTest` — cap eviction, blank-id drop, blocked-preview-gif row drop).
+New API surface: `search(type=)`, `creatorSearchPreviews`, `nicheSearchPreviews`, `tagsMatch`
+(tagsMatch wired endpoint-side only — the Tags section is the existing Trending-tags one; a
+typed-query tags row was NOT built: the empty/suggestion state already covers it). Images
+render a 3-up static poster strip (avgColor placeholder, no player path, no tap target);
+Creators/Niches render preview-thumb rows → `onOpenCreator`/`onOpenNiche` callbacks wired in
+MainActivity (search closes, feed opens — same swap as NichesScreen).niches suggest remains
+a fallback (explicitly independent of this spec).
+
+Rules:
+- Tabs lazy-load (1 request on first open, cached in the VM, never refetched per
+  recomposition) — the ≤10-req/5s invariant stays intact.
+- ContentFilter: every gif-backed row (GIFs/Images tiles, creator previews, niche previews)
+  flows the single ContentFilter — a row whose preview gif is blocked drops the whole row
+  (leak-zero at the cheapest check point, no second filter surface).
+- History: app keeps local Room history only; the site's `POST /v2/search/user-history`
+  (202) stays a spec'd-not-scheduled fallback.
+- TV: unchanged — search stays in the TV parity-gap list (D-pad device work).
+- Skipped: no Collections search scope (site has none), no tags results page (site has
+  none), no search-scope selector in the app header (the tab row on the search surface
+  covers it — the site's header scope strip is a redundant desktop affordance).
 
 ## Quick actions — submenu restructure (BUILT 2026-10-01; was spec'd 2026-10-02)
 Quick sheets must stop growing flat rows. Two more sheet items already land this
@@ -689,10 +751,13 @@ Code-verified inventory. Ranked, biggest first:
   playing && !seekFlash → 3s → visible=false); any onPreviewKeyEvent sets visible=true;
   hidden cluster (incl. pills) leaves composition so focus traversal stays clean;
   progress line + seekFlash outside the AnimatedVisibility. D-pad visual verify
-  still pending (emulator).]
-- **Search** — zero `api.search` calls, no search UI anywhere in app-tv. Mobile has
-  full search (tags/creators/suggestions). TV browsing = home rows + Niches +
-  pinned/custom feeds only.
+  still pending (emulator).
+  [D-pad verify DONE 2026-10-02 (later session, TV36): player entry → 3s+ idle →
+  uiautomator dump has NO text nodes (cluster left composition); any key (LEFT)
+  re-revealed it (@creator visible); idle again → gone. Both directions verified.]]
+- **Search** — zero `api.search` calls, no search UI anywhere in app-tv. Mobile search is
+  multi-type (GIFs/Images/Creators/Niches tabs + tag suggestions — see "Full-scope
+  search"). TV browsing = home rows + Niches + pinned/custom feeds only.
 - **Groups management** — no GroupsScreen equivalent: create/favorite/BLOCK niche
   groups unreachable on TV. Mobile's blockable group bundles are the macro-filter
   path (leak-zero); TV only has per-item tag/creator quick-action blocks.
@@ -724,7 +789,17 @@ D-pad only.
   [Initial focus on entry FIXED 2026-10-01: SettingsScreen takes
   requestInitialFocus — AuthSection's first button carries the FocusRequester
   (new firstButtonModifier param); TV passes true.] The chip-skip traversal
-  itself is still open.
+  itself ~~is still open~~ — **CLOSED 2026-10-02 (later session, device-verified on
+  TV36):** root cause is directional-search geometry, not lazy composition — from a
+  right-edge focusable (Set PIN) the wrap-content chip Row's rect has no beam overlap
+  with the source, so the full-width row below wins the DOWN. Fix:
+  `Modifier.focusGroup().fillMaxWidth()` on all three chip rows (grid-columns,
+  Orientation, Video-fit) so the group participates as one full-width unit; plus
+  `giffyFocus(interactionSource)` per chip (M3 FilterChip draws nothing on D-pad focus
+  — same ring-test lesson; the shared MutableInteractionSource avoids the
+  two-focusable race). Verified: DOWN from Set PIN now lands on the Orientation chip
+  group (enters at the rightmost chip — beam-logical), zoomed screenshot shows the
+  BrandRed ring, chip click moves selection, DOWN leaves the group cleanly.
 - **Orientation filter is data-bound, not fetch-bound (probed 2026-10):** the
   API has no orientation parameter, so the filter is client-side over whatever
   pool the feed returns. Live trending pool = 99/99 portrait (0 landscape);

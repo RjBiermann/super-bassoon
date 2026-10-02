@@ -1,5 +1,6 @@
 package com.rjbiermann.giffyviewer.core.network
 
+import com.rjbiermann.giffyviewer.core.network.dto.GifDtoShell
 import com.rjbiermann.giffyviewer.core.network.dto.GifsPageDto
 import com.rjbiermann.giffyviewer.core.network.dto.TemporaryTokenDto
 import kotlinx.serialization.SerialName
@@ -38,6 +39,9 @@ interface GifsApi {
         @Query("order") order: String = "trending",
         @Query("count") count: Int = 40,
         @Query("page") page: Int = 1,
+        // Full-scope search spec (AGENTS-APP): the site sends type=g for the
+        // GIFs tab explicitly (default g); type=i is the Images tab (stills).
+        @Query("type") type: String? = null,
     ): GifsPageDto
 
     /** One creator's gifs — live-verified: filters by userName, paginated.
@@ -106,6 +110,31 @@ interface GifsApi {
     suspend fun trendingTags(
         @Query("count") count: Int = 20,
     ): TrendingTagsDto
+
+    /** Creator preview tiles (full-scope search spec, live-verified 2026-10-02,
+     *  anonymous OK): one preview gif per matched creator — dedupe by gif.userName. */
+    @GET("v2/creators/search/previews")
+    suspend fun creatorSearchPreviews(
+        @Query("query") query: String,
+        @Query("order") order: String = "best_match",
+        @Query("count") count: Int = 30,
+        @Query("page") page: Int = 1,
+    ): CreatorPreviewsDto
+
+    /** Niche preview tiles (same spec): {niche, gif} rows — owner unused. */
+    @GET("v2/niches/search/previews")
+    suspend fun nicheSearchPreviews(
+        @Query("query") query: String,
+        @Query("order") order: String = "best_match",
+        @Query("count") count: Int = 30,
+        @Query("page") page: Int = 1,
+    ): NicheSearchPreviewsDto
+
+    /** Tag-name matches (same spec): bare JSON array ("[\"Feet\"]"). */
+    @GET("v1/tags/match")
+    suspend fun tagsMatch(
+        @Query("query") query: String,
+    ): List<String>
 
     /** Creator search (live-verified 2026-09-30, anonymous OK): paginated
      *  creator cards with follower/gif counts — results-row source. */
@@ -430,6 +459,34 @@ data class TrendingTagsDto(
 data class TrendingTagDto(
     val name: String = "",
     val count: Int = 0,
+)
+
+/** /v2/creators/search/previews (full-scope search spec, live-verified
+ *  2026-10-02): one preview gif per matched creator. */
+@Serializable
+data class CreatorPreviewsDto(
+    val gifs: List<GifDtoShell> = emptyList(),
+)
+
+/** /v2/niches/search/previews (same spec): `{previews: [{niche, gif, user}]}` —
+ *  only niche + gif consumed. */
+@Serializable
+data class NicheSearchPreviewsDto(
+    val previews: List<NichePreviewRowDto> = emptyList(),
+)
+
+@Serializable
+data class NichePreviewRowDto(
+    val niche: NichePreviewNicheDto? = null,
+    val gif: GifDtoShell? = null,
+)
+
+/** Lenient niche object inside a preview row (only id/name consumed; the full
+ *  niche payload carries far more). */
+@Serializable
+data class NichePreviewNicheDto(
+    val id: String = "",
+    val name: String? = null,
 )
 
 /** /v2/creators/search item — username is the identity; counts for the row. */

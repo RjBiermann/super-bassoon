@@ -225,6 +225,14 @@ class MainActivity : ComponentActivity() {
                     showSearch = false
                     feedViewModel.open(FeedSource.Search(query = q))
                 },
+                onOpenCreator = { username ->
+                    showSearch = false
+                    feedViewModel.open(FeedSource.Creator(username = username))
+                },
+                onOpenNiche = { id, name ->
+                    showSearch = false
+                    feedViewModel.open(FeedSource.Niche(id, name))
+                },
                 viewModel = searchViewModel,
             )
         } else if (confirmed && showNiches) {
