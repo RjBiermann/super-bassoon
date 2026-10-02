@@ -103,12 +103,16 @@ the player's ⋯ sheet (no tiles exist on an empty feed); TV speed label Locale.
 TvPlayerScreen progress fraction starts at 0 (stale BISECT probe removed).
 
 **Critical**
-- Dead control: CollectionsScreen share `IconButton(onClick = {})` — wire it or remove the icon (repo "no stubs" rule).
-- Explore error path: `onFailure { loading = false }` with no error UI, and the
-  `LaunchedEffect(creators.size)` refetch never re-fires when a failed fetch adds nothing →
-  permanently blank screen until recomposition. Same silent-failure pattern in
-  NichesScreen.loadMore + TvNichesViewModel.loadMore. Shared `EmptyState` (core:ui) covers
-  empty states on FeedScreen only — every other list surface needs an error/empty branch.
+- ~~Dead control: CollectionsScreen share `IconButton(onClick = {})`~~ — CLOSED: the share
+  icon was removed (top-bar actions now = create; per-item edit/delete). No dead control remains
+  there.
+- Explore error path — UPDATED round 3: a `loadFailed` flag + error EmptyState + Retry button
+  were added, but the wiring is still broken: `.onFailure` only does `loading = false` and
+  **never sets `loadFailed = true`** → the error branch is unreachable and the
+  `LaunchedEffect(creators.size)` refetch still never re-fires on failure. Retry UI exists,
+  cannot ever render. Sharpest open item. Same silent-failure pattern confirmed in
+  NicheAboutScreen (three `runCatching{}.onSuccess{}` fetches, no failure state) and
+  FollowingScreen (no error/empty/loading handling at all) — see round 3 below.
 - PIN lock (PinLockScreen): `✓` key fixed (submits at <4 digits too); brute-force
   slowdown (3+ wrong → 15s wait) shipped. NO recovery affordance — deliberate
   (user decision 2026-10: forgotten PIN = clear app data, keeps the lock opaque).
@@ -133,23 +137,28 @@ TvPlayerScreen progress fraction starts at 0 (stale BISECT probe removed).
 - AuthScreen hierarchy — closed: paste-token removed (2026-10 user decision);
   PKCE "Sign in with browser" is the only path.
 - Settings Switch rows: whole row should be `Modifier.toggleable(role = Role.Switch)`
-  (target size + TalkBack state announcement), not Switch-only hit area — data-saver
-  row closed; remaining switch rows (verified-only, AMOLED, dynamic color) could
-  reuse the same pattern.
+  (target size + TalkBack state announcement), not Switch-only hit area — CLOSED for data-saver,
+  verified-only and AMOLED (all whole-row toggleable now); the last open instance is the
+  dynamic-color row (round 3 Medium below).
 - FeedScreen empty-Favorites hint — closed (points at the player's ⋯ sheet now).
 - Double-tap like — closed: double-tap = LIKE (never unlike), rail heart toggles.
 - TvPlayerScreen pause/seek — closed: horizontal = ±10s seek with flash,
   hold-repeat progressive, CENTER = play/pause; TvSourceFeedScreen onMenu opens
   quick actions.
-- Tile a11y noise: image contentDescription "Gif by @user" + visible "@user" Text = creator
-  announced twice per tile; make the image decorative or mergeDescendants. Long-press
-  affordance unannounced (add onLongClickLabel semantics).
-- Search suggestions render a bare count ("1234", no unit) — "1,234 gifs".
+- ~~Tile a11y noise~~ — CLOSED on mobile: image is decorative (`contentDescription = null`)
+  and the tile carries `onLongClickLabel = "Open quick actions"` (FeedScreen GifTile).
+  **TV instance still open:** TvHomeScreen `GifCard` image still says
+  `contentDescription = "Gif by @${gif.userName}"` next to the visible "@user" Text —
+  creator announced twice per card.
+- ~~Search suggestions render a bare count~~ — CLOSED: rows now show `"%,d gifs"`
+  (grouped + unit).
 
 **Low**
-- OfflineNotice duplicates core:ui EmptyState — reuse it.
-- QuickBlockSheet speed label `String.format("%.2f")` is locale-dependent (comma decimals)
-  and 2 decimals is false precision for 0.25 steps → Locale.US + %.1f.
+- ~~OfflineNotice duplicates core:ui EmptyState — reuse it~~ — CLOSED: OfflineNotice deleted;
+  EmptyState is the only empty surface.
+- Speed label precision — CLOSED with correction: both labels are `Locale.US` now, and the
+  original "%.1f" claim was wrong — speed steps are 0.25, so 2 decimals is real precision
+  (0.25×, 1.25×). Kept %.2f on both platforms.
 - PinLockScreen: no haptic on keypress / wrong-PIN shake.
 - NichesScreen initial fetch inside `remember { scope.launch {} }` — should be
   LaunchedEffect(Unit) (same length, correct idiom).
@@ -157,6 +166,79 @@ TvPlayerScreen progress fraction starts at 0 (stale BISECT probe removed).
 
 Skipped by design: live D-pad traversal audit (needs emulator session via debroid/mobile
 MCP); contrast math under dynamic-color theme (Material guarantees it).
+
+## UI/UX + a11y + feature audit round 3 (2026-10-02, docs-only)
+Full sweep of every composable in feature:*/app-*/core:ui (grep-driven a11y patterns +
+file-by-file reads of the smaller screens; FeedScreen/PlayerScreen/Settings covered region-by-
+region). Stale round-1 items above are already marked. New findings, code-verified, fixes
+unscheduled — a user slice picks.
+
+**Critical (broken UI, must fix first)**
+- ~~ExploreScreen `loadFailed` is a dead flag~~ — CLOSED 2026-10-01: onFailure writes it,
+  Retry clears it, and the size/loadFailed LaunchedEffect re-fires on failure.
+
+**High (silent failures — same class as the Explore item)**
+- ~~FollowingScreen: zero error/empty/loading handling~~ — CLOSED 2026-10-01:
+  FollowingViewModel gained loadFailed (creators+niches result), the screen shows
+  error+Retry and a "Nothing followed yet" empty state.
+- ~~NicheAboutScreen swallow failures~~ — CLOSED 2026-10-01: detail failure shows
+  error EmptyState + Retry (loadAbout() local fun shared by initial + retry); section
+  fetches degrade to empty sections.
+- System back from an opened feed exits the app: MainActivity's BackHandler covers only the
+  overlay flags (settings/search/collections/…), but feeds opened inside FeedScreen via
+  `viewModel.open(...)` (creator chip, More ▾ item, search submit, Explore/Following/Niche
+  hops) set no flag — back gesture finishes the activity. The doc's "no back stack" posture
+  covers Settings, not this: from a creator feed the only escape is the Trending chip.
+  Consider a BackHandler that `viewModel.open(previous)` before letting back exit.
+  [BUILT 2026-10-01: open() remembers the prior source; canGoBack StateFlow +
+  FeedScreen BackHandler pops one level; verified compile + code-review.]
+
+**Medium**
+- ~~CustomFeedsScreen delete has NO confirm dialog~~ — CLOSED 2026-10-01: confirm-first
+  AlertDialog (mirrors Groups), same destructive-class wording.
+- ~~CustomFeedsScreen ref chips dead tap + <48dp Remove~~ — CLOSED 2026-10-01:
+  AssistChip (click = remove, the X states it; refs re-add trivially), 48dp IconButton
+  with "remove @user"-style descriptions.
+- ~~TV home login drift~~ — CLOSED 2026-10-01: isLoggedIn is now a token-flow StateFlow;
+  Following row refresh keyed on it (Liked row rides its own token flow).
+- ~~FeedRow LoadState.Error~~ — CLOSED 2026-10-01: error rows show "Couldn't load <title>"
+  + Retry (gifs.retry()); the filter-empty hint landed earlier. Explore/Following creator-row
+  guards still open (failed fetch = blank strip).
+- ~~Settings dynamic-color Switch-only row~~ — CLOSED 2026-10-01: whole-row toggleable
+  (last switch row; data-saver/verified-only/AMOLED already done).
+
+**Low**
+- ~~"upstream" wording ×2~~ — CLOSED 2026-10-01: AgeGate reworded ("the sites it browses"),
+  AuthSection "sync to your account".
+- ~~WebViewLoginScreen println~~ — CLOSED 2026-10-01: removed.
+- ~~Inverted close/back labels~~ — CLOSED 2026-10-01: Settings X = "close",
+  WebViewLogin ArrowBack = "back".
+- ~~PlayerScreen dead onTogglePlay param~~ — CLOSED 2026-10-01: param + wiring removed
+  (PlayerControls builds its own player lambda).
+- ~~TvNiches 📌 emoji prefix~~ — CLOSED 2026-10-01: PushPin vector icon with
+  contentDescription "pinned".
+- ~~TV media NEXT/PREV keys~~ — CLOSED 2026-10-01: handled (walk the list, up/down parity).
+- ~~SearchScreen rows <48dp~~ — CLOSED 2026-10-01: vertical padding 10→14dp.
+- contentDescription capitalization still mixed: "Back" ×1 vs "back" ×9, "Remove" ×1.
+- AuthSection signed-in state shows only "Signed in" — no @username (site shows the account).
+- RateLimitBus "cooling down" indicator — still spec'd in the Mobile bullet, zero UI
+  consumers anywhere (grep-verified). Mark spec'd-not-built or build it.
+- TV home "More ▾" DropdownMenuItems have no giffyFocus ring (M3 popup rows) — whether
+  they show visible D-pad focus at all needs the skipped device check.
+
+**Feature audit (2026-10-02) — parity writes unchanged; corrections**
+- GifsApi has `POST v2/me/collections` (create) + `DELETE v2/me/collections/{id}` but NO
+  add-content write; no report endpoint; no `GET /v2/me/followers`; no tags-trending search
+  tab; no niches/suggest. All eight round-1 parity gaps stand (Report · Add to a Collection ·
+  Add to a Niche · Followers page · Tags browse tab · Niches suggest · server search history ·
+  creator stats header).
+- Collections empty-state copy misleads: "Create New Collection bundles gifs from your watch
+  page" — the app cannot ADD gifs to a collection at all (that's the parity gap). Reword until
+  the add-write ships.
+- TV parity list correction: **§8 shuffle on TV is CLOSED** — TvSourceFeedScreen renders the
+  shared FeedFilterDialog (Shuffle/Off/Reshuffle chips) over the same feedprefs blob +
+  shared FeedRepository.paging path. The "TV has the Filter chip only" line above was stale;
+  remaining TV gaps (Search, Groups mgmt, custom-feed mgmt, Collections, followers) stand.
 
 ## UX polish (Phase 7 slice 3, verified live on Phone34 + TV36)
 - Mobile tiles: avgColor placeholder + reserved aspect ratio (no layout jump / black
@@ -397,8 +479,9 @@ Code-verified inventory. Ranked, biggest first:
   add to them (quick actions), but create/rename/delete is mobile-only
   (CustomFeedsScreen). Stacks with the empty-creation deferral above.
 - **Collections** — mobile-only screen (CollectionsScreen); nothing on TV.
-- **§8 shuffle** — no shuffle on TV source feeds (mobile: chips + reshuffle +
-  infinite-shuffle player). TV has the Filter chip only.
+- **§8 shuffle** — ~~no shuffle on TV source feeds~~ CLOSED round 3: TvSourceFeedScreen
+  renders the shared FeedFilterDialog (Shuffle/Off/Reshuffle) over the same feedprefs blob;
+  shuffle applies via the shared FeedRepository path. Mobile parity holds.
 
 **Broken on TV (own sections):** auto-swipe dead toggle + end-of-media parking +
 play-after-end (AGENTS-PLAYER.md), TvNichesViewModel copy-paste paging +

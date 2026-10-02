@@ -63,6 +63,7 @@ fun ExploreScreen(
         loading = true
         val before = creators.size
         scope.launch {
+            loadFailed = false
             runCatching { api.verifiedCreators(page = nextPage) }
                 .onSuccess { pageDto ->
                     // upstream pagination overlaps: page n re-lists page n-1 rows —
@@ -72,13 +73,16 @@ fun ExploreScreen(
                     // Server repeats the tail when exhausted and carries no page
                     // count — no growth means the list is complete.
                     if (creators.size == before) endReached = true
-                }.onFailure { loading = false }
+                }.onFailure { loadFailed = true }
             loading = false
         }
     }
 
-    // Initial load + auto-fetch as the list walks toward the end (§9 UX note).
-    LaunchedEffect(creators.size) { loadMore() }
+    // Initial load + auto-fetch as the list walks toward the end (§9 UX note);
+    // a failed fetch re-fires once loadFailed clears (Retry sets it false).
+    LaunchedEffect(creators.size, loadFailed) {
+        if (!loadFailed) loadMore()
+    }
 
     Scaffold(
         topBar = {

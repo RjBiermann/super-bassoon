@@ -143,6 +143,15 @@ fun TvPlayerScreen(
                             seekBy(player, -10_000L) { seekFlash = it }
                             true
                         }
+                        // Media-key remotes: next/prev walk the list (up/down parity).
+                        android.view.KeyEvent.KEYCODE_MEDIA_NEXT -> {
+                            if (index < gifs.size - 1) index++
+                            true
+                        }
+                        android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
+                            if (index > 0) index--
+                            true
+                        }
                     }
                     when (e.key) {
                         Key.DirectionDown -> {

@@ -59,6 +59,26 @@ fun FollowingScreen(
             )
         },
     ) { padding ->
+        if (viewModel.loadFailed.collectAsStateWithLifecycle().value) {
+            com.rjbiermann.giffyviewer.core.ui.EmptyState(
+                message = "Couldn't load your follows",
+                hint = "Check your connection and retry",
+                modifier = Modifier.fillMaxSize().padding(padding),
+            )
+            androidx.compose.material3.TextButton(
+                onClick = { viewModel.refresh() },
+                modifier = Modifier.padding(16.dp),
+            ) { Text("Retry") }
+            return@Scaffold
+        }
+        if (creators.isEmpty() && niches.isEmpty()) {
+            com.rjbiermann.giffyviewer.core.ui.EmptyState(
+                message = "Nothing followed yet",
+                hint = "Follow creators and join niches to fill this page",
+                modifier = Modifier.fillMaxSize().padding(padding),
+            )
+            return@Scaffold
+        }
         LazyColumn(
             modifier =
                 Modifier

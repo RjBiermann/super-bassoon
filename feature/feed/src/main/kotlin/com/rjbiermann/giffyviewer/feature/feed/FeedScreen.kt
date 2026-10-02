@@ -98,6 +98,10 @@ fun FeedScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    // System back returns to the prior feed before exiting (round-3 audit:
+    // chip/More/search-opened feeds set no overlay flag — back killed the app).
+    val canGoBack by viewModel.canGoBack.collectAsStateWithLifecycle()
+    androidx.activity.compose.BackHandler(enabled = canGoBack) { viewModel.back() }
 
     LaunchedEffect(showBlockHint) {
         if (showBlockHint) {

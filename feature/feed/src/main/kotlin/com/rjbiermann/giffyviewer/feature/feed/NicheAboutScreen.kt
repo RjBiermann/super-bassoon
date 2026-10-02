@@ -58,6 +58,9 @@ fun NicheAboutScreen(
     var detail by remember { mutableStateOf<com.rjbiermann.giffyviewer.core.network.NicheDetail?>(null) }
     var topCreators by remember { mutableStateOf<List<com.rjbiermann.giffyviewer.core.network.CreatorSearchItemDto>>(emptyList()) }
     var related by remember { mutableStateOf<List<com.rjbiermann.giffyviewer.core.network.FollowedNicheDto>>(emptyList()) }
+    // Audit: failures must surface — detail failure = full-screen error + retry;
+    // the two section fetches degrade to empty sections.
+    var detailFailed by remember { mutableStateOf(false) }
     val joined by joinViewModel.joined.collectAsStateWithLifecycle(initialValue = emptySet())
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -71,13 +74,20 @@ fun NicheAboutScreen(
         context.startActivity(android.content.Intent.createChooser(intent, "Share $nicheName"))
     }
 
-    LaunchedEffect(nicheId) {
-        joinViewModel.refresh()
+    fun loadAbout() {
         scope.launch {
-            runCatching { api.nicheDetail(nicheId) }.onSuccess { detail = it.niche }
+            detailFailed = false
+            runCatching { api.nicheDetail(nicheId) }
+                .onSuccess { detail = it.niche }
+                .onFailure { if (detail == null) detailFailed = true }
             runCatching { api.nicheTopCreators(nicheId) }.onSuccess { topCreators = it.creators }
             runCatching { api.nicheRelated(nicheId) }.onSuccess { related = it.niches }
         }
+    }
+
+    LaunchedEffect(nicheId) {
+        joinViewModel.refresh()
+        loadAbout()
     }
 
     Scaffold(
@@ -98,6 +108,18 @@ fun NicheAboutScreen(
             )
         },
     ) { padding ->
+        if (detailFailed) {
+            com.rjbiermann.giffyviewer.core.ui.EmptyState(
+                message = "Couldn't load this niche",
+                hint = "Check your connection and retry",
+                modifier = Modifier.fillMaxSize().padding(padding),
+            )
+            androidx.compose.material3.TextButton(
+                onClick = { loadAbout() },
+                modifier = Modifier.padding(16.dp),
+            ) { Text("Retry") }
+            return@Scaffold
+        }
         Column(modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
             detail?.let { d ->
                 Column(modifier = Modifier.padding(16.dp)) {

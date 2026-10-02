@@ -9,6 +9,7 @@ import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -34,8 +35,12 @@ class TvHomeViewModel
         /** Liked (PLAN §7): network-live, never cached — same source as mobile. */
         val liked = repository.paging(FeedSource.Liked).cachedIn(viewModelScope)
 
-        /** Logged-in surfaces (Liked/Following rows) show only with a token. */
-        val isLoggedIn = tokenStore.tokenOrNull() != null
+        /** Logged-in surfaces (Liked/Following rows) show only with a token —
+         *  reactive so in-app sign-in/out updates the home rows without a restart. */
+        val isLoggedIn: StateFlow<Boolean> =
+            tokenStore.token
+                .map { it != null }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
         /** Explore row (§9: Top Creators) — first page of verified creators, anon OK. */
         val exploreCreators =

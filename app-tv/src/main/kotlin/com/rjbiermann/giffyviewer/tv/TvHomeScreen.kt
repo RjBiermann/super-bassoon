@@ -75,8 +75,9 @@ fun TvHomeScreen(
         androidx.hilt.navigation.compose
             .hiltViewModel()
     val followingCreators by followingVm.creators.collectAsStateWithLifecycle(initialValue = emptyList())
-    val isLoggedIn = homeViewModel.isLoggedIn
-    LaunchedEffect(Unit) { if (isLoggedIn) followingVm.refresh() }
+    val isLoggedIn by homeViewModel.isLoggedIn.collectAsStateWithLifecycle(false)
+    // Sign-in refreshes the Following row (Liked row rides its own token flow).
+    LaunchedEffect(isLoggedIn) { if (isLoggedIn) followingVm.refresh() }
     val exploreCreators by homeViewModel.exploreCreators.collectAsStateWithLifecycle(initialValue = emptyList())
     val continueEntries by continueViewModel.entries.collectAsStateWithLifecycle(initialValue = emptyList())
     val hasFavorites by homeViewModel.hasFavorites.collectAsStateWithLifecycle(initialValue = false)
@@ -205,6 +206,19 @@ private fun FeedRow(
                 modifier = Modifier.padding(start = 16.dp, top = 4.dp),
             )
         }
+        if (gifs.loadState.refresh is LoadState.Error) {
+            // Offline home row: explain + one-press retry (Niches parity).
+            Text(
+                text = "Couldn't load $title",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 16.dp, top = 4.dp),
+            )
+            androidx.compose.material3.TextButton(
+                onClick = { gifs.retry() },
+                modifier = Modifier.padding(start = 8.dp),
+            ) { Text("Retry") }
+        }
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -317,7 +331,9 @@ internal fun GifCard(
                             .data(gif.posterUrl)
                             .crossfade(200)
                             .build(),
-                    contentDescription = "Gif by @${gif.userName}",
+                    // Decorative: the visible "@user" Text announces the creator —
+                    // saying both duplicates the name per card (mobile-parity fix).
+                    contentDescription = null,
                     contentScale = ContentScale.Crop,
                     // fixed landscape card (10-foot norm); portrait gifs crop — fine for browse
                     modifier = Modifier.fillMaxWidth().height(CARD_ROW_HEIGHT_DP),

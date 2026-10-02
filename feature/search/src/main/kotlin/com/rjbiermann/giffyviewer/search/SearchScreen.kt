@@ -112,7 +112,7 @@ fun SearchScreen(
                             .fillMaxWidth()
                             .clickable {
                                 submit(entry.query)
-                            }.padding(horizontal = 16.dp, vertical = 10.dp),
+                            }.padding(horizontal = 16.dp, vertical = 14.dp),
                 ) {
                     Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(20.dp))
                     Text(
@@ -133,7 +133,7 @@ fun SearchScreen(
                             .fillMaxWidth()
                             .clickable {
                                 submit(suggestion.text)
-                            }.padding(horizontal = 16.dp, vertical = 10.dp),
+                            }.padding(horizontal = 16.dp, vertical = 14.dp),
                 ) {
                     Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(20.dp))
                     Text(

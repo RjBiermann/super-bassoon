@@ -52,7 +52,7 @@ fun AgeGate(
             Text(
                 text =
                     "This app shows adult content. You must be 18 or older. " +
-                        "Not affiliated with or endorsed by upstream.",
+                        "Not affiliated with or endorsed by the sites it browses.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

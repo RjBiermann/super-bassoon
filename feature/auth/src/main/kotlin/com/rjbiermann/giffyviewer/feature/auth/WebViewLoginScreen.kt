@@ -54,7 +54,7 @@ fun WebViewLoginScreen(
                 title = { Text("Sign in with browser") },
                 navigationIcon = {
                     IconButton(onClick = onClose) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "close")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -88,7 +88,6 @@ fun WebViewLoginScreen(
                                         view: WebView,
                                         url: String?,
                                     ) {
-                                        println("WebViewLogin page=$url")
                                     }
                                 }
                             loadUrl(TokenStore.authorizeUrl(pkce))

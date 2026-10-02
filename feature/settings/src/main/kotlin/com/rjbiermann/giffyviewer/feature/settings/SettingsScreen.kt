@@ -142,7 +142,7 @@ fun SettingsScreen(
                 title = { Text("Settings") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Outlined.Close, contentDescription = "back")
+                        Icon(Icons.Outlined.Close, contentDescription = "close")
                     }
                 },
                 colors =
@@ -376,8 +376,17 @@ fun SettingsScreen(
                         Switch(checked = amoled, onCheckedChange = null)
                     }
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        // Last Switch-only row → whole-row toggleable (a11y parity).
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp)
+                                    .toggleable(
+                                        value = dynamicColor,
+                                        role = Role.Switch,
+                                        onValueChange = { viewModel.setDynamicColor(it) },
+                                    ),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
@@ -388,10 +397,7 @@ fun SettingsScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            Switch(
-                                checked = dynamicColor,
-                                onCheckedChange = { viewModel.setDynamicColor(it) },
-                            )
+                            Switch(checked = dynamicColor, onCheckedChange = null)
                         }
                     }
                 }

@@ -77,13 +77,30 @@ class FeedViewModel
             refreshGen.value = refreshGen.value + 1
         }
 
+        /** One-level back (audit round 3): feeds opened from chips/More/hops set
+         *  no overlay flag, so system back exited the app. open() remembers the
+         *  prior source; FeedScreen's BackHandler pops it before back exits. */
+        private var previousSource: FeedSource? = null
+
+        private val _canGoBack = MutableStateFlow(false)
+        val canGoBack: StateFlow<Boolean> = _canGoBack.asStateFlow()
+
+        fun back() {
+            previousSource?.let { mutableSource.value = it }
+            previousSource = null
+            _canGoBack.value = false
+        }
+
         fun open(feed: FeedSource) {
             viewModelScope.launch {
                 // Per-feed sort persistence (§8): a fresh source adopts its saved sort.
                 val saved = settings.feedSort(feed.baseKey).first()
                 val sortable = feed is FeedSource.Search || feed is FeedSource.Creator || feed is FeedSource.Niche
                 val adopt = sortable && saved.isNotEmpty() && sourceIsUnsorted(feed)
-                mutableSource.value = if (adopt) feed.withSort(saved) else feed
+                val next = if (adopt) feed.withSort(saved) else feed
+                if (next != mutableSource.value) previousSource = mutableSource.value
+                _canGoBack.value = next != mutableSource.value && previousSource != null
+                mutableSource.value = next
             }
         }
 

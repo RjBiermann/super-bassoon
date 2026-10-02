@@ -5,12 +5,15 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -19,6 +22,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -100,10 +104,17 @@ fun TvNichesScreen(
                                 }
                             }.padding(horizontal = 16.dp, vertical = 8.dp),
                 ) {
-                    Text(
-                        text = (if (isPinned) "📌 " else "") + niche.name,
-                        style = MaterialTheme.typography.titleMedium,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = niche.name, style = MaterialTheme.typography.titleMedium)
+                        if (isPinned) {
+                            // Vector pin (emoji-prefix anti-pattern; announced oddly).
+                            androidx.compose.material3.Icon(
+                                imageVector = androidx.compose.material.icons.Icons.Filled.PushPin,
+                                contentDescription = "pinned",
+                                modifier = Modifier.padding(start = 6.dp).size(14.dp),
+                            )
+                        }
+                    }
                     Text(
                         text = "${niche.gifs} gifs · ${niche.subscribers} subscribers",
                         style = MaterialTheme.typography.bodySmall,

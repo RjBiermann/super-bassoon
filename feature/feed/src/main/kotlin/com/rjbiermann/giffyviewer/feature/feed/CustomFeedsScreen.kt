@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -19,7 +20,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -125,6 +125,9 @@ fun CustomFeedsScreen(
     val refs = remember { mutableStateListOf<String>() }
     var creatorInput by remember { mutableStateOf("") }
     var tagInput by remember { mutableStateOf("") }
+    // Confirm-first: same destructive class as Collections/Groups delete (also
+    // evicts the feed's cached pages).
+    var deleteFor by remember { mutableStateOf<CustomFeedEntity?>(null) }
     val feeds by viewModel.feeds.collectAsStateWithLifecycle(emptyList())
     val groups by viewModel.favoriteGroups.collectAsStateWithLifecycle(emptyList())
     // Empty feed is valid: create it now, fill it later from any tile's
@@ -171,18 +174,21 @@ fun CustomFeedsScreen(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         refs.forEach { ref ->
-                            InputChip(
-                                selected = false,
-                                onClick = {},
+                            AssistChip(
+                                // Click = remove (the whole chip is one target;
+                                // the X icon states it — refs re-add trivially).
+                                onClick = { refs.remove(ref) },
                                 label = { Text(customRefSummary(ref)) },
                                 trailingIcon = {
-                                    Icon(
-                                        Icons.Default.Close,
-                                        contentDescription = "Remove",
-                                        Modifier.clickable {
-                                            refs.remove(ref)
-                                        },
-                                    )
+                                    androidx.compose.material3.IconButton(
+                                        onClick = { refs.remove(ref) },
+                                        modifier = Modifier.size(48.dp),
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            contentDescription = "remove ${customRefSummary(ref)}",
+                                        )
+                                    }
                                 },
                             )
                         }
@@ -285,10 +291,26 @@ fun CustomFeedsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    OutlinedButton(onClick = { viewModel.delete(feed.id) }) { Text("Delete") }
+                    OutlinedButton(onClick = { deleteFor = feed }) { Text("Delete") }
                 }
             }
         }
+    }
+    deleteFor?.let { feed ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { deleteFor = null },
+            title = { Text("Delete “${feed.name}”?") },
+            text = { Text("Removes the feed and its cached pages. Creators and tags stay untouched.") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    viewModel.delete(feed.id)
+                    deleteFor = null
+                }) { Text("Delete") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { deleteFor = null }) { Text("Cancel") }
+            },
+        )
     }
 }
 

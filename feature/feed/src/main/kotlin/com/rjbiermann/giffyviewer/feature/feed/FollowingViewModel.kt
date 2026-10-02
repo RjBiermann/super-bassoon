@@ -31,21 +31,29 @@ class FollowingViewModel
         private val _niches = MutableStateFlow<List<com.rjbiermann.giffyviewer.core.network.FollowedNicheDto>>(emptyList())
         val niches: StateFlow<List<com.rjbiermann.giffyviewer.core.network.FollowedNicheDto>> = _niches
 
+        private val _loadFailed = MutableStateFlow(false)
+        val loadFailed: StateFlow<Boolean> = _loadFailed
+
         fun refresh() {
             if (!loggedIn) return
             viewModelScope.launch {
                 // 269 follows → 3 pages of 100; fetch all (read-only, rate-limited).
                 var page = 1
-                runCatching {
-                    while (true) {
-                        val dto = api.followingCreators(page = page)
-                        _creators.value = _creators.value + dto.items
-                        if (page >= dto.pages) break
-                        page++
-                    }
-                }
-                runCatching { api.followedNiches() }
-                    .onSuccess { _niches.value = it.niches }
+                _loadFailed.value = false
+                val creatorsOk =
+                    runCatching {
+                        while (true) {
+                            val dto = api.followingCreators(page = page)
+                            _creators.value = _creators.value + dto.items
+                            if (page >= dto.pages) break
+                            page++
+                        }
+                    }.isSuccess
+                val nichesOk =
+                    runCatching { api.followedNiches() }
+                        .onSuccess { _niches.value = it.niches }
+                        .isSuccess
+                _loadFailed.value = !(creatorsOk && nichesOk)
             }
         }
     }

@@ -58,7 +58,7 @@ fun AuthSection(
             Text("Signed in", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             Text(
-                "Your favorites, follows and likes sync to your upstream account.",
+                "Your favorites, follows and likes sync to your account.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
