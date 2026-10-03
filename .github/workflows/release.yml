@@ -23,6 +23,11 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      # Gradle wrapper + dependency cache (same as ci.yml) — release builds
+      # no longer re-download the whole dependency tree on every tag.
+      - name: Setup Gradle (caching + wrapper validation)
+        uses: gradle/actions/setup-gradle@v4
+
       - name: Decode keystore
         run: |
           echo "$SIGNING_KEY" | base64 -d > keystore/release.keystore
@@ -31,7 +36,9 @@ jobs:
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
 
       - name: Build signed release APKs
-        run: ./gradlew :app-mobile:assembleRelease :app-tv:assembleRelease --console=plain -Dorg.gradle.jvmargs=-Xmx3g -PversionTag=${{ github.ref_name }}
+        # --build-cache: mobile + TV share the same plugin/stdlib compile
+        # outputs within one invocation.
+        run: ./gradlew :app-mobile:assembleRelease :app-tv:assembleRelease --console=plain --build-cache -Dorg.gradle.jvmargs=-Xmx3g -PversionTag=${{ github.ref_name }}
         env:
           SIGNING_STORE_FILE: ${{ github.workspace }}/keystore/release.keystore
           SIGNING_PASS: ${{ secrets.SIGNING_PASS }}

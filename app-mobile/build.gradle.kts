@@ -1,3 +1,12 @@
+// Local signing password: keystore/signing.properties (gitignored, generated
+// with the keystore). CI supplies SIGNING_PASS and never reads this file.
+fun localSigningPass(): String? =
+    rootProject.file("keystore/signing.properties")
+        .takeIf { it.exists() }
+        ?.readLines()
+        ?.firstOrNull { it.startsWith("pass=") }
+        ?.substringAfter("pass=")
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -29,11 +38,14 @@ android {
     signingConfigs {
         create("release") {
             // CI (Phase 10): the base64 keystore decodes to this file; secrets
-            // SIGNING_KEY (base64) + SIGNING_PASS drive the workflow.
+            // SIGNING_KEY (base64) + SIGNING_PASS drive the workflow. Local
+            // builds take the password from keystore/signing.properties
+            // (gitignored; generated with the keystore, never in the repo).
+            val localPass = localSigningPass()
             storeFile = file(System.getenv("SIGNING_STORE_FILE") ?: "../keystore/release.keystore")
-            storePassword = System.getenv("SIGNING_PASS") ?: "giffy_local"
+            storePassword = System.getenv("SIGNING_PASS") ?: localPass
             keyAlias = "giffy"
-            keyPassword = System.getenv("SIGNING_PASS") ?: "giffy_local"
+            keyPassword = System.getenv("SIGNING_PASS") ?: localPass
         }
     }
     buildTypes {

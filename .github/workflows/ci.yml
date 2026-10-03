@@ -1,0 +1,48 @@
+name: CI
+
+# Standard FOSS gate: every push to main and every PR builds the project and
+# runs the repo's own checks (ktlint, detekt, unit tests, debug+release-ish
+# compilation via Gradle `build`). A red tree cannot sneak into a tag — release.yml
+# (tag-driven signing + GitHub Release) runs separately on `v*` tags only.
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # Caches the Gradle wrapper + downloaded/extracted dependency tree
+      # across runs (gradle/actions dependency caching). setup-java already
+      # caches the JDK itself.
+      - name: Setup Gradle (caching + wrapper validation)
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build + checks (ktlint / detekt / unit tests)
+        # --build-cache: both app modules + all libs reuse compile outputs
+        # within the one invocation (no cross-run state to trust).
+        run: ./gradlew build --console=plain --build-cache -Dorg.gradle.jvmargs=-Xmx3g --stacktrace
+
+      - name: Upload reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-reports
+          path: |
+            **/build/reports/ktlint/
+            **/build/reports/detekt/
+            **/build/reports/tests/
+          if-no-files-found: ignore
+          retention-days: 7
