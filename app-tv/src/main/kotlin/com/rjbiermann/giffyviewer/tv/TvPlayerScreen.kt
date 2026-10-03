@@ -118,6 +118,14 @@ fun TvPlayerScreen(
     // Player text auto-hide state — declared before the key-event Column.
     var textVisible by remember { mutableStateOf(true) }
 
+    // Menu-less-remote keymap (AGENTS-APP): hold-Center ≥500ms opens the
+    // quick-actions panel (the same panel MENU opens); short-tap Center keeps
+    // play/pause. KeyUp suppression lives in CenterHold.up().
+    val centerHold =
+        remember(scope) {
+            CenterHold(scope) { actionsFor = gifs.getOrNull(index) }
+        }
+
     // D-pad events only reach onPreviewKeyEvent via a FOCUSED node inside the
     // hierarchy — the PlayerView never takes focus, so grab it on entry.
     val playerFocus =
@@ -158,6 +166,15 @@ fun TvPlayerScreen(
                                     }
                                     Key.DirectionLeft -> {
                                         seekBy(player, -10_000L) { seekFlash = it }
+                                        true
+                                    }
+                                    // Menu-less-remote keymap: consume the held
+                                    // (and tapped) Center KeyDown without
+                                    // triggering the seek/table paths — the
+                                    // action fires on KeyUp, tap vs hold is
+                                    // CenterHold's clock.
+                                    Key.DirectionCenter -> {
+                                        if (e.nativeKeyEvent.repeatCount == 0) centerHold.down()
                                         true
                                     }
                                     else -> false
@@ -210,11 +227,16 @@ fun TvPlayerScreen(
                         -> true
                         // CENTER = play/pause (audit: "can't pause on TV");
                         // at the ended frame restarts (playOrRestart).
+                        // Menu-less-remote keymap: a fired hold already opened
+                        // the quick-actions panel — the KeyUp must not ALSO
+                        // run play/pause (spec KeyUp-suppression rule).
                         Key.DirectionCenter -> {
-                            if (player.playbackState == Player.STATE_ENDED) {
-                                player.playOrRestart()
-                            } else {
-                                player.playWhenReady = !(player.playWhenReady)
+                            if (!centerHold.up()) {
+                                if (player.playbackState == Player.STATE_ENDED) {
+                                    player.playOrRestart()
+                                } else {
+                                    player.playWhenReady = !(player.playWhenReady)
+                                }
                             }
                             true
                         }

@@ -745,7 +745,7 @@ Hard caps: pane depth 2 (main → pane → existing picker dialog/screen, same a
 today); no labels outside the site-lingo table — pane titles reuse existing
 wording ("Add to…", "Tags", "Block…", "Block creator", "Block keyword").
 
-## TV menu-less-remote keymap (spec'd 2026-10-02 — user ask; build pending)
+## TV menu-less-remote keymap (BUILT + D-pad-verified 2026-10-02, TV36 — was spec'd same day, user ask)
 No-button-limitation rule: **every feature reachable with only D-pad + Back + Center**;
 MENU and media keys are bonus parity, never the only path. Gap: TV quick actions open
 only via `Key.Menu` (tiles / niche rows / player) — unreachable on Menu-less remotes
@@ -768,6 +768,22 @@ in AGENTS-UX-PATTERNS.md "No-button-limitation rule"; spec here (graduation step
   hold ≥500ms opens the panel in the player, on a focused home card, and on a niche row;
   panel closes with BACK before navigation; MENU (where present) still opens the same
   panel.
+[BUILT 2026-10-02 batch 17 — `CenterHold` (app-tv, ~50 lines): per-focused-node hold
+state — initial (non-repeat) Center KeyDown starts a 500ms clock and is consumed;
+KeyUp reports whether the hold fired (suppresses the surface's short-tap action); state
+resets on every press so a panel opening that steals focus and swallows the KeyUp cannot
+leak into the next press. Wired on all three Center-meaningful surfaces:
+TvPlayerScreen (hold = quick-actions panel, tap = play/pause unchanged), shared GifCard
+(hold = panel, tap = card open — covers home rows AND TvSourceFeedScreen grids),
+TvNiches row (hold = togglePin in place, tap = open the niche feed).
+Device-verified on TV36 (fresh profile): hold-Center opened the quick-actions panel in
+the player (Like/Mute/Speed rows), on a focused Continue Watching card, and pinned the
+first niche row in place — the niche-row case directly proves KeyUp suppression (focus
+never leaves the row; the feed did NOT open after the hold); short-tap Center kept
+every prior action (card → player, row → niche feed, player play/pause proven via
+watch_history position advance→static); BACK closed the panel before navigation;
+MENU still opens the same panel. Device-input lesson: `input keyevent -t <ms>` is NOT
+a valid flag — use `--duration <ms>` for a held key; `-t` degrades to an instant tap.]
 - Explicitly unchanged/parked: number keys, double-click, preview-on-focus,
   hold-for-2× (AGENTS-UX-PATTERNS skips), media keys stay player-internal parity only.
 

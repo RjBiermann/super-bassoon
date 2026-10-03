@@ -594,7 +594,7 @@ Executed the four build slices spec'd in AGENTS-APP.md "Design-system consistenc
 (batch 15)". Compile + ktlint + detekt + unit tests green on :core:ui/:feature:feed/
 :feature:search/:app-tv/:app-mobile. Deviation noted: slices built in one pass with ONE
 combined device pass (Medium_Phone + TV36) instead of verify-per-slice — emulator fragility
-made per-slice ringo-dance uneconomical; all gates still covered:
+made per-slice device dance uneconomical; all gates still covered:
 - **S1 typography (F1+F2+F8):** mobile Typography rebased to the standard M3 scale
   (titleLarge 22, headlineMedium 28, headlineSmall 24, labelSmall 11, fractional standard
   tracking — the 1sp caption tracking gone; display slots stay 32 per spec); TvTheme
@@ -630,3 +630,34 @@ made per-slice ringo-dance uneconomical; all gates still covered:
   slot contract per spec F8 — row content heights were already 10-foot sized and
   unaffected; flagged here in case a 3m-screen legibility report ever wants a TV-specific
   bump (that would be a deliberate deviation from the spec, not drift).
+
+### Session 2026-10-02 batch 17 (pending-items sweep — the TV menu-less-remote keymap built + device-verified)
+Reviewed every AGENTS doc's parked/deferred/blocked list; found exactly ONE remaining
+"build pending" item with a numbered spec — the TV menu-less-remote keymap (hold-Center,
+AGENTS-APP.md + AGENTS-UX-PATTERNS.md "No-button-limitation rule", user ask). BUILT:
+- `CenterHold` (app-tv, new ~50-line helper): per-focused-node hold state — initial
+  (non-repeat) Center KeyDown starts a 500ms clock and is consumed; KeyUp reports
+  whether the hold fired (caller suppresses the surface's short-tap action); state
+  resets per press so a panel stealing focus and swallowing the KeyUp can't leak into
+  the next press. No new dependency, no architecture change.
+- Wired on all three Center-meaningful surfaces: TvPlayerScreen (hold = quick-actions
+  panel; tap = play/pause + restart-at-end unchanged), shared `GifCard` (hold = panel;
+  tap = card open — covers home rows AND TvSourceFeedScreen grids), TvNiches row
+  (hold = togglePin in place, "no panel there" per spec; tap = open niche feed).
+- D-pad-verified on TV36 (fresh profile, `--duration 700` holds): hold opened the panel
+  in the player (player-variant rows), on a focused Continue Watching card (card-variant
+  rows), and pinned the first niche row in place — the niche row directly proves KeyUp
+  suppression (in-place action, focus never left, feed did NOT open); short-tap Center
+  kept every prior action (card→player, row→niche feed, player play/pause proven via
+  watch_history position advance→static); BACK closed the panel before navigation;
+  MENU still opens the same panel. Compile + ktlint + detekt + unit tests green on
+  :app-tv. Mobile untouched.
+- Device-input lesson: `adb shell input keyevent -t <ms>` is NOT a valid flag — use
+  `--duration <ms>` for a held key; `-t` degrades to an instant tap (cost: one wrong
+  read mid-session).
+- Remaining parked/blocked (all unchanged, reasons re-affirmed): Groups→custom-feeds
+  merge (re-evaluation condition unmet), Followers page (row shape — no-guess rule),
+  Report (unprobeable), server search-history sync / server collections / niches
+  suggest (spec'd-not-scheduled fallbacks — decided, not parked), soaks (emulator
+  fragility), Gate 324 (blocked on SIGNING secrets), minimap/preview-on-focus/
+  show-more/two-column + RateLimitBus indicator (decided skips).

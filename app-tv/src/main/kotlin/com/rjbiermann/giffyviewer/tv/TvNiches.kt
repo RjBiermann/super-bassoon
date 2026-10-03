@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -86,6 +87,14 @@ fun TvNichesScreen(
                         androidx.compose.foundation.interaction
                             .MutableInteractionSource()
                     }
+                // Menu-less-remote keymap: hold-Center ≥500ms = the row's MENU
+                // action (toggle the home pin); short-tap Center opens the
+                // niche feed (same as the click).
+                val scope = rememberCoroutineScope()
+                val centerHold =
+                    remember(scope, niche.id) {
+                        CenterHold(scope) { viewModel.togglePin(niche) }
+                    }
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -109,6 +118,22 @@ fun TvNichesScreen(
                                     if (event.type == KeyEventType.KeyUp && event.key == Key.Menu) {
                                         viewModel.togglePin(niche)
                                         true
+                                    } else if (event.key == Key.DirectionCenter) {
+                                        // Menu-less-remote keymap: Center KeyDown
+                                        // is consumed (hold clock owns the press);
+                                        // KeyUp either suppresses (hold fired the
+                                        // pin toggle) or opens the niche feed.
+                                        when (event.type) {
+                                            KeyEventType.KeyDown -> {
+                                                if (event.nativeKeyEvent.repeatCount == 0) centerHold.down()
+                                                true
+                                            }
+                                            KeyEventType.KeyUp -> {
+                                                if (!centerHold.up()) onOpenNiche(FeedSource.Niche(niche.id, niche.name))
+                                                true
+                                            }
+                                            else -> false
+                                        }
                                     } else {
                                         false
                                     }

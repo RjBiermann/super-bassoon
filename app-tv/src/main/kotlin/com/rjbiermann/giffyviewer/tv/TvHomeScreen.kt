@@ -24,6 +24,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -302,6 +303,10 @@ internal fun GifCard(
     // 10-foot UX: focused card grows so the D-pad user always sees where focus is.
     var focused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (focused) 1.08f else 1f, label = "cardScale")
+    // Menu-less-remote keymap: hold-Center ≥500ms opens the quick-actions
+    // panel (the same panel MENU opens); short-tap Center keeps the card open.
+    val scope = rememberCoroutineScope()
+    val centerHold = remember(scope) { CenterHold(scope, onMenu) }
     Card(
         onClick = onClick,
         // Mobile tiles use 12dp rounded corners (GifTile in feature:feed).
@@ -323,6 +328,22 @@ internal fun GifCard(
                     if (event.type == KeyEventType.KeyUp && event.key == Key.Menu) {
                         onMenu()
                         true
+                    } else if (event.key == Key.DirectionCenter) {
+                        // Menu-less-remote keymap: Center KeyDown is consumed
+                        // (the hold clock owns the press); KeyUp either
+                        // suppresses (hold fired the panel) or opens the card
+                        // as before.
+                        when (event.type) {
+                            KeyEventType.KeyDown -> {
+                                if (event.nativeKeyEvent.repeatCount == 0) centerHold.down()
+                                true
+                            }
+                            KeyEventType.KeyUp -> {
+                                if (!centerHold.up()) onClick()
+                                true
+                            }
+                            else -> false
+                        }
                     } else {
                         false
                     }

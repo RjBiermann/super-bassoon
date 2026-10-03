@@ -136,7 +136,7 @@ opens quick actions; verified in TvSourceFeedScreen 2026-10-02).
    two openers) — if it needs a new bare key, it first needs a strong reason the panel isn't enough.
 6. **BACK dismisses overlays before navigation**, and never bypasses the age gate / PIN.
 
-### No-button-limitation rule (2026-10, user ask — spec'd, build pending)
+### No-button-limitation rule (2026-10, user ask — BUILT 2026-10-02, see graduation note below)
 Constraint: **every feature must be reachable with only D-pad + Back + Center.** MENU and the
 `KEYCODE_MEDIA_*` transport keys are bonus parity for remotes that have them — never the only
 path to a feature. The gap this closes: TV quick actions (favorite/block/add-to-feed/like/
@@ -161,8 +161,8 @@ Mainstream deltas deliberately NOT adopted: Netflix's "Up = exit player" (our fe
 vertical — Up = prev item is the spatially honest mapping), number-key percent-jump
 (YouTube-only nicety), double-click anything (rule 3).
 
-[Graduation: spec'd here; build pending — AGENTS-APP.md "TV menu-less-remote keymap"
-carries the numbered spec.]
+[Graduation: BUILT + D-pad-verified 2026-10-02 on TV36 — AGENTS-APP.md "TV
+menu-less-remote keymap" carries the build record.]
 
 ## Device-type summary used across the doc
 
