@@ -16,7 +16,7 @@ the **ID token** as `Authorization: Bearer` on every user endpoint (`/v2/likes`,
 `/v2/feeds/liked`, `/v2/feeds/for-you`, `/v1/me/follows`, `/v2/me/following`,
 `/v2/me/collections`, and the write actions — all probed live, all writes reverted).
 Kinde's **access_token is REJECTED** by the API (`BadTokenFormat: "must be a JWT with
-type=bearer"`; its payload also has `aud: []` vs the API's `https://api.redgifs.com`).
+type=bearer"`; its payload also has `aud: []` vs the API's audience.
 TokenStore correctly stores the ID token; the hourly expiry + silent refresh stays.
 The refresh grant (form-urlencoded, public client) was re-verified live: 200,
 mints a fresh ID token + refresh token.

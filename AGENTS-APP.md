@@ -966,11 +966,11 @@ Deliberately NOT built this batch (still parked, with reasons):
 batch-16 entry in root AGENTS.md. The findings text below is the original audit, kept for
 the evidence; each F-item notes its fix in the code.
 User ask: "colors, typography, styling still not consistent in mobile and TV. Use standard
-mobile and TV UI/UX design. Match theming to the RedGIFs site." Findings below are
+mobile and TV UI/UX design. Match theming to the browsed site." Findings below are
 static-source evidence (line-checked this session); every fix is a build slice with its own
 device-verify gate. THE RECONCILIATION RULE this spec follows:
 
-**Palette + typeface = borrowed RedGIFs brand (GiffyColors + DM Sans, verified from the
+**Palette + typeface = borrowed site brand (GiffyColors + DM Sans, verified from the
 site's CSS 2026-09-30 — the "match the site" half). Sizes/roles/tracking/shape = the
 standard platform scales — M3 for mobile, tv-material defaults for TV (the "standard
 UI/UX" half).** Site brand colors ride inside the standard role system; the platform

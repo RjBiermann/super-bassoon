@@ -1,6 +1,6 @@
 # Giffy Viewer — Agent Guidance (root)
 
-Unofficial RedGifs client. Pure viewer and gif organizer — browsing/viewing and
+Unofficial client for a public GIF-hosting site. Pure viewer and gif organizer — browsing/viewing and
 organizing (labels, favorites, feeds, filters) work whether the person is signed in or
 using in-app-only features, and watching gifs on the TV is a first-class use case, not
 an afterthought. GitHub-Releases-only distribution.
@@ -566,7 +566,7 @@ with documented cost reasons).
 
 ### Session 2026-10-02 batch 15 (doc-only — design-system consistency audit mobile↔TV via standard M3/tv-material grounding; no code changes)
 User ask: colors/typography/styling inconsistent between mobile and TV — use standard
-mobile/TV UI/UX design, keep theming matched to the RedGIFs site. Static audit done,
+mobile/TV UI/UX design, keep theming matched to the browsed site. Static audit done,
 spec written in **AGENTS-APP.md "Design-system consistency audit (2026-10-02 batch 15)"**;
 no code touched. Highlights:
 - **Standards verified from source, not memory:** decoded tv-material 1.0.1 Typography
@@ -582,7 +582,7 @@ no code touched. Highlights:
   Color.White/Black with drifting scrim alphas (0.55/0.6/0.3/0.7) across the two
   independently-built player overlay layers; corner-radius scatter (3/6/8/12/16/24/32/999
   dp ad hoc, no shape scale); slot-mapping drift (same element, different text slots).
-- **Reconciliation rule spec'd:** RedGIFs site = brand (GiffyColors palette + DM Sans);
+- **Reconciliation rule spec'd:** browsed site = brand (GiffyColors palette + DM Sans);
   standard scales = the design system (M3 mobile, tv-material defaults with family
   swapped to DM Sans for TV). 4 build slices ordered (typography rebase → color roles +
   AMOLED fix → shape scale → palette re-verify vs live CSS via Playwright), each with a
