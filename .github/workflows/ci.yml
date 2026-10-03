@@ -7,7 +7,18 @@ name: CI
 on:
   push:
     branches: ["main"]
+    # Docs-only pushes (README, LICENSE, AGENTS specs) can't affect a single
+    # .kt file — skip the build gate; code+docs commits still run (only pure
+    # doc pushes match the ignore set).
+    paths-ignore:
+      - "**.md"
+      - "LICENSE"
+      - "docs/**"
   pull_request:
+    paths-ignore:
+      - "**.md"
+      - "LICENSE"
+      - "docs/**"
 
 permissions:
   contents: read
