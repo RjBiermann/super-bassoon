@@ -191,13 +191,14 @@ class TokenStore(
             runCatching {
                 val payload = token.split('.')[1]
                 val json =
-                    Json.parseToJsonElement(
-                        Base64
-                            .UrlSafe
-                            .withPadding(Base64.PaddingOption.ABSENT)
-                            .decode(payload)
-                            .decodeToString(),
-                    ).jsonObject
+                    Json
+                        .parseToJsonElement(
+                            Base64
+                                .UrlSafe
+                                .withPadding(Base64.PaddingOption.ABSENT)
+                                .decode(payload)
+                                .decodeToString(),
+                        ).jsonObject
                 json["preferred_username"]?.jsonPrimitive?.content?.takeIf { it.isNotEmpty() }
             }.getOrNull()
 

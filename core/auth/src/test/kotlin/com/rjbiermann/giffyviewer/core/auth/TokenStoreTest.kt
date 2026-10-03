@@ -103,11 +103,12 @@ class TokenStoreTest {
     @Test
     fun `usernameFromJwt reads the live-verified preferred_username claim`() {
         assertEquals("testuser", TokenStore.usernameFromJwt("h.$payloadB64.sig"))
-        assertNull(TokenStore.usernameFromJwt("h." +
+        val noClaimPayload =
             kotlin.io.encoding.Base64
                 .UrlSafe
                 .withPadding(kotlin.io.encoding.Base64.PaddingOption.ABSENT)
-                .encode("""{"sub":"kp_x"}""".encodeToByteArray()) + ".sig"))
+                .encode("""{"sub":"kp_x"}""".encodeToByteArray())
+        assertNull(TokenStore.usernameFromJwt("h.$noClaimPayload.sig"))
         assertNull(TokenStore.usernameFromJwt("garbage"))
         assertNull(TokenStore.usernameFromJwt("a." + "".padEnd(4, 'x') + ".c"))
     }

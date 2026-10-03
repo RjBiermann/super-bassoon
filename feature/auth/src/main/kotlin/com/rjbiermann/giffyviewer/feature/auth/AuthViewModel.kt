@@ -27,7 +27,12 @@ class AuthViewModel
         val username: StateFlow<String?> =
             store.token
                 .map { t -> t?.let(TokenStore::usernameFromJwt) }
-                .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000), null)
+                .stateIn(
+                    viewModelScope,
+                    kotlinx.coroutines.flow.SharingStarted
+                        .WhileSubscribed(5_000),
+                    null,
+                )
 
         /** PKCE material for the in-flight WebView login, kept until consumed. */
         private var pkce: TokenStore.Pkce? = null

@@ -1,3 +1,7 @@
+// PlayerView/AspectRatio resize modes are @UnstableApi — same file-level
+// opt-in PlayerScreen.kt carries (lint UnsafeOptInUsageError).
+@file:androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.rjbiermann.giffyviewer.feature.feed
 
 import androidx.compose.foundation.background
