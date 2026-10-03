@@ -861,6 +861,23 @@ pill + More ▾ menu), D-pad-verified on TV36. See AGENTS.md batch 12 for detail
   [D-pad verify DONE 2026-10-02 (later session, TV36): player entry → 3s+ idle →
   uiautomator dump has NO text nodes (cluster left composition); any key (LEFT)
   re-revealed it (@creator visible); idle again → gone. Both directions verified.]]
+- **For You row** — BUILT 2026-10-03 (mobile↔TV parity): TV home gains a
+  logged-in "For You" FIRST row (site home order, verified sweep — mobile
+  chips: For You first when logged in). FeedRepository now serves
+  `FeedSource.ForYou` NETWORK-LIVE (`ForYouNetworkPagingSource`, same
+  no-cache rule as Liked — per-user server personalization must not ride the
+  shared Room feed cache; behavioural side-effect: For You no longer renders
+  from cache in airplane mode, intended). Scope (Creators·Niches·All) stays a
+  read-time filter over the server pages via the repo's 5-min ForYouContext
+  (the endpoint has no scope param — verified in GifsApi). Signed-out: row
+  absent, ZERO for-you network activity (paging collected only when the row
+  composes) — device-verified Television_AOSP 2026-10-03, 0 FATALs.
+  SIGNED-IN device verify DONE 2026-10-03 (Television_1080p, real in-app
+  WebView login by the user): For You FIRST row (order fix landed mid-verify:
+  the row shipped after Trending despite the comment — Trending ↔ For You
+  swapped, site order now exact), personalized content visibly distinct from
+  Trending, D-pad walk → card opens player, ZERO Auth401s the whole session,
+  0 FATALs, row survives force-stop → relaunch.
 - **Search** — ~~zero `api.search` calls~~ BUILT 2026-10-02 batch 12: home "Search"
   pill → shared SearchScreen (feature:search dep added to app-tv); submit opens
   `FeedSource.Search` via TvSourceFeedScreen. D-pad-verified on TV36.

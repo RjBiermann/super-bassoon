@@ -68,6 +68,49 @@ Gone: the earlier `localStorage.auth_data` polling capture — the real site nev
 
 **Emulator quirk (informational):** upstream-site.example pages can paint black/white in emulator WebViews (old Chrome WebView + the site's own CSS). auth2 login pages render fine. (The paste-token fallback was removed 2026-10 — if a device WebView ever fails the auth2 page there is no fallback UI; the auth2 page itself is WebView-verified.)
 
+## Auth drift watch (found 2026-10-03 live probes — NOT built, user-slice gated)
+Probing a fresh pasted Kinde bundle (provided 2026-10-03) against `/v2/feeds/for-you`
+shows the API is NO LONGER accepting out-of-session tokens the way the 2026-09-30
+paste flow did. Facts, probed live (curl + Playwright + on-device):
+- **Pasted id_token → 401 `UserTokenRequired`** on device (auth interceptor Bearer
+  present; the message is the server's). Same from curl.
+- **access_token → 401 `BadTokenFormat` "must be a JWT with type=bearer"** — unchanged
+  from the 2026-09-30 finding (id_token is still the right token TO send). refresh
+  grant (`POST {oauthToken}`, refresh_token grant, public SPA client) returns 200 with
+  the same shapes (id_token/access_token both header-typ JWT) — rotating the grant does
+  not produce a typ=bearer token.
+- **The site's own SPA gets 200** on `GET /v2/feeds/for-you?page=1&count=50&source=all`
+  with `Bearer <id_token>` (typ=JWT, same issuer/azp) plus `x-session-id: <random-64bit>`
+  and a Chrome UA — the app sends NONE of x-session-id (it does send the UA).
+- **Same bearer + same x-session-id + same UA replayed from curl seconds later →
+  401 `BadTokenSignature`** ("could not verify with any known key"), while the browser
+  keeps getting 200. Only unexplained delta left: the browser's cookie jar
+  (credentials ride along on api.redgifs.com). Read: **tokens are session-bound
+  server-side** — a mint belongs to its browser session; replaying it from another
+  client fails.
+- Consequences for the app (RESOLVED 2026-10-03, later same day): a REAL in-app
+  WebView PKCE login (own session, own cookie jar) DOES produce a token the API
+  accepts with the CURRENT client — no CookieJar/x-session-id adaptation needed.
+  Full signed-in session verified on Television_1080p: For You fetched 200 with
+  ZERO Auth401 lines the entire session, D-pad → player, force-stop → relaunch
+  keeps the session. So: tokens are session-bound server-side (foreign mints
+  fail — the paste-a-foreign-bundle path stays retired as a primary path; the
+  initial hypothesis below stands for that case only), but the app's own login
+  flow authenticates normally. Watch: if a NEW authenticated endpoint 401s,
+  re-probe the SPA's headers (x-session-id/cookies) before assuming app bugs.
+  Testing note (2026-10-03): debroid token-injection CANNOT fake a signed-in
+  state anymore — inject a foreign mint, every user call 401s. Sign in for real
+  via the in-app WebView (email → OTP; OTP = user slice).
+- (Original 2026-10-03 hypothesis, kept for the record: the in-app WebView PKCE
+  login might still 401 on session-bound endpoints even after a real in-app
+  login — probed FALSE by the Television_1080p signed-in session.)
+- Session lesson: `orientation_filter` on a TV/profile flips silently if a stray
+  ENTER lands on a chip during D-pad walks — an all-portrait pool then empties
+  Trending (and every revalidated feed row) while the creators row (not
+  orientation-filtered) still fills. Check Settings → Orientation first on any
+  "row renders empty" report; DataStore file (`files/datastore/*.preferences_pb`)
+  is the quick check (`orientation_filter` value).
+
 ## Real-token end-to-end (verified on TV36 2026-09-30)
 - **The browser id_token (issuer `upstream-auth-host.example`) IS the API bearer** — works on
   `v2/feeds/*`, `v2/users/{name}/search`, `v1/me`, `v2/likes`. The Kinde **access_token**

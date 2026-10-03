@@ -61,7 +61,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
-import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
@@ -560,20 +559,45 @@ fun FeedScreen(
                         inlinePlayer.volume = 0f // muted preview, tap = full player
                         inlinePlayer.repeatMode = Player.REPEAT_MODE_ONE
                         snapshotFlow {
+                            // The scroll-stop TRANSITION is part of the key: mid-fling
+                            // the settle fires once and used to be skipped on
+                            // isScrollInProgress (never retried → the shared player
+                            // stayed paused on the previous gif's frozen frame).
                             val info = gridState.layoutInfo
-                            info.visibleItemsInfo
-                                .firstOrNull {
-                                    isSettled(it.offset.y, it.size.height, info.viewportSize.height)
-                                }?.index
-                        }.distinctUntilChanged().collect { settled ->
-                            inlinePlayer.pause()
+                            val settled =
+                                info.visibleItemsInfo
+                                    .firstOrNull {
+                                        isSettled(it.offset.y, it.size.height, info.viewportSize.height)
+                                    }?.index
+                            settled to gridState.isScrollInProgress
+                        }.distinctUntilChanged().collect { (settled, scrolling) ->
+                            if (scrolling) {
+                                // Scroll in progress: pause (frozen frame stays on
+                                // the current tile — standard video-list UX) and
+                                // DON'T move the surface; the settle emission after
+                                // the scroll-stop transition drives everything else.
+                                inlinePlayer.pause()
+                                return@collect
+                            }
+                            // Switching content: clear the previous gif's last
+                            // frame BEFORE the surface moves to the new tile —
+                            // otherwise the incoming tile paints the stale frame
+                            // during the (re)attach window (reported glitch).
+                            val nextGif = settled?.let { items[it] }
+                            if (nextGif != null && inlinePlayer.currentGifId.value != nextGif.id) {
+                                inlinePlayer.stop()
+                            }
                             inlineIndex = settled
-                            if (settled != null) {
-                                delay(INLINE_SETTLE_MS) // settle grace — skip hover-bys
-                                val gif = items[settled]
-                                if (!gridState.isScrollInProgress) {
-                                    gif?.let { inlinePlayer.playGif(it, dataSaver = false) }
-                                }
+                            if (settled == null) return@collect
+                            delay(INLINE_SETTLE_MS) // settle grace — skip hover-bys
+                            if (gridState.isScrollInProgress) return@collect // re-checked after grace
+                            val gif = items[settled] ?: return@collect
+                            if (inlinePlayer.currentGifId.value != gif.id) {
+                                inlinePlayer.playGif(gif, dataSaver = false)
+                            } else if (!inlinePlayer.isPlaying) {
+                                // Same page re-settled (scroll-start/stop flip or
+                                // touch): just resume, never restart from 0.
+                                inlinePlayer.play()
                             }
                         }
                     }
@@ -713,19 +737,25 @@ private fun GifTile(
             )
             if (inlinePlayer != null && inlineAttached) {
                 // Inline preview surface (AGENTS-PLAYER spec): the shared muted
-                // player on the settled tile; poster stays underneath until the
-                // first frame. PlayerView consumes no touches (controller off)
-                // so the tile's tap/long-press keep working.
+                // player on the settled tile. TextureView surface (see
+                // inline_player_view.xml): transparent until the first frame —
+                // the poster underneath stays visible through attach/prepare,
+                // no black window. PlayerView consumes no touches (controller
+                // off) so the tile's tap/long-press keep working.
                 AndroidView(
                     factory = { ctx ->
-                        PlayerView(ctx).apply {
-                            useController = false
-                            isClickable = false
-                            isFocusable = false
-                            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                        }
+                        android.view.LayoutInflater
+                            .from(ctx)
+                            .inflate(
+                                com.rjbiermann.giffyviewer.feature.feed.R.layout.inline_player_view,
+                                null,
+                                false,
+                            ).apply {
+                                isClickable = false
+                                isFocusable = false
+                            }
                     },
-                    update = { view -> view.player = inlinePlayer },
+                    update = { view -> (view as PlayerView).player = inlinePlayer },
                     modifier = Modifier.matchParentSize(),
                 )
             }

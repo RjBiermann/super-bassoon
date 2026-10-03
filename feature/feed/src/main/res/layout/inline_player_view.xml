@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Inline feed-autoplay preview surface (AGENTS-PLAYER spec).
+    texture_view (not the default surface_view): a SurfaceView is a separate
+    window layer that is BLACK until ExoPlayer paints its first frame and
+    punches through the poster — a black flash on every tile switch. A
+    TextureView renders inside the app window and stays transparent until
+    real frames arrive, so the tile's poster stays visible through the whole
+    attach/prepare window (zero black window). Muted looped preview only;
+    the swipe player keeps its own surfaces.
+-->
+<androidx.media3.ui.PlayerView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    app:surface_type="texture_view"
+    app:shutter_background_color="@android:color/transparent"
+    app:use_controller="false"
+    app:resize_mode="fit" />

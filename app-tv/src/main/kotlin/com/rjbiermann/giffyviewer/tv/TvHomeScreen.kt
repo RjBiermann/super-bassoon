@@ -76,6 +76,9 @@ fun TvHomeScreen(
     val topThisWeek = homeViewModel.topThisWeek.collectAsLazyPagingItems()
     val favorites = homeViewModel.favorites.collectAsLazyPagingItems()
     val liked = homeViewModel.liked.collectAsLazyPagingItems()
+    // For You (server personalization; TV↔mobile parity): first row when
+    // logged in — same home order as mobile's site-verified sweep.
+    val forYou = homeViewModel.forYou.collectAsLazyPagingItems()
     val followingVm: com.rjbiermann.giffyviewer.feature.feed.FollowingViewModel =
         androidx.hilt.navigation.compose
             .hiltViewModel()
@@ -117,6 +120,11 @@ fun TvHomeScreen(
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp),
             )
+        }
+        // Logged-in For You row goes FIRST (site home order, verified sweep);
+        // anonymous users never see it (the feed 401s anonymous).
+        if (isLoggedIn) {
+            item { FeedRow("For You", forYou, onOpenGif, onMenu = { actionsFor = it }, preview = preview, dataSaver = dataSaver) }
         }
         item { FeedRow("Trending", trending, onOpenGif, onMenu = { actionsFor = it }, preview = preview, dataSaver = dataSaver) }
         // Explore = Top Creators (§9 lingo) — creators row, tap → creator feed.

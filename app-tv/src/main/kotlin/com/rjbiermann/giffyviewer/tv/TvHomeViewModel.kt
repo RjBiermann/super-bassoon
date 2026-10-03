@@ -33,6 +33,11 @@ class TvHomeViewModel
         /** Liked (PLAN §7): network-live, never cached — same source as mobile. */
         val liked = repository.paging(FeedSource.Liked).cachedIn(viewModelScope)
 
+        /** For You (filed 2026-10 TV↔mobile parity gap): network-live server
+         *  personalization, same flow shape as Liked — mobile-first home row
+         *  order (verified sweep: For You first when logged in). */
+        val forYou = repository.paging(FeedSource.ForYou).cachedIn(viewModelScope)
+
         /** Logged-in surfaces (Liked/Following rows) show only with a token —
          *  reactive so in-app sign-in/out updates the home rows without a restart. */
         val isLoggedIn: StateFlow<Boolean> =

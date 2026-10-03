@@ -114,6 +114,32 @@ class FeedRepository
                             },
                         ).flow
                     }
+            } else if (feed is FeedSource.ForYou) {
+                // Network-live, never cached (PLAN §7, same rule as Liked):
+                // the server personalizes per user — Room cache would serve
+                // another user's glob. ForYou context (scope + follows) is
+                // fetched per page by the source (5-min repo memo makes
+                // per-page calls cheap; rate-limit invariant).
+                kotlinx.coroutines.flow
+                    .combine(
+                        settings.orientationFilter,
+                        settings.verifiedOnly,
+                    ) { o, v -> o to v }
+                    .flatMapLatest { (o, v) ->
+                        Pager(
+                            config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = 10, enablePlaceholders = false),
+                            pagingSourceFactory = {
+                                ForYouNetworkPagingSource(
+                                    api,
+                                    contentFilter,
+                                    PAGE_SIZE,
+                                    forYouContext = { forYouContext() },
+                                    orientation = o,
+                                    verifiedOnly = v,
+                                )
+                            },
+                        ).flow
+                    }
             } else {
                 // Orientation (global) + §8 per-feed prefs BOTH restart the pager:
                 // combine them so either change re-reads cached pages through the

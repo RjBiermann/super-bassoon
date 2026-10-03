@@ -68,14 +68,37 @@ Implementation (FeedScreen + GifTile):
   `repeatMode = REPEAT_MODE_ONE`.
 - **Settle:** `snapshotFlow` over the staggered-grid visible items → first item
   ≥50% main-axis visible (`isSettled`, pure + unit-tested `InlineSettleTest`) →
-  pause, set `inlineIndex`, 150ms settle grace (`INLINE_SETTLE_MS` knob),
-  re-check `isScrollInProgress`, then `playGif(gif, dataSaver = false)` —
-  one stream fetch per settled tile, never mid-fling (rate-limit invariant).
-  Settled null / scroll → pause. Adjacent prefetch NOT run inline (preview only;
-  PlayerScreen keeps its own preload).
-- **Surface:** each tile hosts an `AndroidView(PlayerView)` (controller off,
+  150ms settle grace (`INLINE_SETTLE_MS` knob), re-check `isScrollInProgress`,
+  then `playGif(gif, dataSaver = false)` — one stream fetch per settled tile,
+  never mid-fling (rate-limit invariant). Settled null / scroll → pause.
+  **Fixed 2026-10-03 (user report, first video played, scroll stalled on its
+  frozen frame):** the flow originally emitted ONCE per distinct settled index
+  and skipped play when `isScrollInProgress` — at fling-settle that skip was
+  final (no re-emission → never retried). The snapshot is now keyed on
+  `(settledIndex, isScrollInProgress)`: the scroll-stop transition itself
+  re-emits, play is re-checked after the grace, and a same-gif re-settle
+  `play()`s (resume) instead of restarting from 0.
+- **Surface:** each tile hosts an AndroidView(PlayerView) (controller off,
   non-clickable so tile tap/long-press keep working) only while
-  `inlineIndex == index`; the poster AsyncImage stays underneath.
+  `inlineIndex == index` — inflated from `res/layout/inline_player_view.xml`,
+  whose two XML-only knobs close the black-flash report (2026-10-03):
+  `surface_type=texture_view` (a SurfaceView is a separate compositor layer
+  that is BLACK until the first frame and punches through the poster;
+  TextureView renders in-window, transparent until frames land — poster
+  visible through the whole prepare window) and
+  `shutter_background_color=transparent` (PlayerView's black shutter covers
+  the surface until first frame regardless of surface type). Only
+  surface_type has no programmatic setter — hence the 15-line XML, not
+  hand-rolled UI. On content switch the collect `stop()`s the player BEFORE
+  the surface moves (no stale previous-gif frame on the incoming tile) and
+  the surface stays on the outgoing tile (frozen frame) while scrolling —
+  no mid-fling surface jumps. NOTE: attach-on-first-frame was attempted and
+  REVERTED — ExoPlayer without an attached surface doesn't decode, so
+  onRenderedFirstFrame never fires (chicken-and-egg deadlock; poster froze).
+  TikTok/Reels precedent (2026-10-03 research): per-tile surface +
+  TextureView + settle-driven switch — we mirror the surface rules; their
+  2–3-player pool stays unbuilt (rate-limit invariant; fallback per the
+  fallback rule if a live verify ever proves the single player too heavy).
 - **Tap → `onOpenPlayer(index)`** as today; inline view is a preview, not a
   feature-complete player (controls/sound/like/speed/all live in PlayerScreen).
   FeedScreen leaves composition under PlayerScreen (MainActivity else-chain) →
