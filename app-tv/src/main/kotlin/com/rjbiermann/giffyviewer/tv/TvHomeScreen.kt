@@ -93,7 +93,8 @@ fun TvHomeScreen(
         item {
             Text(
                 text = "Giffy Viewer",
-                style = MaterialTheme.typography.headlineMedium,
+                // F8 (batch 15): same slot as mobile's GiffyScaffold title.
+                style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp),
             )
         }
@@ -262,7 +263,8 @@ internal fun LazyPagingItems<Gif>.indexOf(id: String): Int {
 private fun RowTitle(text: String) {
     Text(
         text = text,
-        style = MaterialTheme.typography.titleLarge,
+        // F8 (batch 15): same slot as mobile's section headers (titleSmall).
+        style = MaterialTheme.typography.titleSmall,
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
     )
 }

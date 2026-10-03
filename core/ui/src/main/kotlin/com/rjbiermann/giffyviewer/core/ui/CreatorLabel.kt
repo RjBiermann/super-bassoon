@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -46,7 +47,9 @@ fun CreatorLabel(
         Text(text = "@$username", color = tint, style = style)
         if (verified) {
             VerifiedTick(
-                tint = tickTint.takeOrElse { GiffyColors.Info },
+                // Role read (audit batch 15, F5): scheme tertiary = shared Info
+                // cyan; direct palette reads stay out of composables.
+                tint = tickTint.takeOrElse { MaterialTheme.colorScheme.tertiary },
                 modifier = Modifier.padding(start = 4.dp).size(tickSize),
             )
         }

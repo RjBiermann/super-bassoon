@@ -563,3 +563,70 @@ niches suggest (spec'd-not-scheduled fallbacks), TV player soak + mobile auto-sw
 boundary soak (emulator fragility), Gate 324 (blocked on SIGNING secrets), minimap
 player / TV preview-on-focus / TV show-more panel / two-column expanded (decided skips
 with documented cost reasons).
+
+### Session 2026-10-02 batch 15 (doc-only — design-system consistency audit mobile↔TV via standard M3/tv-material grounding; no code changes)
+User ask: colors/typography/styling inconsistent between mobile and TV — use standard
+mobile/TV UI/UX design, keep theming matched to the RedGIFs site. Static audit done,
+spec written in **AGENTS-APP.md "Design-system consistency audit (2026-10-02 batch 15)"**;
+no code touched. Highlights:
+- **Standards verified from source, not memory:** decoded tv-material 1.0.1 Typography
+  tokens from the AAR in the gradle cache — TV defaults ARE the standard M3 type scale
+  (Display 57/45/36, Headline 32/28/24, Title 22/16/14, Body 16/14/12, Label 14/12/11 +
+  fractional tracking) with Roboto; mobile standard is the same scale via Compose M3.
+- **8 findings, evidence-checked:** TV typography copied from mobile verbatim — no
+  10-foot scaling at all (TV compensates by jumping text slots, worst case 10sp labels on
+  a 3m screen); mobile Typography off-standard in title/headline-small/label slots +
+  hardcoded 1sp tracking; TV `giffyTvColors` hardcodes Widget for surface → **AMOLED
+  broken on TV** (stays #191919 while mobile goes true black); dead inversePrimary=lime
+  TV mapping; 17 direct `GiffyColors.*` palette bypasses in composables; ~33 bare
+  Color.White/Black with drifting scrim alphas (0.55/0.6/0.3/0.7) across the two
+  independently-built player overlay layers; corner-radius scatter (3/6/8/12/16/24/32/999
+  dp ad hoc, no shape scale); slot-mapping drift (same element, different text slots).
+- **Reconciliation rule spec'd:** RedGIFs site = brand (GiffyColors palette + DM Sans);
+  standard scales = the design system (M3 mobile, tv-material defaults with family
+  swapped to DM Sans for TV). 4 build slices ordered (typography rebase → color roles +
+  AMOLED fix → shape scale → palette re-verify vs live CSS via Playwright), each with a
+  device-verify gate (shared Settings screen = cleanest side-by-side surface).
+- Theme-mode decisions unchanged (dark-only, no light theme, no new dynamic-color work).
+
+### Session 2026-10-02 batch 16 (batch-15 build slices LANDED — code + device-verified + live palette re-verify)
+Executed the four build slices spec'd in AGENTS-APP.md "Design-system consistency audit
+(batch 15)". Compile + ktlint + detekt + unit tests green on :core:ui/:feature:feed/
+:feature:search/:app-tv/:app-mobile. Deviation noted: slices built in one pass with ONE
+combined device pass (Medium_Phone + TV36) instead of verify-per-slice — emulator fragility
+made per-slice ringo-dance uneconomical; all gates still covered:
+- **S1 typography (F1+F2+F8):** mobile Typography rebased to the standard M3 scale
+  (titleLarge 22, headlineMedium 28, headlineSmall 24, labelSmall 11, fractional standard
+  tracking — the 1sp caption tracking gone; display slots stay 32 per spec); TvTheme
+  `tvTypography()` now builds from tv-material's OWN default tokens (verified identical to
+  the M3 scale from the AAR) with ONLY DM Sans swapped in — no more phone-sized copy.
+  F8 slot remap on TV: screen titles headlineMedium → titleLarge (TvHomeScreen, TvNiches,
+  TvSourceFeedScreen), row titles titleLarge → titleSmall (TvHomeScreen RowTitle). Device:
+  phone top-bar title renders 22sp-line (74px @ this density), TV title 58px / row title
+  37px lines — slot-per-element mapping holds, only the family/weight brand rides on top.
+- **S2 colors (F3+F4+F5+F6a+F6b):** `giffyTvColors` now maps surface/surfaceVariant from
+  `c.surfaceContainer`/`c.surfaceVariant` (AMOLED reaches TV cards); F4 verified-then-removed:
+  decoded tv-material 1.0.1 bytecode — NO component reads inversePrimary (only the
+  ColorScheme bean stores it); all 17 direct `GiffyColors.*` composables reads → roles
+  (Lime→secondary, BrandRed→primary, Info→tertiary; Focus.kt/PillButton/VerifiedTick/
+  CreatorLabel/PlayerScreen/QuickSheet/TvPlayerScreen); PinLock key text White →
+  onSurface. **F6a landed too (was spec'd inside F6): shared `PlayerOverlay` tokens in
+  :core:ui (scrim 55% / track 30% / secondary-on-video 70%) used by BOTH player screens —
+  the drifting 0.6 error-scrim tokenized to 0.55 as part of it.** Device: TV36 AMOLED ON →
+  screencap pixel sample = #000000 background (was #191919/#0F0F0F), OFF → back to
+  #0F0F0F; both directions verified.
+- **S3 shapes (F7):** M3 shape scale explicit in GiffyTheme (Shapes 4/8/12/16/28 — equal to
+  M3 defaults, zero visual delta, scale now owned); ad-hoc radii mapped: 3→shapes.extraSmall
+  (player progress bars), 6→8 (AudioBadge), 24→shapes.extraLarge (GiffyPillButton),
+  32→shapes.extraLarge (SearchScreen field), 999→CircleShape (player pills/chips/badge).
+- **S4 palette re-verify (live):** Playwright read of the site's :root CSS vars —
+  **ZERO drift** on all 14 borrowed tokens (brand #d70003, lime #ebfa63/#daf02b/#92ab05,
+  neutrals 0f0f0f/090909/191919/efeef0/bab9c0/94939d, functional 00d3a3/ff575a/59c2e5/
+  ffc815, DM Sans families). GiffyColors stays exactly as pinned 2026-09-30.
+- **Device smoke:** Medium_Phone age-gate-profile → Trending grid + Settings render
+  (typography live); TV36 home → creator feed → TvPlayerScreen (text cluster re-reveal,
+  niche pills) — 0 fatals throughout, nothing regressed.
+- Slot-remap legibility note: TV row titles at titleSmall (14sp @ tv scale) match mobile's
+  slot contract per spec F8 — row content heights were already 10-foot sized and
+  unaffected; flagged here in case a 3m-screen legibility report ever wants a TV-specific
+  bump (that would be a deliberate deviation from the spec, not drift).

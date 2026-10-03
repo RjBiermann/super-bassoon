@@ -34,7 +34,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FastForward
@@ -102,7 +102,7 @@ import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayer
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
-import com.rjbiermann.giffyviewer.core.ui.GiffyColors
+import com.rjbiermann.giffyviewer.core.ui.PlayerOverlay
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flatMapLatest
@@ -437,7 +437,7 @@ fun PlayerScreen(
                         Modifier
                             .align(Alignment.TopCenter)
                             .padding(top = 24.dp)
-                            .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(999.dp))
+                            .background(PlayerOverlay.scrim, CircleShape)
                             .padding(horizontal = 12.dp, vertical = 6.dp),
                 )
             }
@@ -737,8 +737,7 @@ private fun PlayerPage(
                                 0f to androidx.compose.ui.graphics.Color.Transparent,
                                 0.65f to androidx.compose.ui.graphics.Color.Transparent,
                                 1f to
-                                    androidx.compose.ui.graphics.Color.Black
-                                        .copy(alpha = 0.55f),
+                                    PlayerOverlay.scrim,
                             ),
                         ),
             )
@@ -762,7 +761,7 @@ private fun PlayerPage(
                 gif.description?.takeIf { it.isNotBlank() }?.let { desc ->
                     Text(
                         text = desc,
-                        color = Color.White.copy(alpha = 0.7f),
+                        color = PlayerOverlay.secondaryOnVideo,
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
@@ -782,14 +781,14 @@ private fun PlayerPage(
                         gif.niches.take(3).forEach { niche ->
                             Text(
                                 text = niche.name,
-                                color = GiffyColors.Lime,
+                                color = MaterialTheme.colorScheme.secondary,
                                 style = MaterialTheme.typography.labelMedium,
                                 modifier =
                                     Modifier
                                         .clickable {
                                             onOpenNiche(niche.id, niche.name)
-                                        }.background(Color.Transparent, RoundedCornerShape(999.dp))
-                                        .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(999.dp))
+                                        }.background(Color.Transparent, CircleShape)
+                                        .border(1.dp, PlayerOverlay.track, CircleShape)
                                         .padding(horizontal = 10.dp, vertical = 4.dp),
                             )
                         }
@@ -798,7 +797,7 @@ private fun PlayerPage(
                         gif.tags.take(6).forEach { tag ->
                             Text(
                                 text = tag,
-                                color = GiffyColors.Lime,
+                                color = MaterialTheme.colorScheme.secondary,
                                 style = MaterialTheme.typography.labelMedium,
                                 modifier =
                                     Modifier
@@ -857,7 +856,7 @@ private fun PlayerPage(
             Icon(
                 imageVector = Icons.Filled.Favorite,
                 contentDescription = null,
-                tint = GiffyColors.Lime,
+                tint = MaterialTheme.colorScheme.secondary,
                 modifier =
                     Modifier
                         .align(Alignment.TopStart)
@@ -878,7 +877,7 @@ private fun PlayerPage(
                 modifier =
                     Modifier
                         .align(Alignment.Center)
-                        .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                        .background(PlayerOverlay.scrim, MaterialTheme.shapes.medium)
                         .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -890,7 +889,7 @@ private fun PlayerPage(
                         onClick = onRetry,
                         colors =
                             androidx.compose.material3.ButtonDefaults.textButtonColors(
-                                contentColor = GiffyColors.Lime,
+                                contentColor = MaterialTheme.colorScheme.secondary,
                             ),
                         modifier = Modifier.heightIn(min = 48.dp),
                     ) { Text("Retry", style = MaterialTheme.typography.labelLarge) }
@@ -942,8 +941,8 @@ private fun PlayerControls(
     onScrubFinished: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val trackColor = Color.White.copy(alpha = 0.3f)
-    val fill = GiffyColors.Lime
+    val trackColor = PlayerOverlay.track
+    val fill = MaterialTheme.colorScheme.secondary
 
     // bottom-aligned overlay column: controls row above the always-visible
     // thin progress bar (PLAN §9: progress at the player's bottom edge)
@@ -1008,7 +1007,7 @@ private fun PlayerControls(
                         Modifier
                             .fillMaxWidth()
                             .height(3.dp)
-                            .background(trackColor, RoundedCornerShape(3.dp)),
+                            .background(trackColor, MaterialTheme.shapes.extraSmall),
                 ) {
                     val fraction = if (durationMs > 0) positionMs.toFloat() / durationMs else 0f
                     Box(
@@ -1016,7 +1015,7 @@ private fun PlayerControls(
                             Modifier
                                 .fillMaxWidth(fraction.coerceIn(0f, 1f))
                                 .height(3.dp)
-                                .background(fill, RoundedCornerShape(3.dp)),
+                                .background(fill, MaterialTheme.shapes.extraSmall),
                     )
                 }
             }
@@ -1064,7 +1063,7 @@ private fun ActionRail(
             Icon(
                 imageVector = if (liked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                 contentDescription = if (liked) "Liked — tap to unlike" else "Like",
-                tint = if (liked) GiffyColors.Lime else Color.White,
+                tint = if (liked) MaterialTheme.colorScheme.secondary else Color.White,
             )
         }
         if (hasAudio) {
@@ -1087,7 +1086,7 @@ private fun ActionRail(
             Icon(
                 imageVector = Icons.Filled.FastForward,
                 contentDescription = if (autoSwipeOn) "auto-swipe on" else "auto-swipe off",
-                tint = if (autoSwipeOn) GiffyColors.Lime else Color.White,
+                tint = if (autoSwipeOn) MaterialTheme.colorScheme.secondary else Color.White,
             )
         }
     }

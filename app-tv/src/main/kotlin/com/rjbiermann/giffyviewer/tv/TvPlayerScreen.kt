@@ -50,6 +50,7 @@ import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
+import com.rjbiermann.giffyviewer.core.ui.PlayerOverlay
 import com.rjbiermann.giffyviewer.core.ui.giffyFocus
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import kotlinx.coroutines.launch
@@ -253,14 +254,14 @@ fun TvPlayerScreen(
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .height(3.dp)
-                        .background(Color.White.copy(alpha = 0.3f)),
+                        .background(PlayerOverlay.track),
             ) {
                 Box(
                     modifier =
                         Modifier
                             .fillMaxWidth(fraction.coerceIn(0f, 1f))
                             .fillMaxHeight()
-                            .background(com.rjbiermann.giffyviewer.core.ui.GiffyColors.Lime),
+                            .background(MaterialTheme.colorScheme.secondary),
                 )
             }
             // Seek feedback: "1:23 / 2:45" while seeking (TV keymap §).
@@ -303,7 +304,7 @@ fun TvPlayerScreen(
                     gif.description?.takeIf { it.isNotBlank() }?.let { desc ->
                         Text(
                             text = desc,
-                            color = Color.White.copy(alpha = 0.7f),
+                            color = PlayerOverlay.secondaryOnVideo,
                             style = MaterialTheme.typography.bodyMedium,
                             maxLines = 2,
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -324,12 +325,12 @@ fun TvPlayerScreen(
                                         Modifier
                                             .giffyFocus(
                                                 interactionSource = interaction,
-                                                fillOnFocus = com.rjbiermann.giffyviewer.core.ui.GiffyColors.BrandRed,
+                                                fillOnFocus = MaterialTheme.colorScheme.primary,
                                             ),
                                     interactionSource = interaction,
                                     colors =
                                         ButtonDefaults.textButtonColors(
-                                            contentColor = com.rjbiermann.giffyviewer.core.ui.GiffyColors.Lime,
+                                            contentColor = MaterialTheme.colorScheme.secondary,
                                         ),
                                 ) {
                                     Text(niche.name, style = MaterialTheme.typography.labelMedium)

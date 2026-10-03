@@ -74,10 +74,9 @@ class TvMainActivity : ComponentActivity() {
                 modifier = Modifier.fillMaxSize(),
             ) {
                 val composeColors = androidx.compose.material3.MaterialTheme.colorScheme
-                val composeTypo = androidx.compose.material3.MaterialTheme.typography
                 androidx.tv.material3.MaterialTheme(
                     colorScheme = giffyTvColors(composeColors),
-                    typography = tvTypography(composeTypo),
+                    typography = tvTypography(),
                 ) {
                     // tv-material has its OWN LocalContentColor whose default is
                     // Color.Black — bare tv3 Texts outside tv Surfaces render

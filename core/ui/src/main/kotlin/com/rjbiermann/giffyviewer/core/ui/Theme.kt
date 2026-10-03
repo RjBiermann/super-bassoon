@@ -1,8 +1,10 @@
 package com.rjbiermann.giffyviewer.core.ui
 
 import android.os.Build
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -12,6 +14,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
@@ -76,7 +79,7 @@ private fun giffyColors(amoled: Boolean): ColorScheme {
     )
 }
 
-private val DmSans =
+val DmSans =
     FontFamily(
         Font(R.font.dm_sans_regular, FontWeight.Normal),
         Font(R.font.dm_sans_medium, FontWeight.Medium),
@@ -84,27 +87,42 @@ private val DmSans =
         Font(R.font.dm_sans_bold, FontWeight.Bold),
     )
 
-/** PLAN §9 scale: headings 32/24/20/18/16/14, body 16/14/12/10, caption ls 1sp. */
+/**
+ * Standard M3 type scale (m3.material.io), DM Sans family on every slot —
+ * the borrowed sizes drift (headline 32/24/20, title 18/…, label 10, 1sp
+ * tracking) are gone; slots ride the scale defaults (audit batch 15, F2).
+ * Display slots stay 32 (nothing renders display today; correct when used).
+ */
 private fun dmSansTypography(): Typography {
     val d = Typography()
     return Typography(
         displayLarge = d.displayLarge.copy(fontFamily = DmSans, fontSize = 32.sp),
         displayMedium = d.displayMedium.copy(fontFamily = DmSans, fontSize = 32.sp),
         displaySmall = d.displaySmall.copy(fontFamily = DmSans, fontSize = 32.sp),
-        headlineLarge = d.headlineLarge.copy(fontFamily = DmSans, fontSize = 32.sp),
-        headlineMedium = d.headlineMedium.copy(fontFamily = DmSans, fontSize = 24.sp),
-        headlineSmall = d.headlineSmall.copy(fontFamily = DmSans, fontSize = 20.sp),
-        titleLarge = d.titleLarge.copy(fontFamily = DmSans, fontSize = 18.sp),
-        titleMedium = d.titleMedium.copy(fontFamily = DmSans, fontSize = 16.sp),
-        titleSmall = d.titleSmall.copy(fontFamily = DmSans, fontSize = 14.sp),
-        bodyLarge = d.bodyLarge.copy(fontFamily = DmSans, fontSize = 16.sp),
-        bodyMedium = d.bodyMedium.copy(fontFamily = DmSans, fontSize = 14.sp),
-        bodySmall = d.bodySmall.copy(fontFamily = DmSans, fontSize = 12.sp),
-        labelLarge = d.labelLarge.copy(fontFamily = DmSans, fontSize = 14.sp),
-        labelMedium = d.labelMedium.copy(fontFamily = DmSans, fontSize = 12.sp, letterSpacing = 1.sp),
-        labelSmall = d.labelSmall.copy(fontFamily = DmSans, fontSize = 10.sp, letterSpacing = 1.sp),
+        headlineLarge = d.headlineLarge.copy(fontFamily = DmSans),
+        headlineMedium = d.headlineMedium.copy(fontFamily = DmSans),
+        headlineSmall = d.headlineSmall.copy(fontFamily = DmSans),
+        titleLarge = d.titleLarge.copy(fontFamily = DmSans),
+        titleMedium = d.titleMedium.copy(fontFamily = DmSans),
+        titleSmall = d.titleSmall.copy(fontFamily = DmSans),
+        bodyLarge = d.bodyLarge.copy(fontFamily = DmSans),
+        bodyMedium = d.bodyMedium.copy(fontFamily = DmSans),
+        bodySmall = d.bodySmall.copy(fontFamily = DmSans),
+        labelLarge = d.labelLarge.copy(fontFamily = DmSans),
+        labelMedium = d.labelMedium.copy(fontFamily = DmSans),
+        labelSmall = d.labelSmall.copy(fontFamily = DmSans),
     )
 }
+
+/** M3 shape scale made explicit (audit batch 15, F7): 4/8/12/16/28/full. */
+private val GiffyShapes =
+    Shapes(
+        extraSmall = RoundedCornerShape(4.dp),
+        small = RoundedCornerShape(8.dp),
+        medium = RoundedCornerShape(12.dp),
+        large = RoundedCornerShape(16.dp),
+        extraLarge = RoundedCornerShape(28.dp),
+    )
 
 /**
  * Material 3 theming (m3.material.io): dark-first borrowed theme (PLAN §9),
@@ -126,6 +144,7 @@ fun GiffyTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = dmSansTypography(),
+        shapes = GiffyShapes,
         content = content,
     )
 }

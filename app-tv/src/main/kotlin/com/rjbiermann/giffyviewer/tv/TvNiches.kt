@@ -71,7 +71,8 @@ fun TvNichesScreen(
     Column(modifier = Modifier.fillMaxSize()) {
         Text(
             text = "Niches",
-            style = MaterialTheme.typography.headlineMedium,
+            // F8 (batch 15): same slot as mobile's GiffyScaffold title.
+            style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp),
         )
         LazyColumn(

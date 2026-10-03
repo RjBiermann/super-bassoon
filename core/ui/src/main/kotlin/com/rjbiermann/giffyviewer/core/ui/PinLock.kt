@@ -26,7 +26,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -142,7 +141,8 @@ fun PinLockScreen(
                         Text(
                             key.toString(),
                             style = MaterialTheme.typography.titleLarge,
-                            color = Color.White,
+                            // Role read (audit batch 15, F6b) — not a bare White.
+                            color = MaterialTheme.colorScheme.onSurface,
                             modifier =
                                 Modifier.clearAndSetSemantics {
                                     // A11y (audit finding 11): glyph keys get real

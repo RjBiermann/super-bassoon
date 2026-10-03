@@ -83,7 +83,8 @@ fun TvSourceFeedScreen(
         Column {
             Text(
                 text = source.title(),
-                style = MaterialTheme.typography.headlineMedium,
+                // F8 (batch 15): same slot as mobile's GiffyScaffold title.
+                style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 0.dp),
             )
             if (source is FeedSource.Creator) {

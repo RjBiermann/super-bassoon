@@ -27,7 +27,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
-import com.rjbiermann.giffyviewer.core.ui.GiffyColors
 import com.rjbiermann.giffyviewer.feature.feed.orderNichesByTagMatch
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flatMapLatest
@@ -79,7 +78,7 @@ internal fun QuickBlockSheet(
                 Text(
                     text = "Shuffle seed $shuffleSeed",
                     style = MaterialTheme.typography.bodySmall,
-                    color = GiffyColors.Lime,
+                    color = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
             }
@@ -93,7 +92,7 @@ internal fun QuickBlockSheet(
                         style = MaterialTheme.typography.bodyMedium,
                         color =
                             if (dragSpeed != currentSpeed) {
-                                GiffyColors.Lime
+                                MaterialTheme.colorScheme.secondary
                             } else {
                                 MaterialTheme.colorScheme.onSurface
                             },

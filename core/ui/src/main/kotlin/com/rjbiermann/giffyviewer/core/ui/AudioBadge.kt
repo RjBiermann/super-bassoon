@@ -23,7 +23,7 @@ fun AudioBadge(modifier: Modifier = Modifier) {
     Box(
         modifier =
             modifier
-                .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(6.dp))
+                .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
                 .padding(horizontal = 4.dp, vertical = 3.dp),
     ) {
         Icon(

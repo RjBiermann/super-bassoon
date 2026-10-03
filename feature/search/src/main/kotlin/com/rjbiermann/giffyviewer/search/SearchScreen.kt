@@ -116,7 +116,7 @@ fun SearchScreen(
                     KeyboardActions(onSearch = {
                         submit(query)
                     }),
-                shape = RoundedCornerShape(32.dp),
+                shape = MaterialTheme.shapes.extraLarge,
                 modifier = Modifier.fillMaxWidth().focusRequester(fieldFocus),
             )
         }

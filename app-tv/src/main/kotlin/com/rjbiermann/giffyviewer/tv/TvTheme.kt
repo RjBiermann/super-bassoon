@@ -1,5 +1,6 @@
 package com.rjbiermann.giffyviewer.tv
 
+import com.rjbiermann.giffyviewer.core.ui.DmSans
 import com.rjbiermann.giffyviewer.core.ui.GiffyColors
 
 /**
@@ -14,7 +15,6 @@ fun giffyTvColors(c: androidx.compose.material3.ColorScheme): androidx.tv.materi
         onPrimary = c.onPrimary,
         primaryContainer = c.primaryContainer,
         onPrimaryContainer = c.onPrimaryContainer,
-        inversePrimary = c.secondary, // lime
         secondary = c.secondary,
         onSecondary = c.onSecondary,
         secondaryContainer = c.secondaryContainer,
@@ -25,9 +25,12 @@ fun giffyTvColors(c: androidx.compose.material3.ColorScheme): androidx.tv.materi
         onTertiaryContainer = c.onTertiaryContainer,
         background = c.background,
         onBackground = c.onBackground,
-        surface = com.rjbiermann.giffyviewer.core.ui.GiffyColors.Widget,
+        // Surface roles come from the compose scheme's containers — NOT a
+        // hardcoded GiffyColors.Widget — so AMOLED collapses to true black on
+        // the TV too (audit batch 15, F3).
+        surface = c.surfaceContainer,
         onSurface = c.onSurface,
-        surfaceVariant = com.rjbiermann.giffyviewer.core.ui.GiffyColors.Widget,
+        surfaceVariant = c.surfaceVariant,
         onSurfaceVariant = c.onSurfaceVariant,
         surfaceTint = c.primary,
         inverseSurface = c.inverseSurface,
@@ -40,22 +43,28 @@ fun giffyTvColors(c: androidx.compose.material3.ColorScheme): androidx.tv.materi
         borderVariant = GiffyColors.BrandRed,
     )
 
-/** Same DM Sans text styles as mobile — only the tv-material locals change. */
-fun tvTypography(t: androidx.compose.material3.Typography): androidx.tv.material3.Typography =
-    androidx.tv.material3.Typography(
-        displayLarge = t.displayLarge,
-        displayMedium = t.displayMedium,
-        displaySmall = t.displaySmall,
-        headlineLarge = t.headlineLarge,
-        headlineMedium = t.headlineMedium,
-        headlineSmall = t.headlineSmall,
-        titleLarge = t.titleLarge,
-        titleMedium = t.titleMedium,
-        titleSmall = t.titleSmall,
-        bodyLarge = t.bodyLarge,
-        bodyMedium = t.bodyMedium,
-        bodySmall = t.bodySmall,
-        labelLarge = t.labelLarge,
-        labelMedium = t.labelMedium,
-        labelSmall = t.labelSmall,
+/**
+ * tv-material's own default token scale (verified: identical to the M3 scale —
+ * Title 22/16/14, Label 14/12/11 …), with ONLY the family swapped to DM Sans.
+ * No more phone-sized copy of the mobile Typography (audit batch 15, F1).
+ */
+fun tvTypography(): androidx.tv.material3.Typography {
+    val d = androidx.tv.material3.Typography()
+    return androidx.tv.material3.Typography(
+        displayLarge = d.displayLarge.copy(fontFamily = DmSans),
+        displayMedium = d.displayMedium.copy(fontFamily = DmSans),
+        displaySmall = d.displaySmall.copy(fontFamily = DmSans),
+        headlineLarge = d.headlineLarge.copy(fontFamily = DmSans),
+        headlineMedium = d.headlineMedium.copy(fontFamily = DmSans),
+        headlineSmall = d.headlineSmall.copy(fontFamily = DmSans),
+        titleLarge = d.titleLarge.copy(fontFamily = DmSans),
+        titleMedium = d.titleMedium.copy(fontFamily = DmSans),
+        titleSmall = d.titleSmall.copy(fontFamily = DmSans),
+        bodyLarge = d.bodyLarge.copy(fontFamily = DmSans),
+        bodyMedium = d.bodyMedium.copy(fontFamily = DmSans),
+        bodySmall = d.bodySmall.copy(fontFamily = DmSans),
+        labelLarge = d.labelLarge.copy(fontFamily = DmSans),
+        labelMedium = d.labelMedium.copy(fontFamily = DmSans),
+        labelSmall = d.labelSmall.copy(fontFamily = DmSans),
     )
+}

@@ -3,9 +3,11 @@ package com.rjbiermann.giffyviewer.core.ui
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.unit.dp
 
 /**
@@ -18,12 +20,13 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun VerifiedTick(
     modifier: Modifier = Modifier,
-    tint: Color = GiffyColors.Info,
+    tint: Color = Color.Unspecified,
 ) {
+    // Role read (audit batch 15, F5): default comes from the scheme's tertiary.
     Icon(
         imageVector = Icons.Filled.Verified,
         contentDescription = "verified creator",
-        tint = tint,
+        tint = tint.takeOrElse { MaterialTheme.colorScheme.tertiary },
         modifier = modifier,
     )
 }

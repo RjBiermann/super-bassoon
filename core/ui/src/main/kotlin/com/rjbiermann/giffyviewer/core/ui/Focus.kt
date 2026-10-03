@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -41,7 +42,8 @@ fun Modifier.giffyFocus(
             interactionSource ?: remember { MutableInteractionSource() }
         val focused by interaction.collectIsFocusedAsState()
         val border by animateColorAsState(
-            if (focused) GiffyColors.BrandRed else Color.Transparent,
+            // Role read (audit batch 15, F5) — not a direct GiffyColors read.
+            if (focused) MaterialTheme.colorScheme.primary else Color.Transparent,
             label = "giffyFocusBorder",
         )
         val fill by animateColorAsState(
@@ -68,15 +70,22 @@ fun GiffyPillButton(
     Button(
         onClick = onClick,
         modifier = modifier.onFocusChanged { focused = it.isFocused },
-        shape = RoundedCornerShape(24.dp),
+        // Shape on the M3 scale (batch 15, F7): 24 → extraLarge.
+        shape = MaterialTheme.shapes.extraLarge,
         colors =
             ButtonDefaults.buttonColors(
                 // Rest = primaryContainer fill + TextHigh (audit: red-on-black was
-                // 3.5:1 < AA); focus = brand red fill + white.
-                containerColor = if (focused) GiffyColors.BrandRed else GiffyColors.TextHigh.copy(alpha = 0.08f),
-                contentColor = if (focused) Color.White else GiffyColors.TextHigh,
+                // 3.5:1 < AA); focus = brand red fill + inverse text. Role reads
+                // (audit batch 15, F5) — no direct palette access.
+                containerColor =
+                    if (focused) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+                    },
+                contentColor = if (focused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
             ),
-        border = BorderStroke(1.dp, GiffyColors.BrandRed),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
     ) {
         Text(text)

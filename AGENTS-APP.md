@@ -902,3 +902,114 @@ Deliberately NOT built this batch (still parked, with reasons):
   chip-skip traversal — D-pad device work, must be built with emulator verification.
 - UX-PATTERNS candidates (hold-for-speed, minimised player, TV preview-on-focus) —
   still user-slice gated per that doc's graduation rule.
+
+## Design-system consistency audit — colors/typography/shapes mobile ↔ TV (2026-10-02 batch 15, doc-only — spec, no code)
+**STATUS (batch 16, same day): ALL FOUR BUILD SLICES LANDED + device-verified** — see the
+batch-16 entry in root AGENTS.md. The findings text below is the original audit, kept for
+the evidence; each F-item notes its fix in the code.
+User ask: "colors, typography, styling still not consistent in mobile and TV. Use standard
+mobile and TV UI/UX design. Match theming to the RedGIFs site." Findings below are
+static-source evidence (line-checked this session); every fix is a build slice with its own
+device-verify gate. THE RECONCILIATION RULE this spec follows:
+
+**Palette + typeface = borrowed RedGIFs brand (GiffyColors + DM Sans, verified from the
+site's CSS 2026-09-30 — the "match the site" half). Sizes/roles/tracking/shape = the
+standard platform scales — M3 for mobile, tv-material defaults for TV (the "standard
+UI/UX" half).** Site brand colors ride inside the standard role system; the platform
+supplies the scale. No invented sizes, no invented shapes, palette stays borrowed.
+
+**Standards grounded (verified this session, not from memory):**
+- tv-material 1.0.1 default Typography tokens were decoded from the AAR in the gradle
+  cache (`TypeScaleTokens` bytecode) — they are the standard M3 type scale exactly:
+  Display 57/45/36 (lh 64/52/44), Headline 32/28/24 (lh 40/36/32), Title 22/16/14
+  (lh 28/24/20), Body 16/14/12 (lh 24/20/16), Label 14/12/11 (lh 20/16/16), tracking
+  bodyLarge 0.5sp, titleMedium 0.2sp, labelLarge 0.1sp, titleSmall/labelSmall 0.1–0.5sp —
+  with Roboto as the default family. The TV standard scale exists and is bigger than
+  mobile (10-foot); it is currently overridden wholesale (F1).
+- Mobile standard = the same M3 scale via `androidx.compose.material3` (m3.material.io).
+- M3 shape scale: extra-small 4dp, small 8, medium 12, large 16, extra-large 28, full
+  (999). tv-material Cards carry their own shape tokens (leave those).
+
+**Findings (evidence-checked):**
+
+- **F1 — TV typography is phone-sized (worst offender).** `TvTheme.tvTypography()` copies
+  the mobile `Typography` verbatim — zero 10-foot scaling — while its own comment claims
+  "10-foot sizes aside". TV screens compensate by jumping to bigger slots for the same
+  semantic element (screen titles = headlineMedium, row titles = titleLarge vs mobile's
+  titleLarge default in GiffyScaffold), so slot semantics diverge per platform AND the
+  rendered sizes are still phone-sized on a 3m screen: `labelSmall` renders 10sp on TV
+  (mobile scale) where the TV standard is 11sp at minimum and titles should be 22–32sp.
+  Standard fix: `tvTypography` = tv-material default token SIZES + line-heights + tracking,
+  with ONLY the family swapped to DM Sans (and weights as borrowed). TV screens then use
+  the same slot-per-semantic-element mapping as mobile (screen title = titleLarge like
+  GiffyScaffold, row title = titleSmall, meta = bodySmall) — re-check each Tv* screen's
+  slot after the rebase; the current slot-jumps (F8) become unnecessary.
+
+- **F2 — mobile Typography is off the standard M3 scale it sits on.** Borrowed scale:
+  display 32/32/32, headline 32/24/20, title 18/16/14, label 14/12/10. Standard:
+  headline 32/28/24, title 22/16/14, label 14/12/11. Body 16/14/12 already matches.
+  Also hardcoded `letterSpacing = 1.sp` on labelMedium/labelSmall instead of the standard
+  fractional tracking. Standard fix: titleLarge 22 (GiffyScaffold titles + TV row titles
+  then match), headlineSmall 24, labelSmall 11, drop the 1sp tracking for the standard
+  values. Display slots (32) stay — nothing renders display today; correct when used.
+
+- **F3 — TV surface color ignores AMOLED.** `giffyTvColors()` hardcodes
+  `GiffyColors.Widget` (#191919) for TV `surface`/`surfaceVariant` instead of reading the
+  (already AMOLED-adjusted) compose scheme it receives. AMOLED ON: mobile collapses to
+  true black, TV cards stay grey — the "AMOLED option shared with mobile" claim in the
+  TvMainActivity comment is broken for surfaces. Fix: take `surface`/`surfaceVariant`
+  from `c.surfaceContainer*` (whatever AMOLED resolved them to); keep GiffyColors as the
+  scheme's only input, not a bypass around it.
+
+- **F4 — dead `inversePrimary = lime` mapping on TV.** `giffyTvColors` maps
+  inversePrimary to lime while mobile maps it to BrandRed; no TV code reads
+  inversePrimary (grep, this session) — dead + inconsistent. Verify-then-remove: check
+  tv-material's internal focus/elevation states don't read it (they use border/primary
+  per the token set), then delete the override so both platforms agree on BrandRed.
+
+- **F5 — palette bypass: direct `GiffyColors.*` reads in composables.** 11×
+  `GiffyColors.Lime`, 4× `GiffyColors.BrandRed`, 2× Info across PlayerScreen/QuickSheet/
+  Focus.kt/CreatorLabel/TvPlayerScreen — the palette reads around the ColorScheme, so
+  AMOLED and dynamic-color modes can't re-map those accents and a future palette update
+  has 17 call-site edits instead of one. Standard fix: composables read roles —
+  Lime → `colorScheme.secondary`, BrandRed → `colorScheme.primary`, Info →
+  `colorScheme.tertiary`; `GiffyColors` stays as the single token source that feeds the
+  scheme (Theme.kt) and nothing else.
+
+- **F6 — bare `Color.White`/`Color.Black` scatter (~33 sites) with no scrim tokens.**
+  Two classes with different verdicts:
+  (a) **Over-video overlay layer** (PlayerScreen + TvPlayerScreen scrims, progress-track
+  fills, on-video text/icons): white/black over video is the media-overlay standard and
+  is correct — but the alphas drift (0.55/0.6/0.3/0.7 across the two players, same
+  elements built twice). Spec: one shared overlay token set (scrim 55%, track 30%,
+  secondary-on-video 70%) in a small `PlayerOverlay` object in :core:ui used by BOTH
+  player screens — this is also the two-players-diverging problem at its root.
+  (b) **Plain-surface white text** (PinLock title, Focus.kt contentColor): bypasses the
+  theme; switch to `colorScheme` roles.
+
+- **F7 — shape scatter: 3/6/8/12/16/24/32/999dp, all ad hoc.** Standard fix: define the
+  M3 shape scale once (`Shapes` in GiffyTheme, mirrored for tv-material where screens
+  need it): 4/8/12/16/28/full. Map the ad-hoc values: 3→4, 6→8, 12/16 stay, 24/32→28,
+  999→full (progress/badge pills). No new radii without a slot.
+
+- **F8 — slot-mapping drift (consequence of F1).** Screen title: TV = headlineMedium,
+  mobile = GiffyScaffold's TopAppBar (titleLarge). Row title: TV = titleLarge, mobile
+  = titleSmall. After F1 lands, remap TV screens to mobile's slot-per-element mapping so
+  "same element, same slot" holds and only the scale differs. GiffyScaffold itself is
+  already the mobile standard (TopAppBar via shared scaffold) — TV has no direct
+  equivalent; the slot mapping is the consistency contract.
+
+**Build order (each slice compile+ktlint+detekt+tests green, device-verified before next):**
+1. S1 typography rebase (F1+F2+F8) — highest visual delta, one PR; verify side-by-side on
+   Medium_Phone + TV36 (shared Settings screen is the cleanest comparison surface) and
+   D-pad legibility on TV36 at 3m-equivalent (screen-size zoom).
+2. S2 colors (F3+F4+F5+F6b) — AMOLED toggle verified on TV36 (cards collapse to black).
+3. S3 shapes (F7) — mechanical; verify FeedFilterDialog chips + player pills (the
+   previous ring-check stop rule still applies to any dialog change).
+4. Build-time palette re-verify (the "match the site" half): Playwright re-read of the
+   site's CSS variables → GiffyColors diff report, since values were pinned 2026-09-30.
+   No drift expected (site is stable), but the check belongs in the S2 session.
+
+Skipped by design: no light theme (stays dark-only — root AGENTS.md decision stands),
+no new dynamic-color work (existing opt-in), no font swap (DM Sans stays), no TV
+overscan changes (leanback skill's 48dp rule — separate D-pad device work, untouched).
