@@ -2,12 +2,14 @@
 
 // Local signing password: keystore/signing.properties (gitignored, generated
 // with the keystore). CI supplies SIGNING_PASS and never reads this file.
-fun localSigningPass(): String? =
-    rootProject.file("keystore/signing.properties")
-        .takeIf { it.exists() }
-        ?.readLines()
-        ?.firstOrNull { it.startsWith("pass=") }
-        ?.substringAfter("pass=")
+fun localSigningPass(): String? {
+    val props = rootProject.file("keystore/signing.properties")
+    if (!props.exists()) return null
+    for (line in props.readLines()) {
+        if (line.startsWith("pass=")) return line.substringAfter("pass=")
+    }
+    return null
+}
 
 plugins {
     alias(libs.plugins.android.application)
