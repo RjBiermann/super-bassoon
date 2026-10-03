@@ -30,6 +30,7 @@ jobs:
 
       - name: Decode keystore
         run: |
+          mkdir -p keystore
           echo "$SIGNING_KEY" | base64 -d > keystore/release.keystore
           test -s keystore/release.keystore
         env:
