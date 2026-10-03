@@ -22,10 +22,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         TagPrefEntity::class,
         KeywordBlockEntity::class,
         HideCountEntity::class,
-        NicheGroupEntity::class,
         CustomFeedEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 @TypeConverters(ListConverters::class, MapStringStringConverter::class)
@@ -43,8 +42,6 @@ abstract class GiffyDatabase : RoomDatabase() {
     abstract fun watchHistoryDao(): WatchHistoryDao
 
     abstract fun contentPrefsDao(): ContentPrefsDao
-
-    abstract fun nicheGroupDao(): NicheGroupDao
 
     abstract fun customFeedDao(): CustomFeedDao
 
@@ -136,6 +133,25 @@ abstract class GiffyDatabase : RoomDatabase() {
             object : Migration(2, 3) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE `gifs` ADD COLUMN `description` TEXT")
+                }
+            }
+
+        /** v10: niche groups merged into custom feeds (AGENTS-CONTENT-FILTER.md
+         *  merge). custom_feeds gains the group `state`; each group becomes a
+         *  custom feed whose refs are its tags (bare tag refs — the fetcher and
+         *  ref-summary treat a ref without a creator:/niche: prefix as a tag
+         *  search). The old group:<id> cache rows become unreachable (new feed
+         *  ids) — evicted in the same migration. */
+        val MIGRATION_9_10 =
+            object : Migration(9, 10) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE `custom_feeds` ADD COLUMN `state` TEXT NOT NULL DEFAULT 'NEUTRAL'")
+                    db.execSQL(
+                        "INSERT INTO `custom_feeds` (`name`, `sourcesJson`, `createdAt`, `state`) " +
+                            "SELECT `name`, `tagList`, `createdAt`, `state` FROM `niche_groups`",
+                    )
+                    db.execSQL("DROP TABLE IF EXISTS `niche_groups`")
+                    db.execSQL("DELETE FROM `feed_pages` WHERE `pageKey` LIKE 'group:%'")
                 }
             }
     }

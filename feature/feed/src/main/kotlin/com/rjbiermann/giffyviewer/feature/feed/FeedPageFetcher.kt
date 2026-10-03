@@ -59,13 +59,20 @@ class FeedPageFetcher(
                 // ponytail: page n maps to creator[(n-1) % n_creators] at fetch time;
                 // a changed favorite set shifts the mapping until the cache refreshes
                 // (read-time filter in FeedPagingSource keeps unfavorited rows out).
-                // Non-empty is guaranteed by the early return in load().
+                // The mediator guards an empty favorite set, but the paging source
+                // self-fills unfetched pages too — a fresh install with zero favorited
+                // creators walks an unfetched Favorites page → degenerate empty page,
+                // not a divide-by-zero (live-proven on TV36).
                 val creators = favorites()
-                api.userGifs(
-                    username = creators[(page - 1) % creators.size],
-                    count = pageSize,
-                    page = (page - 1) / creators.size + 1,
-                )
+                if (creators.isEmpty()) {
+                    GifsPageDto()
+                } else {
+                    api.userGifs(
+                        username = creators[(page - 1) % creators.size],
+                        count = pageSize,
+                        page = (page - 1) / creators.size + 1,
+                    )
+                }
             }
             is FeedSource.ForYou -> api.feedForYou(count = pageSize, page = page)
             is FeedSource.Niche ->
@@ -77,23 +84,6 @@ class FeedPageFetcher(
                     // server's default ordering rides on an omitted param.
                     order = feed.sort.ifEmpty { null },
                 )
-            is FeedSource.Group -> {
-                // ponytail: page n maps to tag[(n-1) % n_tags]; a changed tag list
-                // shifts the mapping until the cache refreshes (same pattern as
-                // the Favorites creator rotation; dedup handled by the source).
-                // Groups UI requires 1+ tags, so empty is a degenerate safe path.
-                val tags = feed.tags
-                if (tags.isEmpty()) {
-                    GifsPageDto()
-                } else {
-                    api.search(
-                        searchText = tags[(page - 1) % tags.size],
-                        count = pageSize,
-                        page = (page - 1) / tags.size + 1,
-                        order = "trending",
-                    )
-                }
-            }
             is FeedSource.Creator ->
                 api.userGifs(
                     username = feed.username,

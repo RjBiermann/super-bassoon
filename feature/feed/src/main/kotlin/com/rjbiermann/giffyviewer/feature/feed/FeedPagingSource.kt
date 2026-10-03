@@ -9,20 +9,22 @@ import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.model.matchesOrientation
 import com.rjbiermann.giffyviewer.core.model.resolutionMatches
 
-/** §8 untagged-only (group feeds): tags must stay inside the group bundle. */
+/** §8 untagged-only (tag-bundle feeds — the merged groups): tags must stay
+ *  inside the bundle. Applies to custom feeds whose refs are ALL tag refs —
+ *  a feed that blends creators/niches has no single bundle to bound to. */
 internal fun untagged(
     gif: Gif,
     feed: FeedSource,
     prefs: com.rjbiermann.giffyviewer.core.datastore.FeedPrefs,
-): Boolean =
-    if (prefs.untaggedOnly && feed is FeedSource.Group) {
-        // Non-empty required: an untagged gif carries no group signal at all
-        // (vacuous "all{}" would let every untagged gif through — live-proven).
-        val bundle = feed.tags.map { it.lowercase() }.toSet()
-        gif.tags.isNotEmpty() && gif.tags.all { it.lowercase() in bundle }
-    } else {
-        true
-    }
+): Boolean {
+    if (!prefs.untaggedOnly || feed !is FeedSource.Custom) return true
+    val refs = feed.refs
+    if (refs.isEmpty() || refs.any { it.startsWith("creator:") || it.startsWith("niche:") }) return true
+    // Non-empty required: an untagged gif carries no bundle signal at all
+    // (vacuous "all{}" would let every untagged gif through — live-proven).
+    val bundle = refs.map { it.removePrefix("tag:").lowercase() }.toSet()
+    return gif.tags.isNotEmpty() && gif.tags.all { it.lowercase() in bundle }
+}
 
 /** How long the refresh load waits for the mediator's first write (first-launch race). */
 private const val CACHE_WAIT_MS = 20_000L
@@ -69,7 +71,7 @@ class FeedPagingSource(
                 "creator_prefs",
                 "tag_prefs",
                 "keyword_blocks",
-                "niche_groups",
+                "custom_feeds",
             ) {
                 override fun onInvalidated(tables: Set<String>) {
                     invalidate()
@@ -112,10 +114,10 @@ class FeedPagingSource(
                 val ids = (entity?.gifIds ?: emptyList()).filterNot { it in seen }
                 val byId = if (ids.isEmpty()) emptyMap() else pageDao.gifsByIds(ids).associateBy { it.id }
                 // ContentFilter choke point (leak-zero): blocked creators/tags/keywords
-                // never reach the UI, however they got into the cache. BLOCKED group
-                // tags ride the same reload (§6 stage 2).
+                // never reach the UI, however they got into the cache. BLOCKED feed
+                // refs ride the same reload (§6 stage 2, merged custom feeds).
                 contentFilter.refreshFrom(db.contentPrefsDao())
-                contentFilter.refreshGroupTags(db.nicheGroupDao())
+                contentFilter.refreshBlockedFeeds(db.customFeedDao())
                 // Favorites feed keeps unfavorited rows out at read time (instant
                 // un-favorite; the round-robin cache itself refreshes on TTL).
                 val scopeCtx = if (feed is FeedSource.ForYou) forYouContext() else null

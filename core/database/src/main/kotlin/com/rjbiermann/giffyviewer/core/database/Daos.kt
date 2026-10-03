@@ -218,21 +218,6 @@ interface ContentPrefsDao {
 }
 
 @Dao
-interface NicheGroupDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(group: NicheGroupEntity): Long
-
-    @Query("SELECT * FROM niche_groups ORDER BY createdAt DESC")
-    fun all(): Flow<List<NicheGroupEntity>>
-
-    @Query("SELECT * FROM niche_groups WHERE state = 'BLOCKED'")
-    suspend fun blocked(): List<NicheGroupEntity>
-
-    @Query("DELETE FROM niche_groups WHERE id = :id")
-    suspend fun delete(id: Long)
-}
-
-@Dao
 interface CustomFeedDao {
     @Query("SELECT * FROM custom_feeds ORDER BY createdAt")
     fun all(): Flow<List<CustomFeedEntity>>
@@ -245,4 +230,8 @@ interface CustomFeedDao {
 
     @Query("DELETE FROM custom_feeds WHERE id = :id")
     suspend fun delete(id: Long)
+
+    /** Stage 2 (§6): BLOCKED feeds drive the ContentFilter macro-blocks. */
+    @Query("SELECT * FROM custom_feeds WHERE state = 'BLOCKED'")
+    suspend fun blocked(): List<CustomFeedEntity>
 }

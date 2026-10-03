@@ -440,6 +440,10 @@ fun TvPlayerScreen(
                 onBack()
                 onOpenCreator(username)
             },
+            onOpenNiche = { niche ->
+                onBack()
+                onOpenNiche(niche)
+            },
         )
     }
 }

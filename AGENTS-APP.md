@@ -632,8 +632,10 @@ Real gaps (site has them, app doesn't) — **spec'd-not-scheduled, a user slice 
   on mobile (@lilymatrix → "154 posts · 121 followers · 200,599 views").
 
 Parked (not gaps): For You server blend is `v2/feeds/for-you` as-is (70% favorite-creator
-weighting was a local-blend idea, superseded by the server feed); search-history sync and
-server collections remain spec'd-not-scheduled fallbacks per AGENTS-NETWORK.md.
+weighting was a local-blend idea, superseded by the server feed); search-history sync is a
+spec'd-not-scheduled fallback per AGENTS-NETWORK.md; **server collections CLOSED
+2026-10-02 batch 18 as ALREADY BUILT** (CollectionsViewModel is server-backed source of
+truth; only collection-content BROWING lacks a verified endpoint).
 
 ## Full-scope search (spec'd 2026-10-02 — BUILT same day, mobile; device-verified batch 14)
 The site's search results page (Playwright-verified live, desktop, `query=feet`):
@@ -784,8 +786,40 @@ every prior action (card → player, row → niche feed, player play/pause prove
 watch_history position advance→static); BACK closed the panel before navigation;
 MENU still opens the same panel. Device-input lesson: `input keyevent -t <ms>` is NOT
 a valid flag — use `--duration <ms>` for a held key; `-t` degrades to an instant tap.]
-- Explicitly unchanged/parked: number keys, double-click, preview-on-focus,
-  hold-for-2× (AGENTS-UX-PATTERNS skips), media keys stay player-internal parity only.
+- Explicitly unchanged/parked: number keys, double-click, hold-for-2× (built batch 14),
+  media keys stay player-internal parity only. preview-on-focus + show-more panel
+  graduated batch 18 (AGENTS-UX-PATTERNS "TV"; build record this file).
+
+## TV preview-on-focus + show-more panel (BUILT + D-pad-verified 2026-10-02 batch 18, TV36 — former decided skips, user ask "do these")
+Both built per AGENTS-UX-PATTERNS' own advisories; the "decided skip" layer is superseded
+by the user slice.
+
+**Preview-on-focus (TikTok TV pattern — `FocusPreview`, app-tv, shared by home rows AND
+source-feed grids):** the SETTLED focus (card holds D-pad focus ≥600ms — fast walking
+never decodes) starts a muted+looped preview on that card; focus leaving clears it.
+ONE player instance per screen moves gif-to-gif (no decoder churn) — `GiffyPlayerFactory`
+threaded into TvHomeScreen/TvSourceFeedScreen; card poster swaps to a `PlayerView` while
+`settledId == gif.id`; released when the screen leaves composition (player open = release).
+Always SD rendition (`playGif(gif, dataSaver = true)`) — a preview must not burn HD data
+(gif-id cache key means the real player later replays from cache). Muted+REPEAT_ONE set
+at creation; no watch-history writes (screens own history). Data-saver ON = posters stay
+static (same rule as the mobile inline autoplay). Device-verified: surface appears in the
+focused card after dwell (home row + source-feed grid), follows the focus move, absent
+with data-saver ON, absent after unfocus.
+
+**Show-more panel (TikTok TV "show more"):** a "Show more" main-pane row in
+TvQuickActionsDialog (when the gif has a description or niches) opens a pane with the
+FULL description (the player cluster truncates to 2 lines) + one row per gif niche
+(Open niche: …, no ≤3 cap) — DEVIATION from the original UX-PATTERNS candidate: the
+DOWN-routing was NOT taken (DOWN is the item-walk key per the keymap's spatially-honest
+rule; this panel is the rule-5 sanctioned path). Niche rows open the feed via a new
+`onOpenNiche` hook wired on all three panel call sites (player: exits first; home/source
+feed: in-place swap). Device-verified: hold-Center → panel → Show more → full description
++ niche rows render; ‹ Back returns.
+
+Also batch 18 on this file's topics: the merged niche-group management moved into the
+shared CustomFeedsScreen (state cycle + TV focus-ring treatment on the row buttons;
+AGENTS-CONTENT-FILTER.md DONE section).
 
 ## TV parity gaps vs mobile (audited 2026-10-01, deferred — doc-only)
 Code-verified inventory. Ranked, biggest first:

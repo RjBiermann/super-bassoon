@@ -65,6 +65,8 @@ fun TvQuickActionsDialog(
     onDismiss: () -> Unit,
     /** Links audit #3: the D-pad link equivalent — navigate to the creator feed. */
     onOpenCreator: (String) -> Unit = {},
+    /** Show-more pane: niche pills open the niche feed (player exits first). */
+    onOpenNiche: (com.rjbiermann.giffyviewer.feature.feed.FeedSource.Niche) -> Unit = {},
     /** The open feed itself as an addable ref (e.g. browsing a niche). */
     addableFeedRef: String? = null,
     /** Non-null in the player: adds Like/Mute/Speed/Auto-swipe rows. */
@@ -136,6 +138,31 @@ fun TvQuickActionsDialog(
                             showAddToNiche = true
                         }
                         QuickAction(text = "‹ Back") { view = "main" }
+                        return@M3Surface
+                    }
+                    "more" -> {
+                        // TikTok TV "show more" parity (AGENTS-UX-PATTERNS TV):
+                        // the full description (the player cluster truncates to
+                        // 2 lines) + the gif's niches as openable rows. The
+                        // DOWN-routing from the original candidate is NOT taken —
+                        // DOWN is the item-walk key (keymap rule); this panel is
+                        // the rule-5 sanctioned path.
+                        val desc = gif.description
+                        if (desc != null && desc.isNotBlank()) {
+                            Text(
+                                text = desc,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(bottom = 8.dp),
+                            )
+                        }
+                        gif.niches.forEach { niche ->
+                            QuickAction(text = "Open niche: ${niche.name}") {
+                                onDismiss()
+                                onOpenNiche(com.rjbiermann.giffyviewer.feature.feed.FeedSource.Niche(niche.id, niche.name))
+                            }
+                        }
+                        QuickAction(text = "‹ Back", first = first) { view = "main" }
                         return@M3Surface
                     }
                     "block" -> {
@@ -232,6 +259,9 @@ fun TvQuickActionsDialog(
                 QuickAction(text = "Add to…") { view = "addto" }
                 if (gif.tags.isNotEmpty()) {
                     QuickAction(text = "Tags…") { view = "tags" }
+                }
+                if (!gif.description.isNullOrBlank() || gif.niches.isNotEmpty()) {
+                    QuickAction(text = "Show more") { view = "more" }
                 }
                 QuickAction(text = "Block…") { view = "block" }
                 QuickAction(text = "Close") { onDismiss() }

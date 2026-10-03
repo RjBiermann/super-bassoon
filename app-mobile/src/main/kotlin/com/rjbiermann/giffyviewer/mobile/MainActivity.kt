@@ -33,8 +33,6 @@ import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
 import com.rjbiermann.giffyviewer.feature.feed.FollowingScreen
 import com.rjbiermann.giffyviewer.feature.feed.FollowingViewModel
-import com.rjbiermann.giffyviewer.feature.feed.GroupsScreen
-import com.rjbiermann.giffyviewer.feature.feed.GroupsViewModel
 import com.rjbiermann.giffyviewer.feature.feed.NicheAboutScreen
 import com.rjbiermann.giffyviewer.feature.feed.NicheJoinViewModel
 import com.rjbiermann.giffyviewer.feature.feed.NichesScreen
@@ -81,7 +79,6 @@ class MainActivity : ComponentActivity() {
         var playerStartIndex by rememberSaveable { mutableStateOf<Int?>(null) }
         var showSettings by rememberSaveable { mutableStateOf(false) }
         var showNiches by rememberSaveable { mutableStateOf(false) }
-        var showGroups by rememberSaveable { mutableStateOf(false) }
         var showExplore by rememberSaveable { mutableStateOf(false) }
         var showFollowing by rememberSaveable { mutableStateOf(false) }
         var showCollections by rememberSaveable { mutableStateOf(false) }
@@ -95,7 +92,6 @@ class MainActivity : ComponentActivity() {
                     aboutNiche != null ||
                     showSettings ||
                     showNiches ||
-                    showGroups ||
                     showExplore ||
                     showFollowing ||
                     showCollections ||
@@ -109,7 +105,6 @@ class MainActivity : ComponentActivity() {
                 showCustomFeeds -> showCustomFeeds = false
                 showFollowing -> showFollowing = false
                 showExplore -> showExplore = false
-                showGroups -> showGroups = false
                 showNiches -> showNiches = false
                 showCollections -> showCollections = false
                 else -> showSettings = false
@@ -205,17 +200,6 @@ class MainActivity : ComponentActivity() {
                 },
                 viewModel = customFeedsVm,
             )
-        } else if (confirmed && showGroups) {
-            val groupsViewModel: GroupsViewModel = hiltViewModel()
-            val feedViewModel2: FeedViewModel = hiltViewModel()
-            GroupsScreen(
-                onBack = { showGroups = false },
-                onOpenGroup = { group ->
-                    showGroups = false
-                    feedViewModel2.open(group)
-                },
-                viewModel = groupsViewModel,
-            )
         } else if (confirmed && showSearch) {
             val searchViewModel: SearchViewModel = hiltViewModel()
             val feedViewModel: FeedViewModel = hiltViewModel()
@@ -256,7 +240,6 @@ class MainActivity : ComponentActivity() {
                 onOpenSettings = { showSettings = true },
                 onOpenSearch = { showSearch = true },
                 onOpenNiches = { showNiches = true },
-                onOpenGroups = { showGroups = true },
                 onOpenCustomFeeds = { showCustomFeeds = true },
                 onOpenExplore = { showExplore = true },
                 onOpenFollowing = { showFollowing = true },

@@ -23,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -31,15 +32,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.rjbiermann.giffyviewer.core.database.CustomFeedEntity
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
-import com.rjbiermann.giffyviewer.core.database.NicheGroupEntity
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.ui.GiffyScaffold
+import com.rjbiermann.giffyviewer.core.ui.giffyFocus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -56,11 +58,7 @@ class CustomFeedsViewModel
         val feeds: StateFlow<List<CustomFeedEntity>> =
             db.customFeedDao().all().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-        /** FAVORITED groups offered as one-tap tag expansion. */
-        val favoriteGroups: StateFlow<List<NicheGroupEntity>> =
-            db.nicheGroupDao().all().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-        /** Saves a definition; refs are pre-expanded ("creator:<u>" / "tag:<text>"). */
+        /** Saves a definition; refs are pre-expanded ("creator:<u>" / "tag:<text>" / "niche:<id>|<name>"). */
         fun save(
             name: String,
             refs: List<String>,
@@ -88,6 +86,20 @@ class CustomFeedsViewModel
             viewModelScope.launch {
                 db.feedPageDao().evictBase("custom:$id")
                 db.customFeedDao().delete(id)
+            }
+        }
+
+        /** Merged niche-group state cycle (PLAN §6/§7): FAVORITED → pinned home
+         *  tab · BLOCKED → ContentFilter macro-filter · NEUTRAL → openable only. */
+        fun cycleState(feed: CustomFeedEntity) {
+            val next =
+                when (feed.state) {
+                    "FAVORITED" -> "BLOCKED"
+                    "BLOCKED" -> "NEUTRAL"
+                    else -> "FAVORITED"
+                }
+            viewModelScope.launch {
+                db.customFeedDao().upsert(feed.copy(state = next))
             }
         }
     }
@@ -147,15 +159,23 @@ public fun orderNichesByTagMatch(
     return matching + (niches - matching.toSet())
 }
 
-/** Custom feed builder (PLAN §7): named blend of creators + tags (+ groups expanded). */
+/** Custom feed builder (PLAN §7): named blend of creators + tags (+ niches).
+ *  Also hosts the merged niche-group management (DB v10): FAVORITED feeds pin
+ *  as home tabs, BLOCKED feeds are the ContentFilter macro-filter. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomFeedsScreen(
     onBack: () -> Unit,
     onOpenFeed: (FeedSource.Custom) -> Unit,
     viewModel: CustomFeedsViewModel,
+    /** TV keeps the no-focus-on-open trap away: first focus on the name field. */
+    requestInitialFocus: Boolean = false,
 ) {
     var name by remember { mutableStateOf("") }
+    val firstFocus = androidx.compose.runtime.remember { androidx.compose.ui.focus.FocusRequester() }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        if (requestInitialFocus) firstFocus.requestFocus()
+    }
     val refs = remember { mutableStateListOf<String>() }
     var creatorInput by remember { mutableStateOf("") }
     var tagInput by remember { mutableStateOf("") }
@@ -163,7 +183,6 @@ fun CustomFeedsScreen(
     // evicts the feed's cached pages).
     var deleteFor by remember { mutableStateOf<CustomFeedEntity?>(null) }
     val feeds by viewModel.feeds.collectAsStateWithLifecycle(emptyList())
-    val groups by viewModel.favoriteGroups.collectAsStateWithLifecycle(emptyList())
     // Empty feed is valid: create it now, fill it later from any tile's
     // long-press "Add to custom feed…" quick action.
     val canSave = name.isNotBlank()
@@ -179,7 +198,7 @@ fun CustomFeedsScreen(
         ) {
             item {
                 Text(
-                    "Blend creators, groups and tags into one feed",
+                    "Blend creators, niches and tags into one feed — or bundle tags to favorite as a tab or block as a filter",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -189,7 +208,16 @@ fun CustomFeedsScreen(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Feed name") },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .then(
+                                if (requestInitialFocus) {
+                                    Modifier.focusRequester(firstFocus)
+                                } else {
+                                    Modifier
+                                },
+                            ),
                     singleLine = true,
                 )
             }
@@ -265,27 +293,6 @@ fun CustomFeedsScreen(
                     ) { Text("Add") }
                 }
             }
-            if (groups.any { it.state == "FAVORITED" }) {
-                item {
-                    Text("Add a group's tags:", style = MaterialTheme.typography.titleSmall)
-                    Row(
-                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        groups.filter { it.state == "FAVORITED" }.forEach { group ->
-                            AssistChip(
-                                onClick = {
-                                    group.tagList
-                                        .split(',')
-                                        .filter { it.isNotBlank() }
-                                        .forEach { tag -> refs.add("tag:${tag.trim().lowercase()}") }
-                                },
-                                label = { Text(group.name) },
-                            )
-                        }
-                    }
-                }
-            }
             item {
                 Button(
                     enabled = canSave,
@@ -307,7 +314,11 @@ fun CustomFeedsScreen(
                     Column(
                         Modifier
                             .clickable {
-                                onOpenFeed(FeedSource.Custom(feed.id, feed.name, parseCustomRefs(feed.sourcesJson)))
+                                // Blocked feeds open no feed — macro-filter only
+                                // (merged niche-group rule).
+                                if (feed.state != "BLOCKED") {
+                                    onOpenFeed(FeedSource.Custom(feed.id, feed.name, parseCustomRefs(feed.sourcesJson)))
+                                }
                             }.weight(1f),
                     ) {
                         Text(feed.name, style = MaterialTheme.typography.titleMedium)
@@ -317,7 +328,28 @@ fun CustomFeedsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    OutlinedButton(onClick = { deleteFor = feed }) { Text("Delete") }
+                    // Merged group state cycle: Tab (favorited) → Blocked → Neutral.
+                    // giffyFocus: M3 buttons draw nothing on D-pad focus (TV).
+                    val cycleInteraction = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                    TextButton(
+                        onClick = { viewModel.cycleState(feed) },
+                        modifier = Modifier.giffyFocus(cycleInteraction),
+                        interactionSource = cycleInteraction,
+                    ) {
+                        Text(
+                            when (feed.state) {
+                                "FAVORITED" -> "Tab"
+                                "BLOCKED" -> "Blocked"
+                                else -> "Neutral"
+                            },
+                        )
+                    }
+                    val deleteInteraction = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                    OutlinedButton(
+                        onClick = { deleteFor = feed },
+                        modifier = Modifier.giffyFocus(deleteInteraction),
+                        interactionSource = deleteInteraction,
+                    ) { Text("Delete") }
                 }
             }
         }

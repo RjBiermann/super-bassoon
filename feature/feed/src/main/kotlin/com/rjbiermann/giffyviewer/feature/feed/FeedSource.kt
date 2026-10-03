@@ -68,24 +68,12 @@ sealed interface FeedSource {
         override val ttlMs = TTL_SEARCH
     }
 
-/**
-     * Group feed (PLAN §7): a user-defined tag bundle fetched round-robin — page n
-     * maps to tag[(n-1) % n_tags], same pattern as the Favorites creator rotation
-     * (live-verified: v2/gifs/search's search_text matches tags). Cached group:<id>.
-     */
-    data class Group(
-        val id: Long,
-        val name: String,
-        val tags: List<String>,
-    ) : FeedSource {
-        override val keyBase = "group:$id"
-        override val ttlMs = TTL_SEARCH
-    }
-
-    /** Custom feed (PLAN §7 builder): named blend of creators/groups/tags,
-     *  fetched round-robin like Group — page n maps to
-     *  refs[(n-1) % n] with inner page (n-1)/n + 1. Sources types:
-     *  "creator:<username>" · "group:<id>|<name>|<tags>" · "tag:<text>". */
+    /** Custom feed (PLAN §7 builder): named blend of creators/tags/niches,
+     *  fetched round-robin — page n maps to refs[(n-1) % n] with inner page
+     *  (n-1)/n + 1. Ref types: "creator:<username>" · "tag:<text>" (bare legacy
+     *  tags from the v10 group migration count as tag refs) · "niche:<id>|<name>".
+     *  Also carries the merged niche-group role via the DB `state` column:
+     *  FAVORITED feeds pin as home tabs, BLOCKED feeds drive the ContentFilter. */
     data class Custom(
         val id: Long,
         val name: String,
@@ -132,7 +120,6 @@ fun FeedSource.title(): String =
         is FeedSource.TopThisWeek -> "Top This Week"
         is FeedSource.Niche -> this.name
         is FeedSource.Creator -> "@${this.username}"
-        is FeedSource.Group -> this.name
         is FeedSource.Custom -> this.name
         is FeedSource.Search -> "Search: $query"
         is FeedSource.Favorites -> "Favorites"

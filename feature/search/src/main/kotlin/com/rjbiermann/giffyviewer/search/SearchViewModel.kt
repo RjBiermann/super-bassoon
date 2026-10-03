@@ -143,7 +143,7 @@ class SearchViewModel
             run {
                 // Session reload: the choke point's block sets before filtering.
                 filter.refreshFrom(db.contentPrefsDao())
-                filter.refreshGroupTags(db.nicheGroupDao())
+                filter.refreshBlockedFeeds(db.customFeedDao())
                 when (scope) {
                     SCOPE_IMAGES -> {
                         if (q in _images.value) return

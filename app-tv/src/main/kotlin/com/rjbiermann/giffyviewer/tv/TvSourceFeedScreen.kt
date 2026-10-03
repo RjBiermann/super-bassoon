@@ -54,8 +54,26 @@ fun TvSourceFeedScreen(
     viewModel: TvNicheFeedViewModel,
     /** Shared quick-action model (favorite/block/custom-feed adds). */
     feedViewModel: com.rjbiermann.giffyviewer.feature.feed.FeedViewModel,
+    /** Show-more pane niche rows — the feed swaps (same semantics as onOpenCreator). */
+    onOpenNiche: (com.rjbiermann.giffyviewer.feature.feed.FeedSource.Niche) -> Unit = {},
+    /** Preview-on-focus (AGENTS-UX-PATTERNS): null factory = no previews. */
+    playerFactory: com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory? = null,
+    dataSaver: Boolean = false,
 ) {
     val gifs = remember(source.keyBase) { viewModel.gifs(source) }.collectAsLazyPagingItems()
+    // Preview-on-focus (same FocusPreview shape as the home rows).
+    val previewContext = androidx.compose.ui.platform.LocalContext.current
+    val preview =
+        remember(source, playerFactory) {
+            if (playerFactory == null) {
+                null
+            } else {
+                FocusPreview(playerFactory, previewContext)
+            }
+        }
+    androidx.compose.runtime.DisposableEffect(preview) {
+        onDispose { preview?.release() }
+    }
     // MENU quick actions (mobile QuickBlockSheet parity) — any pinned feed.
     var actionsFor by remember { mutableStateOf<Gif?>(null) }
     // §8 per-feed filter (same feedprefs storage as mobile; the shared dialog
@@ -135,6 +153,8 @@ fun TvSourceFeedScreen(
                                 .then(if (i == 0) Modifier.focusRequester(firstCardFocus) else Modifier)
                                 .fillMaxWidth(),
                         onMenu = { actionsFor = gif },
+                        preview = preview,
+                        dataSaver = dataSaver,
                         onClick = { onOpenGif(snapshot(gifs), gifs.indexOf(gif.id)) },
                     )
                 }
@@ -143,7 +163,11 @@ fun TvSourceFeedScreen(
     }
     if (showFilter) {
         FeedFilterDialog(
-            isGroup = source is FeedSource.Group,
+            // §8 strict-tags chip: tag-bundle custom feeds only (the merged groups).
+            isTagBundle =
+                source is FeedSource.Custom &&
+                    source.refs.isNotEmpty() &&
+                    source.refs.all { !it.startsWith("creator:") && !it.startsWith("niche:") },
             prefs = feedPrefs,
             onApply = { next ->
                 feedViewModel.setFeedPrefs(source.baseKey, next)
@@ -158,6 +182,7 @@ fun TvSourceFeedScreen(
             feedViewModel = feedViewModel,
             addableFeedRef = (source as? FeedSource.Niche)?.let { packNicheRef(it.id, it.name, prefixed = true) },
             onDismiss = { actionsFor = null },
+            onOpenNiche = onOpenNiche,
         )
     }
 }

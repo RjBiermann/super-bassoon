@@ -41,7 +41,7 @@ class ContinueWatchingViewModel
                         .continueWatching(limit = 20)
                         .map { rows ->
                             contentFilter.refreshFrom(db.contentPrefsDao())
-                            contentFilter.refreshGroupTags(db.nicheGroupDao())
+                            contentFilter.refreshBlockedFeeds(db.customFeedDao())
                             rows.mapNotNull { row ->
                                 db.gifDao().byId(row.gifId)?.let {
                                     val gif = it.toModel()

@@ -12,25 +12,37 @@ class ContentFilterTest {
     private val gifTags = listOf("Bigger", "Femboy", "NSFW")
 
     @Test
-    fun `blocked niche-group tags feed the pipeline (stage 2)`() =
+    fun `blocked custom-feed refs feed the pipeline (stage 2, merged groups)`() =
         runTest {
             val f = ContentFilter()
             f.refreshFrom(FakeContentPrefsDao())
-            f.refreshGroupTags(
-                object : NicheGroupDao {
-                    override suspend fun upsert(group: NicheGroupEntity): Long = 0
+            f.refreshBlockedFeeds(
+                object : CustomFeedDao {
+                    override fun all(): kotlinx.coroutines.flow.Flow<List<CustomFeedEntity>> = kotlinx.coroutines.flow.flowOf(emptyList())
 
-                    override fun all(): kotlinx.coroutines.flow.Flow<List<NicheGroupEntity>> = kotlinx.coroutines.flow.flowOf(emptyList())
+                    override suspend fun byId(id: Long): CustomFeedEntity? = null
 
-                    override suspend fun blocked(): List<NicheGroupEntity> =
-                        listOf(NicheGroupEntity(1, "No Femboy", " bigger ,femboy,, ", "BLOCKED", 0))
+                    override suspend fun upsert(feed: CustomFeedEntity): Long = 0
 
                     override suspend fun delete(id: Long) {}
+
+                    override suspend fun blocked(): List<CustomFeedEntity> =
+                        listOf(
+                            // Legacy bare tags from the v10 group migration.
+                            CustomFeedEntity(1, "No Femboy", " bigger ,femboy,, ", 0, "BLOCKED"),
+                            // creator: refs join the global creator blocks.
+                            CustomFeedEntity(2, "No Alpha", "creator:alpha,tag:spam", 0, "BLOCKED"),
+                        )
                 },
             )
-            assertEquals("group", f.hideReason("anyone", gifTags))
+            assertEquals("feed", f.hideReason("anyone", gifTags))
             // whitespace/empty tag entries are ignored, not treated as tags
             assertNull(f.hideReason("anyone", listOf("Solo")))
+            assertEquals("creator", f.hideReason("Alpha", gifTags))
+            // the feed's tag refs land in the feed set, not the prefs tag set
+            assertEquals("feed", f.hideReason("anyone", listOf("spam")))
+            // niche: refs are skipped (niche tag lists aren't local data)
+            assertNull(f.hideReason("anyone", listOf("niche-tag")))
         }
 
     private suspend fun filter(

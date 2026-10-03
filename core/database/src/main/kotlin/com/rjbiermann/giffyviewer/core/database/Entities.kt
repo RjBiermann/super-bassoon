@@ -98,21 +98,13 @@ data class HideCountEntity(
     val count: Int,
 )
 
-/** Niche group (PLAN §6): user-defined tag bundle; full feeds + macro-filter. */
-@Entity(tableName = "niche_groups")
-data class NicheGroupEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val name: String,
-    /** Comma-separated tag list (matches the site's groups storage shape). */
-    val tagList: String,
-    /** BLOCKED | FAVORITED | NEUTRAL. */
-    val state: String,
-    val createdAt: Long,
-)
-
 /**
- * Custom feed definition (PLAN §7): named blend of creators, groups and single
- * tags. sources_json = app-side JSON list [{type:"creator"|"group"|"tag", ref}].
+ * Custom feed definition (PLAN §7): named blend of creators, tags and niches.
+ * sources_json = app-side list of refs, comma-joined:
+ * "creator:<username>" · "tag:<text>" · "niche:<id>|<name>" (legacy bare tags
+ * from the v10 group migration are tag refs too).
+ * state = BLOCKED (macro-filter, stage 2) | FAVORITED (pinned home tab) | NEUTRAL
+ * — the former niche_groups table merged into this one (DB v10).
  */
 @Entity(tableName = "custom_feeds")
 data class CustomFeedEntity(
@@ -120,4 +112,5 @@ data class CustomFeedEntity(
     val name: String,
     val sourcesJson: String,
     val createdAt: Long,
+    val state: String = "NEUTRAL",
 )

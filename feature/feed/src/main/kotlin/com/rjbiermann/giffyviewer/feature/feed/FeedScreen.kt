@@ -93,7 +93,6 @@ fun FeedScreen(
     onOpenSettings: () -> Unit = {},
     onOpenSearch: () -> Unit = {},
     onOpenNiches: () -> Unit = {},
-    onOpenGroups: () -> Unit = {},
     onOpenExplore: () -> Unit = {},
     onOpenFollowing: () -> Unit = {},
     onOpenCollections: () -> Unit = {},
@@ -177,7 +176,7 @@ fun FeedScreen(
                 // DropdownMenu): screens · custom feeds · pinned tabs. The open
                 // surface keeps a selected marker when it lives here.
                 var moreOpen by remember { mutableStateOf(false) }
-                val favGroups by viewModel.favoriteGroups.collectAsStateWithLifecycle(emptyList())
+                val favoritedFeeds by viewModel.favoritedFeeds.collectAsStateWithLifecycle(emptyList())
                 val pinnedCreators by viewModel.pinnedCreators.collectAsStateWithLifecycle(emptySet())
                 val customFeeds by viewModel.customFeeds.collectAsStateWithLifecycle(emptyList())
                 Box {
@@ -187,8 +186,7 @@ fun FeedScreen(
                                 source is FeedSource.Liked ||
                                 source is FeedSource.Custom ||
                                 (source is FeedSource.Niche) ||
-                                source is FeedSource.Creator ||
-                                source is FeedSource.Group,
+                                source is FeedSource.Creator,
                         onClick = { moreOpen = true },
                         label = { Text("More ▾") },
                     )
@@ -248,13 +246,6 @@ fun FeedScreen(
                                 onOpenNiches()
                             },
                         )
-                        DropdownMenuItem(
-                            text = { Text("Groups…") },
-                            onClick = {
-                                moreOpen = false
-                                onOpenGroups()
-                            },
-                        )
                         // Always reachable: the builder is the ONLY way to create
                         // a feed, so "New feed…" must not be gated on having any
                         // (fresh install would otherwise never reach the screen).
@@ -285,12 +276,8 @@ fun FeedScreen(
                         )
                         val pinnedSection =
                             pinnedNiches.map { it as FeedSource } +
-                                favGroups.filter { it.state == "FAVORITED" }.map {
-                                    FeedSource.Group(
-                                        it.id,
-                                        it.name,
-                                        it.tagList.split(','),
-                                    ) as FeedSource
+                                favoritedFeeds.filter { it.state == "FAVORITED" }.map {
+                                    FeedSource.Custom(it.id, it.name, parseCustomRefs(it.sourcesJson)) as FeedSource
                                 } +
                                 pinnedCreators.map { FeedSource.Creator(it) as FeedSource }
                         if (pinnedSection.isNotEmpty()) {
@@ -447,9 +434,15 @@ fun FeedScreen(
                     )
                 }
             }
+            // §8 strict-tags chip: tag-bundle custom feeds only (the merged
+            // groups — all refs are tag refs).
+            val tagBundle =
+                (source as? FeedSource.Custom)?.let { c ->
+                    c.refs.isNotEmpty() && c.refs.all { !it.startsWith("creator:") && !it.startsWith("niche:") }
+                } == true
             if (showFilter) {
                 FeedFilterDialog(
-                    isGroup = source is FeedSource.Group,
+                    isTagBundle = tagBundle,
                     prefs = feedPrefs,
                     onApply = { next ->
                         viewModel.setFeedPrefs(source.baseKey, next)

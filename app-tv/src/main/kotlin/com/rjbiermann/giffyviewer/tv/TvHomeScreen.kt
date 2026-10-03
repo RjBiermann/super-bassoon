@@ -65,6 +65,11 @@ import com.rjbiermann.giffyviewer.core.ui.avgColorOr
 fun TvHomeScreen(
     onOpenGif: (list: List<Gif>, index: Int) -> Unit,
     onOpenCreator: (String) -> Unit,
+    /** Show-more pane niche rows (quick actions). */
+    onOpenNiche: (com.rjbiermann.giffyviewer.feature.feed.FeedSource.Niche) -> Unit = {},
+    /** Preview-on-focus (AGENTS-UX-PATTERNS): null factory = no previews. */
+    playerFactory: com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory? = null,
+    dataSaver: Boolean = false,
     homeViewModel: TvHomeViewModel,
     continueViewModel: ContinueWatchingViewModel,
 ) {
@@ -87,6 +92,21 @@ fun TvHomeScreen(
     // Remote MENU key on a focused card opens creator quick actions.
     var actionsFor by remember { mutableStateOf<Gif?>(null) }
 
+    // Preview-on-focus: one shared player for the whole screen, moved gif
+    // to gif on the settled (600ms) focus — data-saver keeps posters.
+    val previewContext = androidx.compose.ui.platform.LocalContext.current
+    val preview =
+        remember(playerFactory) {
+            if (playerFactory == null) {
+                null
+            } else {
+                FocusPreview(playerFactory, previewContext)
+            }
+        }
+    androidx.compose.runtime.DisposableEffect(preview) {
+        onDispose { preview?.release() }
+    }
+
     LazyColumn(
         // Paint the borrowed page color — the window background is a lighter gray.
         modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
@@ -99,17 +119,17 @@ fun TvHomeScreen(
                 modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp),
             )
         }
-        item { FeedRow("Trending", trending, onOpenGif, onMenu = { actionsFor = it }) }
+        item { FeedRow("Trending", trending, onOpenGif, onMenu = { actionsFor = it }, preview = preview, dataSaver = dataSaver) }
         // Explore = Top Creators (§9 lingo) — creators row, tap → creator feed.
         item { CreatorRow("Explore", exploreCreators, onOpenCreator, failed = exploreFailed, onRetry = { homeViewModel.refreshExplore() }) }
-        item { FeedRow("Top This Week", topThisWeek, onOpenGif, onMenu = { actionsFor = it }) }
+        item { FeedRow("Top This Week", topThisWeek, onOpenGif, onMenu = { actionsFor = it }, preview = preview, dataSaver = dataSaver) }
         // Empty-state rule: no blank favorites row when nothing is favorited.
         if (hasFavorites) {
-            item { FeedRow("Favorites", favorites, onOpenGif, onMenu = { actionsFor = it }) }
+            item { FeedRow("Favorites", favorites, onOpenGif, onMenu = { actionsFor = it }, preview = preview, dataSaver = dataSaver) }
         }
         // Logged-in rows (§9 TV): Liked (network-live) + Following creators.
         if (isLoggedIn) {
-            item { FeedRow("Liked GIFs & Images", liked, onOpenGif, onMenu = { actionsFor = it }) }
+            item { FeedRow("Liked GIFs & Images", liked, onOpenGif, onMenu = { actionsFor = it }, preview = preview, dataSaver = dataSaver) }
             item { CreatorRow("Following", followingCreators.map { it }, onOpenCreator) }
         }
         item {
@@ -120,9 +140,12 @@ fun TvHomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     items(continueEntries, key = { it.gif.id }) { entry ->
-                        GifCard(entry.gif, Modifier.width(cardWidth(entry.gif)), onMenu = { actionsFor = entry.gif }) {
-                            onOpenGif(listOf(entry.gif), 0)
-                        }
+                        GifCard(
+                            entry.gif,
+                            Modifier.width(cardWidth(entry.gif)),
+                            onMenu = { actionsFor = entry.gif },
+                            onClick = { onOpenGif(listOf(entry.gif), 0) },
+                        )
                     }
                 }
             }
@@ -138,6 +161,7 @@ fun TvHomeScreen(
             feedViewModel = quickVm,
             onDismiss = { actionsFor = null },
             onOpenCreator = onOpenCreator,
+            onOpenNiche = onOpenNiche,
         )
     }
 }
@@ -206,6 +230,9 @@ private fun FeedRow(
     gifs: LazyPagingItems<Gif>,
     onOpenGif: (List<Gif>, Int) -> Unit,
     onMenu: (Gif) -> Unit,
+    /** Preview-on-focus state (null = feature off). */
+    preview: FocusPreview? = null,
+    dataSaver: Boolean = false,
 ) {
     // Reserve the row's space while paging loads — a zero-height row that pops
     // to full height shoves every row below (homepage UI drift, user report).
@@ -240,9 +267,14 @@ private fun FeedRow(
         ) {
             items(count = gifs.itemCount, key = { i -> gifs[i]?.id ?: "pending$i" }) { i ->
                 gifs[i]?.let { gif ->
-                    GifCard(gif, Modifier.width(cardWidth(gif)), onMenu = { onMenu(gif) }) {
-                        onOpenGif(snapshot(gifs), gifs.indexOf(gif.id))
-                    }
+                    GifCard(
+                        gif,
+                        Modifier.width(cardWidth(gif)),
+                        onMenu = { onMenu(gif) },
+                        onClick = { onOpenGif(snapshot(gifs), gifs.indexOf(gif.id)) },
+                        preview = preview,
+                        dataSaver = dataSaver,
+                    )
                 }
             }
         }
@@ -299,6 +331,9 @@ internal fun GifCard(
     modifier: Modifier,
     onMenu: () -> Unit,
     onClick: () -> Unit,
+    /** Preview-on-focus state (null = feature off). */
+    preview: FocusPreview? = null,
+    dataSaver: Boolean = false,
 ) {
     // 10-foot UX: focused card grows so the D-pad user always sees where focus is.
     var focused by remember { mutableStateOf(false) }
@@ -307,6 +342,19 @@ internal fun GifCard(
     // panel (the same panel MENU opens); short-tap Center keeps the card open.
     val scope = rememberCoroutineScope()
     val centerHold = remember(scope) { CenterHold(scope, onMenu) }
+    // Preview-on-focus: the SETTLED focus (600ms dwell) starts the muted loop;
+    // unfocusing clears it (fast walking never decodes).
+    LaunchedEffect(focused, dataSaver, preview?.enabled) {
+        if (preview == null || !preview.enabled) {
+            return@LaunchedEffect
+        }
+        if (!focused) {
+            if (preview.settledId == gif.id) preview.onSettled(null, dataSaver)
+        } else if (!dataSaver) {
+            kotlinx.coroutines.delay(600)
+            preview.onSettled(gif, dataSaver)
+        }
+    }
     Card(
         onClick = onClick,
         // Mobile tiles use 12dp rounded corners (GifTile in feature:feed).
@@ -360,20 +408,32 @@ internal fun GifCard(
                         .clip(RoundedCornerShape(12.dp))
                         .background(avgColorOr(gif.avgColor, MaterialTheme.colorScheme.surfaceVariant)),
             ) {
-                AsyncImage(
-                    model =
-                        ImageRequest
-                            .Builder(LocalContext.current)
-                            .data(gif.posterUrl)
-                            .crossfade(200)
-                            .build(),
-                    // Decorative: the visible "@user" Text announces the creator —
-                    // saying both duplicates the name per card (mobile-parity fix).
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    // fixed landscape card (10-foot norm); portrait gifs crop — fine for browse
-                    modifier = Modifier.fillMaxWidth().height(CARD_ROW_HEIGHT_DP),
-                )
+                if (preview != null && preview.settledId == gif.id && preview.player != null) {
+                    // Settled-focus preview: the poster swaps to the muted+looped
+                    // SD loop until focus moves away (or the real player opens).
+                    androidx.compose.ui.viewinterop.AndroidView(
+                        factory = { ctx ->
+                            androidx.media3.ui.PlayerView(ctx).apply { useController = false }
+                        },
+                        update = { view -> view.player = preview.player },
+                        modifier = Modifier.fillMaxWidth().height(CARD_ROW_HEIGHT_DP),
+                    )
+                } else {
+                    AsyncImage(
+                        model =
+                            ImageRequest
+                                .Builder(LocalContext.current)
+                                .data(gif.posterUrl)
+                                .crossfade(200)
+                                .build(),
+                        // Decorative: the visible "@user" Text announces the creator —
+                        // saying both duplicates the name per card (mobile-parity fix).
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        // fixed landscape card (10-foot norm); portrait gifs crop — fine for browse
+                        modifier = Modifier.fillMaxWidth().height(CARD_ROW_HEIGHT_DP),
+                    )
+                }
                 // Audio-know-before-tap badge — mobile-tile parity (unified UI).
                 if (gif.hasAudio) {
                     AudioBadge(modifier = Modifier.align(androidx.compose.ui.Alignment.TopEnd).padding(8.dp))

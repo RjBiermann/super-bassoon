@@ -62,18 +62,16 @@ conventions* are fine; its *retention playbook* is not.
   only if Continue Watching proves discoverable enough on its own.
 
 ### TV
-- **Preview-on-focus (TikTok TV app):** focused row card starts a muted loop.
-  Cost:decode-per-focus churn + the rate-limit invariant (manifest fetches
-  per focus move at TvLazyRow scroll speed). Mitigation exists in §9
-  (adjacent prefetch, decode fallback env vars) but the 2 req/s budget makes
-  focus-scoped previewing risky. Mark: only if a low-cost advisory
-  (leadership: preview only the settled focus after 600ms dwell) — otherwise
-  skip.
-- **In-episode "show more" panel (TikTok TV):** D-pad DOWN on the player
-  expands description/tags/actions below the video. Matches the existing
-  MENU quick-actions + description display already shipped; add DOWN-on-player
-  focus routing as polish (AGENTS-APP.md TV section already collects focus
-  lessons — route lessons there when touched).
+- **Preview-on-focus (TikTok TV app):** BUILT 2026-10-02 batch 18 in the low-cost
+  advisory shape — preview ONLY the settled focus (≥600ms dwell), ONE shared muted
+  player per screen (no decoder churn), SD-only, data-saver keeps posters, released
+  when the player opens. Build record in AGENTS-APP.md "TV preview-on-focus + show-more
+  panel"; device-verified on TV36.
+- **In-episode "show more" panel (TikTok TV):** BUILT 2026-10-02 batch 18 — as a
+  "Show more" pane in the quick-actions panel (full description + per-niche open rows).
+  DEVIATION: the DOWN-routing from this original note was NOT taken — DOWN is the
+  item-walk key per the TV keymap's spatially-honest rule; the panel is the rule-5
+  sanctioned path. Build record in AGENTS-APP.md.
 - **Row autoplay trailer (IG TV-style hero row):** molested pattern — skip
   outright (bandage: data burn for zero intent signal, viewer-only).
 

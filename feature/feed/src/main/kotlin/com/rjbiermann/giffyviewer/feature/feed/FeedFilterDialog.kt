@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 /** §8 per-feed filter dialog: duration / resolution / orientation chips. */
 @Composable
 fun FeedFilterDialog(
-    isGroup: Boolean = false,
+    isTagBundle: Boolean = false,
     prefs: com.rjbiermann.giffyviewer.core.datastore.FeedPrefs,
     onApply: (com.rjbiermann.giffyviewer.core.datastore.FeedPrefs) -> Unit,
     onDismiss: () -> Unit,
@@ -84,9 +84,10 @@ fun FeedFilterDialog(
                         )
                     }
                 }
-                if (isGroup) {
-                    // §8: group feeds can restrict to gifs whose tags stay
-                    // inside the group bundle (no outside-tag content).
+                if (isTagBundle) {
+                    // §8: tag-bundle custom feeds (the merged groups) can restrict
+                    // to gifs whose tags stay inside the bundle (no outside-tag
+                    // content).
                     Row(
                         modifier =
                             Modifier

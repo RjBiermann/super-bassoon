@@ -99,12 +99,14 @@ class TvMainActivity : ComponentActivity() {
         // the same way Settings/Auth already are.
         var showSearch by remember { mutableStateOf(false) }
         var showCollections by remember { mutableStateOf(false) }
-        var showGroups by remember { mutableStateOf(false) }
         var showCustomFeeds by remember { mutableStateOf(false) }
         var nicheAbout: FeedSource.Niche? by remember { mutableStateOf(null) }
         var openFeed: FeedSource? by remember { mutableStateOf(null) }
         val pinnedNiches by settings.pinnedNiches.collectAsStateWithLifecycle(initialValue = emptySet())
         val pinnedCreators by settings.pinnedCreators.collectAsStateWithLifecycle(initialValue = emptySet())
+        // Preview-on-focus gates on data-saver (posters only — same rule as the
+        // mobile inline autoplay).
+        val dataSaver by settings.dataSaver.collectAsStateWithLifecycle(false)
         // Custom feed pills (PLAN §7 builder) — from Room, ordered by creation.
         val customFeeds by db
             .customFeedDao()
@@ -119,7 +121,6 @@ class TvMainActivity : ComponentActivity() {
                 openFeed != null ||
                 showSearch ||
                 showCollections ||
-                showGroups ||
                 showCustomFeeds ||
                 nicheAbout != null
         androidx.activity.compose.BackHandler(
@@ -130,7 +131,6 @@ class TvMainActivity : ComponentActivity() {
                 openFeed != null -> openFeed = null
                 showSearch -> showSearch = false
                 showCollections -> showCollections = false
-                showGroups -> showGroups = false
                 showCustomFeeds -> showCustomFeeds = false
                 nicheAbout != null -> nicheAbout = null
                 showNiches -> showNiches = false
@@ -180,6 +180,9 @@ class TvMainActivity : ComponentActivity() {
                             onOpenGif = { gifs, index -> player = gifs to index },
                             viewModel = feedVm,
                             feedViewModel = quickVm,
+                            onOpenNiche = { niche -> openFeed = niche },
+                            playerFactory = playerFactory,
+                            dataSaver = dataSaver,
                         )
                     }
                 }
@@ -231,18 +234,10 @@ class TvMainActivity : ComponentActivity() {
                         onBack = { showCollections = false },
                         viewModel = hiltViewModel(),
                     )
-                showGroups ->
-                    com.rjbiermann.giffyviewer.feature.feed.GroupsScreen(
-                        onBack = { showGroups = false },
-                        onOpenGroup = { group ->
-                            showGroups = false
-                            openFeed = group
-                        },
-                        viewModel = hiltViewModel(),
-                    )
                 showCustomFeeds ->
                     com.rjbiermann.giffyviewer.feature.feed.CustomFeedsScreen(
                         onBack = { showCustomFeeds = false },
+                        requestInitialFocus = true,
                         onOpenFeed = { feed ->
                             showCustomFeeds = false
                             openFeed = feed
@@ -332,13 +327,6 @@ class TvMainActivity : ComponentActivity() {
                                             },
                                         )
                                         androidx.compose.material3.DropdownMenuItem(
-                                            text = { androidx.compose.material3.Text("Groups") },
-                                            onClick = {
-                                                moreOpen = false
-                                                showGroups = true
-                                            },
-                                        )
-                                        androidx.compose.material3.DropdownMenuItem(
                                             text = { androidx.compose.material3.Text("Collections") },
                                             onClick = {
                                                 moreOpen = false
@@ -386,6 +374,9 @@ class TvMainActivity : ComponentActivity() {
                         TvHomeScreen(
                             onOpenGif = { gifs, index -> player = gifs to index },
                             onOpenCreator = { username -> openFeed = FeedSource.Creator(username = username) },
+                            onOpenNiche = { niche -> openFeed = niche },
+                            playerFactory = playerFactory,
+                            dataSaver = dataSaver,
                             homeViewModel = home,
                             continueViewModel = continueVm,
                         )

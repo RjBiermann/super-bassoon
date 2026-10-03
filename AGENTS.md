@@ -661,3 +661,60 @@ AGENTS-APP.md + AGENTS-UX-PATTERNS.md "No-button-limitation rule", user ask). BU
   suggest (spec'd-not-scheduled fallbacks — decided, not parked), soaks (emulator
   fragility), Gate 324 (blocked on SIGNING secrets), minimap/preview-on-focus/
   show-more/two-column + RateLimitBus indicator (decided skips).
+
+### Session 2026-10-02 batch 18 (pending-items sweep — six parked items driven; merge built + two TV features built + both soaks passed)
+Executed the parked list on the user slice "do these" (AGENTS-CONTENT-FILTER merge,
+server collections, niches suggest, both player soaks, TV preview-on-focus, TV show-more
+panel). Compile + ktlint + detekt + unit tests green across all touched modules
+(:core:database/:feature:feed/:feature:search/:app-tv/:app-mobile); migration SQL
+host-checked; migrations registered in both app modules.
+
+- **Groups → custom-feeds merge SHIPPED** (was deferred; user ask): DB v10
+  (`custom_feeds.state`, groups→tag-bundle custom feeds, `niche_groups` dropped,
+  group cache evicted) — live-migrated on TV36 + host SQL sanity. ContentFilter
+  stage 2 = `refreshBlockedFeeds(CustomFeedDao)`: BLOCKED feeds' tag refs → tag
+  blocks, creator: refs → creator blocks (the blockable-creators want), niche: refs
+  skipped (no local tag data — doc'd). `FeedSource.Group` deleted; untagged-only now
+  bounds pure-tag-bundle Custom feeds; backup v3 (state field; v2 exports import fine).
+  GroupsScreen/GroupsViewModel deleted; CustomFeedsScreen hosts the merged management
+  (Tab/Blocked/Neutral cycle, BLOCKED feed opens no feed, TV giffyFocus row buttons,
+  `requestInitialFocus` on the name field for TV). More ▾ lost the Groups entry
+  (mobile Pinned section pins FAVORITED feeds). Full record in
+  AGENTS-CONTENT-FILTER.md DONE section. Device-verified: state cycle 3-way, blocked
+  open-guard, neutral opens; shared TextField on TV TRAPS D-pad focus (escaping via
+  `input text` — a TV-hosted list screen MUST have requestInitialFocus on the first
+  focusable; now wired).
+- **Server collections CLOSED — already built** (stale doc): CollectionsViewModel is
+  fully server-backed (GET /v2/me/collections + all writes). Only collection-content
+  BROWSING lacks a verified endpoint (no-guess class). NETWORK/APP docs corrected.
+- **Niches suggest stays blocked (needs you):** `v2/niches/suggest` requires a USER
+  token (401-live-probed with the anon token) and the param name for the tag context
+  was never recorded — no-guess rule holds. Fresh token bundle re-unblocks.
+- **TV preview-on-focus BUILT + verified** (`FocusPreview`, app-tv): settled focus
+  ≥600ms dwell → muted+looped SD preview on the focused card; ONE shared player per
+  screen (no decoder churn); data-saver keeps posters; released on player open.
+  Home rows + source-feed grids; surface-follows-focus verified, no-surface with
+  data-saver ON.
+- **TV show-more panel BUILT + verified:** "Show more" pane in TvQuickActionsDialog
+  (full description + per-niche rows via new onOpenNiche wired on 3 call sites;
+  player exits first). The original DOWN-routing candidate overtaken by the keymap —
+  documented as a deviation in AGENTS-UX-PATTERNS.md.
+- **Player soaks BOTH PASSED** (AGENTS-PLAYER.md batch-18 records): mobile boundary
+  soak (Medium_Phone, 21 min, 62 distinct gifs, page-1→2 boundary crossed live,
+  0 FATALs) and TV end-of-media loop soak (TV36, six real end→restart cycles via
+  watch_history position samples; after ~35 min the AVD decoder wedged mid-frame —
+  the known emulator fragility, loop functioned across all cycles first).
+- **Incidental live-crash fix:** `FeedPageFetcher` Favorites branch guarded an empty
+  favorite set (divide-by-zero → LoadResult.Error on the Favorites pager of every
+  fresh install / zero-favorites account) — degenerate empty page instead.
+  Live-proven on TV36 before/after.
+- Session quirks worth remembering: `adb shell am start` needs the manifest path
+  `.mobile.MainActivity` (mobile's class is NESTED under the app namespace —
+  resolve-activity shows it); a TV emulator restart does NOT wipe data on this AVD
+  (the "fresh profile" assumption from earlier batches no longer holds — check
+  DataStore before trusting stale prefs); a mid-test DB push can zero the main file
+  — force-stop + `pm clear` + fresh gate is the clean reset.
+- Deferred decisions unchanged: Report (unprobeable), server search-history sync /
+  silent rendition swap / LAN pairing (spec'd-not-scheduled fallbacks), Followers
+  page (row shape — no-guess), Gate 324 (SIGNING secrets), minimap/two-column/
+  RateLimitBus indicator (decided skips).

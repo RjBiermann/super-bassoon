@@ -77,7 +77,7 @@ class FeedRepository
             val orientation = settings.orientationFilter.first()
             val verifiedOnly = settings.verifiedOnly.first()
             contentFilter.refreshFrom(db.contentPrefsDao())
-            contentFilter.refreshGroupTags(db.nicheGroupDao())
+            contentFilter.refreshBlockedFeeds(db.customFeedDao())
             val pool =
                 db
                     .gifDao()

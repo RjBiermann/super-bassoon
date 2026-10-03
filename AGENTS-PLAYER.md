@@ -119,6 +119,22 @@ Fixed with a bounds guard before `items[page]` (the null check only catches
 placeholders). Full clean pass still pending — the Phone34 emulator dies
 every few minutes on this host, so a 10-min soak keeps getting interrupted.
 
+**SOAK PASSED (2026-10-02 batch 18, Medium_Phone):** 21-minute continuous
+auto-swipe run at 1× over a fresh profile — 62 DISTINCT gifs advanced
+(`COUNT(DISTINCT gifId)` on watch_history as the observable), the
+page-1→page-2 boundary crossed live (count jumped 40→42 with
+appended-page ids), zero FATAL exceptions. The "keeps getting interrupted"
+streak is closed.
+
+**TV end-of-media loop soak (batch 18, TV36):** the STATE_ENDED →
+seekTo(0)+play loop was exercised with the media ACTUALLY ending —
+watch_history position samples cycled 10396 → 6263 → 16283 → 13155 →
+6332 → 16342 across six real cycle-end restarts (19.2s gif, 5s sampler).
+After ~35 min of continuous decoder activity playback wedged mid-frame
+(position frozen, Codec2 "Invalid WorkBundle" chatter) — the DOCUMENTED
+emulator decode fragility, not app behavior (the loop had functioned over
+all cycles before the wedge).
+
 ## Auto-swipe advance (2026-10-01)
 - **Bare-lambda trap:** a `{ ... }` block placed as a statement inside
   `onPlaybackStateChanged` compiles clean but never runs (it's a discarded

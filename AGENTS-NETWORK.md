@@ -50,4 +50,10 @@ network just returns raw pages that the pipeline will consume.
 `v2/analytics`, `v2/metrics/*`, `v2/announcements/*`, `v2/auth/clients/*`, upload pages.
 Galleries (`v2/gallery/*`) were hard-gated on Phase-2 verification — never built, no UI.
 Spec'd-not-scheduled fallbacks (LAN pairing, server search-history sync, silent rendition
-swap, server collections) stay unbuilt until a live verification proves the need.
+swap) stay unbuilt until a live verification proves the need.
+
+**Server collections CLOSED (2026-10-02 batch 18, stale-doc correction):** collections
+were ALREADY fully server-backed — `CollectionsViewModel` is source-of-truth from
+`GET /v2/me/collections`, and create/rename/delete/add/remove-gif writes are all wired
+(live-verified 2026-10-01). What remains un-verified is BROWSING a collection's gifs
+(the collection-content feed): no verified endpoint, same no-guess class.

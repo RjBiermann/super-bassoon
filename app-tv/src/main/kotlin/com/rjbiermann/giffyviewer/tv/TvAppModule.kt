@@ -88,6 +88,7 @@ object TvAppModule {
                 GiffyDatabase.MIGRATION_6_7,
                 GiffyDatabase.MIGRATION_7_8,
                 GiffyDatabase.MIGRATION_8_9,
+                GiffyDatabase.MIGRATION_9_10,
             ).build()
 
     /** Images share the API's OkHttp instance → same rate limiter covers media. */

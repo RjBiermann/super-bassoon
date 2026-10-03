@@ -320,9 +320,10 @@ class FeedViewModel
             }
         }
 
-        /** FAVORITED niche groups → pinned tabs (PLAN §7); BLOCKED feeds the filter. */
-        val favoriteGroups: StateFlow<List<com.rjbiermann.giffyviewer.core.database.NicheGroupEntity>> =
-            db.nicheGroupDao().all().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        /** FAVORITED custom feeds → pinned tabs (PLAN §7; the merged niche-group
+         *  role, DB v10). BLOCKED feeds drive the filter instead. */
+        val favoritedFeeds: StateFlow<List<com.rjbiermann.giffyviewer.core.database.CustomFeedEntity>> =
+            db.customFeedDao().all().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
         /** Pinned creator usernames — Home tabs (PLAN §7 pin-to-tabs), shared by both apps. */
         val pinnedCreators: StateFlow<Set<String>> =

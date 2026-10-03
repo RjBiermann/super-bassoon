@@ -80,7 +80,7 @@ Import/Export landed — see ContentPrefsBackup below; niche groups landed in DB
 - Niche groups: DB v5 (`niche_groups`), GroupsScreen live on both apps, BLOCKED groups feed stage 2.
 - Hide counts: single rolling 7-day counter (`hide_counts`), no per-reason split — matches the spec.
 
-## Merging groups into custom feeds (considered, deferred 2026-10-01)
+## Merging groups into custom feeds (SHIPPED 2026-10-02 — see the DONE section at the bottom)
 
 Conceptually `niche_groups` is a special case of `custom_feeds` (an all-tag-refs feed), and the
 merge would generalize blocking to per-ref granularity (blockable `creator:` refs — not possible
@@ -105,3 +105,43 @@ NOT part of the ContentFilter pipeline — a global DataStore pref `orientation_
 (`any`/`horizontal`/`vertical`, shared SettingsScreen) applied strictly AFTER ContentFilter
 at the read-time filter stage. See AGENTS-APP.md for wiring points. No hide counts, no toast:
 like promoted (stage 0), it's not user content-blocking.
+
+## Merging groups into custom feeds — DONE (2026-10-02 batch 18, user ask)
+The deferred merge SHIPPED. `niche_groups` is gone (DB v10, `MIGRATION_9_10`):
+each group became a custom feed whose refs are its tags (bare legacy tag refs —
+the fetcher treats a ref without a `creator:`/`niche:` prefix as a tag search);
+`custom_feeds.state` (BLOCKED | FAVORITED | NEUTRAL) carries the group role.
+"custom_feeds ADD COLUMN state TEXT NOT NULL DEFAULT 'NEUTRAL'" + INSERT…SELECT
+from `niche_groups` + DROP + `DELETE FROM feed_pages WHERE pageKey LIKE 'group:%'`
+(same ALTER-with-default shape as the live-proven MIGRATION_8_9). Migration SQL
+sanity-checked on host (states carried, refs parseable as tags, group cache
+evicted) and the real migration ran live on TV36 (old v9 profile → v10).
+
+ContentFilter stage 2 rewrite (`refreshBlockedFeeds(dao: CustomFeedDao)`): a
+BLOCKED custom feed's tag refs (bare or "tag:"-prefixed) join the global tag
+block set; its `creator:` refs join the global creator blocks (the merge's
+blockable-creators want); `niche:` refs are SKIPPED — a niche's tag list isn't
+local data, mapping it would be a guess. MUST run after `refreshFrom` (it
+merges, not replaces, the creator set). Hide-count reason string "group" →
+"feed". FeedPagingSource invalidation observer watches `custom_feeds`.
+
+`FeedSource.Group` deleted — group feeds are `FeedSource.Custom(id, name, refs)`
+with the same round-robin fetch. `untagged()` (§8 strict tags) applies to
+custom feeds whose refs are ALL tag refs (a blended creator/niche feed has no
+single bundle to bound to). GroupsScreen/GroupsViewModel deleted;
+CustomFeedsScreen hosts the merged management (per-row state cycle
+Tab/Blocked/Neutral with the TV giffyFocus ring treatment, BLOCKED rows open no
+feed, builder hint updated). More ▾ lost the Groups entry on both apps (mobile
+Pinned section now pins FAVORITED feeds; TV already surfaces all custom feeds).
+`ContentPrefsBackup` v3: `CustomFeedDef.state` (absent in v2 exports → NEUTRAL;
+versioned-importer rule holds — groups were never exported pre-v3).
+
+Device-verified (TV36): migration live, feed created via typed input (and the
+screen's initial focus landed on the name field — requestInitialFocus wired for
+TV), state cycled Neutral→Tab→Blocked→Neutral, BLOCKED feed opens no feed,
+NEUTRAL feed opens. Verification lesson: `adb shell input -t` isn't a thing and
+a shared TextField traps D-pad focus on TV (CAST via `input text` into the
+focused field; coordinate taps escape the trap) — TV-hosted shared list screens
+MUST take `requestInitialFocus = true` and put it on the FIRST focusable.
+
+Re-evaluation trigger for this merge: satisfied by the user ask ("do these").

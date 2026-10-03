@@ -33,15 +33,19 @@ object ContentPrefsBackup {
     data class CustomFeedDef(
         val id: Long,
         val name: String,
-        /** Pre-expanded refs ("creator:<u>" / "tag:<text>"), comma-joined. */
+        /** Comma-joined refs ("creator:<u>" / "tag:<text>" / "niche:<id>|<name>";
+         *  legacy bare tags count as tag refs). */
         val sourcesJson: String,
         val createdAt: Long,
+        /** v3: the merged group state (BLOCKED | FAVORITED | NEUTRAL) — absent
+         *  in v2 exports, decodes to NEUTRAL. */
+        val state: String = "NEUTRAL",
     )
 
     @Serializable
     data class Backup(
         val format: String = "giffy-prefs",
-        val version: Int = 2,
+        val version: Int = 3,
         val dataSaver: Boolean = false,
         val creatorPrefs: List<CreatorPref> = emptyList(),
         val tagPrefs: List<TagPref> = emptyList(),
@@ -76,7 +80,7 @@ object ContentPrefsBackup {
                     },
                 customFeeds =
                     customFeeds.map {
-                        CustomFeedDef(it.id, it.name, it.sourcesJson, it.createdAt)
+                        CustomFeedDef(it.id, it.name, it.sourcesJson, it.createdAt, it.state)
                     },
             ),
         )
@@ -101,6 +105,7 @@ object ContentPrefsBackup {
                         name = it.name,
                         sourcesJson = it.sourcesJson,
                         createdAt = it.createdAt,
+                        state = it.state,
                     ),
                 )
             }
