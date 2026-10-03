@@ -265,6 +265,45 @@ class FeedViewModel
             }
         }
 
+        /** Anonymous users never see the follow row anywhere (a PUT would 401).
+         *  Pairs with [refreshFollowedCreators] gating. */
+        val loggedIn: Boolean
+            get() = tokenStore.tokenOrNull() != null
+
+        /** Creator follow state (server source of truth): GET v1/me/follows →
+         *  username array (verified), lowercased — Gif.userName casing is not
+         *  guaranteed to match the server list. */
+        private val _followedCreators = MutableStateFlow<Set<String>>(emptySet())
+        val followedCreators: StateFlow<Set<String>> = _followedCreators
+
+        fun refreshFollowedCreators() {
+            viewModelScope.launch {
+                if (tokenStore.tokenOrNull() == null) return@launch
+                runCatching { withContext(Dispatchers.IO) { api.followedCreators() } }
+                    .onSuccess { _followedCreators.value = it.map(String::lowercase).toSet() }
+            }
+        }
+
+        /** PUT v1/me/follows/{username} / DELETE → 204 (verified), JSON body
+         *  {source, source_id, position}. Optimistic flip only on success —
+         *  signed-out users never reach here (the row is hidden). */
+        fun toggleFollowCreator(username: String) {
+            viewModelScope.launch {
+                if (tokenStore.tokenOrNull() == null) return@launch
+                val wasFollowing = username.lowercase() in _followedCreators.value
+                runCatching {
+                    if (wasFollowing) {
+                        api.unfollowCreator(username)
+                    } else {
+                        api.followCreator(username)
+                    }
+                }.onSuccess {
+                    _followedCreators.value =
+                        if (wasFollowing) _followedCreators.value - username.lowercase() else _followedCreators.value + username.lowercase()
+                }
+            }
+        }
+
         /** POST v2/me/collections/{id}/gifs {gifId} → 204 (probed, reverted). */
         fun addToCollection(
             folderId: String,

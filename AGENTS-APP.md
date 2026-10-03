@@ -921,7 +921,15 @@ D-pad only.
 
 **Minor:** ~~no NicheAbout entry from TvNichesScreen~~ CLOSED batch 12 (About
 focusable per row → shared NicheAboutScreen, D-pad-verified); TV "Following"
-row is read-only — unverified whether a follow action exists anywhere on TV.
+row is read-only — ~~unverified whether a follow action exists anywhere on TV~~
+**CLOSED 2026-10-03 (batch 19):** follow/unfollow is now wired BOTH apps via
+FeedViewModel (refreshFollowedCreators + toggleFollowCreator over the verified
+PUT/DELETE v1/me/follows, optimistic flip on success): mobile quick-sheet row
++ TV TvQuickActions row, same main-pane position after "Open @user's feed".
+Anonymous (no token) shows no row on either app — device-verified on
+Television_AOSP (panel dump: Like/Mute/Speed/Favorite/Open/Pin rows, no
+Follow row signed-out). Signed-in on-device verify (row flips Follow ↔
+Unfollow) needs a fresh token bundle.
 
 **Parity OK (verified in code):** age gate, PIN lock, Settings/data saver/video
 fit/verified-only, per-feed prefs (same feedprefs blob + shared dialog),

@@ -718,3 +718,39 @@ host-checked; migrations registered in both app modules.
   silent rendition swap / LAN pairing (spec'd-not-scheduled fallbacks), Followers
   page (row shape — no-guess), Gate 324 (SIGNING secrets), minimap/two-column/
   RateLimitBus indicator (decided skips).
+
+### Session 2026-10-03 batch 19 (pending-items sweep — creator Follow/Unfollow built; ktlint tree hygiene)
+User slice: "review the docs and implement pending/deferred/parked items" →
+executed from the doc'd pending lists. Compile + ktlint + detekt + unit tests
+green on :feature:feed/:app-tv/:app-mobile.
+- **Creator Follow/Unfollow BUILT (both apps)** — the last remaining doc'd
+  TV↔mobile parity item ("TV Following row read-only / no follow action
+  anywhere") plus the round-1 parity list's spec'd Follow row. FeedViewModel:
+  `followedCreators` StateFlow (GET v1/me/follows username array, lowercased —
+  Gif.userName casing not guaranteed to match), `refreshFollowedCreators()`
+  (token-gated, fetched on panel open — 1 request per open, rate-limit-safe),
+  `toggleFollowCreator(username)` (PUT/DELETE v1/me/follows + verified JSON
+  FollowBody, 204; optimistic flip only on success), `loggedIn` expose.
+  Wired: mobile QuickSheet main pane + TV TvQuickActions main pane, identical
+  position right after "Open @user's feed"; row hidden for anonymous users on
+  both (a write would 401 — NicheJoinViewModel gating pattern).
+- **TvQuickActions row presence device-verified (Television_AOSP):** home →
+  creator feed grid → card → player → MENU → panel rows render
+  (Like/Mute/Speed/Auto-swipe/Favorite/Open/Pin/Add to…/Tags…), signed-out
+  profile → NO Follow row (anonymity gate live), 0 FATALs; emulator stopped
+  cleanly. Signed-in row-flip verify needs a fresh token bundle (none this
+  session — 1h id_tokens, account login is not agent-possible).
+- **Stale doc corrections noted along the way:** (a) "Vertical video on TV
+  fullscreen-fill (option, not built)" — already built: TvPlayerScreen maps the
+  shared videoFit pref crop→RESIZE_MODE_ZOOM / stretch→FILL (AGENTS-APP
+  Orientation-filter section is stale on this, kept corrected here); (b) "Add to
+  a Collection" TV parity — already built (TvQuickActions Add-to pane).
+- **ktlint tree hygiene:** `ktlintMainSourceSetCheck` was failing on pre-existing
+  violations in TvHomeScreen (2), TvQuickActions (1), CustomFeedsScreen (4 —
+  fully-qualified `androidx...` chains + >140 cols from batch 18) — all
+  reformatted to imports/short names; no log changes.
+- Remaining parked/blocked unchanged (all need external input, not code):
+  Report (unprobeable), Followers page (row shape no-guess), niches suggest +
+  server search-history sync + collection browsing endpoint (fallbacks/no-guess),
+  Gate 324 (SIGNING secrets), minimap/two-column/RateLimitBus indicator
+  (decided skips). Follow-flip signed-in check joins the token-bundle queue.

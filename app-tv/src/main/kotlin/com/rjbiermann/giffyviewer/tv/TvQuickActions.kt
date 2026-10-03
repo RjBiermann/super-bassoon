@@ -33,6 +33,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
 import com.rjbiermann.giffyviewer.core.ui.giffyFocus
+import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
 import com.rjbiermann.giffyviewer.feature.feed.customRefSummary
 import com.rjbiermann.giffyviewer.feature.feed.gifFeedRefs
@@ -66,7 +67,7 @@ fun TvQuickActionsDialog(
     /** Links audit #3: the D-pad link equivalent — navigate to the creator feed. */
     onOpenCreator: (String) -> Unit = {},
     /** Show-more pane: niche pills open the niche feed (player exits first). */
-    onOpenNiche: (com.rjbiermann.giffyviewer.feature.feed.FeedSource.Niche) -> Unit = {},
+    onOpenNiche: (FeedSource.Niche) -> Unit = {},
     /** The open feed itself as an addable ref (e.g. browsing a niche). */
     addableFeedRef: String? = null,
     /** Non-null in the player: adds Like/Mute/Speed/Auto-swipe rows. */
@@ -75,6 +76,10 @@ fun TvQuickActionsDialog(
     var showAddToFeed by remember { mutableStateOf(false) }
     var showAddToCollection by remember { mutableStateOf(false) }
     var showAddToNiche by remember { mutableStateOf(false) }
+    // Follow row (mobile quick-sheet parity): server read on open, toggled in
+    // place; anonymous users see no row (a write would 401).
+    LaunchedEffect(gif.id) { feedViewModel.refreshFollowedCreators() }
+    val followedCreators by feedViewModel.followedCreators.collectAsStateWithLifecycle(emptySet())
     // Two views (user: "too many options"): main / tags submenu.
     var view by remember { mutableStateOf("main") }
     val customFeeds by feedViewModel.customFeeds.collectAsStateWithLifecycle(emptyList())
@@ -159,7 +164,7 @@ fun TvQuickActionsDialog(
                         gif.niches.forEach { niche ->
                             QuickAction(text = "Open niche: ${niche.name}") {
                                 onDismiss()
-                                onOpenNiche(com.rjbiermann.giffyviewer.feature.feed.FeedSource.Niche(niche.id, niche.name))
+                                onOpenNiche(FeedSource.Niche(niche.id, niche.name))
                             }
                         }
                         QuickAction(text = "‹ Back", first = first) { view = "main" }
@@ -239,6 +244,20 @@ fun TvQuickActionsDialog(
                 QuickAction(text = "Open @${gif.userName}'s feed") {
                     onDismiss()
                     onOpenCreator(gif.userName)
+                }
+                if (feedViewModel.loggedIn) {
+                    QuickAction(
+                        text =
+                            if (gif.userName.lowercase() in followedCreators) {
+                                "Unfollow @${gif.userName}"
+                            } else {
+                                "Follow @${gif.userName}"
+                            },
+                        onClick = {
+                            feedViewModel.toggleFollowCreator(gif.userName)
+                            onDismiss()
+                        },
+                    )
                 }
                 QuickAction(
                     text =

@@ -49,6 +49,10 @@ internal fun QuickBlockSheet(
      *  navigates in place. */
     onOpenFeed: () -> Unit = {},
 ) {
+    // Follow state (site parity "Follow ↔ Following"): server read on open,
+    // toggled in place. Anonymous users see no row (a write would 401).
+    androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.refreshFollowedCreators() }
+    val followedCreators by viewModel.followedCreators.collectAsState(initial = emptySet())
     // Hoisted for the AddToCustomFeedDialog scope below.
     val customFeeds by viewModel.customFeeds.collectAsState(initial = emptyList())
     val collections by viewModel.collections.collectAsState(initial = emptyList())
@@ -128,6 +132,18 @@ internal fun QuickBlockSheet(
                         viewModel.open(FeedSource.Creator(username = gif.userName))
                         onDismiss()
                         onOpenFeed()
+                    }
+                    if (viewModel.loggedIn) {
+                        listStyle(
+                            if (gif.userName.lowercase() in followedCreators) {
+                                "Unfollow @${gif.userName}"
+                            } else {
+                                "Follow @${gif.userName}"
+                            },
+                        ) {
+                            viewModel.toggleFollowCreator(gif.userName)
+                            onDismiss()
+                        }
                     }
                     val pinnedCreators by viewModel.pinnedCreators.collectAsState(initial = emptySet())
                     listStyle(

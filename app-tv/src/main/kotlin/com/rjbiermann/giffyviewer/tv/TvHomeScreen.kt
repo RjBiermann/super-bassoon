@@ -129,7 +129,9 @@ fun TvHomeScreen(
         }
         // Logged-in rows (§9 TV): Liked (network-live) + Following creators.
         if (isLoggedIn) {
-            item { FeedRow("Liked GIFs & Images", liked, onOpenGif, onMenu = { actionsFor = it }, preview = preview, dataSaver = dataSaver) }
+            item {
+                FeedRow("Liked GIFs & Images", liked, onOpenGif, onMenu = { actionsFor = it }, preview = preview, dataSaver = dataSaver)
+            }
             item { CreatorRow("Following", followingCreators.map { it }, onOpenCreator) }
         }
         item {
@@ -413,7 +415,9 @@ internal fun GifCard(
                     // SD loop until focus moves away (or the real player opens).
                     androidx.compose.ui.viewinterop.AndroidView(
                         factory = { ctx ->
-                            androidx.media3.ui.PlayerView(ctx).apply { useController = false }
+                            val view = androidx.media3.ui.PlayerView(ctx)
+                            view.useController = false
+                            view
                         },
                         update = { view -> view.player = preview.player },
                         modifier = Modifier.fillMaxWidth().height(CARD_ROW_HEIGHT_DP),

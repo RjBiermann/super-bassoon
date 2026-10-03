@@ -2,6 +2,7 @@ package com.rjbiermann.giffyviewer.feature.feed
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -25,6 +26,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -172,8 +175,8 @@ fun CustomFeedsScreen(
     requestInitialFocus: Boolean = false,
 ) {
     var name by remember { mutableStateOf("") }
-    val firstFocus = androidx.compose.runtime.remember { androidx.compose.ui.focus.FocusRequester() }
-    androidx.compose.runtime.LaunchedEffect(Unit) {
+    val firstFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
         if (requestInitialFocus) firstFocus.requestFocus()
     }
     val refs = remember { mutableStateListOf<String>() }
@@ -330,7 +333,7 @@ fun CustomFeedsScreen(
                     }
                     // Merged group state cycle: Tab (favorited) → Blocked → Neutral.
                     // giffyFocus: M3 buttons draw nothing on D-pad focus (TV).
-                    val cycleInteraction = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                    val cycleInteraction = remember { MutableInteractionSource() }
                     TextButton(
                         onClick = { viewModel.cycleState(feed) },
                         modifier = Modifier.giffyFocus(cycleInteraction),
@@ -344,7 +347,7 @@ fun CustomFeedsScreen(
                             },
                         )
                     }
-                    val deleteInteraction = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                    val deleteInteraction = remember { MutableInteractionSource() }
                     OutlinedButton(
                         onClick = { deleteFor = feed },
                         modifier = Modifier.giffyFocus(deleteInteraction),
