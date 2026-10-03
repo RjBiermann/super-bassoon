@@ -537,3 +537,29 @@ Still parked/blocked (unchanged, reasons stand):
 - RateLimitBus indicator (decided spec'd-not-built 2026-10-01), vertical-video TV
   fullscreen-fill (option; pool is ~all-portrait live — honest empty state covers it),
   FormFactorPreviews (FeedScreen needs VM fakes; preview-only value).
+
+### Session 2026-10-02 batch 14 (pending-items sweep — two pending items closed)
+- **Hold-to-2× BUILT + device-verified (Medium_Phone)** (the last cheap Phone candidate
+  in AGENTS-UX-PATTERNS.md — user slice = "implement the pending items"): long-press on
+  the swipe-player body plays at 2× while held, release restores the session speed;
+  "2× speed" chip while engaged; swipe/pager consumption cancels; tap + double-tap
+  unchanged. ONE LaunchedEffect(speed, holdSpeed) is the only setPlaybackSpeed
+  application point. Verified: indicator appears during hold, gone on release, swipe
+  still pages, single tap still re-reveals controls. Player-only (never on tiles).
+- **Full-scope search on-device verify CLOSED (Medium_Phone):** typed query → TabRow
+  (GIFs · Images · Creators · Niches, below the suggestions rows — scroll to reach);
+  GIFs submit path unchanged; Images renders the 3-up static poster strip; Creators and
+  Niches render preview-thumb rows. All four scopes live on the device.
+- Session lesson: this emulator profile carried the stale `orientation_filter=horizontal`
+  from the earlier empty-homepage incident — home grid legitimately empty + endless
+  refresh spinner (documented behavior: pool is all-portrait, filter is honest). `pm clear`
+  + fresh age gate restored the grid. Not a bug; remember when a "feed is blank" report
+  comes from a test device.
+- Compile + ktlint + detekt + unit tests green on :feature:feed.
+Still parked/blocked (unchanged, reasons stand): Groups→custom-feeds merge (re-evaluation
+condition — blockable creators as a want — still unmet), Followers page (row shape,
+no-guess rule), Report (unprobeable), server search-history sync / server collections /
+niches suggest (spec'd-not-scheduled fallbacks), TV player soak + mobile auto-swipe
+boundary soak (emulator fragility), Gate 324 (blocked on SIGNING secrets), minimap
+player / TV preview-on-focus / TV show-more panel / two-column expanded (decided skips
+with documented cost reasons).

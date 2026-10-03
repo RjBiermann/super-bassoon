@@ -635,7 +635,7 @@ Parked (not gaps): For You server blend is `v2/feeds/for-you` as-is (70% favorit
 weighting was a local-blend idea, superseded by the server feed); search-history sync and
 server collections remain spec'd-not-scheduled fallbacks per AGENTS-NETWORK.md.
 
-## Full-scope search (spec'd 2026-10-02 — BUILT same day, mobile; on-device verify pending)
+## Full-scope search (spec'd 2026-10-02 — BUILT same day, mobile; device-verified batch 14)
 The site's search results page (Playwright-verified live, desktop, `query=feet`):
 `/search/<scope>?query=&order=score` with result tabs **GIFs · Images · Creators · Niches**.
 `/search/tags` 404s home — tags have no results page; the header search box's Tags scope
@@ -683,6 +683,18 @@ Rules:
 - Skipped: no Collections search scope (site has none), no tags results page (site has
   none), no search-scope selector in the app header (the tab row on the search surface
   covers it — the site's header scope strip is a redundant desktop affordance).
+
+## Hold-to-2× on the swipe player (BUILT 2026-10-02 batch 14 — UX-PATTERNS graduation)
+The last cheap Phone candidate from AGENTS-UX-PATTERNS.md graduated (user slice
+="implement the pending items"). Inside the swipe player only (never on tiles): a
+long-press on the player body plays at **2× while held** and restores the session
+speed on release — a "2× speed" chip shows while engaged; a swipe (pager consumption)
+or movement ≥ touch-slop cancels, so the VerticalPager drag and the pinch zoom are
+untouched; tap + double-tap handling is unchanged (the race runs up / cancel /
+movement against the platform long-press timeout before the tap path). Speed state
+gains `holdSpeed`; ONE `LaunchedEffect(speed, holdSpeed)` is now the only
+`setPlaybackSpeed` application point (the quick-sheet slider and the hold both write
+state, the effect applies — no dual writers).
 
 ## Quick actions — submenu restructure (BUILT 2026-10-01; was spec'd 2026-10-02)
 Quick sheets must stop growing flat rows. Two more sheet items already land this
@@ -732,6 +744,32 @@ Per-surface deltas:
 Hard caps: pane depth 2 (main → pane → existing picker dialog/screen, same as
 today); no labels outside the site-lingo table — pane titles reuse existing
 wording ("Add to…", "Tags", "Block…", "Block creator", "Block keyword").
+
+## TV menu-less-remote keymap (spec'd 2026-10-02 — user ask; build pending)
+No-button-limitation rule: **every feature reachable with only D-pad + Back + Center**;
+MENU and media keys are bonus parity, never the only path. Gap: TV quick actions open
+only via `Key.Menu` (tiles / niche rows / player) — unreachable on Menu-less remotes
+(projectors, basic smart-TV remotes). Full rationale + anti-confusion rule amendments
+in AGENTS-UX-PATTERNS.md "No-button-limitation rule"; spec here (graduation step 2):
+
+- **Hold-Center = quick-actions panel** (the same TvQuickActionsDialog MENU opens):
+  Center KeyDown starts a ~500ms timer; firing opens the panel on every Center-meaningful
+  surface — TvPlayerScreen (focused card modifier already carries the onPreviewKeyEvent),
+  TvHomeScreen focused card, TvNiches row.
+- **KeyUp suppression:** when the hold fired, the subsequent KeyUp must NOT also run the
+  surface's Center action (play/pause toggle in the player, card open). Track
+  `holdFired` per press; reset on KeyUp.
+- **TvNiches row:** hold-Center = `viewModel.togglePin(niche)` (the row's MENU action);
+  no panel there.
+- **TvPlayerScreen note:** Center KeyDown is currently unconsumed (KeyUp-only) — the
+  KeyDown branch must consume the held press without triggering the seek/table paths;
+  short-tap behavior (play/pause, restart-at-end) unchanged.
+- **Device-verify gate (TV36):** short-tap Center still play/pauses with no regression;
+  hold ≥500ms opens the panel in the player, on a focused home card, and on a niche row;
+  panel closes with BACK before navigation; MENU (where present) still opens the same
+  panel.
+- Explicitly unchanged/parked: number keys, double-click, preview-on-focus,
+  hold-for-2× (AGENTS-UX-PATTERNS skips), media keys stay player-internal parity only.
 
 ## TV parity gaps vs mobile (audited 2026-10-01, deferred — doc-only)
 Code-verified inventory. Ranked, biggest first:

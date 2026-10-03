@@ -73,6 +73,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -121,6 +123,9 @@ import kotlin.math.roundToInt
  */
 private const val IDLE_HIDE_MS = 3_000L
 
+/** Hold-to-2× (UX-PATTERNS candidate): long-press on the player body = 2× while held. */
+private const val HOLD_SPEED = 2f
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalCoroutinesApi::class)
 @Composable
 fun PlayerScreen(
@@ -158,8 +163,14 @@ fun PlayerScreen(
     val muteScope = rememberCoroutineScope()
     val player = remember { playerFactory.create(context) }
 
-    // playback speed: session-only — resets when the player is released (PLAN §9)
+    // playback speed: session-only — resets when the player is released (PLAN §9).
+    // holdSpeed (hold-to-2×) overrides it while the long-press is held; the single
+    // LaunchedEffect below is the only speed application point.
     var speed by remember { mutableFloatStateOf(1f) }
+    var holdSpeed by remember { mutableStateOf(false) }
+    LaunchedEffect(speed, holdSpeed) {
+        player.setPlaybackSpeed(if (holdSpeed) HOLD_SPEED else speed)
+    }
     // playback failure overlay (PLAN §9): Retry re-resolves, Skip advances
     var playError by remember { mutableStateOf(false) }
     // auto-advance plays the next item from 0 — a watched neighbor resuming
@@ -348,68 +359,86 @@ fun PlayerScreen(
             )
         }
 
-        VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-            // Soak-found crash (2026-10-01): during a paging refresh the
-            // presenter list can momentarily empty while the pager still
-            // composes page 0 — items.get(page) throws out-of-bounds. Guard
-            // bounds first; the null check below only catches placeholders.
-            if (page >= items.itemCount) return@VerticalPager
-            val gif = items[page]
-            if (gif != null) {
-                PlayerPage(
-                    gif = gif,
-                    active = page == pagerState.currentPage,
-                    player = player,
-                    dataSaver = dataSaver,
-                    watchHistory = db.watchHistoryDao(),
-                    onPlayingChanged = { isPlaying = it },
-                    controlsVisible = controlsVisible,
-                    onHideControls = { controlsVisible = false },
-                    onShowControls = { controlsVisible = true },
-                    scrubbing = scrubbing,
-                    onScrubbing = { scrubbing = it },
-                    scrubPositionMs = scrubPositionMs,
-                    onScrub = { scrubPositionMs = it },
-                    positionMs = positionMs,
-                    durationMs = durationMs,
-                    zoom = zoom.floatValue,
-                    pan = pan.value,
-                    onZoom = { z, p ->
-                        zoom.floatValue = z.coerceIn(1f, 3f)
-                        pan.value = p
-                    },
-                    fullscreen = fullscreen,
-                    onToggleFullscreen = { fullscreen = !fullscreen },
-                    liked = gif.id in likedIds,
-                    onToggleLike = {
-                        if (isLoggedIn) viewModel.toggleLike(gif.id) else onOpenAccount()
-                    },
-                    muted = muted,
-                    onToggleMute = { on -> muteScope.launch { settings.setMuted(on) } },
-                    onShare = { shareGif(context, gif) },
-                    onOverflow = { sheetFor = gif },
-                    autoSwipeOn = autoSwipe && !dataSaver,
-                    onToggleAutoSwipe = { muteScope.launch { settings.setAutoSwipe(!autoSwipe) } },
-                    skipResume = skipResume,
-                    playError = playError && page == pagerState.currentPage,
-                    onRetry = {
-                        playError = false
-                        player.playGif(gif, dataSaver)
-                    },
-                    onSkip = { playError = false },
-                    videoFit = videoFit,
-                    onOpenCreator = {
-                        viewModel.open(FeedSource.Creator(username = gif.userName))
-                        onBack()
-                    },
-                    onOpenTag = { tag ->
-                        viewModel.open(FeedSource.Search(query = tag))
-                        onBack()
-                    },
-                    onOpenNiche = { id, name ->
-                        viewModel.open(FeedSource.Niche(id = id, name = name))
-                        onBack()
-                    },
+        Box(modifier = Modifier.weight(1f)) {
+            VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+                // Soak-found crash (2026-10-01): during a paging refresh the
+                // presenter list can momentarily empty while the pager still
+                // composes page 0 — items.get(page) throws out-of-bounds. Guard
+                // bounds first; the null check below only catches placeholders.
+                if (page >= items.itemCount) return@VerticalPager
+                val gif = items[page]
+                if (gif != null) {
+                    PlayerPage(
+                        gif = gif,
+                        active = page == pagerState.currentPage,
+                        player = player,
+                        dataSaver = dataSaver,
+                        watchHistory = db.watchHistoryDao(),
+                        onPlayingChanged = { isPlaying = it },
+                        controlsVisible = controlsVisible,
+                        onHideControls = { controlsVisible = false },
+                        onShowControls = { controlsVisible = true },
+                        scrubbing = scrubbing,
+                        onScrubbing = { scrubbing = it },
+                        scrubPositionMs = scrubPositionMs,
+                        onScrub = { scrubPositionMs = it },
+                        positionMs = positionMs,
+                        durationMs = durationMs,
+                        zoom = zoom.floatValue,
+                        pan = pan.value,
+                        onZoom = { z, p ->
+                            zoom.floatValue = z.coerceIn(1f, 3f)
+                            pan.value = p
+                        },
+                        fullscreen = fullscreen,
+                        onToggleFullscreen = { fullscreen = !fullscreen },
+                        liked = gif.id in likedIds,
+                        onToggleLike = {
+                            if (isLoggedIn) viewModel.toggleLike(gif.id) else onOpenAccount()
+                        },
+                        muted = muted,
+                        onToggleMute = { on -> muteScope.launch { settings.setMuted(on) } },
+                        onShare = { shareGif(context, gif) },
+                        onOverflow = { sheetFor = gif },
+                        autoSwipeOn = autoSwipe && !dataSaver,
+                        onToggleAutoSwipe = { muteScope.launch { settings.setAutoSwipe(!autoSwipe) } },
+                        skipResume = skipResume,
+                        playError = playError && page == pagerState.currentPage,
+                        onRetry = {
+                            playError = false
+                            player.playGif(gif, dataSaver)
+                        },
+                        onSkip = { playError = false },
+                        videoFit = videoFit,
+                        onOpenCreator = {
+                            viewModel.open(FeedSource.Creator(username = gif.userName))
+                            onBack()
+                        },
+                        onOpenTag = { tag ->
+                            viewModel.open(FeedSource.Search(query = tag))
+                            onBack()
+                        },
+                        onOpenNiche = { id, name ->
+                            viewModel.open(FeedSource.Niche(id = id, name = name))
+                            onBack()
+                        },
+                        onHoldSpeed = { holdSpeed = it },
+                    )
+                }
+            }
+            // hold-to-2× indicator (UX-PATTERNS candidate): shows while the
+            // long-press hold is engaged; gone on release.
+            if (holdSpeed) {
+                Text(
+                    text = "2× speed",
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 24.dp)
+                            .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(999.dp))
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
                 )
             }
         }
@@ -423,10 +452,7 @@ fun PlayerScreen(
             viewModel = viewModel,
             showSpeed = true,
             currentSpeed = speed,
-            onSpeedChange = { newSpeed ->
-                speed = newSpeed
-                player.setPlaybackSpeed(newSpeed)
-            },
+            onSpeedChange = { newSpeed -> speed = newSpeed },
             onOpenFeed = onBack,
         )
     }
@@ -472,6 +498,8 @@ private fun PlayerPage(
     onOpenTag: (String) -> Unit = {},
     /** Links audit #5: cluster niche pills navigate to the niche feed. */
     onOpenNiche: (id: String, name: String) -> Unit = { _, _ -> },
+    /** Hold-to-2×: engaged while the long-press is held on the player body. */
+    onHoldSpeed: (Boolean) -> Unit = {},
 ) {
     // React to the shared player's media swaps (attach gating below).
     val playingId by player.currentGifId.collectAsStateWithLifecycle()
@@ -578,15 +606,66 @@ private fun PlayerPage(
                     }
                 }
                 // single tap: reveal UI when hidden, pause/play when shown;
-                // double tap: like/unlike + heart pop (PLAN §9). Non-consuming
-                // (no detectTapGestures) — it would eat the down event and
-                // starve the VerticalPager's drag gesture.
-                .pointerInput(controlsVisible) {
+                // double tap: like/unlike + heart pop (PLAN §9); hold: 2× while
+                // held (UX-PATTERNS candidate). Non-consuming (no
+                // detectTapGestures) — it would eat the down event and starve
+                // the VerticalPager's drag gesture.
+                .pointerInput(controlsVisible, active, liked) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
-                        val up =
-                            waitForUpOrCancellation()
-                                ?: return@awaitEachGesture
+                        val downPos = down.position
+                        var upChange: PointerInputChange? = null
+                        // long-press race: up / swipe-cancel vs the hold timeout.
+                        // null = the pointer was still down when the timeout fired.
+                        var cancel = false
+                        val upInTime =
+                            withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis.toLong()) {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val change =
+                                        event.changes.firstOrNull { it.id == down.id }
+                                            ?: continue
+                                    if (event.changes.any { it.isConsumed } ||
+                                        (change.position - downPos).getDistance() >=
+                                        viewConfiguration.touchSlop
+                                    ) {
+                                        // pager/pinch took the gesture — a swipe, not a hold
+                                        cancel = true
+                                        break
+                                    }
+                                    if (change.changedToUp()) {
+                                        upChange = change
+                                        break
+                                    }
+                                }
+                                upChange != null
+                            }
+                        if (cancel) return@awaitEachGesture
+                        if (upInTime == null) {
+                            // still down after the long-press timeout: hold-to-2× —
+                            // speed up while held, restore on release (player body
+                            // only, never on tiles). A hold is never a tap.
+                            if (active) {
+                                onHoldSpeed(true)
+                                try {
+                                    while (true) {
+                                        val event = awaitPointerEvent()
+                                        val change =
+                                            event.changes.firstOrNull { it.id == down.id }
+                                        if (event.changes.any { it.isConsumed } ||
+                                            change == null ||
+                                            change.changedToUp()
+                                        ) {
+                                            break
+                                        }
+                                    }
+                                } finally {
+                                    onHoldSpeed(false)
+                                }
+                            }
+                            return@awaitEachGesture
+                        }
+                        val up = upChange ?: return@awaitEachGesture
                         if ((up.position - down.position).getDistance() >=
                             viewConfiguration.touchSlop
                         ) {

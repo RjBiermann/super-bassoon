@@ -34,19 +34,18 @@ conventions* are fine; its *retention playbook* is not.
 ## Candidates (not scheduled — mapped per device)
 
 ### Phone / compact window
-- **Hold-for-speed (TikTok):** long-press on the player body = 2× while held,
-  release restores. Adds a conflicts list: long-press already opens the quick
-  sheet on tiles; inside the player only. Reuse of the existing
-  long-press-disambiguation clock is the whole cost. Cheap, high value.
-  Keep as: hold-to-2× inside the player only, never on tiles.
+- **Hold-for-speed (TikTok):** ~~candidate~~ **GRADUATED 2026-10-02 (batch 14)** —
+  built inside the swipe player only (PlayerScreen): long-press on the player
+  body = 2× while held, release restores the session speed; "2× speed" chip
+  shows while held; swipe (pager consumption) cancels; never on tiles.
+  Device-verified on Medium_Phone.
 - **Swipe-down/tap-top to shrink the player (TikTok/Reels minimap):** player
   collapses to a small anchored window over the grid. Cost is high (PiP
   lifecycle, one-active-player invariant in §9 lives here); viewer value is
   low. Skip unless requested.
-- **Bottom gradient scrim on player text (TikTok/Reels):** description/tags/@user and
-  action-rail icons sit on a bottom gradient instead of raw video — legibility on bright
-  content. Found missing in the 2026-10 audit (AGENTS-APP.md); adopt with the next
-  player-controls touch, cheap (one `Brush.verticalGradient` behind the bottom cluster).
+- **Bottom gradient scrim on player text (TikTok/Reels):** ~~candidate~~ BUILT
+  (audit H5 closed, see AGENTS-APP.md UI/UX audit) — one `Brush.verticalGradient`
+  behind the bottom cluster, fades with the controls.
 - **Instagram tap-to-collapse captions/description:** long description lines
   truncate to 2 lines with "more" — already how the description+tags display
   behaves (Phase 9 slice set). Verify parity when touching it; nothing to build.
@@ -130,10 +129,40 @@ opens quick actions; verified in TvSourceFeedScreen 2026-10-02).
    player); never two different behaviors for the same key on the same surface.
 3. **No double-tap bindings** — phone remotes debounce taps; TV remotes send accidental
    repeats. Mobile double-tap-like ports to the panel's Like item instead.
-4. **Hold repeats its own key's action** (progressive seek), never triggers a new one.
-5. **Everything else goes in the MENU panel** — if it needs a new bare key, it first needs a
-   strong reason the panel isn't enough.
+4. **Hold repeats its own key's action** (progressive seek), never triggers a new one —
+   single sanctioned exception: **hold-Center = quick-actions panel** (see the
+   menu-less-remote subsection below; no-button-limitation rule).
+5. **Everything else goes in the quick-actions panel** (MENU or hold-Center — same panel,
+   two openers) — if it needs a new bare key, it first needs a strong reason the panel isn't enough.
 6. **BACK dismisses overlays before navigation**, and never bypasses the age gate / PIN.
+
+### No-button-limitation rule (2026-10, user ask — spec'd, build pending)
+Constraint: **every feature must be reachable with only D-pad + Back + Center.** MENU and the
+`KEYCODE_MEDIA_*` transport keys are bonus parity for remotes that have them — never the only
+path to a feature. The gap this closes: TV quick actions (favorite/block/add-to-feed/like/
+mute/speed) opened **only** via `Key.Menu` (tiles, niche rows, player) — unreachable on
+Menu-less remotes (projectors, basic smart-TV remotes). Everything else already matches the
+mainstream table above with no button-dependent features (Center play/pause, L/R ±10s +
+hold-repeat, Back dismiss-first, speed panel-only, deliberately no number keys / no
+double-click).
+
+**Hold-Center spec (the fix, D-pad+Back-only):**
+- Press-and-hold Center ≥500ms opens the quick-actions panel (same panel MENU opens — one
+  panel, two openers, rule 2 intact) on every surface Center is meaningful: player, focused
+  home card, niche row.
+- A press held past the 500ms mark must NOT also fire the KeyUp action on release — when the
+  panel opened from the hold, suppress the pending play/pause (player) or open (cards).
+- Niche rows: hold-Center = toggle pin (the row's MENU action); no new panel there.
+- short-tap Center keeps its existing action (play/pause in the player, open on cards) —
+  hold vs tap disambiguation is the ~500ms clock, mirroring the mobile long-press pattern.
+- BACK still dismisses the panel first (rule 6, unchanged).
+
+Mainstream deltas deliberately NOT adopted: Netflix's "Up = exit player" (our feed is
+vertical — Up = prev item is the spatially honest mapping), number-key percent-jump
+(YouTube-only nicety), double-click anything (rule 3).
+
+[Graduation: spec'd here; build pending — AGENTS-APP.md "TV menu-less-remote keymap"
+carries the numbered spec.]
 
 ## Device-type summary used across the doc
 
