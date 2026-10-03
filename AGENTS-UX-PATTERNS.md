@@ -144,10 +144,11 @@ mainstream table above with no button-dependent features (Center play/pause, L/R
 hold-repeat, Back dismiss-first, speed panel-only, deliberately no number keys / no
 double-click).
 
-**Hold-Center spec (the fix, D-pad+Back-only):**
-- Press-and-hold Center ≥500ms opens the quick-actions panel (same panel MENU opens — one
-  panel, two openers, rule 2 intact) on every surface Center is meaningful: player, focused
-  home card, niche row.
+**Hold-Center spec (the fix, D-pad+Back-only; amended 2026-10-03: release-evaluated —
+  press-then-release ≥500ms, action fires ON KeyUp, no need to keep holding):**
+- Long-press Center (≥500ms press duration) opens the quick-actions panel (same panel MENU
+  opens — one panel, two openers, rule 2 intact) on every surface Center is meaningful:
+  player, focused home card, niche row.
 - A press held past the 500ms mark must NOT also fire the KeyUp action on release — when the
   panel opened from the hold, suppress the pending play/pause (player) or open (cards).
 - Niche rows: hold-Center = toggle pin (the row's MENU action); no new panel there.

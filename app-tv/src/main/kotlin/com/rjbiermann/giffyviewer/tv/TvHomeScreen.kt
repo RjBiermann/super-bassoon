@@ -24,7 +24,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -342,8 +341,7 @@ internal fun GifCard(
     val scale by animateFloatAsState(if (focused) 1.08f else 1f, label = "cardScale")
     // Menu-less-remote keymap: hold-Center ≥500ms opens the quick-actions
     // panel (the same panel MENU opens); short-tap Center keeps the card open.
-    val scope = rememberCoroutineScope()
-    val centerHold = remember(scope) { CenterHold(scope, onMenu) }
+    val centerHold = remember { CenterHold(onHold = onMenu) }
     // Preview-on-focus: the SETTLED focus (600ms dwell) starts the muted loop;
     // unfocusing clears it (fast walking never decodes).
     LaunchedEffect(focused, dataSaver, preview?.enabled) {

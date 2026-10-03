@@ -1,52 +1,42 @@
 package com.rjbiermann.giffyviewer.tv
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import android.os.SystemClock
 
 /**
- * TV menu-less-remote keymap (AGENTS-APP "TV menu-less-remote keymap"): on
- * remotes without a MENU key (projectors, basic smart-TV remotes), press-and-
- * hold CENTER ≥500ms fires [onHold] — the same quick-actions panel MENU opens
- * (one panel, two openers). A short tap stays the surface's existing CENTER
- * action; the caller decides both.
+ * TV menu-less-remote keymap (AGENTS-APP "TV menu-less-remote keymap"): a
+ * LONG PRESS on CENTER — press, then release after ≥[HOLD_MS]ms — fires
+ * [onHold] on release, the same quick-actions panel MENU opens (one panel,
+ * two openers). The action is evaluated on KeyUp, so the user does not have
+ * to keep the button held until something happens: press-and-release with a
+ * long duration is enough. A short tap stays the surface's existing CENTER
+ * action; [up] returns true when the long press fired and the caller must
+ * NOT also run the short-tap action (spec KeyUp-suppression rule — no double
+ * play/pause or card open).
  *
- * One instance per focused node. [down] starts the hold clock on the initial
- * (non-repeat) KeyDown — repeats must not restart it. [up] on KeyUp reports
- * whether the hold fired: when it did, the caller must NOT also run the
- * short-tap action (spec KeyUp-suppression rule — no double play/pause or
- * card open). State resets on the next press, so a panel opening that steals
- * focus and swallows the KeyUp cannot leak into the next press.
+ * One instance per focused node. [down] records the press start on the
+ * initial (non-repeat) KeyDown — repeats must not touch it. State resets on
+ * every press, so a swallowed KeyUp cannot leak into the next press.
  */
 class CenterHold(
-    private val scope: CoroutineScope,
+    private val now: () -> Long = SystemClock::elapsedRealtime,
     private val onHold: () -> Unit,
 ) {
-    private var job: Job? = null
-    private var fired = false
+    private var downAt = -1L
 
-    /** Initial Center KeyDown: start the ~500ms hold clock. Returns true (consumed). */
+    /** Initial Center KeyDown: record the press start. Returns true (consumed). */
     fun down(): Boolean {
-        job?.cancel()
-        fired = false
-        job =
-            scope.launch {
-                delay(HOLD_MS)
-                fired = true
-                onHold()
-            }
+        downAt = now()
         return true
     }
 
-    /** Center KeyUp: true = the hold fired — suppress the short-tap action. */
+    /** Center KeyUp: true = long press — [onHold] fired, suppress the short tap. */
     fun up(): Boolean {
-        job?.cancel()
-        val suppress = fired
-        fired = false
-        return suppress
+        val longPress = downAt >= 0 && now() - downAt >= HOLD_MS
+        downAt = -1L
+        if (longPress) onHold()
+        return longPress
     }
 }
 
-/** Hold threshold (~500ms, mirroring the mobile long-press window). */
+/** Long-press threshold (~500ms, mirroring the mobile long-press window). */
 private const val HOLD_MS = 500L

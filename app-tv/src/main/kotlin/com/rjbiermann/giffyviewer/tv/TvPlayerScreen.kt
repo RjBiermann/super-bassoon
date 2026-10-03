@@ -123,7 +123,7 @@ fun TvPlayerScreen(
     // play/pause. KeyUp suppression lives in CenterHold.up().
     val centerHold =
         remember(scope) {
-            CenterHold(scope) { actionsFor = gifs.getOrNull(index) }
+            CenterHold { actionsFor = gifs.getOrNull(index) }
         }
 
     // D-pad events only reach onPreviewKeyEvent via a FOCUSED node inside the

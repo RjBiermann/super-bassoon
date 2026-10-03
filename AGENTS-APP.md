@@ -754,13 +754,14 @@ only via `Key.Menu` (tiles / niche rows / player) — unreachable on Menu-less r
 (projectors, basic smart-TV remotes). Full rationale + anti-confusion rule amendments
 in AGENTS-UX-PATTERNS.md "No-button-limitation rule"; spec here (graduation step 2):
 
-- **Hold-Center = quick-actions panel** (the same TvQuickActionsDialog MENU opens):
-  Center KeyDown starts a ~500ms timer; firing opens the panel on every Center-meaningful
-  surface — TvPlayerScreen (focused card modifier already carries the onPreviewKeyEvent),
-  TvHomeScreen focused card, TvNiches row.
-- **KeyUp suppression:** when the hold fired, the subsequent KeyUp must NOT also run the
-  surface's Center action (play/pause toggle in the player, card open). Track
-  `holdFired` per press; reset on KeyUp.
+- **Long-press Center = quick-actions panel** (the same TvQuickActionsDialog MENU opens):
+  a press released after ≥500ms opens the panel on every Center-meaningful surface —
+  TvPlayerScreen (focused card modifier already carries the onPreviewKeyEvent),
+  TvHomeScreen focused card, TvNiches row. The action fires ON KeyUp (release-evaluated —
+  user ask 2026-10-03: "no need to keep holding"), not on a while-held timer.
+- **KeyUp suppression:** when the long press fired, that same KeyUp must NOT also run the
+  surface's Center action (play/pause toggle in the player, card open). Track the press
+  start per press; reset on KeyUp.
 - **TvNiches row:** hold-Center = `viewModel.togglePin(niche)` (the row's MENU action);
   no panel there.
 - **TvPlayerScreen note:** Center KeyDown is currently unconsumed (KeyUp-only) — the
@@ -770,11 +771,15 @@ in AGENTS-UX-PATTERNS.md "No-button-limitation rule"; spec here (graduation step
   hold ≥500ms opens the panel in the player, on a focused home card, and on a niche row;
   panel closes with BACK before navigation; MENU (where present) still opens the same
   panel.
-[BUILT 2026-10-02 batch 17 — `CenterHold` (app-tv, ~50 lines): per-focused-node hold
-state — initial (non-repeat) Center KeyDown starts a 500ms clock and is consumed;
-KeyUp reports whether the hold fired (suppresses the surface's short-tap action); state
-resets on every press so a panel opening that steals focus and swallows the KeyUp cannot
-leak into the next press. Wired on all three Center-meaningful surfaces:
+[BUILT 2026-10-02 batch 17 — `CenterHold` (app-tv): per-focused-node hold state;
+REWORKED 2026-10-03 (user bug report: panel required KEEPING the button held — the
+batch-17 while-held timer fired mid-hold instead of on release). Now release-evaluated:
+`down()` records the press start on the initial (non-repeat) KeyDown; `up()` measures the
+press duration — ≥500ms fires onHold ON the KeyUp and returns true (suppresses the
+surface's short-tap action); no coroutine, no scope needed. State resets on every press so
+a swallowed KeyUp cannot leak into the next press. `CenterHoldTest` (3 cases: short tap,
+long press + suppression, swallowed-KeyUp reset) — first test source set in :app-tv
+(+ junit dep). Wired on all three Center-meaningful surfaces:
 TvPlayerScreen (hold = quick-actions panel, tap = play/pause unchanged), shared GifCard
 (hold = panel, tap = card open — covers home rows AND TvSourceFeedScreen grids),
 TvNiches row (hold = togglePin in place, tap = open the niche feed).
@@ -784,8 +789,13 @@ first niche row in place — the niche-row case directly proves KeyUp suppressio
 never leaves the row; the feed did NOT open after the hold); short-tap Center kept
 every prior action (card → player, row → niche feed, player play/pause proven via
 watch_history position advance→static); BACK closed the panel before navigation;
-MENU still opens the same panel. Device-input lesson: `input keyevent -t <ms>` is NOT
-a valid flag — use `--duration <ms>` for a held key; `-t` degrades to an instant tap.]
+MENU still opens the same panel. Device-input lesson (corrected 2026-10-03): on SDK-34
+AVD images `input keyevent` supports NEITHER `-t` NOR `--duration` (silently ignored →
+instant tap) — `keyevent` only takes `--longpress`/`--doubletap`, and `--longpress` just
+stamps FLAG_LONG_PRESS with an instant UP (no wall-clock hold). To inject a REAL held key
+on this image: `input keycombination -t <ms> <key> <key>` (same key twice) — the hold
+lands between the down and up phases; the extra final UP fires a tap action behind the
+hold (harmless in the panel-open test).]
 - Explicitly unchanged/parked: number keys, double-click, hold-for-2× (built batch 14),
   media keys stay player-internal parity only. preview-on-focus + show-more panel
   graduated batch 18 (AGENTS-UX-PATTERNS "TV"; build record this file).
