@@ -13,9 +13,8 @@ import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.util.concurrent.TimeUnit
 
-/** APP_USER_AGENT must be a realistic client identity (house rule) — never a bare bot fingerprint. */
-const val APP_USER_AGENT: String =
-    "Mozilla/5.0 (X11; Linux x86_64; rv:156.0) Gecko/20100101 Firefox/156.0"
+/** UA + client hints + the rest of the browser identity live in [BrowserIdentity] (Chrome-Android). */
+const val APP_USER_AGENT: String = BrowserIdentity.USER_AGENT
 
 /** Routed through [com.rjbiermann.giffyviewer.core.model.Hosts] (encoded). */
 val BASE_URL: String get() = com.rjbiermann.giffyviewer.core.model.Hosts.apiBase
@@ -45,13 +44,15 @@ data class NetworkComponents(
  */
 fun buildNetwork(
     baseUrl: String = BASE_URL,
-    userAgent: String = APP_USER_AGENT,
     authToken: suspend () -> String? = { null },
     onUnauthorized: () -> Unit = {},
     enableLogging: Boolean = false,
 ): NetworkComponents {
     val bus: RateLimitBus =
         kotlinx.coroutines.flow.MutableSharedFlow(replay = 8, extraBufferCapacity = 16)
+    // Retuned 2026-10-03 (browser-like budget — see AGENTS-NETWORK.md): 15 req/5s
+    // rolling window (3 req/s sustained), burst 15 — permits normal scroll speeds
+    // with zero visible throttling; 429/5xx backoff + circuit breaker unchanged.
     val limiter = RollingWindowRateLimiter()
     val breaker = CircuitBreaker()
 
@@ -59,10 +60,7 @@ fun buildNetwork(
         request: okhttp3.Request,
         token: String?,
     ): okhttp3.Request {
-        val builder =
-            request
-                .newBuilder()
-                .header("User-Agent", userAgent)
+        val builder = request.newBuilder()
         if (!token.isNullOrBlank()) {
             builder.header("Authorization", "Bearer $token")
         }
@@ -74,7 +72,7 @@ fun buildNetwork(
             val request = chain.request()
             // The temp-token call itself must go out unauthenticated (re-entrancy).
             if (request.url.encodedPath.endsWith("v2/auth/temporary")) {
-                return@Interceptor chain.proceed(request.newBuilder().header("User-Agent", userAgent).build())
+                return@Interceptor chain.proceed(request)
             }
             val token = kotlinx.coroutines.runBlocking { authToken() }
             var response = chain.proceed(authed(request, token))
@@ -101,6 +99,7 @@ fun buildNetwork(
             .Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
+            .addInterceptor(BrowserIdentityInterceptor())
             .addInterceptor(authInterceptor)
             .addInterceptor(RateLimitInterceptor(limiter))
             .addInterceptor(

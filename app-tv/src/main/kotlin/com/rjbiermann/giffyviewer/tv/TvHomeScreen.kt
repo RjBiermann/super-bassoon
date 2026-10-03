@@ -2,6 +2,7 @@ package com.rjbiermann.giffyviewer.tv
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.FilterChip
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -54,6 +56,7 @@ import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.ui.AudioBadge
 import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
 import com.rjbiermann.giffyviewer.core.ui.avgColorOr
+import com.rjbiermann.giffyviewer.core.ui.giffyFocus
 
 /**
  * 10-foot UI (PLAN §8 TV): vertical stack of rows, D-pad navigates rows and
@@ -122,9 +125,20 @@ fun TvHomeScreen(
             )
         }
         // Logged-in For You row goes FIRST (site home order, verified sweep);
-        // anonymous users never see it (the feed 401s anonymous).
+        // anonymous users never see it (the feed 401s anonymous). The scope
+        // chip row rides under THIS row's title only (§7 = feed-local pref).
         if (isLoggedIn) {
-            item { FeedRow("For You", forYou, onOpenGif, onMenu = { actionsFor = it }, preview = preview, dataSaver = dataSaver) }
+            item {
+                FeedRow(
+                    "For You",
+                    forYou,
+                    onOpenGif,
+                    onMenu = { actionsFor = it },
+                    preview = preview,
+                    dataSaver = dataSaver,
+                    scopeChips = { ForYouScopeRow(homeViewModel) },
+                )
+            }
         }
         item { FeedRow("Trending", trending, onOpenGif, onMenu = { actionsFor = it }, preview = preview, dataSaver = dataSaver) }
         // Explore = Top Creators (§9 lingo) — creators row, tap → creator feed.
@@ -242,6 +256,8 @@ private fun FeedRow(
     /** Preview-on-focus state (null = feature off). */
     preview: FocusPreview? = null,
     dataSaver: Boolean = false,
+    /** Optional content under the title, above the cards (For You scope chips). */
+    scopeChips: (@Composable () -> Unit)? = null,
 ) {
     // Reserve the row's space while paging loads — a zero-height row that pops
     // to full height shoves every row below (homepage UI drift, user report).
@@ -249,6 +265,7 @@ private fun FeedRow(
     // live-proven) can empty a row entirely — never a silent blank strip.
     Column(modifier = Modifier.padding(vertical = 8.dp).heightIn(min = ROW_RESERVED_HEIGHT)) {
         RowTitle(title)
+        scopeChips?.invoke()
         if (gifs.itemCount == 0 && gifs.loadState.refresh is LoadState.NotLoading) {
             Text(
                 text = "No videos match your filters — Settings → Orientation",
@@ -309,6 +326,34 @@ private fun RowTitle(text: String) {
         style = MaterialTheme.typography.titleSmall,
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
     )
+}
+
+/**
+ * For You scope chips (§7 Creators·Niches·All, logged-in home): same three
+ * labels as the mobile FeedScreen selector row, writing the SAME
+ * settings.forYouScope pref through TvHomeViewModel (mobile FeedViewModel
+ * parity — no duplicated pref logic). Renders under the For You row title.
+ * M3 FilterChip + the shared giffyFocus ring (the TvSourceFeedScreen
+ * FilterChip D-pad pattern).
+ */
+@Composable
+private fun ForYouScopeRow(homeViewModel: TvHomeViewModel) {
+    val scope by homeViewModel.forYouScope.collectAsStateWithLifecycle("all")
+    Row(
+        modifier = Modifier.padding(start = 16.dp, top = 2.dp, bottom = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        listOf("All" to "all", "Creators" to "creators", "Niches" to "niches").forEach { (label, value) ->
+            val interaction = remember { MutableInteractionSource() }
+            FilterChip(
+                selected = scope == value,
+                onClick = { homeViewModel.setForYouScope(value) },
+                label = { Text(label) },
+                interactionSource = interaction,
+                modifier = Modifier.giffyFocus(interaction, shape = RoundedCornerShape(8.dp)),
+            )
+        }
+    }
 }
 
 /** Fixed row content height (10-foot legible) — card width derives per gif aspect. */

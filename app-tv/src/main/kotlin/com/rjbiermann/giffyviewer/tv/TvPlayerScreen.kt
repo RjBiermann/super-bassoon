@@ -41,6 +41,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
@@ -117,6 +118,11 @@ fun TvPlayerScreen(
 
     // Player text auto-hide state — declared before the key-event Column.
     var textVisible by remember { mutableStateOf(true) }
+
+    // Playback failure overlay (mobile PlayerScreen parity): Retry re-resolves
+    // the current gif, Skip advances. Keyed to the gif so moving past a failed
+    // item clears the overlay instead of leaving it stuck.
+    var playError by remember(gif.id) { mutableStateOf(false) }
 
     // Menu-less-remote keymap (AGENTS-APP): hold-Center ≥500ms opens the
     // quick-actions panel (the same panel MENU opens); short-tap Center keeps
@@ -286,6 +292,60 @@ fun TvPlayerScreen(
                             .background(MaterialTheme.colorScheme.secondary),
                 )
             }
+            // Playback failure overlay (mobile PlayerScreen parity): centered
+            // panel over the PlayerView, Retry re-calls the playGif path, Skip
+            // advances the list index. Keys/items clear it; buttons carry the
+            // shared giffyFocus ring (the TvQuickActions D-pad pattern).
+            if (playError) {
+                Column(
+                    modifier =
+                        Modifier
+                            .align(Alignment.Center)
+                            .background(PlayerOverlay.scrim, MaterialTheme.shapes.medium)
+                            .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text("Playback failed", style = MaterialTheme.typography.titleMedium)
+                    Row(
+                        modifier = Modifier.padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        val retryInteraction = remember { MutableInteractionSource() }
+                        TextButton(
+                            onClick = {
+                                playError = false
+                                textVisible = true
+                                scope.launch {
+                                    val resume = db.watchHistoryDao().byGif(gif.id)?.positionMs ?: 0L
+                                    player.playGif(gif, dataSaver, resumeMs = resume)
+                                }
+                            },
+                            colors =
+                                ButtonDefaults
+                                    .textButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.secondary,
+                                    ),
+                            modifier = Modifier.giffyFocus(retryInteraction),
+                            interactionSource = retryInteraction,
+                        ) { Text("Retry", style = MaterialTheme.typography.labelLarge) }
+                        val skipInteraction = remember { MutableInteractionSource() }
+                        TextButton(
+                            onClick = {
+                                playError = false
+                                textVisible = true
+                                if (index < gifs.size - 1) index++
+                            },
+                            colors =
+                                ButtonDefaults
+                                    .textButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.onSurface,
+                                    ),
+                            modifier = Modifier.giffyFocus(skipInteraction),
+                            interactionSource = skipInteraction,
+                        ) { Text("Skip", style = MaterialTheme.typography.labelLarge) }
+                    }
+                }
+            }
             // Seek feedback: "1:23 / 2:45" while seeking (TV keymap §).
             seekFlash?.let { label ->
                 Text(
@@ -392,9 +452,15 @@ fun TvPlayerScreen(
     // off (or data-saver on) → loop the gif; on → advance to the next item,
     // looping the last one. CENTER/PLAY routes through playOrRestart() so a
     // press at the ended frame restarts instead of instantly re-ending.
+    // Playback failure (mobile PlayerScreen parity) rides the same listener:
+    // onPlayerError flips the Retry/Skip overlay (declared above).
     DisposableEffect(player, autoSwipeOn, dataSaver) {
         val listener =
             object : Player.Listener {
+                override fun onPlayerError(error: PlaybackException) {
+                    playError = true
+                }
+
                 override fun onPlaybackStateChanged(state: Int) {
                     if (state != Player.STATE_ENDED) return
                     if (!(autoSwipeOn && !dataSaver) || index >= gifs.size - 1) {

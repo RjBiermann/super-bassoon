@@ -9,12 +9,14 @@ import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.database.toModel
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.model.matchesOrientation
+import com.rjbiermann.giffyviewer.core.model.resolutionMatches
 import com.rjbiermann.giffyviewer.core.network.GifsApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -140,6 +142,8 @@ class FeedRepository
                             },
                         ).flow
                     }
+            } else if (feed is FeedSource.Continue) {
+                continueWatchingPager()
             } else {
                 // Orientation (global) + §8 per-feed prefs BOTH restart the pager:
                 // combine them so either change re-reads cached pages through the
@@ -157,6 +161,59 @@ class FeedRepository
                         cachedPager(feed, forceRefresh, p, o, v)
                     }
             }
+
+        /** "Continue Watching" (§8, mobile): Room-only read through the SAME
+         *  read-time chain TV's ContinueWatchingViewModel applies — ContentFilter
+         *  (leak-zero) + verified-only + orientation + §8 per-feed prefs (the
+         *  Filter ▾ dialog stays honest on this surface). DataStore prefs ride
+         *  the combine → pager restart; Room-table changes (a block written on
+         *  this surface, a finished video) ride the source's invalidation-tracker
+         *  observer → per-load re-derivation. NO hide-count increment: the filter
+         *  counted these at watch time — a recount would double-count (TV's
+         *  ContinueWatchingViewModel comment). */
+        private fun continueWatchingPager(): Flow<PagingData<Gif>> =
+            kotlinx.coroutines.flow
+                .combine(
+                    settings.orientationFilter,
+                    settings.verifiedOnly,
+                    settings.feedPrefs(FeedSource.Continue.keyBase),
+                ) { o, v, p -> Triple(o, v, p) }
+                .flatMapLatest { (o, v, p) ->
+                    Pager(
+                        config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = 10, enablePlaceholders = false),
+                        pagingSourceFactory = {
+                            ContinueWatchingPagingSource(db) {
+                                continueWatchingEntries(o, v, p)
+                            }
+                        },
+                    ).flow
+                }
+
+        /** Derivation per load: watch_history → gifs, filtered read-time.
+         *  Per-feed orientation "" = follow the global §6 pref (§8). */
+        private suspend fun continueWatchingEntries(
+            orientationPref: String,
+            verifiedOnly: Boolean,
+            prefs: com.rjbiermann.giffyviewer.core.datastore.FeedPrefs,
+        ): List<Gif> {
+            contentFilter.refreshFrom(db.contentPrefsDao())
+            contentFilter.refreshBlockedFeeds(db.customFeedDao())
+            val orientation = prefs.orientation.ifEmpty { orientationPref }
+            val rows = db.watchHistoryDao().continueWatching(limit = CONTINUE_LIMIT).first()
+            val byId =
+                db
+                    .gifDao()
+                    .byIds(rows.map { it.gifId })
+                    .associateBy { it.id }
+            return rows
+                .mapNotNull { row -> byId[row.gifId]?.toModel() }
+                .filter { contentFilter.allow(it.userName, it.tags, it.description) }
+                .filter { !verifiedOnly || it.verified }
+                .filter { it.matchesOrientation(orientation) }
+                .filter { durationIn(it.durationSeconds, prefs.duration) }
+                .filter { it.resolutionMatches(prefs.resolution) }
+                .let { shuffleOrdered(it, prefs.shuffleSeed) }
+        }
 
         private fun cachedPager(
             feed: FeedSource,
@@ -207,6 +264,9 @@ class FeedRepository
             const val PAGE_SIZE = 20
             private const val CTX_TTL_MS = 5 * 60_000L
 
+            /** "Continue Watching" row length — TV's ContinueWatchingViewModel uses 20. */
+            private const val CONTINUE_LIMIT = 20
+
             // Session-wide ids ever returned per feed. The server reshuffles page
             // contents between fetches, so a DB-row-only dedup misses ids still
             // live in the pager's list → duplicate LazyGrid keys → crash
@@ -214,5 +274,20 @@ class FeedRepository
             private val seenIds = HashMap<String, MutableSet<String>>()
 
             fun seenFor(keyBase: String): MutableSet<String> = seenIds.getOrPut(keyBase) { mutableSetOf() }
+
+            /** Pure seed decision (mobile For-You default slice, 2026-10):
+             *  a stored token cold-starts on For You (TV parity); anonymous
+             *  keeps Trending. */
+            fun defaultLandingSource(tokenPresent: Boolean): FeedSource = if (tokenPresent) FeedSource.ForYou else FeedSource.Trending
+
+            /** Pure offline-fallback rule (same slice): only a SEEDED For You
+             *  (never user-navigated, no content loaded) reverts to Trending.
+             *  Trending rebuilds from Room — gate 3 holds offline; For You is
+             *  network-live with no cache, so its error state is a dead end. */
+            fun shouldRevertToTrending(
+                source: FeedSource,
+                userNavigated: Boolean,
+                hasContent: Boolean,
+            ): Boolean = source is FeedSource.ForYou && !userNavigated && !hasContent
         }
     }

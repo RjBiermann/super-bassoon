@@ -27,14 +27,18 @@ fun RateLimitBus.publish(event: RateLimitEvent) {
 /**
  * Rolling-window rate limiter.
  *
- * Hard invariant (PLAN §4): never more than [maxPerWindow] requests in any rolling
- * [windowMs] window. This is stricter than a classic token bucket — a 10-burst + 2/s
- * refill bucket can legally produce 20 requests inside one 5-second window, which
- * violates the invariant. Rolling-window gives max burst [maxPerWindow] and a flat
- * 2 req/s sustained (10 per 5s) — both plan numbers in one mechanism.
+ * Hard invariant (2026-10-03 browser-like budget): never more than [maxPerWindow]
+ * requests in any rolling [windowMs] window. This is stricter than a classic token
+ * bucket — a burst + refill bucket can legally pack extra requests into one window,
+ * which violates the invariant. Rolling-window gives max burst [maxPerWindow] and a
+ * flat 3 req/s sustained (15 per 5s). Rationale: the site's own SPA bursts ~10 API
+ * calls at page load and re-fetches pages only as the human scrolls (count=50 home,
+ * one page request every few seconds even scrolling hard) — 15/5s covers fast
+ * scrolling with zero visible throttling while keeping a well-under-server floor.
+ * (Previous budget: 10/5s; 429 Retry-After cooldown + circuit breaker unchanged.)
  */
 class RollingWindowRateLimiter(
-    private val maxPerWindow: Int = 10,
+    private val maxPerWindow: Int = 15,
     private val windowMs: Long = 5_000,
     private val now: () -> Long = System::currentTimeMillis,
     private val delayFn: suspend (Long) -> Unit = { delay(it) },

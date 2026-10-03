@@ -32,7 +32,7 @@ prefs + the normative UI-lingo table below (formerly PLAN.md §3, §7–9).
   Tags… · Block… · Close; panes are in-place swaps.
 - Creator profile: Follow/Unfollow (server-backed, `v1/me/follows`; button states Follow ↔ Following per site); niche cards show Join/Leave state (site wording "Join Niche / Leave Niche", API `v2/niches/{id}/subscription`).
 - Tap username → profile-like view (follow/block/manage lists).
-- Feeds: Trending / Explore / Top(day…all), group feeds, custom feeds, For You, Search, Favorites, Groups, Settings.
+- Feeds: Trending / Explore / Top(day…all), group feeds, custom feeds, For You, Search, Favorites, Groups, Settings — plus **"Continue Watching"** in More ▾ (mobile, 2026-10; app-only label): Room-only partial-watches surface — shared `FeedSource.Continue` reads `WatchHistoryDao.continueWatching(20)` through the SAME read-time chain TV's ContinueWatchingViewModel applies (ContentFilter + verified-only + orientation) plus §8 per-feed prefs; invalidation via the source's invalidation-tracker observer (watch_history/gifs/pref tables → per-load re-derivation), no hide-count increment (watch-time counted); helpful empty state when nothing partial; resume rides the swipe player's existing watch_history position.
 - **UI lingo = site words (verified live via logged-in Playwright sweep, 2026-10-01 — normative for every user-visible label):**
   - For You / Trending (home tabs; For You scope dropdown **Creators · Niches · All**).
   - **Explore** (NOT "Discover" — site nav renders Home · Explore · Niches · Profile); Explore = "Top Creators" surface (`/explore/creators`).

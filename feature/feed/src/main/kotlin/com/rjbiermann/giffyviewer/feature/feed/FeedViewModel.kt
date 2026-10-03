@@ -52,8 +52,31 @@ class FeedViewModel
         private val api: GifsApi,
         private val tokenStore: TokenStore,
     ) : ViewModel() {
-        private val mutableSource = MutableStateFlow<FeedSource>(FeedSource.Trending)
+        /** Seeded at init (mobile For-You default slice, 2026-10): a valid
+         *  stored token lands the app on For You like TV does; no token keeps
+         *  Trending. Also guards the offline fallback below — a seeded For You
+         *  that never loaded (network-live source, no Room cache) reverts so
+         *  the cached Trending grid still renders (airplane-mode gate 3). */
+        private val seededForYou = FeedRepository.defaultLandingSource(tokenStore.token.value != null)
+
+        private val mutableSource = MutableStateFlow<FeedSource>(seededForYou)
         val source: StateFlow<FeedSource> = mutableSource.asStateFlow()
+
+        /** True only after the user picks a feed — a seeded default failing to
+         *  load then falls back to Trending instead of an offline dead screen. */
+        private var userNavigated = false
+
+        /** Refresh-error fallback: the network-live For You pager failed
+         *  BEFORE any user navigation with no content rendered (still on the
+         *  seeded default) — the app must show cached content offline, so
+         *  revert to Trending (Room-backed, gate 3). FeedScreen observes
+         *  loadState and calls this; manual opens set the navigation guard. */
+        fun notifyRefreshError(hasContent: Boolean) {
+            if (!FeedRepository.shouldRevertToTrending(source.value, userNavigated, hasContent)) return
+            userNavigated = false
+            mutableSource.value = FeedSource.Trending
+            _canGoBack.value = false
+        }
 
         /** Bumped by pull-to-refresh / the "Refresh feed" pill: restarts the pager
          *  (fresh REFRESH generation) with the one-shot TTL bypass (PLAN §9). */
@@ -102,7 +125,12 @@ class FeedViewModel
                 val sortable = feed is FeedSource.Search || feed is FeedSource.Creator || feed is FeedSource.Niche
                 val adopt = sortable && saved.isNotEmpty() && sourceIsUnsorted(feed)
                 val next = if (adopt) feed.withSort(saved) else feed
-                if (next != mutableSource.value) previousSource = mutableSource.value
+                if (next != mutableSource.value) {
+                    previousSource = mutableSource.value
+                    // Any explicit open (chip/More/hop) is user navigation —
+                    // the seeded-default offline fallback no longer applies.
+                    userNavigated = true
+                }
                 _canGoBack.value = next != mutableSource.value && previousSource != null
                 mutableSource.value = next
             }

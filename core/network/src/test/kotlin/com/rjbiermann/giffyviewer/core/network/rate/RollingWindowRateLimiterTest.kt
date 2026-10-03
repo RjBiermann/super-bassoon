@@ -7,47 +7,48 @@ import org.junit.Test
 
 class RollingWindowRateLimiterTest {
     @Test
-    fun `never more than 10 requests in any rolling 5-second window`() =
+    fun `never more than 15 requests in any rolling 5-second window`() =
         runTest {
             var virtualNow = 0L
             val limiter = RollingWindowRateLimiter(now = { virtualNow }, delayFn = { virtualNow += it })
             val grantedAt = mutableListOf<Long>()
 
-            repeat(30) {
+            repeat(45) {
                 limiter.acquireSlot()
                 grantedAt.add(virtualNow)
             }
 
-            // invariant: any window of 5_000ms contains at most 10 grants
+            // invariant: any window of 5_000ms contains at most 15 grants
             for (i in grantedAt.indices) {
                 val inWindow = grantedAt.count { it in grantedAt[i] until grantedAt[i] + 5_000 }
-                assertTrue("window starting at grant $i has $inWindow entries", inWindow <= 10)
+                assertTrue("window starting at grant $i has $inWindow entries", inWindow <= 15)
             }
         }
 
     @Test
-    fun `burst of 10 passes immediately, 11th waits`() =
+    fun `burst of 15 passes immediately, 16th waits`() =
         runTest {
             var virtualNow = 0L
             val limiter = RollingWindowRateLimiter(now = { virtualNow }, delayFn = { virtualNow += it })
 
-            repeat(10) { limiter.acquireSlot() }
+            repeat(15) { limiter.acquireSlot() }
             assertEquals(0, virtualNow) // burst costs zero elapsed time
             limiter.acquireSlot()
-            assertEquals(5_000, virtualNow) // 11th waits for the window to slide
+            assertEquals(5_000, virtualNow) // 16th waits for the window to slide
         }
 
     @Test
-    fun `sustained rate is 2 per second`() =
+    fun `sustained rate is 3 per second`() =
         runTest {
             var virtualNow = 0L
             val limiter = RollingWindowRateLimiter(now = { virtualNow }, delayFn = { virtualNow += it })
 
-            repeat(10) { limiter.acquireSlot() } // burst
+            repeat(15) { limiter.acquireSlot() } // burst
             val t0 = virtualNow
             repeat(20) { limiter.acquireSlot() } // sustained phase
             val elapsed = virtualNow - t0
-            // 20 requests after a full burst: windows slide at 2/s → ~10s
+            // 20 requests after a full burst: all 15 slots share start time 0, so the
+            // whole window slides at once — 20 more arrive in two windows → ~10s
             assertTrue("sustained 20 reqs took ${elapsed}ms", elapsed in 9_500..11_000)
         }
 

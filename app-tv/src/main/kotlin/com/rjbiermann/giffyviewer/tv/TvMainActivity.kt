@@ -248,6 +248,7 @@ class TvMainActivity : ComponentActivity() {
                     SettingsScreen(
                         onBack = { showSettings = false },
                         showGridColumns = false,
+                        showFeedAutoplay = false,
                         requestInitialFocus = true,
                     )
                 else -> {

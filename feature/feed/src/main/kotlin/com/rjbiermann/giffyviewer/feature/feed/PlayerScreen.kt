@@ -36,19 +36,15 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Fullscreen
-import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -56,8 +52,6 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -116,8 +110,7 @@ import kotlin.math.roundToInt
  * TikTok-style swipe player (PLAN §9): vertical pager, only the active page
  * plays. Resume positions go to `watch_history`; SimpleCache writes under the
  * gif ID. Controls: single tap reveals the overlay / pauses, auto-hide after
- * idle, fullscreen toggle (immersive), always-on thin progress bar with
- * remaining-time chip, draggable scrub, two-finger pinch zoom (1x–3x) that
+ * idle, always-on thin progress bar with remaining-time chip, draggable scrub, two-finger pinch zoom (1x–3x) that
  * resets on swipe (PLAN §9 revised 2026-09-30), and the right action rail
  * (like / mute / share / overflow).
  */
@@ -126,7 +119,7 @@ private const val IDLE_HIDE_MS = 3_000L
 /** Hold-to-2× (UX-PATTERNS candidate): long-press on the player body = 2× while held. */
 private const val HOLD_SPEED = 2f
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class)
 @Composable
 fun PlayerScreen(
     startIndex: Int,
@@ -182,7 +175,6 @@ fun PlayerScreen(
     // is no more page").
     val pendingAdvance = remember { mutableStateOf(false) }
 
-    var fullscreen by remember { mutableStateOf(false) }
     var controlsVisible by remember { mutableStateOf(true) }
     var isPlaying by remember { mutableStateOf(true) }
     var scrubbing by remember { mutableStateOf(false) }
@@ -194,18 +186,14 @@ fun PlayerScreen(
     val zoom = remember(pagerState.currentPage) { mutableFloatStateOf(1f) }
     val pan = remember(pagerState.currentPage) { mutableStateOf(Offset.Zero) }
 
-    // immersive when fullscreen; restore on exit / dispose
-    DisposableEffect(fullscreen) {
+    // immersive fullscreen player: hide the system bars once, restore on dispose
+    DisposableEffect(Unit) {
         val window = (context as? Activity)?.window
-        if (window != null) {
-            val controller = WindowCompat.getInsetsController(window, view)
-            if (fullscreen) {
-                controller.systemBarsBehavior =
-                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                controller.hide(WindowInsetsCompat.Type.systemBars())
-            } else {
-                controller.show(WindowInsetsCompat.Type.systemBars())
-            }
+        window?.let {
+            val controller = WindowCompat.getInsetsController(it, view)
+            controller.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(WindowInsetsCompat.Type.systemBars())
         }
         onDispose { }
     }
@@ -343,104 +331,85 @@ fun PlayerScreen(
 
     var sheetFor by remember { mutableStateOf<Gif?>(null) }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        AnimatedVisibility(visible = !fullscreen) {
-            TopAppBar(
-                title = { Text("Now playing") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "back")
-                    }
-                },
-                colors =
-                    TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                    ),
-            )
-        }
-
-        Box(modifier = Modifier.weight(1f)) {
-            VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-                // Soak-found crash (2026-10-01): during a paging refresh the
-                // presenter list can momentarily empty while the pager still
-                // composes page 0 — items.get(page) throws out-of-bounds. Guard
-                // bounds first; the null check below only catches placeholders.
-                if (page >= items.itemCount) return@VerticalPager
-                val gif = items[page]
-                if (gif != null) {
-                    PlayerPage(
-                        gif = gif,
-                        active = page == pagerState.currentPage,
-                        player = player,
-                        dataSaver = dataSaver,
-                        watchHistory = db.watchHistoryDao(),
-                        onPlayingChanged = { isPlaying = it },
-                        controlsVisible = controlsVisible,
-                        onHideControls = { controlsVisible = false },
-                        onShowControls = { controlsVisible = true },
-                        scrubbing = scrubbing,
-                        onScrubbing = { scrubbing = it },
-                        scrubPositionMs = scrubPositionMs,
-                        onScrub = { scrubPositionMs = it },
-                        positionMs = positionMs,
-                        durationMs = durationMs,
-                        zoom = zoom.floatValue,
-                        pan = pan.value,
-                        onZoom = { z, p ->
-                            zoom.floatValue = z.coerceIn(1f, 3f)
-                            pan.value = p
-                        },
-                        fullscreen = fullscreen,
-                        onToggleFullscreen = { fullscreen = !fullscreen },
-                        liked = gif.id in likedIds,
-                        onToggleLike = {
-                            if (isLoggedIn) viewModel.toggleLike(gif.id) else onOpenAccount()
-                        },
-                        muted = muted,
-                        onToggleMute = { on -> muteScope.launch { settings.setMuted(on) } },
-                        onShare = { shareGif(context, gif) },
-                        onOverflow = { sheetFor = gif },
-                        autoSwipeOn = autoSwipe && !dataSaver,
-                        onToggleAutoSwipe = { muteScope.launch { settings.setAutoSwipe(!autoSwipe) } },
-                        skipResume = skipResume,
-                        playError = playError && page == pagerState.currentPage,
-                        onRetry = {
-                            playError = false
-                            player.playGif(gif, dataSaver)
-                        },
-                        onSkip = { playError = false },
-                        videoFit = videoFit,
-                        onOpenCreator = {
-                            viewModel.open(FeedSource.Creator(username = gif.userName))
-                            onBack()
-                        },
-                        onOpenTag = { tag ->
-                            viewModel.open(FeedSource.Search(query = tag))
-                            onBack()
-                        },
-                        onOpenNiche = { id, name ->
-                            viewModel.open(FeedSource.Niche(id = id, name = name))
-                            onBack()
-                        },
-                        onHoldSpeed = { holdSpeed = it },
-                    )
-                }
-            }
-            // hold-to-2× indicator (UX-PATTERNS candidate): shows while the
-            // long-press hold is engaged; gone on release.
-            if (holdSpeed) {
-                Text(
-                    text = "2× speed",
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier =
-                        Modifier
-                            .align(Alignment.TopCenter)
-                            .padding(top = 24.dp)
-                            .background(PlayerOverlay.scrim, CircleShape)
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
+    Box(modifier = Modifier.fillMaxSize()) {
+        VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+            // Soak-found crash (2026-10-01): during a paging refresh the
+            // presenter list can momentarily empty while the pager still
+            // composes page 0 — items.get(page) throws out-of-bounds. Guard
+            // bounds first; the null check below only catches placeholders.
+            if (page >= items.itemCount) return@VerticalPager
+            val gif = items[page]
+            if (gif != null) {
+                PlayerPage(
+                    gif = gif,
+                    active = page == pagerState.currentPage,
+                    player = player,
+                    dataSaver = dataSaver,
+                    watchHistory = db.watchHistoryDao(),
+                    onPlayingChanged = { isPlaying = it },
+                    controlsVisible = controlsVisible,
+                    onHideControls = { controlsVisible = false },
+                    onShowControls = { controlsVisible = true },
+                    scrubbing = scrubbing,
+                    onScrubbing = { scrubbing = it },
+                    scrubPositionMs = scrubPositionMs,
+                    onScrub = { scrubPositionMs = it },
+                    positionMs = positionMs,
+                    durationMs = durationMs,
+                    zoom = zoom.floatValue,
+                    pan = pan.value,
+                    onZoom = { z, p ->
+                        zoom.floatValue = z.coerceIn(1f, 3f)
+                        pan.value = p
+                    },
+                    liked = gif.id in likedIds,
+                    onToggleLike = {
+                        if (isLoggedIn) viewModel.toggleLike(gif.id) else onOpenAccount()
+                    },
+                    muted = muted,
+                    onToggleMute = { on -> muteScope.launch { settings.setMuted(on) } },
+                    onShare = { shareGif(context, gif) },
+                    onOverflow = { sheetFor = gif },
+                    autoSwipeOn = autoSwipe && !dataSaver,
+                    onToggleAutoSwipe = { muteScope.launch { settings.setAutoSwipe(!autoSwipe) } },
+                    skipResume = skipResume,
+                    playError = playError && page == pagerState.currentPage,
+                    onRetry = {
+                        playError = false
+                        player.playGif(gif, dataSaver)
+                    },
+                    onSkip = { playError = false },
+                    videoFit = videoFit,
+                    onOpenCreator = {
+                        viewModel.open(FeedSource.Creator(username = gif.userName))
+                        onBack()
+                    },
+                    onOpenTag = { tag ->
+                        viewModel.open(FeedSource.Search(query = tag))
+                        onBack()
+                    },
+                    onOpenNiche = { id, name ->
+                        viewModel.open(FeedSource.Niche(id = id, name = name))
+                        onBack()
+                    },
+                    onHoldSpeed = { holdSpeed = it },
                 )
             }
+        }
+        // hold-to-2× indicator (UX-PATTERNS candidate): shows while the
+        // long-press hold is engaged; gone on release.
+        if (holdSpeed) {
+            Text(
+                text = "2× speed",
+                color = Color.White,
+                style = MaterialTheme.typography.labelLarge,
+                modifier =
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 24.dp)
+                        .background(PlayerOverlay.scrim, CircleShape)
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+            )
         }
     }
 
@@ -478,8 +447,6 @@ private fun PlayerPage(
     zoom: Float,
     pan: Offset,
     onZoom: (Float, Offset) -> Unit,
-    fullscreen: Boolean,
-    onToggleFullscreen: () -> Unit,
     liked: Boolean,
     onToggleLike: () -> Unit,
     muted: Boolean,
@@ -916,15 +883,13 @@ private fun PlayerPage(
             onScrub = onScrub,
             positionMs = if (scrubbing) scrubPositionMs else positionMs,
             durationMs = durationMs,
-            fullscreen = fullscreen,
-            onToggleFullscreen = onToggleFullscreen,
             onScrubFinished = { player.seekTo(it) },
             modifier = Modifier.align(Alignment.BottomCenter).windowInsetsPadding(WindowInsets.navigationBars),
         )
     }
 }
 
-/** Bottom overlay: play/pause + fullscreen row, slider, always-on 3dp progress bar. */
+/** Bottom overlay: play/pause row, slider, always-on 3dp progress bar. */
 @Composable
 private fun PlayerControls(
     visible: Boolean,
@@ -936,8 +901,6 @@ private fun PlayerControls(
     onScrub: (Long) -> Unit,
     positionMs: Long,
     durationMs: Long,
-    fullscreen: Boolean,
-    onToggleFullscreen: () -> Unit,
     onScrubFinished: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -980,13 +943,6 @@ private fun PlayerControls(
                     fontSize = 10.sp,
                     modifier = Modifier.padding(start = 4.dp, end = 12.dp),
                 )
-                IconButton(onClick = onToggleFullscreen) {
-                    Icon(
-                        if (fullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
-                        contentDescription = if (fullscreen) "exit fullscreen" else "fullscreen",
-                        tint = Color.White,
-                    )
-                }
             }
         }
 

@@ -25,6 +25,7 @@ class TvHomeViewModel
         private val db: com.rjbiermann.giffyviewer.core.database.GiffyDatabase,
         tokenStore: com.rjbiermann.giffyviewer.core.auth.TokenStore,
         private val api: com.rjbiermann.giffyviewer.core.network.GifsApi,
+        private val settings: com.rjbiermann.giffyviewer.core.datastore.SettingsRepository,
     ) : ViewModel() {
         val trending = repository.paging(FeedSource.Trending).cachedIn(viewModelScope)
         val topThisWeek = repository.paging(FeedSource.TopThisWeek).cachedIn(viewModelScope)
@@ -44,6 +45,18 @@ class TvHomeViewModel
             tokenStore.token
                 .map { it != null }
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+        /** For You scope (§7 Creators·Niches·All) — the same settings.forYouScope
+         *  pref the mobile FeedViewModel binds; no duplicate pref logic here.
+         *  Paging reads it per page (repo's 5-min context memo — rate-limit
+         *  invariant), so the chip row only needs to persist the choice. */
+        val forYouScope: StateFlow<String> =
+            settings.forYouScope
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "all")
+
+        fun setForYouScope(scope: String) {
+            viewModelScope.launch { settings.setForYouScope(scope) }
+        }
 
         /** Explore row (§9: Top Creators) — first page of verified creators, anon OK.
          *  Failure surfaces (audit round 3: no silent blank strips). */

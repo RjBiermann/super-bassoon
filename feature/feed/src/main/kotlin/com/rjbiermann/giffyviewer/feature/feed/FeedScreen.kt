@@ -187,6 +187,7 @@ fun FeedScreen(
                         selected =
                             source is FeedSource.TopThisWeek ||
                                 source is FeedSource.Liked ||
+                                source is FeedSource.Continue ||
                                 source is FeedSource.Custom ||
                                 (source is FeedSource.Niche) ||
                                 source is FeedSource.Creator,
@@ -203,6 +204,13 @@ fun FeedScreen(
                                         scope.launch { snackbarHostState.showSnackbar("Nothing cached yet") }
                                     }
                                 }
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Continue Watching") },
+                            onClick = {
+                                moreOpen = false
+                                viewModel.open(FeedSource.Continue)
                             },
                         )
                         DropdownMenuItem(
@@ -472,6 +480,14 @@ fun FeedScreen(
             }
 
             val refreshError = items.loadState.refresh is LoadState.Error
+            // Offline fallback (mobile For-You default slice): the SEEDED For
+            // You source (network-live, no Room cache) that fails its FIRST
+            // refresh reverts to Trending so the cached grid renders — gate 3
+            // wants content, not an error state. Only the initial refresh
+            // (itemCount == 0); mid-feed page errors never re-route the user.
+            if (refreshError && items.itemCount == 0) {
+                LaunchedEffect(source) { viewModel.notifyRefreshError(hasContent = false) }
+            }
             val verifiedOnlyPref by viewModel.verifiedOnly.collectAsStateWithLifecycle(false)
             if (items.itemCount == 0 && refreshError) {
                 com.rjbiermann.giffyviewer.core.ui.EmptyState(
@@ -497,13 +513,19 @@ fun FeedScreen(
                 )
             } else if (items.itemCount == 0 &&
                 items.loadState.refresh is LoadState.NotLoading &&
-                (source is FeedSource.Favorites || source is FeedSource.ForYou || source is FeedSource.Custom)
+                (
+                    source is FeedSource.Favorites ||
+                        source is FeedSource.ForYou ||
+                        source is FeedSource.Custom ||
+                        source is FeedSource.Continue
+                )
             ) {
                 // UX: helpful empty state, never a blank screen (shared EmptyState).
                 val msg =
                     when {
                         source is FeedSource.ForYou -> "Your For You feed is empty"
                         source is FeedSource.Custom -> "This feed is empty"
+                        source is FeedSource.Continue -> "Nothing to continue yet"
                         else -> "No favorites yet"
                     }
                 val hint =
@@ -513,6 +535,8 @@ fun FeedScreen(
                         // point at the player's overflow sheet instead.
                         source is FeedSource.Custom ->
                             "long-press a tile or use ⋯ in the player → “Add to custom feed…”"
+                        source is FeedSource.Continue ->
+                            "watch any video partway — it shows up here to resume"
                         else -> "open any video and use ⋯ → “Favorite @creator”"
                     }
                 com.rjbiermann.giffyviewer.core.ui

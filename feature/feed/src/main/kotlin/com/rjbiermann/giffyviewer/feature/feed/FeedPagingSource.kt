@@ -26,6 +26,21 @@ internal fun untagged(
     return gif.tags.isNotEmpty() && gif.tags.all { it.lowercase() in bundle }
 }
 
+/** §8 shuffle: deterministic per-seed order — hashing every id with the seed
+ *  yields ONE global order across all pages (stable across recomposition;
+ *  Reshuffle = new seed). Seed mixed via splitmix-style XOR: affine keys
+ *  (h+c, h*c) sort identically for every seed — XOR of a seed-scaled constant
+ *  actually permutes the order. Shared with the repository's Continue branch. */
+internal fun shuffleOrdered(
+    gifs: List<Gif>,
+    seed: Long,
+): List<Gif> =
+    if (seed == 0L) {
+        gifs
+    } else {
+        gifs.sortedBy { it.id.hashCode().toLong() xor (seed * -7046029254386353131L) }
+    }
+
 /** How long the refresh load waits for the mediator's first write (first-launch race). */
 private const val CACHE_WAIT_MS = 20_000L
 
@@ -158,21 +173,9 @@ class FeedPagingSource(
                         .filter { untagged(it, feed, prefs) }
                         .filter { durationIn(it.durationSeconds, prefs.duration) }
                         .filter { it.resolutionMatches(prefs.resolution) }
-                        // §8 shuffle: deterministic per-seed order — hashing every id
-                        // with the seed yields ONE global order across all pages
-                        // (stable across recomposition; Reshuffle = new seed).
-                        .let { gifs ->
-                            if (prefs.shuffleSeed != 0L) {
-                                // seed mixed via splitmix-style XOR: affine keys (h+c, h*c)
-                                // sort identically for every seed — XOR of a seed-scaled
-                                // constant actually permutes the order
-                                gifs.sortedBy {
-                                    it.id.hashCode().toLong() xor (prefs.shuffleSeed * -7046029254386353131L)
-                                }
-                            } else {
-                                gifs
-                            }
-                        }.onEach { sessionSeen.add(it.id) }
+                        // §8 shuffle: deterministic per-seed order (shuffleOrdered).
+                        .let { shuffleOrdered(it, prefs.shuffleSeed) }
+                        .onEach { sessionSeen.add(it.id) }
                         // For You scope (§7 Creators·Niches·All): read-time filter over
                         // the SAME cached server pages — one fetch, three filters.
                         .filter {

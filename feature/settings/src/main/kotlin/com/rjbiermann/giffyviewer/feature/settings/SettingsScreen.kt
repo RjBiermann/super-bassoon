@@ -57,6 +57,9 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     /** TV has a fixed grid — hide the mobile-only Grid columns row. */
     showGridColumns: Boolean = true,
+    /** Autoplay in feed is a mobile 1-col-feed surface — hidden on TV
+     *  (same gate idiom as showGridColumns). */
+    showFeedAutoplay: Boolean = true,
     /** TV: the first row takes D-pad focus on entry (mobile touch doesn't need it). */
     requestInitialFocus: Boolean = false,
     viewModel: SettingsViewModel = hiltViewModel(),
@@ -261,31 +264,33 @@ fun SettingsScreen(
                         }
                     }
                 }
-                item(key = "feed-autoplay") {
-                    // Inline feed autoplay (AGENTS-PLAYER.md, built 2026-10-02):
-                    // 1-column feed's settled tile plays a muted+looped preview.
-                    // Lives under the grid block — only meaningful for the 1-col grid.
-                    val feedAutoplay by viewModel.feedAutoplay.collectAsStateWithLifecycle(true)
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .toggleable(
-                                    value = feedAutoplay,
-                                    role = Role.Switch,
-                                    onValueChange = { viewModel.setFeedAutoplay(it) },
-                                ),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Autoplay in feed", style = MaterialTheme.typography.titleSmall)
-                            Text(
-                                "Play a muted preview on the settled tile in the 1-column feed",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                if (showFeedAutoplay) {
+                    item(key = "feed-autoplay") {
+                        // Inline feed autoplay (AGENTS-PLAYER.md, built 2026-10-02):
+                        // 1-column feed's settled tile plays a muted+looped preview.
+                        // Lives under the grid block — only meaningful for the 1-col grid.
+                        val feedAutoplay by viewModel.feedAutoplay.collectAsStateWithLifecycle(true)
+                        Row(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .toggleable(
+                                        value = feedAutoplay,
+                                        role = Role.Switch,
+                                        onValueChange = { viewModel.setFeedAutoplay(it) },
+                                    ),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Autoplay in feed", style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    "Play a muted preview on the settled tile in the 1-column feed",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Switch(checked = feedAutoplay, onCheckedChange = null)
                         }
-                        Switch(checked = feedAutoplay, onCheckedChange = null)
                     }
                 }
             }
