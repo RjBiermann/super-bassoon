@@ -31,9 +31,13 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build + checks (ktlint / detekt / unit tests)
+        # `check` = lint + unit tests over every module. Release SIGNING is NOT
+        # a CI concern — assembleRelease (and its validateSigning) belongs to
+        # release.yml, which carries the keystore secrets. Debug APKs here cover
+        # full compile parity for both app shells.
         # --build-cache: both app modules + all libs reuse compile outputs
         # within the one invocation (no cross-run state to trust).
-        run: ./gradlew build --console=plain --build-cache -Dorg.gradle.jvmargs=-Xmx3g --stacktrace
+        run: ./gradlew :app-mobile:assembleDebug :app-tv:assembleDebug check --console=plain --build-cache -Dorg.gradle.jvmargs=-Xmx3g --stacktrace
 
       - name: Upload reports on failure
         if: failure()
