@@ -754,3 +754,44 @@ green on :feature:feed/:app-tv/:app-mobile.
   server search-history sync + collection browsing endpoint (fallbacks/no-guess),
   Gate 324 (SIGNING secrets), minimap/two-column/RateLimitBus indicator
   (decided skips). Follow-flip signed-in check joins the token-bundle queue.
+
+### Session 2026-10-03 batch 20 (GitHub CI/CD MADE LIVE — repo published, v0.2.0 RELEASED)
+User asks: "add standard android ci/cd like FOSS projects, repo super-bassoon, generate
+secrets via gh". All landed and END-TO-END VERIFIED:
+- Remote: `origin = git@github.com:RjBiermann/super-bassoon.git`; jj identity set
+  (RjBiermann@users.noreply.github.com, all historic commits re-authored).
+- **Fresh signing material** (pre-release key-reset, reuse-forever rule intact):
+  keystore/release.keystore regenerated (RSA-2048, alias giffy, 30y, random 40-hex
+  password), old unpublished keystore discarded. Password lives in
+  keystore/signing.properties (gitignored) read by a ktlint-clean
+  `localSigningPass()` in BOTH build.gradle.kts (CI: SIGNING_PASS env wins; the
+  hardcoded `giffy_local` is gone from source). KTS quirk learned: java.util.* is
+  unreachable in these scripts' classpath — stdlib-only parsing used instead.
+  Secrets pushed to gh: SIGNING_KEY (base64 keystore) + SIGNING_PASS.
+- **ci.yml (standard FOSS gate):** push/PR → JDK17 → setup-gradle@v4 (wrapper +
+  dependency caching) → `:app-mobile:assembleDebug :app-tv:assembleDebug check
+  --build-cache` (debug assembly for compile parity; release SIGNING is
+  deliberately release.yml's job — `check` covers lint+unit+ktlint+detekt). CI
+  ran RED 3× first, each a real gate win: host-pinned `org.gradle.java.home`
+  killed (broke on any other machine), tree-wide ktlint debt surfaced (kts +
+  4 files, fixed via ktlintCheck-equivalent), media3 UnstableApi lint error on
+  FeedScreen (file-level @OptIn like PlayerScreen). Now GREEN on runners.
+- **release.yml hardened:** setup-gradle caching + --build-cache; `mkdir -p
+  keystore` before decode (gitignored dir absent on fresh checkout — first
+  release run caught it). **v0.2.0 RELEASED: GiffyViewer-mobile-0.2.0.apk (3.31
+  MB) + GiffyViewer-tv-0.2.0.apk (3.15 MB), R8-shrunk, signature-verified,
+  disclaimer body.** Gate 324 CLOSED.
+- Dependabot noise (unresolved): GitHub auto-submits gradle tooling deps
+  (logback/bouncycastle/jose4j/jdom2/commons) in the Dependency-Submission
+  snapshot; the security-updates job then can't find them in app build files
+  → red "Dependabot Updates" runs + alert FAILs. Harmless to build/release;
+  silenced-by-config or alert-dismissal still open (needs a decision).
+- Versioning unchanged (tag-driven, `-PversionTag`, packed-semver versionCode);
+  v0.2.0 = versionCode 200 both apps.
+- **Tool evaluations (user ask, doc-recorded):** semantic-release and fastlane
+  both assessed and DECLINED for this repo: semantic-release buys frequent
+  auto-tags + CHANGELOG.md at npm-style cadence (ours is sparse, tag-driven,
+  packed-semver versionCode already pinned to tags) and fastlane's whole value
+  chain (supply/pilot/screengrab/match) targets store-published apps, which
+  §0 excludes. Re-evaluate semantic-release if release cadence grows; never
+  fastlane while GitHub-Releases-only stands.
