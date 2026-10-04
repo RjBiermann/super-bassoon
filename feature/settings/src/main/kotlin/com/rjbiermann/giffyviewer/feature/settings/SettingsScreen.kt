@@ -62,6 +62,8 @@ fun SettingsScreen(
     showFeedAutoplay: Boolean = true,
     /** TV: the first row takes D-pad focus on entry (mobile touch doesn't need it). */
     requestInitialFocus: Boolean = false,
+    /** TV home row size (slice 11) — TV-visible (mobile screens don't). */
+    showTvRowHeight: Boolean = false,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val blocked by viewModel.blocked.collectAsStateWithLifecycle()
@@ -290,6 +292,46 @@ fun SettingsScreen(
                                 )
                             }
                             Switch(checked = feedAutoplay, onCheckedChange = null)
+                        }
+                    }
+                }
+            }
+            if (showTvRowHeight) {
+                item(key = "tv-row-height") {
+                    // TV home row size (slice 11): Default = the current
+                    // 170dp 10-foot card; Large/XL bigger steps for farther
+                    // viewports. Chip pattern mirrors the Orientation block
+                    // (focusGroup + giffyFocus ring — the D-pad chip-skip fix).
+                    val rowHeight by viewModel.tvRowHeight.collectAsStateWithLifecycle("default")
+                    Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+                        Text("TV home row size", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            "Bigger video cards in the TV home feed rows",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier =
+                                Modifier
+                                    .focusGroup()
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp),
+                        ) {
+                            listOf("Default" to "default", "Large" to "large", "XL" to "xl").forEach { (label, value) ->
+                                val src = remember { MutableInteractionSource() }
+                                FilterChip(
+                                    selected = rowHeight == value,
+                                    onClick = { viewModel.setTvRowHeight(value) },
+                                    label = { Text(label) },
+                                    interactionSource = src,
+                                    // giffyFocus ring: M3 chips draw nothing on D-pad focus.
+                                    modifier =
+                                        Modifier
+                                            .giffyFocus(src)
+                                            .padding(end = 6.dp),
+                                )
+                            }
                         }
                     }
                 }

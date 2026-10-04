@@ -12,6 +12,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -30,6 +31,12 @@ fun GiffyScaffold(
     modifier: Modifier = Modifier,
     backIcon: ImageVector = Icons.AutoMirrored.Filled.ArrowBack,
     backDescription: String = "back",
+    /** M3 collapse-on-scroll (FeedScreen content-first hide; null = static bar,
+     *  every other surface unchanged). Callers wire
+     *  Modifier.nestedScroll(behavior.nestedScrollConnection) on the scrolling
+     *  content. Caller-created (not remembered here) so the owning screen can
+     *  read/observe the state — e.g. reduced-motion snap-vs-animate. */
+    scrollBehavior: TopAppBarScrollBehavior? = null,
     actions: @Composable RowScope.() -> Unit = {},
     snackbarHost: @Composable () -> Unit = {},
     content: @Composable (PaddingValues) -> Unit,
@@ -48,6 +55,7 @@ fun GiffyScaffold(
                     }
                 },
                 actions = actions,
+                scrollBehavior = scrollBehavior,
                 colors =
                     TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.surface,

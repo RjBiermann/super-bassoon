@@ -49,7 +49,9 @@ import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.database.WatchHistoryEntity
 import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
 import com.rjbiermann.giffyviewer.core.model.Gif
+import com.rjbiermann.giffyviewer.core.model.contentAspectRatio
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
+import com.rjbiermann.giffyviewer.core.player.seedContentAspectRatio
 import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
 import com.rjbiermann.giffyviewer.core.ui.PlayerOverlay
 import com.rjbiermann.giffyviewer.core.ui.giffyFocus
@@ -105,6 +107,25 @@ fun TvPlayerScreen(
     }
 
     val gif = gifs[index]
+
+    /** One watch-history write — shared by the 5s sampler and the teardown
+     *  flush (finally). Reads [player] and [gif] at call time; key-change
+     *  cancellations capture the OUTGOING gif (correct row). */
+    suspend fun flushWatchPosition() {
+        val pos = player.currentPositionMs
+        // ≥3s playback floor — the watch-history write policy (DB doc).
+        if (pos >= WATCH_POSITION_MIN_MS) {
+            db.watchHistoryDao().upsert(
+                WatchHistoryEntity(
+                    gifId = gif.id,
+                    positionMs = pos,
+                    updatedAt = System.currentTimeMillis(),
+                    watched = player.durationMs > 0 && pos > player.durationMs * 0.8,
+                ),
+            )
+        }
+    }
+
     // Seek feedback: "1:23 / 2:45" flashes while seeking (TV keymap §).
     var seekFlash by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(seekFlash) {
@@ -113,7 +134,8 @@ fun TvPlayerScreen(
             seekFlash = null
         }
     }
-    // Playback speed (MENU panel cycles 0.5 → 1 → 1.5 → 2).
+    // Playback speed (SLICE-13: D-pad slider on the MENU panel Speed row,
+    // mobile QuickSheet parity — 0.5–2× in 0.25 steps; was a 4-step cycle).
     var speed by remember { mutableStateOf(1f) }
 
     // Player text auto-hide state — declared before the key-event Column.
@@ -264,6 +286,15 @@ fun TvPlayerScreen(
                 update = { view ->
                     view.player = player
                     view.resizeMode = fitMode
+                    // SLICE-14 (user: aspect warp on next/prev): the content
+                    // frame has no aspect until ExoPlayer reports videoSize —
+                    // with ZOOM/FILL that degenerates to fill-frame (stretch
+                    // warp). Seed the gif's own width/height at every switch;
+                    // the live videoSize update overrides when it arrives.
+                    // SLICE-16 stale guard: seed runs on EVERY switch, and an
+                    // unknown gif aspect clears (0 = unset) so the PREVIOUS
+                    // video's aspect can never warp the next one.
+                    view.seedContentAspectRatio(gif.contentAspectRatio())
                 },
                 modifier = Modifier.fillMaxSize(),
             )
@@ -430,19 +461,24 @@ fun TvPlayerScreen(
         val resume = db.watchHistoryDao().byGif(gif.id)?.positionMs ?: 0L
         player.playGif(gif, dataSaver, resumeMs = resume)
     }
+
+    // Position sampling (mobile player parity) + teardown flush (2026-10 user
+    // report: BACK from the player lost the clicked video's playback position
+    // — the sampler died on every effect cancellation without a final write,
+    // so up to 5s of playback was never recorded). The non-cancellable
+    // finally writes on BOTH cancellation shapes: a gif switch (next/prev/
+    // auto-swipe) and the player screen leaving composition (BACK) — reopen
+    // then resumes from the real last position via byGif().positionMs. The
+    // 3s floor mirrors the watch-history write policy (DB doc).
     LaunchedEffect(gif.id) {
-        while (true) {
-            kotlinx.coroutines.delay(5_000)
-            val pos = player.currentPositionMs
-            if (pos > 0) {
-                db.watchHistoryDao().upsert(
-                    WatchHistoryEntity(
-                        gifId = gif.id,
-                        positionMs = pos,
-                        updatedAt = System.currentTimeMillis(),
-                        watched = player.durationMs > 0 && pos > player.durationMs * 0.8,
-                    ),
-                )
+        try {
+            while (true) {
+                kotlinx.coroutines.delay(5_000)
+                flushWatchPosition()
+            }
+        } finally {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                flushWatchPosition()
             }
         }
     }
@@ -489,14 +525,10 @@ fun TvPlayerScreen(
                     autoSwipeOn = autoSwipeOn,
                     onToggleLike = { feedViewModel.toggleLike(sheetGif.id) },
                     onToggleMute = { scope.launch { settings.setMuted(!muted) } },
-                    onCycleSpeed = {
-                        speed =
-                            when (speed) {
-                                0.5f -> 1f
-                                1f -> 1.5f
-                                1.5f -> 2f
-                                else -> 0.5f
-                            }
+                    // SLICE-13: quarter-step adjust, clamped to the mobile
+                    // slider's [0.5, 2] range; applied immediately.
+                    onAdjustSpeed = { delta ->
+                        speed = adjustSpeed(speed, delta)
                         player.setPlaybackSpeed(speed)
                     },
                     onToggleAutoSwipe = { scope.launch { settings.setAutoSwipe(!autoSwipeOn) } },
@@ -513,6 +545,9 @@ fun TvPlayerScreen(
         )
     }
 }
+
+/** Watch-history write floor: record only after ≥3s playback (DB doc policy). */
+private const val WATCH_POSITION_MIN_MS = 3_000L
 
 /** ±10s step with a "1:23 / 2:45" flash; hold-repeat = progressive seek. */
 private fun seekBy(

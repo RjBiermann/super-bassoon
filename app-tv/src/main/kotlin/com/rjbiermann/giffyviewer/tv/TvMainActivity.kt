@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -34,6 +36,7 @@ import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.ui.GiffyTheme
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
+import com.rjbiermann.giffyviewer.feature.feed.SurpriseResult
 import com.rjbiermann.giffyviewer.feature.feed.parseNicheRef
 import com.rjbiermann.giffyviewer.feature.settings.SettingsScreen
 import dagger.hilt.android.AndroidEntryPoint
@@ -142,6 +145,15 @@ class TvMainActivity : ComponentActivity() {
         val pinHash by settings.pinHash.collectAsStateWithLifecycle(initialValue = null)
         var unlocked by remember { mutableStateOf(false) }
 
+        // Ribbon-state hoisting (2026-10 user report: back from a full-screen
+        // surface lost the feed's scroll position — home/feed are `when`
+        // branches, so their remember-ed scroll states died with the branch).
+        // Both states live at Root scope: they survive every branch swap
+        // (player, settings, full-page feed, search…) so BACK lands the user
+        // where they were. The paging data itself refills from Room instantly.
+        val homeListState = rememberLazyListState()
+        val feedGridState = rememberLazyGridState()
+
         // PLAN §1: 5% overscan margins on TV — content never touches the bezel.
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 48.dp, vertical = 27.dp)) {
             when {
@@ -183,6 +195,7 @@ class TvMainActivity : ComponentActivity() {
                             onOpenNiche = { niche -> openFeed = niche },
                             playerFactory = playerFactory,
                             dataSaver = dataSaver,
+                            gridState = feedGridState,
                         )
                     }
                 }
@@ -249,6 +262,9 @@ class TvMainActivity : ComponentActivity() {
                         onBack = { showSettings = false },
                         showGridColumns = false,
                         showFeedAutoplay = false,
+                        // TV home has its own row-height setting (mobile grid
+                        // columns section is hidden here; this row SHOWS on TV).
+                        showTvRowHeight = true,
                         requestInitialFocus = true,
                     )
                 else -> {
@@ -314,8 +330,8 @@ class TvMainActivity : ComponentActivity() {
                                             onClick = {
                                                 moreOpen = false
                                                 homeScope.launch {
-                                                    val ok = repository.refreshSurprise()
-                                                    if (ok) openFeed = FeedSource.Surprise
+                                                    val result = repository.refreshSurprise()
+                                                    if (result == SurpriseResult.OK) openFeed = FeedSource.Surprise
                                                 }
                                             },
                                         )
@@ -376,10 +392,13 @@ class TvMainActivity : ComponentActivity() {
                             onOpenGif = { gifs, index -> player = gifs to index },
                             onOpenCreator = { username -> openFeed = FeedSource.Creator(username = username) },
                             onOpenNiche = { niche -> openFeed = niche },
+                            // Slice 10: quick-actions "Open feed" full-page path.
+                            onOpenFeed = { source -> openFeed = source },
                             playerFactory = playerFactory,
                             dataSaver = dataSaver,
                             homeViewModel = home,
                             continueViewModel = continueVm,
+                            listState = homeListState,
                         )
                     }
                 }

@@ -20,6 +20,9 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** "Surprise me" outcome (§8) — copy-differentiation on the feed's snackbar. */
+enum class SurpriseResult { OK, EMPTY, FILTERED_EMPTY }
+
 /**
  * Cache-first feed access (PLAN §5). UI reads Room via [FeedPagingSource];
  * [FeedMediator] refreshes in the background. Airplane mode: rows render from cache.
@@ -72,25 +75,58 @@ class FeedRepository
 
         private fun now(): Long = System.currentTimeMillis()
 
+        /** Favorites-cache invalidation (2026-10 user report): a favorites-set
+         *  change (rename: toggle in quick actions, Settings unfavorite, backup
+         *  import) must evict the cached round-robin pages — read-time filter +
+         *  old mapping otherwise blank the Favorites feed until the 10-min TTL.
+         *  Read-time-consistent refetch on next load; no background fetch
+         *  (No-WorkManager rule). The session dedup set needs no clearing here:
+         *  it is PER PAGER GENERATION now (FeedPagingSource instance field) and
+         *  the creator_prefs write invalidates the source → the factory builds a
+         *  fresh instance with a fresh set. */
+        suspend fun evictFavoritesCache() {
+            db.feedPageDao().evictFavorites()
+        }
+
         /** "Surprise me" pool (§8) — session-only, regenerated per request. */
         private val surprisePool = MutableStateFlow<List<Gif>?>(null)
 
-        suspend fun refreshSurprise(): Boolean {
+        /** "Surprise me" result (§8): OK = pool landed; FILTERED_EMPTY = cached
+         *  rows existed but every candidate was dropped by ContentFilter /
+         *  verified-only / orientation (the batch-14 all-portrait-pool shape —
+         *  honest but mistitled as "nothing cached"); EMPTY = no unwatched
+         *  rows at all (fresh install or everything watched). */
+        suspend fun refreshSurprise(): SurpriseResult {
             val orientation = settings.orientationFilter.first()
             val verifiedOnly = settings.verifiedOnly.first()
             contentFilter.refreshFrom(db.contentPrefsDao())
             contentFilter.refreshBlockedFeeds(db.customFeedDao())
+            val raw = db.gifDao().randomUnwatched(PAGE_SIZE * 2).map { it.toModel() }
             val pool =
-                db
-                    .gifDao()
-                    .randomUnwatched(PAGE_SIZE * 2)
-                    .map { it.toModel() }
+                raw
                     .filter { contentFilter.allow(it.userName, it.tags, it.description) }
                     .filter { !verifiedOnly || it.verified }
                     .filter { it.matchesOrientation(orientation) }
             surprisePool.value = pool.ifEmpty { null }
-            return pool.isNotEmpty()
+            return when {
+                pool.isNotEmpty() -> SurpriseResult.OK
+                raw.isNotEmpty() -> SurpriseResult.FILTERED_EMPTY
+                else -> SurpriseResult.EMPTY
+            }
         }
+
+        /** SLICE-12 hint sink: effective orientation for a feed's base key —
+         *  the per-feed §8 pref merged over the global §6 pref (same semantics as
+         *  FeedPagingSource's read chain / FeedScreen's B3 predicate). Composed
+         *  per-feed so a filtered-empty hint can name the ACTUAL filter and
+         *  value instead of wrongly blaming the global Settings (user report:
+         *  a stale per-feed "horizontal" over a global "any" still blanks the
+         *  row — global Settings → Orientation then shows unset). */
+        fun effectiveOrientation(baseKey: String): Flow<String> =
+            kotlinx.coroutines.flow.combine(
+                settings.orientationFilter,
+                settings.feedPrefs(baseKey),
+            ) { global, perFeed -> perFeed.orientation.ifEmpty { global } }
 
         fun paging(
             feed: FeedSource,
@@ -237,7 +273,8 @@ class FeedRepository
                     ),
                 pagingSourceFactory = {
                     FeedPagingSource(
-                        db,
+                        db.contentPrefsDao(),
+                        db.customFeedDao(),
                         feed,
                         db.feedPageDao(),
                         PAGE_SIZE,
@@ -256,9 +293,31 @@ class FeedRepository
                         orientation = { orientation },
                         verifiedOnly = { verifiedOnly },
                         prefs = { prefs },
-                    )
+                    ).also(::observePrefTables)
                 },
             ).flow
+
+        /** Pref-table invalidation observer (moved from FeedPagingSource's init
+         *  so the source class stays free of the Room database handle): each
+         *  instance owns its observer; a pref-table write (block edit, custom
+         *  feed state, favorites toggle) invalidates the live pager instantly
+         *  (leak-zero re-filter). Deliberately NOT watching feed_pages: every
+         *  mediator write would invalidate every live pager — an endless
+         *  background fetch storm (seen live on TV). */
+        private fun observePrefTables(source: androidx.paging.PagingSource<Int, com.rjbiermann.giffyviewer.core.model.Gif>) {
+            db.invalidationTracker.addObserver(
+                object : androidx.room.InvalidationTracker.Observer(
+                    "creator_prefs",
+                    "tag_prefs",
+                    "keyword_blocks",
+                    "custom_feeds",
+                ) {
+                    override fun onInvalidated(tables: Set<String>) {
+                        source.invalidate()
+                    }
+                },
+            )
+        }
 
         companion object {
             const val PAGE_SIZE = 20
@@ -267,13 +326,13 @@ class FeedRepository
             /** "Continue Watching" row length — TV's ContinueWatchingViewModel uses 20. */
             private const val CONTINUE_LIMIT = 20
 
-            // Session-wide ids ever returned per feed. The server reshuffles page
-            // contents between fetches, so a DB-row-only dedup misses ids still
-            // live in the pager's list → duplicate LazyGrid keys → crash
-            // (live: "Key was already used" during scroll).
-            private val seenIds = HashMap<String, MutableSet<String>>()
-
-            fun seenFor(keyBase: String): MutableSet<String> = seenIds.getOrPut(keyBase) { mutableSetOf() }
+            // Session-wide ids ever returned per feed — DELETED (2026-10, pull-to
+            // -refresh blanking): the static map survived pager restarts, so a
+            // forced REFRESH that re-listed the same ids (Favorites' deterministic
+            // round-robin does, always) deduped every page to empty and the feed
+            // rendered the "No favorites yet" state. Dedup is now PER PAGER
+            // GENERATION (FeedPagingSource instance field) — same semantics the
+            // network-live sources (Liked/ForYou) already use.
 
             /** Pure seed decision (mobile For-You default slice, 2026-10):
              *  a stored token cold-starts on For You (TV parity); anonymous

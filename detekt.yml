@@ -8,6 +8,7 @@ complexity:
     active: false
   TooManyFunctions:
     active: true
+    thresholdInFiles: 13 # TvHomeScreen pure mappings (row-size slice 11 + SLICE-12 hint copy)
     thresholdInInterfaces: 40 # one wide data-access surface per file is by design (ContentPrefsDao, GifsApi)
     thresholdInClasses: 40 # wide data-access fakes (ContentPrefsDao, GifsApi fakes) are one class by design
 style:

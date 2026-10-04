@@ -24,6 +24,9 @@ class SettingsViewModel
     constructor(
         private val db: GiffyDatabase,
         private val settings: com.rjbiermann.giffyviewer.core.datastore.SettingsRepository,
+        // Favorites-cache invalidation on a favorites-set change (same
+        // repository rule the quick-toggle uses — FeedRepository.evictFavoritesCache).
+        private val feedRepository: com.rjbiermann.giffyviewer.feature.feed.FeedRepository,
     ) : ViewModel() {
         private val dao: ContentPrefsDao = db.contentPrefsDao()
 
@@ -48,7 +51,11 @@ class SettingsViewModel
         }
 
         fun unfavoriteCreator(username: String) {
-            viewModelScope.launch { dao.unblockCreator(username) }
+            viewModelScope.launch {
+                dao.unblockCreator(username)
+                // The favorites set changed — same invalidation as the quick toggle.
+                feedRepository.evictFavoritesCache()
+            }
         }
 
         fun unblockTag(tag: String) {
@@ -128,6 +135,14 @@ class SettingsViewModel
             viewModelScope.launch { settings.setFeedAutoplay(enabled) }
         }
 
+        /** TV home row size (slice 11): default | large | xl — TV-visible row. */
+        val tvRowHeight: StateFlow<String> =
+            settings.tvRowHeight.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "default")
+
+        fun setTvRowHeight(value: String) {
+            viewModelScope.launch { settings.setTvRowHeight(value) }
+        }
+
         /** PLAN §9 theme options. */
         val amoled: StateFlow<Boolean> =
             settings.amoled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
@@ -151,6 +166,9 @@ class SettingsViewModel
             runCatching {
                 val count = ContentPrefsBackup.import(dao, json, db.customFeedDao())
                 settings.setDataSaver(ContentPrefsBackup.parseDataSaver(json))
+                // Restored FAVORITED creator rows change the favorites set — the
+                // same Favorites-cache invalidation as every other toggler.
+                feedRepository.evictFavoritesCache()
                 count
             }
     }

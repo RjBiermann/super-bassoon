@@ -57,3 +57,16 @@ fun Gif.resolutionMatches(chip: String): Boolean =
         "hd" -> hdUrl != null
         else -> true
     }
+
+/**
+ * SLICE-14: seed aspect (width/height) from the gif's OWN metadata for the
+ * player's content frame. On a gif switch the PlayerView/AspectRatioFrame
+ * has no aspect until the video resolves; with ZOOM/FILL an unknown aspect
+ * degenerates to fill-frame (stretch warp, user report) and a PREVIOUS
+ * video's aspect would warp the NEXT one (SLICE-16). Seeding fixes both;
+ * the live videoSize update overrides when it arrives. Unknown dimensions
+ * (0) → 0 = "no seed / clear" — AspectRatioFrameLayout treats 0 as unset
+ * (current pre-seed behavior).
+ */
+fun Gif.contentAspectRatio(): Float =
+    if (width > 0 && height > 0) width.toFloat() / height else 0f

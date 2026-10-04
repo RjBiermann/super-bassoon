@@ -18,7 +18,21 @@ internal class FakeApi : GifsApi {
     var nicheGifsArgs = mutableListOf<Pair<String, Int>>()
     var searchArgs = mutableListOf<Pair<String, Int>>() // (text, page)
     var likedPages: MutableMap<Int, GifsPageDto> = mutableMapOf()
+
+    /** page → HTTP status code thrown by likedFeed (pool-cap/error probes). */
+    var likedHttpErrors: MutableMap<Int, Int> = mutableMapOf()
+    var likedFeedCalls: MutableList<Int> = mutableListOf()
+    var forYouPages: MutableMap<Int, GifsPageDto> = mutableMapOf()
+    var forYouHttpErrors: MutableMap<Int, Int> = mutableMapOf()
+    var forYouCalls: MutableList<Int> = mutableListOf()
     var likedIdsResult: List<String> = emptyList()
+
+    /** page → dto for trendingPopular (cached-path walk tests); empty = empty page. */
+    var trendingPages: MutableMap<Int, GifsPageDto> = mutableMapOf()
+
+    /** page → HTTP status code thrown by trendingPopular (pool-cap/error probes). */
+    var trendingHttpErrors: MutableMap<Int, Int> = mutableMapOf()
+    var trendingCalls: MutableList<Int> = mutableListOf()
 
     override suspend fun temporaryToken(): TemporaryTokenDto = throw NotImplementedError()
 
@@ -57,7 +71,11 @@ internal class FakeApi : GifsApi {
         count: Int,
         page: Int,
         order: String?,
-    ): GifsPageDto = throw NotImplementedError()
+    ): GifsPageDto {
+        trendingCalls.add(page)
+        trendingHttpErrors[page]?.let { code -> throw httpError(code) }
+        return trendingPages[page] ?: GifsPageDto()
+    }
 
     override suspend fun creatorSearchPreviews(
         query: String,
@@ -137,12 +155,20 @@ internal class FakeApi : GifsApi {
     override suspend fun likedFeed(
         count: Int,
         page: Int,
-    ): GifsPageDto = likedPages[page] ?: GifsPageDto()
+    ): GifsPageDto {
+        likedFeedCalls.add(page)
+        likedHttpErrors[page]?.let { code -> throw httpError(code) }
+        return likedPages[page] ?: GifsPageDto()
+    }
 
     override suspend fun feedForYou(
         count: Int,
         page: Int,
-    ) = throw NotImplementedError()
+    ): GifsPageDto {
+        forYouCalls.add(page)
+        forYouHttpErrors[page]?.let { code -> throw httpError(code) }
+        return forYouPages[page] ?: GifsPageDto()
+    }
 
     override suspend fun likedIds(): List<String> = likedIdsResult
 
@@ -202,3 +228,9 @@ internal class FakeApi : GifsApi {
 
     override suspend fun userStats(username: String) = throw NotImplementedError()
 }
+
+/** Retrofit error shape for paging-source tests (pool-cap 400 / plain 5xx). */
+internal fun httpError(code: Int): retrofit2.HttpException =
+    retrofit2.HttpException(
+        retrofit2.Response.error<Any>(code, okhttp3.ResponseBody.create(null as okhttp3.MediaType?, "error".toByteArray())),
+    )

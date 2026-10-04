@@ -30,6 +30,9 @@ dependencies {
     implementation(project(":core:database"))
     implementation(project(":core:datastore"))
     implementation(project(":core:ui"))
+    // Favorites-cache invalidation rides FeedRepository (shared rule with the
+    // quick-toggle path so a favorites-set change never leaves stale pages).
+    implementation(project(":feature:feed"))
     implementation(libs.activity.compose)
     implementation(libs.material.icons)
     implementation(libs.hilt.android)

@@ -36,6 +36,10 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.paging.runtime)
     implementation(libs.paging.compose)
+    // retrofit2.HttpException is caught in the paging sources (pool-cap 400 →
+    // end-of-pool); retrofit rides transitively via :core:network's API types —
+    // this makes the class visible to this module's compile classpath.
+    implementation(libs.retrofit)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.lifecycle.viewmodel.compose)
@@ -47,6 +51,9 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    // httpError(): retrofit2.HttpException + okhttp3.ResponseBody construction.
+    testImplementation(libs.okhttp)
+    testImplementation(libs.retrofit)
 }
 
 detekt {

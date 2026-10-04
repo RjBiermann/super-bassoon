@@ -57,6 +57,7 @@ import com.rjbiermann.giffyviewer.core.ui.AudioBadge
 import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
 import com.rjbiermann.giffyviewer.core.ui.avgColorOr
 import com.rjbiermann.giffyviewer.core.ui.giffyFocus
+import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 
 /**
  * 10-foot UI (PLAN §8 TV): vertical stack of rows, D-pad navigates rows and
@@ -69,12 +70,22 @@ fun TvHomeScreen(
     onOpenCreator: (String) -> Unit,
     /** Show-more pane niche rows (quick actions). */
     onOpenNiche: (com.rjbiermann.giffyviewer.feature.feed.FeedSource.Niche) -> Unit = {},
+    /** Slice 10: quick-actions "Open feed" — the row's FeedSource full-page. */
+    onOpenFeed: (com.rjbiermann.giffyviewer.feature.feed.FeedSource) -> Unit = {},
     /** Preview-on-focus (AGENTS-UX-PATTERNS): null factory = no previews. */
     playerFactory: com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory? = null,
     dataSaver: Boolean = false,
     homeViewModel: TvHomeViewModel,
     continueViewModel: ContinueWatchingViewModel,
+    /** Hoisted at TvMainActivity Root so BACK from a player/full feed keeps
+     *  scroll position (branch swaps otherwise discard remember-ed states). */
+    listState: androidx.compose.foundation.lazy.LazyListState =
+        androidx.compose.foundation.lazy
+            .rememberLazyListState(),
 ) {
+    // Row-height setting (slice 11): DataStore pref → effective card height.
+    val tvRowHeightPref by homeViewModel.tvRowHeight.collectAsStateWithLifecycle("default")
+    val rowHeight = rowHeightFor(tvRowHeightPref)
     val trending = homeViewModel.trending.collectAsLazyPagingItems()
     val topThisWeek = homeViewModel.topThisWeek.collectAsLazyPagingItems()
     val favorites = homeViewModel.favorites.collectAsLazyPagingItems()
@@ -91,11 +102,28 @@ fun TvHomeScreen(
     LaunchedEffect(isLoggedIn) { if (isLoggedIn) followingVm.refresh() }
     val exploreCreators by homeViewModel.exploreCreators.collectAsStateWithLifecycle(initialValue = emptyList())
     val exploreFailed by homeViewModel.exploreFailed.collectAsStateWithLifecycle(false)
+    // SLICE-12: effective §6/§8 orientation per row (per-feed pref merged over
+    // the global pref) — the filtered-empty hint names the ACTUAL filter.
+    val trendingOrientation by homeViewModel.trendingOrientation.collectAsStateWithLifecycle("any")
+    val topThisWeekOrientation by homeViewModel.topThisWeekOrientation.collectAsStateWithLifecycle("any")
+    val favoritesOrientation by homeViewModel.favoritesOrientation.collectAsStateWithLifecycle("any")
+    val likedOrientation by homeViewModel.likedOrientation.collectAsStateWithLifecycle("any")
+    val forYouOrientation by homeViewModel.forYouOrientation.collectAsStateWithLifecycle("any")
     val continueEntries by continueViewModel.entries.collectAsStateWithLifecycle(initialValue = emptyList())
     val hasFavorites by homeViewModel.hasFavorites.collectAsStateWithLifecycle(initialValue = false)
 
     // Remote MENU key on a focused card opens creator quick actions.
     var actionsFor by remember { mutableStateOf<Gif?>(null) }
+    // The row's feed source for the panel's "Open feed" row (slice 10).
+    var actionsFeed by remember { mutableStateOf<com.rjbiermann.giffyviewer.feature.feed.FeedSource?>(null) }
+
+    fun openActions(
+        gif: Gif,
+        source: com.rjbiermann.giffyviewer.feature.feed.FeedSource?,
+    ) {
+        actionsFor = gif
+        actionsFeed = source
+    }
 
     // Preview-on-focus: one shared player for the whole screen, moved gif
     // to gif on the settled (600ms) focus — data-saver keeps posters.
@@ -133,25 +161,74 @@ fun TvHomeScreen(
                     "For You",
                     forYou,
                     onOpenGif,
-                    onMenu = { actionsFor = it },
+                    onMenu = ::openActions,
                     preview = preview,
                     dataSaver = dataSaver,
                     scopeChips = { ForYouScopeRow(homeViewModel) },
+                    rowHeight = rowHeight,
+                    source = FeedSource.ForYou,
+                    orientation = forYouOrientation,
                 )
             }
         }
-        item { FeedRow("Trending", trending, onOpenGif, onMenu = { actionsFor = it }, preview = preview, dataSaver = dataSaver) }
+        item {
+            FeedRow(
+                "Trending",
+                trending,
+                onOpenGif,
+                onMenu = ::openActions,
+                preview = preview,
+                dataSaver = dataSaver,
+                rowHeight = rowHeight,
+                source = FeedSource.Trending,
+                orientation = trendingOrientation,
+            )
+        }
         // Explore = Top Creators (§9 lingo) — creators row, tap → creator feed.
         item { CreatorRow("Explore", exploreCreators, onOpenCreator, failed = exploreFailed, onRetry = { homeViewModel.refreshExplore() }) }
-        item { FeedRow("Top This Week", topThisWeek, onOpenGif, onMenu = { actionsFor = it }, preview = preview, dataSaver = dataSaver) }
+        item {
+            FeedRow(
+                "Top This Week",
+                topThisWeek,
+                onOpenGif,
+                onMenu = ::openActions,
+                preview = preview,
+                dataSaver = dataSaver,
+                rowHeight = rowHeight,
+                source = FeedSource.TopThisWeek,
+                orientation = topThisWeekOrientation,
+            )
+        }
         // Empty-state rule: no blank favorites row when nothing is favorited.
         if (hasFavorites) {
-            item { FeedRow("Favorites", favorites, onOpenGif, onMenu = { actionsFor = it }, preview = preview, dataSaver = dataSaver) }
+            item {
+                FeedRow(
+                    "Favorites",
+                    favorites,
+                    onOpenGif,
+                    onMenu = ::openActions,
+                    preview = preview,
+                    dataSaver = dataSaver,
+                    rowHeight = rowHeight,
+                    source = FeedSource.Favorites,
+                    orientation = favoritesOrientation,
+                )
+            }
         }
         // Logged-in rows (§9 TV): Liked (network-live) + Following creators.
         if (isLoggedIn) {
             item {
-                FeedRow("Liked GIFs & Images", liked, onOpenGif, onMenu = { actionsFor = it }, preview = preview, dataSaver = dataSaver)
+                FeedRow(
+                    "Liked GIFs & Images",
+                    liked,
+                    onOpenGif,
+                    onMenu = ::openActions,
+                    preview = preview,
+                    dataSaver = dataSaver,
+                    rowHeight = rowHeight,
+                    source = FeedSource.Liked,
+                    orientation = likedOrientation,
+                )
             }
             item { CreatorRow("Following", followingCreators.map { it }, onOpenCreator) }
         }
@@ -165,9 +242,10 @@ fun TvHomeScreen(
                     items(continueEntries, key = { it.gif.id }) { entry ->
                         GifCard(
                             entry.gif,
-                            Modifier.width(cardWidth(entry.gif)),
-                            onMenu = { actionsFor = entry.gif },
+                            Modifier.width(cardWidth(entry.gif, rowHeight)),
+                            onMenu = { openActions(entry.gif, com.rjbiermann.giffyviewer.feature.feed.FeedSource.Continue) },
                             onClick = { onOpenGif(listOf(entry.gif), 0) },
+                            rowHeight = rowHeight,
                         )
                     }
                 }
@@ -182,9 +260,18 @@ fun TvHomeScreen(
         TvQuickActionsDialog(
             gif = gif,
             feedViewModel = quickVm,
-            onDismiss = { actionsFor = null },
+            onDismiss = {
+                actionsFor = null
+                actionsFeed = null
+            },
             onOpenCreator = onOpenCreator,
             onOpenNiche = onOpenNiche,
+            onOpenFeed = { source ->
+                actionsFor = null
+                actionsFeed = null
+                onOpenFeed(source)
+            },
+            feedSource = actionsFeed,
         )
     }
 }
@@ -252,23 +339,38 @@ private fun FeedRow(
     title: String,
     gifs: LazyPagingItems<Gif>,
     onOpenGif: (List<Gif>, Int) -> Unit,
-    onMenu: (Gif) -> Unit,
+    /** Menu select carries the row's feed source (quick-actions "Open feed"). */
+    onMenu: (Gif, FeedSource?) -> Unit,
+    /** The row's own feed (slice 10) — null = row without an openable source. */
+    source: FeedSource? = null,
     /** Preview-on-focus state (null = feature off). */
     preview: FocusPreview? = null,
     dataSaver: Boolean = false,
     /** Optional content under the title, above the cards (For You scope chips). */
     scopeChips: (@Composable () -> Unit)? = null,
+    /** Effective card height (slice 11 row-size setting). */
+    rowHeight: Dp = CARD_ROW_HEIGHT_DP,
+    /** SLICE-12: effective §6/§8 orientation for THIS row's feed — drives the
+     *  honest filtered-empty copy ("any" → generic hint, strict value → names
+     *  the actual filter, per-feed pref vs global Settings distinguished). */
+    orientation: String = "any",
 ) {
     // Reserve the row's space while paging loads — a zero-height row that pops
     // to full height shoves every row below (homepage UI drift, user report).
     // A strict global pref (orientation "horizontal" over an all-portrait pool,
     // live-proven) can empty a row entirely — never a silent blank strip.
-    Column(modifier = Modifier.padding(vertical = 8.dp).heightIn(min = ROW_RESERVED_HEIGHT)) {
+    Column(modifier = Modifier.padding(vertical = 8.dp).heightIn(min = reservedHeight(rowHeight))) {
         RowTitle(title)
         scopeChips?.invoke()
         if (gifs.itemCount == 0 && gifs.loadState.refresh is LoadState.NotLoading) {
+            // SLICE-12 (user report): the old copy blamed "Settings →
+            // Orientation" unconditionally — wrong when a per-feed §8 pref is
+            // the cause (global Settings shows unset) and wrong when NO
+            // orientation filter is effective at all (another drop emptied the
+            // row: ContentFilter blocks, verified-only, dead pool). Never
+            // claim orientation when the effective orientation is "any".
             Text(
-                text = "No videos match your filters — Settings → Orientation",
+                text = filteredEmptyHint(orientation),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 16.dp, top = 4.dp),
@@ -295,11 +397,12 @@ private fun FeedRow(
                 gifs[i]?.let { gif ->
                     GifCard(
                         gif,
-                        Modifier.width(cardWidth(gif)),
-                        onMenu = { onMenu(gif) },
+                        Modifier.width(cardWidth(gif, rowHeight)),
+                        onMenu = { onMenu(gif, source) },
                         onClick = { onOpenGif(snapshot(gifs), gifs.indexOf(gif.id)) },
                         preview = preview,
                         dataSaver = dataSaver,
+                        rowHeight = rowHeight,
                     )
                 }
             }
@@ -363,19 +466,51 @@ internal val CARD_ROW_HEIGHT_DP = 170.dp
 internal val ROW_RESERVED_HEIGHT = 210.dp
 
 /**
+ * SLICE-12 filtered-empty copy: names the ACTUAL effective orientation (the
+ * per-feed §8 pref merged over the global §6 one, delivered already merged
+ * via TvHomeViewModel's repository sink). "any" → the generic copy — another
+ * drop (ContentFilter blocks, verified-only, pool dead-end) emptied the row
+ * and the hint must NOT claim an orientation filter that isn't set.
+ */
+internal fun filteredEmptyHint(orientation: String): String =
+    if (orientation == "any") {
+        "No videos match your filters"
+    } else {
+        "No videos match your filters — orientation: $orientation"
+    }
+
+/**
+ * Row-size setting (slice 11, DataStore `tv_row_height`): DEFAULT keeps the
+ * current 170dp 10-foot card; Large/XL scale it for farther viewports. Pure
+ * mapping so the Settings choice is unit-testable.
+ */
+internal fun rowHeightFor(pref: String): Dp =
+    when (pref) {
+        "large" -> CARD_ROW_HEIGHT_DP * 1.4f
+        "xl" -> CARD_ROW_HEIGHT_DP * 1.8f
+        else -> CARD_ROW_HEIGHT_DP
+    }
+
+/** Loading-reserved height scales with the row-size setting (card + caption). */
+internal fun reservedHeight(rowHeight: Dp): Dp = rowHeight + (ROW_RESERVED_HEIGHT - CARD_ROW_HEIGHT_DP)
+
+/**
  * Mixed-orientation rows (PLAN §9 TV): card width = row height × the gif's own
  * aspect, clamped — portrait never narrower than 120dp, landscape capped at the
  * classic 280dp wide card; unknown aspect → the landscape default.
  */
-internal fun cardWidth(gif: Gif): Dp =
+internal fun cardWidth(
+    gif: Gif,
+    rowHeight: Dp = CARD_ROW_HEIGHT_DP,
+): Dp =
     if (gif.width <= 0 || gif.height <= 0) {
         280.dp
     } else {
         val aspect = gif.width.toFloat() / gif.height
         if (aspect < 1f) {
-            (CARD_ROW_HEIGHT_DP * aspect).coerceAtLeast(120.dp)
+            (rowHeight * aspect).coerceAtLeast(120.dp)
         } else {
-            (CARD_ROW_HEIGHT_DP * aspect).coerceAtMost(280.dp)
+            (rowHeight * aspect).coerceAtMost(280.dp)
         }
     }
 
@@ -388,6 +523,8 @@ internal fun GifCard(
     /** Preview-on-focus state (null = feature off). */
     preview: FocusPreview? = null,
     dataSaver: Boolean = false,
+    /** Poster/card height (slice 11 row-size setting; default = 170dp). */
+    rowHeight: Dp = CARD_ROW_HEIGHT_DP,
 ) {
     // 10-foot UX: focused card grows so the D-pad user always sees where focus is.
     var focused by remember { mutableStateOf(false) }
@@ -396,14 +533,16 @@ internal fun GifCard(
     // panel (the same panel MENU opens); short-tap Center keeps the card open.
     val centerHold = remember { CenterHold(onHold = onMenu) }
     // Preview-on-focus: the SETTLED focus (600ms dwell) starts the muted loop;
-    // unfocusing clears it (fast walking never decodes).
+    // unfocusing (or data-saver engaging) clears it (fast walking never decodes).
+    // The settledId guard inside onUnsettled makes a late un-settle from a
+    // walked-away card harmless to a newer settle elsewhere (T5).
     LaunchedEffect(focused, dataSaver, preview?.enabled) {
         if (preview == null || !preview.enabled) {
             return@LaunchedEffect
         }
-        if (!focused) {
-            if (preview.settledId == gif.id) preview.onSettled(null, dataSaver)
-        } else if (!dataSaver) {
+        if (!focused || dataSaver) {
+            preview.onUnsettled(gif.id)
+        } else {
             kotlinx.coroutines.delay(600)
             preview.onSettled(gif, dataSaver)
         }
@@ -457,36 +596,52 @@ internal fun GifCard(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(CARD_ROW_HEIGHT_DP)
+                        .height(rowHeight)
                         .clip(RoundedCornerShape(12.dp))
                         .background(avgColorOr(gif.avgColor, MaterialTheme.colorScheme.surfaceVariant)),
             ) {
+                // Poster ALWAYS composed, UNDER the preview surface (mobile GifTile
+                // parity): the preview's transparent TextureView lets it show
+                // through attach/prepare until the first video frame — no black
+                // frame before the preview starts (T4), no poster swap at all.
+                AsyncImage(
+                    model =
+                        ImageRequest
+                            .Builder(LocalContext.current)
+                            .data(gif.posterUrl)
+                            .crossfade(200)
+                            .build(),
+                    // Decorative: the visible "@user" Text announces the creator —
+                    // saying both duplicates the name per card (mobile-parity fix).
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    // fixed landscape card (10-foot norm); portrait gifs crop — fine for browse
+                    modifier = Modifier.fillMaxWidth().height(rowHeight),
+                )
                 if (preview != null && preview.settledId == gif.id && preview.player != null) {
-                    // Settled-focus preview: the poster swaps to the muted+looped
-                    // SD loop until focus moves away (or the real player opens).
+                    // Settled-focus preview: the muted+looped SD loop OVERLAYS the
+                    // poster until focus moves away (or the real player opens).
+                    // focus_preview_player.xml: texture_view + transparent shutter
+                    // (poster shows through until the first video frame, T4) and
+                    // resize_mode=zoom — fill+center-crop, the same fill/crop
+                    // semantics as the poster's ContentScale.Crop, so the video
+                    // frames land exactly where the poster rendered (no jump at
+                    // the settle swap, T6).
                     androidx.compose.ui.viewinterop.AndroidView(
                         factory = { ctx ->
-                            val view = androidx.media3.ui.PlayerView(ctx)
-                            view.useController = false
-                            view
+                            android.view.LayoutInflater
+                                .from(ctx)
+                                .inflate(
+                                    com.rjbiermann.giffyviewer.tv.R.layout.focus_preview_player,
+                                    null,
+                                    false,
+                                ).apply {
+                                    isClickable = false
+                                    isFocusable = false
+                                }
                         },
-                        update = { view -> view.player = preview.player },
-                        modifier = Modifier.fillMaxWidth().height(CARD_ROW_HEIGHT_DP),
-                    )
-                } else {
-                    AsyncImage(
-                        model =
-                            ImageRequest
-                                .Builder(LocalContext.current)
-                                .data(gif.posterUrl)
-                                .crossfade(200)
-                                .build(),
-                        // Decorative: the visible "@user" Text announces the creator —
-                        // saying both duplicates the name per card (mobile-parity fix).
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        // fixed landscape card (10-foot norm); portrait gifs crop — fine for browse
-                        modifier = Modifier.fillMaxWidth().height(CARD_ROW_HEIGHT_DP),
+                        update = { view -> (view as androidx.media3.ui.PlayerView).player = preview.player },
+                        modifier = Modifier.matchParentSize(),
                     )
                 }
                 // Audio-know-before-tap badge — mobile-tile parity (unified UI).

@@ -39,6 +39,33 @@ class TvHomeViewModel
          *  order (verified sweep: For You first when logged in). */
         val forYou = repository.paging(FeedSource.ForYou).cachedIn(viewModelScope)
 
+        /** SLICE-12 filtered-empty hint (user report): the old hint blamed
+         *  "Settings → Orientation" unconditionally — wrong when the cause is a
+         *  per-feed §8 pref (or when no filter is set at all and another drop
+         *  emptied the row). These are the EFFECTIVE orientation per feed's base
+         *  key (per-feed pref merged over the global §6 pref, same semantics as
+         *  FeedPagingSource's read chain); the hint names the actual filter. */
+        val trendingOrientation =
+            repository
+                .effectiveOrientation(FeedSource.Trending.keyBase)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "any")
+        val topThisWeekOrientation =
+            repository
+                .effectiveOrientation(FeedSource.TopThisWeek.keyBase)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "any")
+        val favoritesOrientation =
+            repository
+                .effectiveOrientation(FeedSource.Favorites.keyBase)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "any")
+        val likedOrientation =
+            repository
+                .effectiveOrientation(FeedSource.Liked.keyBase)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "any")
+        val forYouOrientation =
+            repository
+                .effectiveOrientation(FeedSource.ForYou.keyBase)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "any")
+
         /** Logged-in surfaces (Liked/Following rows) show only with a token —
          *  reactive so in-app sign-in/out updates the home rows without a restart. */
         val isLoggedIn: StateFlow<Boolean> =
@@ -57,6 +84,14 @@ class TvHomeViewModel
         fun setForYouScope(scope: String) {
             viewModelScope.launch { settings.setForYouScope(scope) }
         }
+
+        /** TV home row size (slice 11): default | large | xl — DataStore pref,
+         *  mapped to the card height in TvHomeScreen.rowHeightFor(). TV-visible
+         *  Settings row (showTvRowHeight) — the mobile grid-columns block is
+         *  hidden here, so this shows on TV only. */
+        val tvRowHeight: StateFlow<String> =
+            settings.tvRowHeight
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "default")
 
         /** Explore row (§9: Top Creators) — first page of verified creators, anon OK.
          *  Failure surfaces (audit round 3: no silent blank strips). */

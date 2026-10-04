@@ -61,6 +61,12 @@ class FeedMediatorFavoritesTest {
         override suspend fun evictStale(olderThan: Long) = throw NotImplementedError()
 
         override suspend fun evictBase(base: String) = throw NotImplementedError()
+
+        override suspend fun evictFavorites(prefix: String) =
+            pages.keys
+                .filter { it.startsWith(prefix) }
+                .forEach { pages.remove(it) }
+                .let { }
     }
 
     private fun mediator(

@@ -41,6 +41,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -54,6 +55,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -108,10 +110,33 @@ fun FeedScreen(
     val source by viewModel.source.collectAsStateWithLifecycle()
     val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle(false)
     val items = viewModel.gifs.collectAsLazyPagingItems()
+    val context = LocalContext.current
+    // Content-first top bar (user report: the title/actions stayed static while
+    // scrolling): M3 enterAlways — the bar collapses on scroll-down, re-reveals
+    // on scroll-up, wired to the staggered grid via nestedScroll. The behavior
+    // flattens to a static bar when motion is scaled to 0 (reduced-motion rule,
+    // same pattern as the RefreshFeedPill scroll-to-top).
+    val reducedMotion =
+        remember {
+            android.provider.Settings.Global.getFloat(
+                context.contentResolver,
+                android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+                1f,
+            ) == 0f
+        }
+    val scrollBehavior =
+        if (reducedMotion) {
+            TopAppBarDefaults.pinnedScrollBehavior()
+        } else {
+            TopAppBarDefaults.enterAlwaysScrollBehavior()
+        }
+    val gridNestedScroll = scrollBehavior.nestedScrollConnection
     val feedAutoplay by viewModel.feedAutoplay.collectAsStateWithLifecycle(true)
     val dataSaver by viewModel.dataSaver.collectAsStateWithLifecycle(false)
     val showBlockHint by viewModel.showBlockHint.collectAsStateWithLifecycle()
-    val context = LocalContext.current
+    // B3: global §6 orientation filter — fallback for the per-feed pref in the
+    // filtered-empty predicate (same merge as FeedPagingSource's read chain).
+    val globalOrientation by viewModel.orientationFilter.collectAsStateWithLifecycle("any")
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     // System back returns to the prior feed before exiting (round-3 audit:
@@ -130,6 +155,7 @@ fun FeedScreen(
         title = source.title(),
         onBack = null,
         modifier = modifier.fillMaxSize(),
+        scrollBehavior = scrollBehavior,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         actions = {
             IconButton(onClick = onOpenSearch) {
@@ -199,9 +225,17 @@ fun FeedScreen(
                             text = { Text("Surprise me") },
                             onClick = {
                                 moreOpen = false
-                                viewModel.surpriseMe { ok ->
-                                    if (!ok) {
-                                        scope.launch { snackbarHostState.showSnackbar("Nothing cached yet") }
+                                viewModel.surpriseMe { result ->
+                                    if (result != SurpriseResult.OK) {
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar(
+                                                when (result) {
+                                                    SurpriseResult.FILTERED_EMPTY ->
+                                                        "Everything in the cache is filtered out — loosen blocks/filters"
+                                                    else -> "Nothing cached yet"
+                                                },
+                                            )
+                                        }
                                     }
                                 }
                             },
@@ -479,26 +513,54 @@ fun FeedScreen(
                 }
             }
 
-            val refreshError = items.loadState.refresh is LoadState.Error
+            val refreshError = items.loadState.refresh as? LoadState.Error
+            // A3 (S1 fix, no probes): the copy was hardcoded "offline" for ANY
+            // empty+error path — breaker-open synthetic 503 / rate-limit
+            // exhaustion / plain HTTP failures read the same. An IOException is
+            // the only connectivity-shaped signal; everything else gets a
+            // "went wrong — retry" copy.
+            val offlineShaped = refreshError?.error is java.io.IOException
             // Offline fallback (mobile For-You default slice): the SEEDED For
             // You source (network-live, no Room cache) that fails its FIRST
             // refresh reverts to Trending so the cached grid renders — gate 3
             // wants content, not an error state. Only the initial refresh
             // (itemCount == 0); mid-feed page errors never re-route the user.
-            if (refreshError && items.itemCount == 0) {
-                LaunchedEffect(source) { viewModel.notifyRefreshError(hasContent = false) }
+            if (refreshError != null && items.itemCount == 0) {
+                // A2 (stale-error guard): the effect fires AFTER the source
+                // change, so a latched error from the PREVIOUS pager can still
+                // be observed here (A1's reset-emit clears it on the next
+                // PagingData delivery). Re-read the CURRENT state at fire time
+                // instead of trusting the composition-time snapshot — the VM
+                // reverts only when the failing refresh still belongs to this
+                // source generation.
+                LaunchedEffect(source) {
+                    viewModel.notifyRefreshError(
+                        hasContent = false,
+                        currentSourceError = {
+                            items.loadState.refresh is LoadState.Error && items.itemCount == 0
+                        },
+                    )
+                }
             }
             val verifiedOnlyPref by viewModel.verifiedOnly.collectAsStateWithLifecycle(false)
-            if (items.itemCount == 0 && refreshError) {
+            if (items.itemCount == 0 && refreshError != null) {
                 com.rjbiermann.giffyviewer.core.ui.EmptyState(
-                    message = "Nothing cached yet",
-                    hint = "You're offline — reconnect to load the feed.",
+                    message = if (offlineShaped) "Nothing cached yet" else "Something went wrong",
+                    hint =
+                        if (offlineShaped) {
+                            "You're offline — reconnect to load the feed."
+                        } else {
+                            "Tap to retry — pull down or tap the tab again."
+                        },
                     modifier = Modifier.fillMaxSize(),
                 )
             } else if (items.itemCount == 0 &&
                 items.loadState.refresh is LoadState.NotLoading &&
                 (
-                    listOf(feedPrefs.duration, feedPrefs.resolution, feedPrefs.orientation).any { it.isNotEmpty() } ||
+                    listOf(feedPrefs.duration, feedPrefs.resolution).any { it.isNotEmpty() } ||
+                        // B3: merge per-feed over the GLOBAL §6 orientation —
+                        // same semantics as FeedPagingSource's read chain.
+                        feedPrefs.orientation.ifEmpty { globalOrientation } != "any" ||
                         feedPrefs.untaggedOnly ||
                         verifiedOnlyPref
                 )
@@ -552,14 +614,6 @@ fun FeedScreen(
                             .LazyStaggeredGridState()
                     }
                 val showPill by rememberScrollingUp(gridState, SCROLL_PILL_THRESHOLD)
-                val reducedMotion =
-                    remember {
-                        android.provider.Settings.Global.getFloat(
-                            context.contentResolver,
-                            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
-                            1f,
-                        ) == 0f
-                    }
                 // Inline feed autoplay (AGENTS-PLAYER spec; live-parity verified
                 // 2026-10-02 — the site's own 1-col feed runs ONE shared muted+
                 // looped <video> on the settled tile): one shared player, first
@@ -577,8 +631,16 @@ fun FeedScreen(
                 DisposableEffect(inlinePlayer) {
                     onDispose { inlinePlayer?.release() }
                 }
-                var inlineIndex by remember { mutableStateOf<Int?>(null) }
+                var inlineIndex by remember(source.keyBase) { mutableStateOf<Int?>(null) }
                 if (inlinePlayer != null) {
+                    // A4 (S3/H2): a source swap must not leave the shared inline
+                    // player carrying the previous tab's gif — stop it before the
+                    // fresh settle logic attaches, and drop the settled index
+                    // (fresh key above; the stale-frame logic below re-paints).
+                    LaunchedEffect(source.keyBase) {
+                        inlinePlayer.stop()
+                        inlineIndex = null
+                    }
                     LaunchedEffect(inlinePlayer, gridState, items.itemCount) {
                         inlinePlayer.volume = 0f // muted preview, tap = full player
                         inlinePlayer.repeatMode = Player.REPEAT_MODE_ONE
@@ -635,7 +697,7 @@ fun FeedScreen(
                         LazyVerticalStaggeredGrid(
                             state = gridState,
                             columns = StaggeredGridCells.Fixed(gridColumns),
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier.fillMaxSize().nestedScroll(gridNestedScroll),
                             // Tiles scroll under the system nav (edge-to-edge);
                             // the inset is a contentPadding, not dead space.
                             contentPadding =

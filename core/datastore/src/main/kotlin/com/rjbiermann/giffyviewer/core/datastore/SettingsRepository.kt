@@ -40,6 +40,9 @@ class SettingsRepository
             val ORIENTATION_FILTER = stringPreferencesKey("orientation_filter")
             val VERIFIED_ONLY = booleanPreferencesKey("verified_only")
             val FEED_AUTOPLAY = booleanPreferencesKey("feed_autoplay")
+
+            /** TV home row size (slice 11): default | large | xl. */
+            val TV_ROW_HEIGHT = stringPreferencesKey("tv_row_height")
         }
 
         /** True once the user attested 18+. Emits false until then; survives restarts. */
@@ -168,6 +171,14 @@ class SettingsRepository
 
         /** For You scope (§7 Creators · Niches · All, logged-in; default All). */
         val forYouScope: Flow<String> = dataStore.data.map { it[Keys.FORYOU_SCOPE] ?: "all" }
+
+        /** TV home row size (slice 11, TV-visible Settings row): default keeps
+         *  the current 170dp card; large/xl scale it (TvHomeScreen.rowHeightFor). */
+        val tvRowHeight: Flow<String> = dataStore.data.map { it[Keys.TV_ROW_HEIGHT] ?: "default" }
+
+        suspend fun setTvRowHeight(value: String) {
+            dataStore.edit { it[Keys.TV_ROW_HEIGHT] = value }
+        }
 
         suspend fun setForYouScope(scope: String) {
             dataStore.edit { it[Keys.FORYOU_SCOPE] = scope }

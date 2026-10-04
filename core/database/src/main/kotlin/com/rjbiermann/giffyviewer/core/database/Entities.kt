@@ -98,6 +98,10 @@ data class HideCountEntity(
     val count: Int,
 )
 
+/** Favorites page-key prefix — the [FeedPageDao.evictFavorites] like-pattern.
+ *  Must stay "fav:v1" + ":p" (FeedSource.Favorites.keyBase, feature:feed). */
+const val FAVORITES_PAGE_PREFIX = "fav:v1:p"
+
 /**
  * Custom feed definition (PLAN §7): named blend of creators, tags and niches.
  * sources_json = app-side list of refs, comma-joined:

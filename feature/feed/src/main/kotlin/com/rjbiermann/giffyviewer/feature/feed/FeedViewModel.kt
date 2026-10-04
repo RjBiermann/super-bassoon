@@ -2,6 +2,8 @@ package com.rjbiermann.giffyviewer.feature.feed
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.paging.LoadState
+import androidx.paging.LoadStates
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.rjbiermann.giffyviewer.core.auth.TokenStore
@@ -25,7 +27,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -36,6 +40,10 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
+
+/** Debounce for pref-driven pager invalidations (§8, wedge fix A2): rapid
+ *  selector taps collapse into ONE forced generation bump. */
+private const val PREFS_INVALIDATE_DEBOUNCE_MS = 250L
 
 /**
  * One feed at a time; switching feeds swaps the pager (PLAN §7 tabs come later,
@@ -70,8 +78,16 @@ class FeedViewModel
          *  BEFORE any user navigation with no content rendered (still on the
          *  seeded default) — the app must show cached content offline, so
          *  revert to Trending (Room-backed, gate 3). FeedScreen observes
-         *  loadState and calls this; manual opens set the navigation guard. */
-        fun notifyRefreshError(hasContent: Boolean) {
+         *  loadState and calls this; manual opens set the navigation guard.
+         *  [currentSourceError] is re-observed at call time (A2 stale-error
+         *  guard): a latched Error from the previous pager must not act on a
+         *  source swap — A1's reset-emit clears it within the same delivery,
+         *  and this re-read skips the residual same-frame window. */
+        fun notifyRefreshError(
+            hasContent: Boolean,
+            currentSourceError: () -> Boolean,
+        ) {
+            if (!currentSourceError()) return
             if (!FeedRepository.shouldRevertToTrending(source.value, userNavigated, hasContent)) return
             userNavigated = false
             mutableSource.value = FeedSource.Trending
@@ -86,6 +102,22 @@ class FeedViewModel
          *  source switch doesn't inherit the bypass (stale-while-revalidate holds). */
         private var consumedGen = -1
 
+        /** Stale-grid fix (S3 report): drop the previous pager's rendered data
+         *  FIRST on every (feed, gen) generation. Without this beat the
+         *  LazyPagingItems collector keeps serving the last generation's tiles
+         *  (and its latched refresh Error state) underneath the new tab until
+         *  the new pager's first page lands. The explicit source LoadStates
+         *  overwrite the presenter's state on the reset event, so a latched
+         *  error cannot leak into the new generation either (A2). */
+        private fun resetGenerationPagingData(): PagingData<Gif> =
+            PagingData.empty(
+                LoadStates(
+                    refresh = LoadState.Loading,
+                    append = LoadState.NotLoading(false),
+                    prepend = LoadState.NotLoading(false),
+                ),
+            )
+
         val gifs: Flow<PagingData<Gif>> =
             mutableSource
                 .combine(refreshGen) { feed, gen -> feed to gen }
@@ -95,6 +127,7 @@ class FeedViewModel
                             (gen > 0 && consumedGen != gen) || feed.keyBase in pendingForce.value
                         pendingForce.value = pendingForce.value - feed.keyBase
                         consumedGen = gen
+                        emit(resetGenerationPagingData())
                         emitAll(repository.paging(feed, forceRefresh = forced))
                     }
                 }.cachedIn(viewModelScope)
@@ -206,7 +239,11 @@ class FeedViewModel
             }
         }
 
-        /** Toggle: favorited → removed, otherwise upserted (PLAN §6 state machine). */
+        /** Toggle: favorited → removed, otherwise upserted (PLAN §6 state machine).
+         *  Either direction changes the favorites SET → the Favorites feed's
+         *  cached round-robin pages (built against the old set) are evicted so
+         *  the next load refetches against the new one (2026-10 user report:
+         *  favoriting a creator blanked the Favorites feed until TTL). */
         fun toggleFavoriteCreator(username: String) {
             viewModelScope.launch {
                 val dao = db.contentPrefsDao()
@@ -218,6 +255,7 @@ class FeedViewModel
                         CreatorPrefEntity(u, "FAVORITED", System.currentTimeMillis()),
                     )
                 }
+                repository.evictFavoritesCache()
             }
         }
 
@@ -404,16 +442,24 @@ class FeedViewModel
         /** "Surprise me" (§8): refresh the random unwatched pool + open it as a
          *  feed source. Returns true when a pool landed (the host opens the
          *  surface; empty = nothing cached or everything watched). */
-        fun surpriseMe(onReady: (Boolean) -> Unit) {
+        fun surpriseMe(onReady: (SurpriseResult) -> Unit) {
             viewModelScope.launch {
-                val ok = repository.refreshSurprise()
-                if (ok) open(FeedSource.Surprise)
-                onReady(ok)
+                val result = repository.refreshSurprise()
+                if (result == SurpriseResult.OK) open(FeedSource.Surprise)
+                onReady(result)
             }
         }
 
         /** §8 per-feed filter prefs (duration/resolution/orientation). */
         fun feedPrefs(baseKey: String): Flow<com.rjbiermann.giffyviewer.core.datastore.FeedPrefs> = settings.feedPrefs(baseKey)
+
+        /** Global §6 orientation filter — B3: the filtered-empty predicate on
+         *  FeedScreen reads per-feed prefs only; this is their fallback
+         *  (same merge semantics as FeedPagingSource's
+         *  prefs.orientation.ifEmpty { orientation() }). */
+        val orientationFilter: StateFlow<String> =
+            settings.orientationFilter
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "any")
 
         fun setFeedPrefs(
             baseKey: String,
@@ -497,6 +543,40 @@ class FeedViewModel
 
         fun dismissBlockHint() {
             viewModelScope.launch { settings.markBlockHintShown() }
+        }
+
+        /** Pref-driven pager invalidation (§8, wedge fix A2) — LAST init member:
+         *  every property above must be initialized before this runs (the
+         *  viewModelScope dispatch is Main.immediate, so the collection starts
+         *  synchronously during construction).
+         *
+         *  A rendered grid must re-read its pages through the fresh filters.
+         *  The repository's cached-pager combine already restarts on global
+         *  orientation / verified-only / this feed's per-feed prefs — this is
+         *  the VM-side guarantee for the device-verified wedge (a source-load
+         *  error can latch the presenter into an eternal Loading state, from
+         *  which only a new generation recovers): ONE forced generation per
+         *  change. Per-source drop(1): the inner combine's first emission is
+         *  the feed's initial pref state, not a change — bumping on it would
+         *  force-refetch p1 on every feed open (request storm). Debounce
+         *  collapses rapid selector taps into one generation.
+         */
+        init {
+            viewModelScope.launch {
+                source
+                    .flatMapLatest { feed ->
+                        val feedPrefs =
+                            combine(
+                                settings.orientationFilter,
+                                settings.verifiedOnly,
+                                settings.feedPrefs(feed.baseKey),
+                            ) { o, v, p -> Triple(o, v, p) }
+                        feedPrefs
+                            .drop(1)
+                            .distinctUntilChanged()
+                            .debounce(PREFS_INVALIDATE_DEBOUNCE_MS)
+                    }.collect { forceRefresh() }
+            }
         }
     }
 

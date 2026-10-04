@@ -62,6 +62,18 @@ interface FeedPageDao {
 
     @Query("DELETE FROM feed_pages WHERE pageKey LIKE :base || ':p%'")
     suspend fun evictBase(base: String)
+
+    /** Favorites pool eviction (2026-10 user report: favoriting a creator
+     *  blanked the Favorites feed until the 10-min TTL): a favorites-set
+     *  change (quick-toggle, Settings unfavorite, backup import) invalidates
+     *  the cached round-robin pages — they were built against the OLD set, so
+     *  the read-time favorites filter dropped every row. Evicting makes the
+     *  next load self-fill against the NEW set. The prefix pins "fav:v1"
+     *  (FeedSource.Favorites.keyBase — the feature:feed contract test guards
+     *  drift); the key lives here because every favorites-write module reaches
+     *  this DAO (feature:settings has no feature:feed dependency). */
+    @Query("DELETE FROM feed_pages WHERE pageKey LIKE :prefix || '%'")
+    suspend fun evictFavorites(prefix: String = FAVORITES_PAGE_PREFIX)
 }
 
 @Dao

@@ -59,6 +59,10 @@ fun TvSourceFeedScreen(
     /** Preview-on-focus (AGENTS-UX-PATTERNS): null factory = no previews. */
     playerFactory: com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory? = null,
     dataSaver: Boolean = false,
+    /** Hoisted at TvMainActivity Root so BACK from the player keeps scroll. */
+    gridState: androidx.compose.foundation.lazy.grid.LazyGridState =
+        androidx.compose.foundation.lazy.grid
+            .rememberLazyGridState(),
 ) {
     val gifs = remember(source.keyBase) { viewModel.gifs(source) }.collectAsLazyPagingItems()
     // Preview-on-focus (same FocusPreview shape as the home rows).
@@ -138,6 +142,7 @@ fun TvSourceFeedScreen(
                     .padding(end = 16.dp, top = 8.dp),
         )
         LazyVerticalGrid(
+            state = gridState,
             columns = GridCells.Fixed(4),
             modifier = Modifier.fillMaxSize().padding(top = 44.dp),
             contentPadding = PaddingValues(16.dp),

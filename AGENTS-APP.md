@@ -772,14 +772,17 @@ in AGENTS-UX-PATTERNS.md "No-button-limitation rule"; spec here (graduation step
   panel closes with BACK before navigation; MENU (where present) still opens the same
   panel.
 [BUILT 2026-10-02 batch 17 — `CenterHold` (app-tv): per-focused-node hold state;
-REWORKED 2026-10-03 (user bug report: panel required KEEPING the button held — the
-batch-17 while-held timer fired mid-hold instead of on release). Now release-evaluated:
-`down()` records the press start on the initial (non-repeat) KeyDown; `up()` measures the
-press duration — ≥500ms fires onHold ON the KeyUp and returns true (suppresses the
-surface's short-tap action); no coroutine, no scope needed. State resets on every press so
-a swallowed KeyUp cannot leak into the next press. `CenterHoldTest` (3 cases: short tap,
-long press + suppression, swallowed-KeyUp reset) — first test source set in :app-tv
-(+ junit dep). Wired on all three Center-meaningful surfaces:
+REWORKED 2026-10-04 (user expectation: standard long-press semantics — the panel must
+OPEN at the 500ms threshold WHILE STILL HOLDING, not on KeyUp). Fire-while-held:
+`down()` schedules a hold timer on the initial (non-repeat) KeyDown via an injectable
+`HoldScheduler` (production: android.os.Handler main looper — `MainHoldScheduler`); the
+~500ms timer FIRES onHold mid-press; `up()` cancels an unfired timer and returns true
+ONLY when a hold already fired (suppresses the surface's short-tap action, no re-fire);
+state resets per press so a swallowed KeyUp cannot leak into the next press. No
+coroutine/scope needed from the callers. `CenterHoldTest` (4 cases: fires-while-held,
+KeyUp-after-fire suppression without re-fire, short tap cancels the timer,
+swallowed-KeyUp reset) — first test source set in :app-tv (+ junit dep). Wired on all
+three Center-meaningful surfaces:
 TvPlayerScreen (hold = quick-actions panel, tap = play/pause unchanged), shared GifCard
 (hold = panel, tap = card open — covers home rows AND TvSourceFeedScreen grids),
 TvNiches row (hold = togglePin in place, tap = open the niche feed).

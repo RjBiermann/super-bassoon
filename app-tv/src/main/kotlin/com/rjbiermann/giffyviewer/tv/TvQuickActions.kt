@@ -27,6 +27,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -50,7 +55,10 @@ data class TvPlayerActions(
     val autoSwipeOn: Boolean,
     val onToggleLike: () -> Unit,
     val onToggleMute: () -> Unit,
-    val onCycleSpeed: () -> Unit,
+    /** SLICE-13 (D-pad slider row, mobile QuickSheet 0.25-step parity):
+     *  LEFT/RIGHT on the focused row adjusts by the given delta (±0.25);
+     *  replacing the old 4-step tap cycle. */
+    val onAdjustSpeed: (Float) -> Unit,
     val onToggleAutoSwipe: () -> Unit,
 )
 
@@ -72,6 +80,12 @@ fun TvQuickActionsDialog(
     addableFeedRef: String? = null,
     /** Non-null in the player: adds Like/Mute/Speed/Auto-swipe rows. */
     playerActions: TvPlayerActions? = null,
+    /** Slice 10: the HOME row's feed source — the main pane gains an
+     *  "Open feed" row that opens it full-page (TvSourceFeedScreen). Rows
+     *  without an openable source (Surprise pool) pass null → no row. */
+    feedSource: FeedSource? = null,
+    /** Slice 10 navigation hook — TvMainActivity swaps `openFeed`. */
+    onOpenFeed: (FeedSource) -> Unit = {},
 ) {
     var showAddToFeed by remember { mutableStateOf(false) }
     var showAddToCollection by remember { mutableStateOf(false) }
@@ -209,14 +223,9 @@ fun TvQuickActionsDialog(
                             },
                         )
                     }
-                    QuickAction(
-                        // Locale.US: comma-decimal locales read "0,50×" — and the
-                        // speed steps are 0.25, so 2 decimals is real precision.
-                        text = "Speed " + String.format(java.util.Locale.US, "%.2f", pa.speed) + "× — tap to change",
-                        onClick = {
-                            pa.onCycleSpeed()
-                            onDismiss()
-                        },
+                    SpeedAdjustRow(
+                        speed = pa.speed,
+                        onAdjust = pa.onAdjustSpeed,
                     )
                     QuickAction(
                         text = "Auto-swipe next: ${if (pa.autoSwipeOn) "ON" else "OFF"}",
@@ -238,6 +247,16 @@ fun TvQuickActionsDialog(
                     },
                 )
                 val pinnedCreators by feedViewModel.pinnedCreators.collectAsStateWithLifecycle(emptySet())
+                // Slice 10 (user ask): home rows show feeds horizontally but cards
+                // jump straight into the player — without this row there was NO path
+                // to the row's feed as a full-page grid. Player-variant panels have
+                // no row context → omitted there (feedSource is null).
+                if (playerActions == null && feedSource != null) {
+                    QuickAction(text = "Open feed") {
+                        onDismiss()
+                        onOpenFeed(feedSource)
+                    }
+                }
                 // Links audit #3: the most basic navigation act on a creator.
                 // Caller decides navigation (home/source-feed open, player exits first —
                 // swapping the feed source under the live pager is the soak-crash class).
@@ -340,6 +359,59 @@ private fun QuickAction(
                 .giffyFocus(interaction),
     ) { Text(text) }
 }
+
+/**
+ * SLICE-13: the panel's Speed row as a D-pad slider (mobile QuickSheet
+ * parity — same 0.5–2× range, 0.25 steps; was a 4-step tap cycle). While
+ * the row is focused, LEFT/RIGHT adjust ±0.25 (held keys repeat via the OS
+ * key-repeat) and UP/normal traversal leaves the row; CENTER opens nothing
+ * (display-only row — the click is intentionally a no-op, the value lives
+ * in the label). The consumed KeyDown prevents directional focus moves out
+ * of the row; the shared giffyFocus ring keeps the batch-12 visible-focus
+ * treatment.
+ */
+@Composable
+private fun SpeedAdjustRow(
+    speed: Float,
+    onAdjust: (Float) -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    Button(
+        onClick = { /* display-only: adjust lives on LEFT/RIGHT (SLICE-13) */ },
+        interactionSource = interaction,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .giffyFocus(interaction)
+                .onKeyEvent { e ->
+                    if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
+                    when (e.key) {
+                        Key.DirectionLeft -> {
+                            onAdjust(-SPEED_STEP)
+                            true
+                        }
+                        Key.DirectionRight -> {
+                            onAdjust(SPEED_STEP)
+                            true
+                        }
+                        else -> false
+                    }
+                },
+    ) {
+        // Locale.US: comma-decimal locales read "0,50×" — and the speed steps
+        // are 0.25, so 2 decimals is real precision.
+        Text("Speed " + String.format(java.util.Locale.US, "%.2f", speed) + "× — ‹ › to adjust")
+    }
+}
+
+/** SLICE-13: quarter-step; [0.5, 2.0] clamp = the mobile slider's range. */
+internal const val SPEED_STEP = 0.25f
+
+/** SLICE-13 pure adjust: quarter-grid snap (fp-safe) + clamp [0.5, 2.0]. */
+internal fun adjustSpeed(
+    current: Float,
+    delta: Float,
+): Float = (Math.round((current + delta) * 4f)).coerceIn(2, 8) / 4f
 
 /** TV feed picker (mobile AddToCustomFeedDialog parity): radio feeds + checkbox refs. */
 @Composable

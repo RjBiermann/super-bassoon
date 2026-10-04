@@ -93,8 +93,10 @@ import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.database.WatchHistoryEntity
 import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
 import com.rjbiermann.giffyviewer.core.model.Gif
+import com.rjbiermann.giffyviewer.core.model.contentAspectRatio
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayer
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
+import com.rjbiermann.giffyviewer.core.player.seedContentAspectRatio
 import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
 import com.rjbiermann.giffyviewer.core.ui.PlayerOverlay
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -676,6 +678,12 @@ private fun PlayerPage(
                 // previous video's last frame for a beat (user report).
                 view.player = if (active && playingId == gif.id) player else null
                 view.resizeMode = videoFitMode
+                // SLICE-16 (stale-aspect guard, TV SLICE-14 parity): re-seed from
+                // the gif's own metadata on every attach/switch — an unknown
+                // gif aspect (0) CLEARS the frame's aspect instead of leaving
+                // the previous video's, so no frame renders with a stale
+                // aspect; the live videoSize update overrides when it arrives.
+                view.seedContentAspectRatio(gif.contentAspectRatio())
             },
             modifier =
                 Modifier
