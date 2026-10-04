@@ -68,5 +68,4 @@ fun Gif.resolutionMatches(chip: String): Boolean =
  * (0) → 0 = "no seed / clear" — AspectRatioFrameLayout treats 0 as unset
  * (current pre-seed behavior).
  */
-fun Gif.contentAspectRatio(): Float =
-    if (width > 0 && height > 0) width.toFloat() / height else 0f
+fun Gif.contentAspectRatio(): Float = if (width > 0 && height > 0) width.toFloat() / height else 0f
