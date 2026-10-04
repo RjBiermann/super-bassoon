@@ -788,7 +788,14 @@ secrets via gh". All landed and END-TO-END VERIFIED:
   → red "Dependabot Updates" runs + alert FAILs. Harmless to build/release;
   silenced-by-config or alert-dismissal still open (needs a decision).
 - Versioning unchanged (tag-driven, `-PversionTag`, packed-semver versionCode);
-  v0.2.0 = versionCode 200 both apps.
+  v0.2.0 = versionCode 200 both apps. **Release policy (updated batch 23):**
+  tags are now cut ONLY via the `cut-release.yml` workflow_dispatch (computes the
+  next vX.Y.Z from existing tags, asserts the packed-semver versionCode strictly
+  increases, rejects any tag/release collision, then creates + pushes without
+  force). Local `jj tag set` / `--allow-move` for tags is RETIRED for pushing —
+  documented escape hatch: manual cut only while CI is down, and only after
+  verifying with `git tag --list 'v*'` + `gh release list` that the target tag
+  is free; never move an existing tag (v0.3.0's assets must stay immutable).
 - **Tool evaluations (user ask, doc-recorded):** semantic-release and fastlane
   both assessed and DECLINED for this repo: semantic-release buys frequent
   auto-tags + CHANGELOG.md at npm-style cadence (ours is sparse, tag-driven,
@@ -805,3 +812,49 @@ User-slice: 4-task batch (TV parity, For You default, browser impersonation, pla
 - **Task 4 (mobile player de-chrome BUILT):** fullscreen toggle + "Now playing" TopAppBar removed from PlayerScreen — always-immersive (bars hidden once, restored on dispose); all controls/gestures/overlays verified kept.
 - **Task 1d (mobile Continue Watching BUILT — user-approved):** FeedSource.Continue (shared family) → FeedRepository.continueWatchingPager(): Room-only static pager (limit-20) through the SAME read-time filter chain as TV (ContentFilter/blocked-feeds/verified-only/orientation/§8 prefs), mobile More ▾ entry + helpful empty state; no hide-count increments. Coordinator fixes: continueWatching returns a Flow (snapshot via .first() per load), one ktlint break.
 - Device verifies pending for all five (Phone34/TV36 cycle per usual gates); nothing committed — working copy describes the whole batch via jj.
+
+### Session 2026-10-04 batch 22 (22-task orchestrator sweep — mobile feed fixes, TV preview quality, TV UX batch, full device pass on both emulators, v0.4.0 released)
+User drove tasks 1-22 live; all edit work ran behind read-only investigation workers + sequential edit workers (one worker per overlapping-file cluster); coordinator validated every report's file:line claims, spot-checked diffs, ran gates, and did the device passes. Compile+ktlint+detekt+tests green per touched module at every harvest.
+- **Tasks 1-3 (mobile feed tab fixes) BUILT:** generation reset-emit (PagingData.empty(Loading)) kills the previous-tab grid flash (S3); backward-indicator copy branch — now IOException = offline, everything else = "Something went wrong" (the hard claims "You're offline" for breaker-open 429 exhaustion gone); stale-error revert guard (re-read at fire time); global orientationFilter added to the filtered-empty predicate; network-live sources (Liked/ForYou) got the bounded dead-end walk (≤8 hops, 400-as-pool-end) they lacked; pool-cap HTTP 400 on the cached walk no longer escapes as LoadResult.Error (wedge: refresh previously stayed Loading forever — pinned via paging-common 3.5.1 bytecode, computeHelperState Loading+no-source-state → previous). Surprise snackbar distinguishes FILTERED_EMPTY vs EMPTY (SurpriseResult).
+- **Team verification did homework:** two device pass on Medium_Phone + a bug the unit tests missed — horizontal-filter cold start wedged the pager 60s+ — pinned and fixed (see tasks 1-3 batch fix slice A). Verified: anon Trending seed, tab steady-state, vertical-filter walk populates, horizontal settles to honest filtered-empty, orientation-pref change recovers without restart (debounced refreshGen bump, drop(1) + 250ms), A3 copy, T18.
+- **Tasks 4-6 (TV preview-on-focus) BUILT:** poster stays composed under a TextureView w/ transparent shutter (no black frame — T4); FocusPreview un-settle race fixed (late un-settle from a walked-away card can't clobber a newer settle; settledId guard, unit-tested) + released-player-mull fix + data-saver-mid-preview fix (now un-settles); resize_mode=zoom in focus_preview_player.xml (Crop parity, T6); GiffyPlayer untouched.
+- **Tasks 7-11 (TV UX batch) BUILT:** favorites cache eviction on favorite-set change (FeedPageDao.evictFavorites() + parallel invalidation shutdown at ViewModel levels); CenterHold rewritten to fire-while-held (HoldScheduler seam, 500ms timer, up() cancels; suppression preserved, CenterHoldTest 4 cases); back-from-player: homeListState/feedGridState hoisted to Root + watch position flushed via NonCancellable finally (3s floor) on both gif-switch and player-exit cancellation; "Open feed" row in TvQuickActions card-variant (wired through TvHomeScreen rows to the existing openFeed path); TV home row size setting (tv_row_height: default 170dp / large 238 / xl 306, showTvRowHeight TV-only section in shared SettingsScreen, TvRowHeightTest).
+- **Tasks 12-16 (TV feed/player polish) BUILT:** honest filtered-empty hint (FeedRow names the ACTUAL effective orientation value; "any" never claims orientation — FilteredEmptyHintTest); D-pad speed slider (TV parity with mobile: 0.25 steps, [0.5, 2.0] clamp, quarter-snap fp fix, SpeedAdjustTest); content aspect seeded from gif w/h at every switch (SeedContentAspect.kt in :core:player — exo_content_frame.setAspectRatio, live videoSize overrides; kills the warp/stretch degenerate-fill on next/prev, T14+T16); per-pager session dedup in network-live sources (Fixes duplicate-key measure-pass crash on For You repeat-friendly pages, Page 15 KenNetworkPagingSource tests).
+- **Task 18 (collapsible top bar) BUILT:** enterAlways scroll behavior via GiffyScaffold + nestedScroll; reduced-motion falls back to pinned; device-verified collapse-on-scroll.
+- **Task 19 BUILT:** per-generation session dedup (removed static seenFor — root cause: the session-wide dedup survived pager restarts and Favorites round-robin re-lists the same ids → all deduped to empty; "No favorites yet" for a non-empty feed). FavoritesRefreshSurvivalTest.
+- **Task 20 DECIDED (memo, no code):** Favorites ↔ custom-feeds merge evaluated — Recommendation: Option 1 (keep separate; Favorites is a live derived view, custom feeds are stored definitions). Re-evaluate only toward a synthetic system entry (Option 2) on an explicit "manage from one place" ask.
+- **Tasks 17/21 (device verification) PASSED — both emulators, 0 FATALs across the session:** Medium_Phone (tasks 1-3 restart wedge found and fixed; mobile clamp + seed parity unchanged) and Television_AOSP (T4 no-black-frame verified by screencap at settle; T5 walk-follow verified; T6 no drift; T7 favorite→Favorites row populated live; T8 hold-Center opens panel without ALSO opening the card; T9 watch position flushed (DB rows 16.3s/37.4s/3.9s) + resume-on-reopen; T10 Open feed row; T11 Large cards bigger on screencap; T12 honest hint under horizontal-global filter; T13 ±0.25 to clamp with 0 fatals; T14 correct aspect on next/prev; T16 Crop fills natural proportions vs Fit bars). ForYou paging stress (T15) BLOCKED on login token (dedup covered by regression tests).
+- **Task 22 (release) LANDED with a tag incident:** v0.3.0 was ALREADY PUBLISHED (batch-21, real assets); the hand-cut v0.3.0-tag flow moved it silently and re-triggered release.yml. Remediated same day: v0.3.0 restored to its batch-21 commit, version-ktlint-CI fix landed (Gif.contentAspectRatio one-liner; :core:model ktlint was missing from its worker's gate list — coordinator gap), v0.4.0 re-cut from the fixed commit, CI green, release success, both APKs signature-verified (same batch-20 cert). Disciplined session for the coordinator: tag list checked BEFORE any push, from now on.
+- **still open:** T15 (For You stress, login), Follow-flip signed-in verify (token bundle), Favorites/custom-feeds merge (Option 1 stands), Dependabot dependency-submission noise (unresolved).
+
+### Session 2026-10-03 batch 23 (doc-only incident record + release-pipeline guard slice — workflows only, no app code touched)
+- **Incident:** a hand-cut tag was attached to a stale revset and MOVED the
+  ALREADY-PUBLISHED v0.3.0 tag (batch-21 release with real assets), silently
+  re-triggering release.yml for a shipped version. Remediation same day:
+  v0.3.0 restored, v0.4.0 re-cut. Goal: re-occurrence made structurally impossible.
+- **cut-release.yml (new, workflow_dispatch):** bump input (major|minor|patch,
+  default minor) → full-history checkout with fetch-tags → next version computed
+  from the highest existing vX.Y.Z tag → guards: (1) packed-semver versionCode
+  (maj*10000+min*100+pat, mirroring -PversionTag in app-*/build.gradle.kts) must
+  strictly increase vs the previous tag; (2) target tag must not exist locally,
+  on origin (git ls-remote --exit-code), or as a GitHub release (gh api, 404-only
+  accepted as "free") — else fail with the reason printed; then create-only:
+  lightweight `git tag` on the dispatch commit (= default-branch HEAD) + push
+  WITHOUT --force (git itself rejects an existing ref). Summary step prints
+  bump/old tag/new tag/sha. Concurrency group `cut-release` serializes cuts so
+  two dispatches can't race to the same computed tag. No third-party actions
+  beyond checkout@v4 (already in release.yml).
+- **release.yml (only change: one guard step + opt-out input):** new
+  "Guard: tag points at default-branch HEAD" step right after checkout —
+  resolves the default branch via gh api, fetches it shallow, fails fast when
+  the triggering tag's SHA ≠ that HEAD (kills the silent-release-of-stale-commit
+  class). `workflow_dispatch` input `skip_head_guard` (boolean, default false)
+  opts the guard out for manual runs; push-triggered releases are always guarded.
+  Everything else in release.yml unchanged.
+- **Doc side:** batch-20 "Versioning unchanged" bullet updated with the new
+  release policy (tags cut only via the workflow; local `jj tag set/--allow-move`
+  retired for pushing; manual escape hatch documented). Gates run: python
+  yaml.safe_load on BOTH workflow files (caught a real YAML error first pass —
+  unquoted `name: Guard: ...` plain scalar with a colon), shell steps
+  shellcheck-reviewed by hand, version-math dry-run verified (v0.4.0 → v0.5.0,
+  code 400 → 500). Gradle not run — no Kotlin touched.

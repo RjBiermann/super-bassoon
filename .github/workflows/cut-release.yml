@@ -1,0 +1,140 @@
+name: Cut release tag
+
+# Creates (never moves) the next vX.Y.Z release tag. Guard sequence:
+#   1. next version = highest existing vX.Y.Z tag + the chosen bump component;
+#   2. packed-semver versionCode must strictly increase vs the previous tag;
+#   3. the tag must not exist locally, on origin, or as a GitHub release;
+#   4. ONLY then is the lightweight tag created and pushed — without --force
+#      (a push of an existing ref is rejected by git itself).
+# Tags are cut ONLY through this workflow (AGENTS.md release policy); local
+# `jj tag set` / manual tag pushing is retired (escape hatch documented there:
+# manual cut only while CI is down, with the same tag-list verification).
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Which semver component to bump"
+        type: choice
+        default: minor
+        options: [major, minor, patch]
+
+permissions:
+  contents: write
+
+# One cut at a time — two dispatches must not race toward the same tag.
+concurrency:
+  group: cut-release
+  cancel-in-progress: false
+
+jobs:
+  cut:
+    runs-on: ubuntu-latest
+    outputs:
+      next: ${{ steps.calc.outputs.next }}
+      prev: ${{ steps.calc.outputs.prev }}
+      sha: ${{ steps.calc.outputs.sha }}
+      bump: ${{ steps.calc.outputs.bump }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+          fetch-depth: 0
+
+      - name: Compute next version
+        id: calc
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          set -euo pipefail
+          # Packed-semver versionCode, mirroring app-*/build.gradle.kts
+          # (-PversionTag): major*10000 + minor*100 + patch.
+          code() { IFS='.' read -r a b c <<< "$1"; echo $((a * 10000 + b * 100 + c)); }
+          highest="$(git tag --list 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1 || true)"
+          if [ -z "$highest" ]; then
+            prev="v0.0.0"; prev_code=0
+          else
+            prev="$highest"; prev_code="$(code "${prev#v}")"
+          fi
+          body="${prev#v}"
+          maj="${body%%.*}"; rest="${body#*.}"
+          min="${rest%%.*}"; pat="${rest#*.}"
+          case "$BUMP" in
+            major) maj=$((maj + 1)); min=0; pat=0 ;;
+            minor) min=$((min + 1)); pat=0 ;;
+            patch) pat=$((pat + 1)) ;;
+            *) echo "::error::invalid bump '$BUMP' (major|minor|patch)"; exit 1 ;;
+          esac
+          next="v$maj.$min.$pat"
+          echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
+          echo "prev=$prev" >> "$GITHUB_OUTPUT"
+          echo "next=$next" >> "$GITHUB_OUTPUT"
+          echo "prev_code=$prev_code" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: "Guard: versionCode strictly increases"
+        env:
+          NEXT: ${{ steps.calc.outputs.next }}
+          PREV_CODE: ${{ steps.calc.outputs.prev_code }}
+          BUMP: ${{ steps.calc.outputs.bump }}
+        run: |
+          set -euo pipefail
+          code() { IFS='.' read -r a b c <<< "$1"; echo $((a * 10000 + b * 100 + c)); }
+          next_code="$(code "${NEXT#v}")"
+          prev_code="${PREV_CODE:-0}"
+          if [ "$next_code" -le "$prev_code" ]; then
+            echo "::error::versionCode would not increase: $NEXT -> $next_code vs previous $prev_code (bump=$BUMP). Aborting."
+            exit 1
+          fi
+          echo "versionCode $prev_code -> $next_code OK"
+
+      - name: "Guard: tag/release must not exist yet"
+        env:
+          NEXT: ${{ steps.calc.outputs.next }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # local tags (fetched above)
+          if git rev-parse -q --verify "refs/tags/$NEXT" >/dev/null 2>&1; then
+            echo "::error::$NEXT already exists locally"; exit 1
+          fi
+          # origin tags — authoritative even if newer than this checkout
+          rc=0
+          git ls-remote --exit-code --tags origin "refs/tags/$NEXT" >/dev/null 2>&1 || rc=$?
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::$NEXT already exists on origin"; exit 1
+          elif [ "$rc" -ne 2 ]; then
+            echo "::error::could not verify origin tags (git ls-remote exit $rc)"; exit 1
+          fi
+          # GitHub releases (a tag can be deleted while its release lives)
+          err="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$NEXT" 2>&1 >/dev/null)" && found=1 || found=0
+          if [ "$found" -eq 1 ]; then
+            echo "::error::a GitHub release already exists for $NEXT"; exit 1
+          elif ! grep -q "HTTP 404" <<< "$err"; then
+            echo "::error::could not verify GitHub releases: $err"; exit 1
+          fi
+          echo "no collision: $NEXT is free (tags + releases)"
+
+      - name: Create and push tag (create-only)
+        env:
+          NEXT: ${{ steps.calc.outputs.next }}
+        run: |
+          set -euo pipefail
+          # Lightweight tag on the dispatch commit (= default-branch HEAD).
+          # No --force anywhere: if the ref somehow appeared since the guards,
+          # git itself rejects the push.
+          git tag "$NEXT" "$GITHUB_SHA"
+          git push origin "refs/tags/$NEXT"
+
+      - name: Summary
+        run: |
+          {
+            echo "## Release tag cut"
+            echo ""
+            echo "| field | value |"
+            echo "| --- | --- |"
+            echo "| bump | ${{ steps.calc.outputs.bump }} |"
+            echo "| previous tag | ${{ steps.calc.outputs.prev }} |"
+            echo "| new tag | ${{ steps.calc.outputs.next }} |"
+            echo "| sha | ${{ steps.calc.outputs.sha }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Cut ${{ steps.calc.outputs.prev }} -> ${{ steps.calc.outputs.next }} @ ${{ steps.calc.outputs.sha }}; release.yml will pick it up on push."

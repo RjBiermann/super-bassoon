@@ -7,6 +7,14 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # Manual runs only to skip the HEAD guard below (input); the normal path is
+  # a tag pushed by cut-release.yml.
+  workflow_dispatch:
+    inputs:
+      skip_head_guard:
+        description: "Skip the tag==default-branch-HEAD guard"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -16,6 +24,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # Guard against the silent-release-of-stale-commit class (batch-23
+      # incident): the triggering tag must point at the default branch's
+      # current HEAD. Tags are cut from HEAD by cut-release.yml, so a mismatch
+      # means the tag was moved/created against a stale commit. Informational
+      # fail-fast; a manual dispatch can opt out via the input above.
+      - name: "Guard: tag points at default-branch HEAD"
+        if: inputs.skip_head_guard != true
+        run: |
+          set -euo pipefail
+          default_branch="$(gh api "repos/$GITHUB_REPOSITORY" --jq .default_branch)"
+          git fetch --no-tags --depth=1 origin "refs/heads/$default_branch"
+          head_sha="$(git rev-parse FETCH_HEAD)"
+          tag_sha="$(git rev-parse "${GITHUB_REF_NAME}^{commit}")"
+          if [ "$tag_sha" != "$head_sha" ]; then
+            echo "::error::tag $GITHUB_REF_NAME points at $tag_sha, but default branch '$default_branch' HEAD is $head_sha — stale commit. Re-cut the tag via cut-release.yml (do not move tags)."
+            exit 1
+          fi
+          echo "tag == $default_branch HEAD ($head_sha) OK"
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
 
       - name: JDK 17
         uses: actions/setup-java@v4
