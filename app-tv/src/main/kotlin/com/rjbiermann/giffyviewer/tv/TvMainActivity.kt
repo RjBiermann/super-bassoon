@@ -10,9 +10,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -148,7 +148,9 @@ class TvMainActivity : ComponentActivity() {
         // (player, settings, full-page feed, search…) so BACK lands the user
         // where they were. The paging data itself refills from Room instantly.
         val homeListState = rememberLazyListState()
-        val feedGridState = rememberLazyGridState()
+        // #15: the source-feed grid is a staggered one now — same hoisting seam,
+        // BACK from the player keeps exactly the same scroll position.
+        val feedGridState = rememberLazyStaggeredGridState()
 
         // PLAN §1: 5% overscan margins on TV — content never touches the bezel.
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 48.dp, vertical = 27.dp)) {
@@ -192,6 +194,24 @@ class TvMainActivity : ComponentActivity() {
                             // #18: the dialog's sort half re-identifies the feed;
                             // the screen drives the forced generation itself.
                             onSortChange = { sorted -> openFeed = sorted },
+                            // #19 tab strip: a tab swaps the full feed (the same
+                            // openFeed path); the strip's Niches/Collections/My
+                            // feeds rows open the Root browser surfaces (openFeed
+                            // cleared so the browser branch composes). Explore/
+                            // Following have no TV host today — strip hides them.
+                            onSwitchFeed = { openFeed = it },
+                            onOpenNiches = {
+                                openFeed = null
+                                showNiches = true
+                            },
+                            onOpenCollections = {
+                                openFeed = null
+                                showCollections = true
+                            },
+                            onOpenCustomFeeds = {
+                                openFeed = null
+                                showCustomFeeds = true
+                            },
                             playerFactory = playerFactory,
                             dataSaver = dataSaver,
                             gridState = feedGridState,

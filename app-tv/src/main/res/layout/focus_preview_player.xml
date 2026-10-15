@@ -8,10 +8,11 @@
     transparent until real frames arrive, so the card's poster underneath
     stays visible through the whole attach/prepare window (no black window).
     shutter_background_color=transparent keeps PlayerView's own first-frame
-    shutter see-through for the same reason. resize_mode=zoom is
-    fill+center-crop — the same fill/crop semantics as the poster's
-    ContentScale.Crop — so the first video frame lands exactly where the
-    poster rendered (no visual jump at the settle swap). Muted looped glance
+    shutter see-through for the same reason. resize_mode=fit (#14 §A crop
+    removal) letterboxes the video identically to the poster's
+    ContentScale.Fit — true-aspect/cropped tiles show the whole frame and
+    the first video frame lands exactly where the poster rendered (no
+    visual jump at the settle swap, T6/T4 preserved). Muted looped glance
     only; the real player keeps its own surfaces.
 -->
 <androidx.media3.ui.PlayerView
@@ -22,4 +23,4 @@
     app:surface_type="texture_view"
     app:shutter_background_color="@android:color/transparent"
     app:use_controller="false"
-    app:resize_mode="zoom" />
+    app:resize_mode="fit" />

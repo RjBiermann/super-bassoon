@@ -29,11 +29,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -76,7 +73,6 @@ import com.rjbiermann.giffyviewer.core.player.GiffyPlayer
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.ui.AudioBadge
 import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
-import com.rjbiermann.giffyviewer.core.ui.Feature
 import com.rjbiermann.giffyviewer.core.ui.GiffyScaffold
 import com.rjbiermann.giffyviewer.core.ui.SCROLL_TO_TOP_THRESHOLD
 import com.rjbiermann.giffyviewer.core.ui.ScrollToTopFab
@@ -163,169 +159,28 @@ fun FeedScreen(
         },
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
-            // M3 FilterChips — feed tabs (more feeds join in Phase 7: groups, For You, custom)
-            // pinned niches become tabs (PLAN §7 pin-to-tabs): "id|name" entries
+            // #19: the tab strip moved VERBATIM into the shared FeedTabStrip —
+            // one call, same chips/More menu/selected logic; onOpen stays the
+            // in-place viewModel.open; ALL screen seams non-null = mobile
+            // zero-delta. State inputs arrive as plain parameters (collected
+            // here, exactly the flows the inline block collected).
             val pinnedEntries by viewModel.pinnedNiches.collectAsStateWithLifecycle(emptySet())
-            val pinnedNiches =
-                remember(pinnedEntries) {
-                    pinnedEntries.mapNotNull { entry ->
-                        parseNicheRef(entry)?.let { (id, name) -> FeedSource.Niche(id, name) }
-                    }
-                }
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                // FIXED set only — three primary tabs + a More menu (consolidated;
-                // pinned/custom grow unbounded and the row became unusable).
-                // For You = server personalized feed, logged-in only (PLAN §7).
-                // Site home order: For You first when logged in (verified sweep).
-                listOf(
-                    FeedSource.ForYou,
-                    FeedSource.Trending,
-                    FeedSource.Favorites,
-                ).filterNot { it is FeedSource.ForYou && !isLoggedIn }
-                    .forEach { candidate ->
-                        FilterChip(
-                            selected = source == candidate,
-                            onClick = { viewModel.open(candidate) },
-                            label = { Text(candidate.title()) },
-                        )
-                    }
-
-                // More ▾ = every secondary surface, grouped in sections (M3
-                // DropdownMenu): screens · custom feeds · pinned tabs. The open
-                // surface keeps a selected marker when it lives here.
-                var moreOpen by remember { mutableStateOf(false) }
-                val favoritedFeeds by viewModel.favoritedFeeds.collectAsStateWithLifecycle(emptyList())
-                val pinnedCreators by viewModel.pinnedCreators.collectAsStateWithLifecycle(emptySet())
-                val customFeeds by viewModel.customFeeds.collectAsStateWithLifecycle(emptyList())
-                Box {
-                    FilterChip(
-                        selected =
-                            source is FeedSource.TopThisWeek ||
-                                source is FeedSource.Liked ||
-                                source is FeedSource.Custom ||
-                                (source is FeedSource.Niche) ||
-                                source is FeedSource.Creator,
-                        onClick = { moreOpen = true },
-                        label = { Text("More ▾") },
-                    )
-                    DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
-                        DropdownMenuItem(
-                            text = { Text("Top This Week") },
-                            onClick = {
-                                moreOpen = false
-                                viewModel.open(FeedSource.TopThisWeek)
-                            },
-                        )
-                        if (isLoggedIn) {
-                            DropdownMenuItem(
-                                text = { Text("Liked GIFs & Images") },
-                                onClick = {
-                                    moreOpen = false
-                                    viewModel.open(FeedSource.Liked)
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Following…") },
-                                onClick = {
-                                    moreOpen = false
-                                    onOpenFollowing()
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Collections…") },
-                                onClick = {
-                                    moreOpen = false
-                                    onOpenCollections()
-                                },
-                            )
-                        }
-                        DropdownMenuItem(
-                            text = { Text("Niches…") },
-                            onClick = {
-                                moreOpen = false
-                                onOpenNiches()
-                            },
-                        )
-                        // Custom feeds (#10): the builder + management surfaces are
-                        // disabled for now — DB rows and the BLOCKED-feed filter
-                        // stage keep working underneath (Feature.CUSTOM_FEEDS).
-                        if (Feature.CUSTOM_FEEDS) {
-                            // Always reachable: the builder is the ONLY way to
-                            // create a feed, so "New feed…" must not be gated on
-                            // having any (fresh install would otherwise never
-                            // reach the screen).
-                            if (customFeeds.isNotEmpty()) {
-                                HorizontalDivider()
-                                Text(
-                                    "Custom feeds",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                                )
-                                customFeeds.forEach { def ->
-                                    DropdownMenuItem(
-                                        text = { Text(def.name) },
-                                        onClick = {
-                                            moreOpen = false
-                                            viewModel.open(FeedSource.Custom(def.id, def.name, parseCustomRefs(def.sourcesJson)))
-                                        },
-                                    )
-                                }
-                            }
-                            DropdownMenuItem(
-                                text = { Text(if (customFeeds.isEmpty()) "New custom feed…" else "New feed…") },
-                                onClick = {
-                                    moreOpen = false
-                                    onOpenCustomFeeds()
-                                },
-                            )
-                        }
-                        val pinnedSection =
-                            pinnedNiches.map { it as FeedSource } +
-                                (
-                                    if (Feature.CUSTOM_FEEDS) {
-                                        favoritedFeeds
-                                            .filter { it.state == "FAVORITED" }
-                                            .map {
-                                                FeedSource.Custom(
-                                                    it.id,
-                                                    it.name,
-                                                    parseCustomRefs(it.sourcesJson),
-                                                ) as FeedSource
-                                            }
-                                    } else {
-                                        emptyList()
-                                    }
-                                ) +
-                                pinnedCreators.map { FeedSource.Creator(it) as FeedSource }
-                        if (pinnedSection.isNotEmpty()) {
-                            HorizontalDivider()
-                            Text(
-                                "Pinned",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                            )
-                            pinnedSection.forEach { feed ->
-                                DropdownMenuItem(
-                                    text = { Text(feed.title()) },
-                                    onClick = {
-                                        moreOpen = false
-                                        viewModel.open(feed)
-                                    },
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+            val favoritedFeeds by viewModel.favoritedFeeds.collectAsStateWithLifecycle(emptyList())
+            val pinnedCreators by viewModel.pinnedCreators.collectAsStateWithLifecycle(emptySet())
+            val customFeeds by viewModel.customFeeds.collectAsStateWithLifecycle(emptyList())
+            FeedTabStrip(
+                source = source,
+                isLoggedIn = isLoggedIn,
+                pinnedNiches = pinnedEntries,
+                favoritedFeeds = favoritedFeeds,
+                pinnedCreators = pinnedCreators,
+                customFeeds = customFeeds,
+                onOpen = { viewModel.open(it) },
+                onOpenFollowing = onOpenFollowing,
+                onOpenNiches = onOpenNiches,
+                onOpenCollections = onOpenCollections,
+                onOpenCustomFeeds = onOpenCustomFeeds,
+            )
 
             // Matching creators above search results (§7) — tap opens their feed.
             val creators by viewModel.creatorResults.collectAsStateWithLifecycle(emptyList())

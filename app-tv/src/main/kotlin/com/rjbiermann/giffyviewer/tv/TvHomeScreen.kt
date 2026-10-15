@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -286,13 +287,18 @@ private fun CreatorRow(
                 }
             }
         }
+        val (centeringState, onCardFocus) = rememberCenteringRow(loading = false)
         androidx.compose.foundation.lazy.LazyRow(
+            state = centeringState,
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             items(creators.size, key = { i -> creators[i].username }) { i ->
                 val creator = creators[i]
-                Card(onClick = { onOpenCreator(creator.username) }) {
+                Card(
+                    onClick = { onOpenCreator(creator.username) },
+                    modifier = Modifier.onFocusChanged { focus -> onCardFocus(i, focus.isFocused) },
+                ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(10.dp)) {
                         AsyncImage(
                             model = creator.profileImageUrl,
@@ -376,7 +382,13 @@ private fun FeedRow(
                 modifier = Modifier.padding(start = 8.dp),
             ) { Text("Retry") }
         }
+        // Focused-row centering (#14 §B): row-loaded guard rides the paging
+        // refresh state — skip re-anchoring while pages load, recompute on settle
+        // (the loading flag is the effect's second key).
+        val (centeringState, onCardFocus) =
+            rememberCenteringRow(loading = gifs.loadState.refresh is LoadState.Loading)
         LazyRow(
+            state = centeringState,
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -386,6 +398,7 @@ private fun FeedRow(
                         gif,
                         Modifier.width(cardWidth(gif, rowHeight)),
                         onMenu = { viaHold -> onMenu(gif, source, viaHold) },
+                        onFocusChange = { focused -> onCardFocus(i, focused) },
                         onClick = { onOpenGif(snapshot(gifs), gifs.indexOf(gif.id)) },
                         preview = preview,
                         dataSaver = dataSaver,
@@ -483,21 +496,25 @@ internal fun reservedHeight(rowHeight: Dp): Dp = rowHeight + (ROW_RESERVED_HEIGH
 
 /**
  * Mixed-orientation rows (PLAN §9 TV): card width = row height × the gif's own
- * aspect, clamped — portrait never narrower than 120dp, landscape capped at the
- * classic 280dp wide card; unknown aspect → the landscape default.
+ * aspect, clamped RELATIVE to the band (#14 §A) — portrait floor = half the
+ * band, landscape cap ≈ the classic 280dp at the default height (170 × 1.65);
+ * unknown aspect → the landscape default. Flat-dp clamps cropped the common
+ * 9:16 pool at the default height (95.6dp wanted vs the 120dp floor); relative
+ * clamps render EXACT at every row-size pref step, with ContentScale.Fit
+ * letterboxing only extreme aspects (avgColor keeps the bars near-invisible).
  */
 internal fun cardWidth(
     gif: Gif,
     rowHeight: Dp = CARD_ROW_HEIGHT_DP,
 ): Dp =
     if (gif.width <= 0 || gif.height <= 0) {
-        280.dp
+        rowHeight * 1.65f
     } else {
         val aspect = gif.width.toFloat() / gif.height
         if (aspect < 1f) {
-            (rowHeight * aspect).coerceAtLeast(120.dp)
+            (rowHeight * aspect).coerceAtLeast(rowHeight * 0.5f)
         } else {
-            (rowHeight * aspect).coerceAtMost(280.dp)
+            (rowHeight * aspect).coerceAtMost(rowHeight * 1.65f)
         }
     }
 
@@ -514,6 +531,13 @@ internal fun GifCard(
     dataSaver: Boolean = false,
     /** Poster/card height (slice 11 row-size setting; default = 170dp). */
     rowHeight: Dp = CARD_ROW_HEIGHT_DP,
+    /** #14 §B: focus moved into/out of this card — row centering (FeedRow,
+     *  CreatorRow). No-op default. */
+    onFocusChange: (Boolean) -> Unit = {},
+    /** #15: true-aspect tile — the box rides the gif's own aspect instead of
+     *  the fixed row band (staggered source-feed grids). Home rows keep the
+     *  band (default false). */
+    trueAspect: Boolean = false,
 ) {
     // 10-foot UX: focused card grows so the D-pad user always sees where focus is.
     var focused by remember { mutableStateOf(false) }
@@ -551,8 +575,10 @@ internal fun GifCard(
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
-                }.onFocusChanged { focused = it.isFocused }
-                .onPreviewKeyEvent { event ->
+                }.onFocusChanged {
+                    focused = it.isFocused
+                    onFocusChange(it.isFocused)
+                }.onPreviewKeyEvent { event ->
                     // Remote MENU button = creator quick actions (favorite/block).
                     if (event.type == KeyEventType.KeyUp && event.key == Key.Menu) {
                         onMenu(false)
@@ -581,12 +607,28 @@ internal fun GifCard(
         Column {
             // avgColor placeholder: no black flash on slow cells.
             // Clip: the poster must round with the card (mobile GifTile parity).
+            // Tile geometry (#14 §A/#15): fixed row band by default; trueAspect
+            // (source-feed grids) rides the gif's own aspect — no crop on ANY
+            // content (mobile GifTile parity), poster ContentScale.Fit
+            // letterboxes only extreme aspects in-color (both geometries).
             Box(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(rowHeight)
-                        .clip(RoundedCornerShape(12.dp))
+                        .then(
+                            if (trueAspect) {
+                                // Same fallback as mobile GifTile (FeedScreen.kt).
+                                Modifier.aspectRatio(
+                                    if (gif.width > 0 && gif.height > 0) {
+                                        gif.width.toFloat() / gif.height
+                                    } else {
+                                        0.8f
+                                    },
+                                )
+                            } else {
+                                Modifier.height(rowHeight)
+                            },
+                        ).clip(RoundedCornerShape(12.dp))
                         .background(avgColorOr(gif.avgColor, MaterialTheme.colorScheme.surfaceVariant)),
             ) {
                 // Poster ALWAYS composed, UNDER the preview surface (mobile GifTile
@@ -603,19 +645,20 @@ internal fun GifCard(
                     // Decorative: the visible "@user" Text announces the creator —
                     // saying both duplicates the name per card (mobile-parity fix).
                     contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    // fixed landscape card (10-foot norm); portrait gifs crop — fine for browse
-                    modifier = Modifier.fillMaxWidth().height(rowHeight),
+                    // Fit (#14 §A): matched boxes render identically; clamped/extreme
+                    // tiles letterbox in avgColor instead of center-cropping.
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.matchParentSize(),
                 )
                 if (preview != null && preview.settledId == gif.id && preview.player != null) {
                     // Settled-focus preview: the muted+looped SD loop OVERLAYS the
                     // poster until focus moves away (or the real player opens).
                     // focus_preview_player.xml: texture_view + transparent shutter
                     // (poster shows through until the first video frame, T4) and
-                    // resize_mode=zoom — fill+center-crop, the same fill/crop
-                    // semantics as the poster's ContentScale.Crop, so the video
-                    // frames land exactly where the poster rendered (no jump at
-                    // the settle swap, T6).
+                    // resize_mode=fit — letterboxes the video identically to the
+                    // poster, so the video frames land exactly where the poster
+                    // rendered (no jump at the settle swap, T6); exact-ratio tiles
+                    // render fit == fill with no delta.
                     androidx.compose.ui.viewinterop.AndroidView(
                         factory = { ctx ->
                             android.view.LayoutInflater

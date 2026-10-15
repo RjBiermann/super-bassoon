@@ -10,10 +10,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
@@ -46,6 +47,7 @@ import com.rjbiermann.giffyviewer.core.ui.giffyFocus
 import com.rjbiermann.giffyviewer.feature.feed.FeedFilterDialog
 import com.rjbiermann.giffyviewer.feature.feed.FeedRepository
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
+import com.rjbiermann.giffyviewer.feature.feed.FeedTabStrip
 import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
 import com.rjbiermann.giffyviewer.feature.feed.activeSort
 import com.rjbiermann.giffyviewer.feature.feed.packNicheRef
@@ -82,10 +84,16 @@ fun TvSourceFeedScreen(
     /** Preview-on-focus (AGENTS-UX-PATTERNS): null factory = no previews. */
     playerFactory: com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory? = null,
     dataSaver: Boolean = false,
+    /** #19 tab strip: a tab opens that feed full-page (the openFeed path the
+     *  issue names) — wired in TvMainActivity. */
+    onSwitchFeed: (FeedSource) -> Unit = {},
+    /** #19 strip seams to Root browser states (openFeed cleared so the browser
+     *  branch composes); Explore/Following have no TV host today — hidden. */
+    onOpenNiches: () -> Unit = {},
+    onOpenCollections: () -> Unit = {},
+    onOpenCustomFeeds: () -> Unit = {},
     /** Hoisted at TvMainActivity Root so BACK from the player keeps scroll. */
-    gridState: androidx.compose.foundation.lazy.grid.LazyGridState =
-        androidx.compose.foundation.lazy.grid
-            .rememberLazyGridState(),
+    gridState: LazyStaggeredGridState = rememberLazyStaggeredGridState(),
 ) {
     val gifs = remember(source.keyBase) { viewModel.gifs(source) }.collectAsLazyPagingItems()
     val scope = rememberCoroutineScope()
@@ -135,125 +143,159 @@ fun TvSourceFeedScreen(
         }
     }
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        // Title + creator stats (v1/users — site-profile counts, tiles-only feeds).
-        val stats by feedViewModel.creatorStats.collectAsStateWithLifecycle()
-        LaunchedEffect(source) {
-            feedViewModel.refreshCreatorStats((source as? FeedSource.Creator)?.username)
-        }
-        Column {
-            Text(
-                text = source.title(),
-                // F8 (batch 15): same slot as mobile's GiffyScaffold title.
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 0.dp),
-            )
-            if (source is FeedSource.Creator) {
-                stats?.let { s ->
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Title + creator stats (v1/users — site-profile counts, tiles-only
+            // feeds) with the Refresh / Sort&filter icons aligned TopEnd above
+            // them (same top region as before — the grid now flows BELOW the
+            // #19 tab strip instead of clearing a fixed 44dp title band).
+            LaunchedEffect(source) {
+                feedViewModel.refreshCreatorStats((source as? FeedSource.Creator)?.username)
+            }
+            Box {
+                Column {
+                    val stats by feedViewModel.creatorStats.collectAsStateWithLifecycle()
                     Text(
-                        text =
-                            "%,d posts · %,d followers · %,d views".format(
-                                java.util.Locale.US,
-                                s.gifs,
-                                s.followers,
-                                s.views,
-                            ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 16.dp, bottom = 4.dp),
+                        text = source.title(),
+                        // F8 (batch 15): same slot as mobile's GiffyScaffold title.
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 0.dp),
                     )
+                    if (source is FeedSource.Creator) {
+                        stats?.let { s ->
+                            Text(
+                                text =
+                                    "%,d posts · %,d followers · %,d views".format(
+                                        java.util.Locale.US,
+                                        s.gifs,
+                                        s.followers,
+                                        s.views,
+                                    ),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 16.dp, bottom = 4.dp),
+                            )
+                        }
+                    }
                 }
-            }
-        }
-        // Top-end icon row (§6 #22 + #18): Refresh (forced generation) and the
-        // ONE Sort & filter entry (sort + filters + clear inside the shared
-        // FeedFilterDialog). Focus ring (unified BrandRed, AGENTS-APP): M3
-        // IconButton's own focus state is subtle on 10-foot — the shared
-        // giffyFocus border marks it.
-        Row(
-            modifier =
-                Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(end = 16.dp, top = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            val refreshInteraction = remember { MutableInteractionSource() }
-            androidx.compose.material3.IconButton(
-                onClick = { refreshAndReturnToTop() },
-                interactionSource = refreshInteraction,
-                modifier =
-                    Modifier
-                        .giffyFocus(refreshInteraction, shape = RoundedCornerShape(8.dp)),
-            ) {
-                androidx.compose.material3.Icon(
-                    Icons.Filled.Refresh,
-                    contentDescription = "Refresh feed",
-                )
-            }
-            val sortInteraction = remember { MutableInteractionSource() }
-            androidx.compose.material3.IconButton(
-                onClick = { showFilter = true },
-                interactionSource = sortInteraction,
-                modifier =
-                    Modifier
-                        .giffyFocus(sortInteraction, shape = RoundedCornerShape(8.dp)),
-            ) {
-                androidx.compose.material3.Icon(
-                    Icons.AutoMirrored.Filled.Sort,
-                    contentDescription = "Sort & filter",
-                )
-            }
-        }
-        LazyVerticalGrid(
-            state = gridState,
-            columns = GridCells.Fixed(4),
-            modifier = Modifier.fillMaxSize().padding(top = 44.dp),
-            contentPadding = PaddingValues(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            items(count = gifs.itemCount, key = { i -> gifs[i]?.id ?: "pending$i" }) { i ->
-                gifs[i]?.let { gif ->
-                    GifCard(
-                        gif = gif,
+                // Top-end icon row (§6 #22 + #18): Refresh (forced generation) and the
+                // ONE Sort & filter entry (sort + filters + clear inside the shared
+                // FeedFilterDialog). Focus ring (unified BrandRed, AGENTS-APP): M3
+                // IconButton's own focus state is subtle on 10-foot — the shared
+                // giffyFocus border marks it.
+                Row(
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(end = 16.dp, top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    val refreshInteraction = remember { MutableInteractionSource() }
+                    androidx.compose.material3.IconButton(
+                        onClick = { refreshAndReturnToTop() },
+                        interactionSource = refreshInteraction,
                         modifier =
                             Modifier
-                                .then(if (i == 0) Modifier.focusRequester(firstCardFocus) else Modifier)
-                                .fillMaxWidth(),
-                        onMenu = { viaHold ->
-                            actionsFor = gif
-                            actionsViaHold = viaHold
-                        },
-                        preview = preview,
-                        dataSaver = dataSaver,
-                        onClick = { onOpenGif(snapshot(gifs), gifs.indexOf(gif.id)) },
-                    )
+                                .giffyFocus(refreshInteraction, shape = RoundedCornerShape(8.dp)),
+                    ) {
+                        androidx.compose.material3.Icon(
+                            Icons.Filled.Refresh,
+                            contentDescription = "Refresh feed",
+                        )
+                    }
+                    val sortInteraction = remember { MutableInteractionSource() }
+                    androidx.compose.material3.IconButton(
+                        onClick = { showFilter = true },
+                        interactionSource = sortInteraction,
+                        modifier =
+                            Modifier
+                                .giffyFocus(sortInteraction, shape = RoundedCornerShape(8.dp)),
+                    ) {
+                        androidx.compose.material3.Icon(
+                            Icons.AutoMirrored.Filled.Sort,
+                            contentDescription = "Sort & filter",
+                        )
+                    }
                 }
             }
-            // End-of-feed footer (#22): composed AFTER the item slots, keyed off
-            // load states — never a pager item, never inside snapshot(). The
-            // button reuses the §6 refresh plumbing.
-            val refreshSettled = gifs.loadState.refresh is LoadState.NotLoading
-            val append = gifs.loadState.append as? LoadState.NotLoading
-            if (refreshSettled && append != null && (append.endOfPaginationReached || gifs.itemCount == 0)) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Text(
-                            text = "End of feed",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        val endInteraction = remember { MutableInteractionSource() }
-                        TextButton(
-                            onClick = { refreshAndReturnToTop() },
-                            interactionSource = endInteraction,
+            // #19: the shared tab strip — same fixed set as mobile (For You when
+            // signed in only · Trending · Favorites · More ▾), hosted on EVERY TV
+            // full feed exactly like mobile hosts its FeedScreen; a tab opens the
+            // new source full-page via onSwitchFeed (Root openFeed). State inputs
+            // are plain parameters — the strip keeps zero VM coupling.
+            val isLoggedIn by feedViewModel.isLoggedIn.collectAsStateWithLifecycle(false)
+            val pinnedNiches by feedViewModel.pinnedNiches.collectAsStateWithLifecycle(emptySet())
+            val favoritedFeeds by feedViewModel.favoritedFeeds.collectAsStateWithLifecycle(emptyList())
+            val pinnedCreators by feedViewModel.pinnedCreators.collectAsStateWithLifecycle(emptySet())
+            val customFeeds by feedViewModel.customFeeds.collectAsStateWithLifecycle(emptyList())
+            FeedTabStrip(
+                source = source,
+                isLoggedIn = isLoggedIn,
+                pinnedNiches = pinnedNiches,
+                favoritedFeeds = favoritedFeeds,
+                pinnedCreators = pinnedCreators,
+                customFeeds = customFeeds,
+                onOpen = onSwitchFeed,
+                onOpenNiches = onOpenNiches,
+                onOpenCollections = onOpenCollections,
+                onOpenCustomFeeds = onOpenCustomFeeds,
+            )
+            // #15: staggered grid — true-aspect GifCard tiles (no square crop),
+            // variable heights, same 4 columns / 16dp padding / 10dp spacing.
+            // The state type changed with it (LazyStaggeredGridState) — hoisted
+            // at Root and threaded; BACK-position parity lives there.
+            LazyVerticalStaggeredGrid(
+                state = gridState,
+                columns = StaggeredGridCells.Fixed(4),
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalItemSpacing = 10.dp,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                items(count = gifs.itemCount, key = { i -> gifs[i]?.id ?: "pending$i" }) { i ->
+                    gifs[i]?.let { gif ->
+                        GifCard(
+                            gif = gif,
                             modifier =
                                 Modifier
-                                    .giffyFocus(endInteraction)
-                                    .padding(top = 4.dp),
-                        ) { Text("Refresh") }
+                                    .then(if (i == 0) Modifier.focusRequester(firstCardFocus) else Modifier)
+                                    .fillMaxWidth(),
+                            onMenu = { viaHold ->
+                                actionsFor = gif
+                                actionsViaHold = viaHold
+                            },
+                            preview = preview,
+                            dataSaver = dataSaver,
+                            onClick = { onOpenGif(snapshot(gifs), gifs.indexOf(gif.id)) },
+                            trueAspect = true,
+                        )
+                    }
+                }
+                // End-of-feed footer (#22): composed AFTER the item slots, keyed off
+                // load states — never a pager item, never inside snapshot(). The
+                // button reuses the §6 refresh plumbing.
+                val refreshSettled = gifs.loadState.refresh is LoadState.NotLoading
+                val append = gifs.loadState.append as? LoadState.NotLoading
+                if (refreshSettled && append != null && (append.endOfPaginationReached || gifs.itemCount == 0)) {
+                    item(span = StaggeredGridItemSpan.FullLine) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text(
+                                text = "End of feed",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            val endInteraction = remember { MutableInteractionSource() }
+                            TextButton(
+                                onClick = { refreshAndReturnToTop() },
+                                interactionSource = endInteraction,
+                                modifier =
+                                    Modifier
+                                        .giffyFocus(endInteraction)
+                                        .padding(top = 4.dp),
+                            ) { Text("Refresh") }
+                        }
                     }
                 }
             }
