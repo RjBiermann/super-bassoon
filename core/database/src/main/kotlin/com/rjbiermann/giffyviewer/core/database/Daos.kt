@@ -223,3 +223,13 @@ interface CustomFeedDao {
     @Query("SELECT * FROM custom_feeds WHERE state = 'BLOCKED'")
     suspend fun blocked(): List<CustomFeedEntity>
 }
+
+/** Single write path for a custom-feed state change: the merged-groups state
+ *  cycle (CustomFeedsScreen) and the Settings "Blocked" unblock both route
+ *  through here so the two surfaces can't diverge on how states are written. */
+suspend fun CustomFeedDao.setFeedState(
+    feed: CustomFeedEntity,
+    state: String,
+) {
+    upsert(feed.copy(state = state))
+}

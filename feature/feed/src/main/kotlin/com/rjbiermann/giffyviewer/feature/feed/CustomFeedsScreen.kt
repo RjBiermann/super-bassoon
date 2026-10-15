@@ -42,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.rjbiermann.giffyviewer.core.database.CustomFeedEntity
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
+import com.rjbiermann.giffyviewer.core.database.setFeedState
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.ui.GiffyScaffold
 import com.rjbiermann.giffyviewer.core.ui.giffyFocus
@@ -93,18 +94,26 @@ class CustomFeedsViewModel
         }
 
         /** Merged niche-group state cycle (PLAN §6/§7): FAVORITED → pinned home
-         *  tab · BLOCKED → ContentFilter macro-filter · NEUTRAL → openable only. */
+         *  tab · BLOCKED → ContentFilter macro-filter · NEUTRAL → openable only.
+         *  The mapping lives in [nextCycleState] and the write in
+         *  [com.rjbiermann.giffyviewer.core.database.setFeedState] so the issue
+         *  #17 Settings "Blocked" panel shares the identical transition. */
         fun cycleState(feed: CustomFeedEntity) {
-            val next =
-                when (feed.state) {
-                    "FAVORITED" -> "BLOCKED"
-                    "BLOCKED" -> "NEUTRAL"
-                    else -> "FAVORITED"
-                }
             viewModelScope.launch {
-                db.customFeedDao().upsert(feed.copy(state = next))
+                db.customFeedDao().setFeedState(feed, feed.nextCycleState())
             }
         }
+    }
+
+/** One owner of the merged-groups state cycle (FAVORITED → BLOCKED → NEUTRAL
+ *  → FAVORITED): CustomFeedsScreen's cycle button and the Settings "Blocked"
+ *  panel's one-tap unblock (from BLOCKED the next state is NEUTRAL) both
+ *  read the next state here. */
+fun CustomFeedEntity.nextCycleState(): String =
+    when (state) {
+        "FAVORITED" -> "BLOCKED"
+        "BLOCKED" -> "NEUTRAL"
+        else -> "FAVORITED"
     }
 
 /** Short label for a custom-feed ref (picker chips + builder pills). */

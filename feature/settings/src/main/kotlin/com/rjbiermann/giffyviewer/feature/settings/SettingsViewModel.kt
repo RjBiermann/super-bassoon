@@ -4,9 +4,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rjbiermann.giffyviewer.core.database.ContentPrefsBackup
 import com.rjbiermann.giffyviewer.core.database.ContentPrefsDao
+import com.rjbiermann.giffyviewer.core.database.CustomFeedEntity
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
+import com.rjbiermann.giffyviewer.core.database.setFeedState
 import com.rjbiermann.giffyviewer.core.database.weekStartMs
+import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
 import com.rjbiermann.giffyviewer.core.model.VideoQuality
+import com.rjbiermann.giffyviewer.feature.feed.FeedRepository
+import com.rjbiermann.giffyviewer.feature.feed.nextCycleState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -24,10 +29,10 @@ class SettingsViewModel
     @Inject
     constructor(
         private val db: GiffyDatabase,
-        private val settings: com.rjbiermann.giffyviewer.core.datastore.SettingsRepository,
+        private val settings: SettingsRepository,
         // Favorites-cache invalidation on a favorites-set change (same
         // repository rule the quick-toggle uses — FeedRepository.evictFavoritesCache).
-        private val feedRepository: com.rjbiermann.giffyviewer.feature.feed.FeedRepository,
+        private val feedRepository: FeedRepository,
     ) : ViewModel() {
         private val dao: ContentPrefsDao = db.contentPrefsDao()
 
@@ -65,6 +70,37 @@ class SettingsViewModel
 
         fun unblockKeyword(pattern: String) {
             viewModelScope.launch { dao.unblockKeyword(pattern) }
+        }
+
+        /** Issue #17 (M2): favorite-tag writes existed since the quick sheet
+         *  shipped but the list was never rendered — the Blocked panel lists
+         *  favorited tags beside the creators. */
+        val favoritedTags: StateFlow<List<String>> =
+            dao.favoriteTagsFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+        fun unfavoriteTag(tag: String) {
+            viewModelScope.launch { dao.unfavoriteTag(tag) }
+        }
+
+        /** Issue #17 (M1): BLOCKED tag-bundle feeds only surfaced on "My
+         *  feeds" — Settings' Blocked panel is the one place the user looks.
+         *  Client-side filter of the definition list (no new DAO query; the
+         *  list is at most a few dozen rows). */
+        val blockedFeeds: StateFlow<List<CustomFeedEntity>> =
+            db
+                .customFeedDao()
+                .all()
+                .map(::blockedFeedRows)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+        /** One tap runs the SAME merged-groups cycle CustomFeedsScreen uses —
+         *  from BLOCKED the next state is NEUTRAL, i.e. an unblock. Read-only
+         *  cycle replay, no favorites-cache effects (blocked feeds hold no
+         *  favorites-cache pages). */
+        fun unblockFeed(feed: CustomFeedEntity) {
+            viewModelScope.launch {
+                db.customFeedDao().setFeedState(feed, feed.nextCycleState())
+            }
         }
 
         /** PLAN §6 Phase 6: optional PIN app lock. */
@@ -182,3 +218,8 @@ class SettingsViewModel
                 count
             }
     }
+
+/** The Blocked-panel feed list is exactly the BLOCKED subset of the custom
+ *  feed definitions (issue #17 M1) — extracted as a pure filter for the unit
+ *  test. */
+internal fun blockedFeedRows(all: List<CustomFeedEntity>): List<CustomFeedEntity> = all.filter { it.state == "BLOCKED" }
