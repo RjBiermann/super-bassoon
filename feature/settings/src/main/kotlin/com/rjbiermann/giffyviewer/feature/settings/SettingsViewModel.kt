@@ -6,6 +6,7 @@ import com.rjbiermann.giffyviewer.core.database.ContentPrefsBackup
 import com.rjbiermann.giffyviewer.core.database.ContentPrefsDao
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.database.weekStartMs
+import com.rjbiermann.giffyviewer.core.model.VideoQuality
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -117,6 +118,15 @@ class SettingsViewModel
 
         fun setVideoFit(fit: String) {
             viewModelScope.launch { settings.setVideoFit(fit) }
+        }
+
+        /** §5 preferred quality (issue #4): auto | highest | 720 | 480 — value
+         *  list owned by core/model VideoQuality (players consume the same). */
+        val videoQuality: StateFlow<String> =
+            settings.videoQuality.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), VideoQuality.AUTO)
+
+        fun setVideoQuality(value: String) {
+            viewModelScope.launch { settings.setVideoQuality(value) }
         }
 
         /** Grid columns (PLAN §6 responsive-first): 0 = Auto (width-derived). */

@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import com.rjbiermann.giffyviewer.core.model.VideoQuality
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -37,6 +38,9 @@ class SettingsRepository
             val GRID_COLUMNS = intPreferencesKey("grid_columns")
             val FORYOU_SCOPE = stringPreferencesKey("foryou_scope")
             val VIDEO_FIT = stringPreferencesKey("video_fit")
+
+            /** Preferred video quality (§5, issue #4): auto | highest | 720 | 480. */
+            val VIDEO_QUALITY = stringPreferencesKey("video_quality")
             val ORIENTATION_FILTER = stringPreferencesKey("orientation_filter")
             val VERIFIED_ONLY = booleanPreferencesKey("verified_only")
             val FEED_AUTOPLAY = booleanPreferencesKey("feed_autoplay")
@@ -162,11 +166,24 @@ class SettingsRepository
             dataStore.edit { it[Keys.FEED_AUTOPLAY] = enabled }
         }
 
-        /** Video fit (§5): fit | crop | stretch — one shared setting, both players. */
+        /** Video fit (§5): fit | crop — one shared setting, both players.
+         *  (Legacy stored "stretch" values de-map to player-side Fit; no
+         *  migration, RESIZE_MODE_FILL retired — user issue #21.) */
         val videoFit: Flow<String> = dataStore.data.map { it[Keys.VIDEO_FIT] ?: "fit" }
 
         suspend fun setVideoFit(fit: String) {
             dataStore.edit { it[Keys.VIDEO_FIT] = fit }
+        }
+
+        /** Preferred quality (§5, issue #4): height-cap value set is owned by
+         *  core/model [com.rjbiermann.giffyviewer.core.model.VideoQuality]
+         *  (the one place for the menu list) — auto | highest | 720 | 480.
+         *  No backup entry, same policy as videoFit (player shell preference,
+         *  not a content filter). */
+        val videoQuality: Flow<String> = dataStore.data.map { it[Keys.VIDEO_QUALITY] ?: VideoQuality.AUTO }
+
+        suspend fun setVideoQuality(value: String) {
+            dataStore.edit { it[Keys.VIDEO_QUALITY] = value }
         }
 
         /** For You scope (§7 Creators · Niches · All, logged-in; default All). */

@@ -116,13 +116,18 @@ fun TvHomeScreen(
     var actionsFor by remember { mutableStateOf<Gif?>(null) }
     // The row's feed source for the panel's "Open feed" row (slice 10).
     var actionsFeed by remember { mutableStateOf<com.rjbiermann.giffyviewer.feature.feed.FeedSource?>(null) }
+    // Issue #3: whether the panel opened via held Center (the panel then
+    // swallows its own release KeyUp — MENU opens keep today's behavior).
+    var actionsViaHold by remember { mutableStateOf(false) }
 
     fun openActions(
         gif: Gif,
         source: com.rjbiermann.giffyviewer.feature.feed.FeedSource?,
+        viaHold: Boolean = false,
     ) {
         actionsFor = gif
         actionsFeed = source
+        actionsViaHold = viaHold
     }
 
     // Preview-on-focus: one shared player for the whole screen, moved gif
@@ -161,7 +166,7 @@ fun TvHomeScreen(
                     "For You",
                     forYou,
                     onOpenGif,
-                    onMenu = ::openActions,
+                    onMenu = { gifEntry, feedSource, viaHold -> openActions(gifEntry, feedSource, viaHold) },
                     preview = preview,
                     dataSaver = dataSaver,
                     scopeChips = { ForYouScopeRow(homeViewModel) },
@@ -176,7 +181,7 @@ fun TvHomeScreen(
                 "Trending",
                 trending,
                 onOpenGif,
-                onMenu = ::openActions,
+                onMenu = { gifEntry, feedSource, viaHold -> openActions(gifEntry, feedSource, viaHold) },
                 preview = preview,
                 dataSaver = dataSaver,
                 rowHeight = rowHeight,
@@ -191,7 +196,7 @@ fun TvHomeScreen(
                 "Top This Week",
                 topThisWeek,
                 onOpenGif,
-                onMenu = ::openActions,
+                onMenu = { gifEntry, feedSource, viaHold -> openActions(gifEntry, feedSource, viaHold) },
                 preview = preview,
                 dataSaver = dataSaver,
                 rowHeight = rowHeight,
@@ -206,7 +211,7 @@ fun TvHomeScreen(
                     "Favorites",
                     favorites,
                     onOpenGif,
-                    onMenu = ::openActions,
+                    onMenu = { gifEntry, feedSource, viaHold -> openActions(gifEntry, feedSource, viaHold) },
                     preview = preview,
                     dataSaver = dataSaver,
                     rowHeight = rowHeight,
@@ -222,7 +227,7 @@ fun TvHomeScreen(
                     "Liked GIFs & Images",
                     liked,
                     onOpenGif,
-                    onMenu = ::openActions,
+                    onMenu = { gifEntry, feedSource, viaHold -> openActions(gifEntry, feedSource, viaHold) },
                     preview = preview,
                     dataSaver = dataSaver,
                     rowHeight = rowHeight,
@@ -243,7 +248,13 @@ fun TvHomeScreen(
                         GifCard(
                             entry.gif,
                             Modifier.width(cardWidth(entry.gif, rowHeight)),
-                            onMenu = { openActions(entry.gif, com.rjbiermann.giffyviewer.feature.feed.FeedSource.Continue) },
+                            onMenu = { viaHold ->
+                                openActions(
+                                    entry.gif,
+                                    com.rjbiermann.giffyviewer.feature.feed.FeedSource.Continue,
+                                    viaHold,
+                                )
+                            },
                             onClick = { onOpenGif(listOf(entry.gif), 0) },
                             rowHeight = rowHeight,
                         )
@@ -263,7 +274,9 @@ fun TvHomeScreen(
             onDismiss = {
                 actionsFor = null
                 actionsFeed = null
+                actionsViaHold = false
             },
+            openViaHold = actionsViaHold,
             onOpenCreator = onOpenCreator,
             onOpenNiche = onOpenNiche,
             onOpenFeed = { source ->
@@ -339,8 +352,10 @@ private fun FeedRow(
     title: String,
     gifs: LazyPagingItems<Gif>,
     onOpenGif: (List<Gif>, Int) -> Unit,
-    /** Menu select carries the row's feed source (quick-actions "Open feed"). */
-    onMenu: (Gif, FeedSource?) -> Unit,
+    /** Menu select carries the row's feed source (quick-actions "Open feed");
+     *  the Boolean distinguishes a HELD Center open (issue #3: the panel then
+     *  swallows its release KeyUp) from a MENU-key open. */
+    onMenu: (Gif, FeedSource?, Boolean) -> Unit,
     /** The row's own feed (slice 10) — null = row without an openable source. */
     source: FeedSource? = null,
     /** Preview-on-focus state (null = feature off). */
@@ -398,7 +413,7 @@ private fun FeedRow(
                     GifCard(
                         gif,
                         Modifier.width(cardWidth(gif, rowHeight)),
-                        onMenu = { onMenu(gif, source) },
+                        onMenu = { viaHold -> onMenu(gif, source, viaHold) },
                         onClick = { onOpenGif(snapshot(gifs), gifs.indexOf(gif.id)) },
                         preview = preview,
                         dataSaver = dataSaver,
@@ -518,7 +533,9 @@ internal fun cardWidth(
 internal fun GifCard(
     gif: Gif,
     modifier: Modifier,
-    onMenu: () -> Unit,
+    /** Called with viaHold=true for the hold-Center open (issue #3: the panel
+     *  must swallow its own release KeyUp), false for the MENU-key open. */
+    onMenu: (viaHold: Boolean) -> Unit,
     onClick: () -> Unit,
     /** Preview-on-focus state (null = feature off). */
     preview: FocusPreview? = null,
@@ -531,7 +548,7 @@ internal fun GifCard(
     val scale by animateFloatAsState(if (focused) 1.08f else 1f, label = "cardScale")
     // Menu-less-remote keymap: hold-Center ≥500ms opens the quick-actions
     // panel (the same panel MENU opens); short-tap Center keeps the card open.
-    val centerHold = remember { CenterHold(onHold = onMenu) }
+    val centerHold = remember { CenterHold(onHold = { onMenu(true) }) }
     // Preview-on-focus: the SETTLED focus (600ms dwell) starts the muted loop;
     // unfocusing (or data-saver engaging) clears it (fast walking never decodes).
     // The settledId guard inside onUnsettled makes a late un-settle from a
@@ -566,7 +583,7 @@ internal fun GifCard(
                 .onPreviewKeyEvent { event ->
                     // Remote MENU button = creator quick actions (favorite/block).
                     if (event.type == KeyEventType.KeyUp && event.key == Key.Menu) {
-                        onMenu()
+                        onMenu(false)
                         true
                     } else if (event.key == Key.DirectionCenter) {
                         // Menu-less-remote keymap: Center KeyDown is consumed

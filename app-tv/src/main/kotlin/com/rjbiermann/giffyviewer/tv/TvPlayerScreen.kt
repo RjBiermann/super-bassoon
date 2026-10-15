@@ -30,6 +30,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -37,6 +38,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -45,10 +47,12 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import coil3.compose.AsyncImage
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.database.WatchHistoryEntity
 import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
 import com.rjbiermann.giffyviewer.core.model.Gif
+import com.rjbiermann.giffyviewer.core.model.VideoQuality
 import com.rjbiermann.giffyviewer.core.model.contentAspectRatio
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.player.seedContentAspectRatio
@@ -81,13 +85,17 @@ fun TvPlayerScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var actionsFor by remember { mutableStateOf<Gif?>(null) }
+    // Issue #3: how the panel was opened — a HELD Center must not let its own
+    // release KeyUp activate the panel's first row (see TvQuickActionsDialog).
+    var actionsViaHold by remember { mutableStateOf(false) }
     val dataSaver by settings.dataSaver.collectAsStateWithLifecycle(false)
-    // §5 video fit (shared setting): fit | crop | stretch.
+    // §5 video fit (shared setting): fit | crop — a legacy stored "stretch"
+    // value de-maps to Fit (RESIZE_MODE_FILL removed, issue #21: destructive
+    // distortion mode retired; no data migration needed).
     val videoFit by settings.videoFit.collectAsStateWithLifecycle("fit")
     val fitMode =
         when (videoFit) {
             "crop" -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-            "stretch" -> AspectRatioFrameLayout.RESIZE_MODE_FILL
             else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
         }
     var index by
@@ -99,6 +107,11 @@ fun TvPlayerScreen(
     DisposableEffect(Unit) {
         onDispose { player.release() }
     }
+
+    // Preferred quality (§5, issue #4): auto | highest | sd — the pick is the
+    // stream URL at prepare time (probe-closed single-rendition MP4 vocabulary;
+    // see VideoQuality.kt).
+    val videoQuality by settings.videoQuality.collectAsStateWithLifecycle(VideoQuality.AUTO)
 
     if (gifs.isEmpty()) {
         // Defensive: a card tap implies an item exists; this guards index churn.
@@ -148,20 +161,34 @@ fun TvPlayerScreen(
 
     // Menu-less-remote keymap (AGENTS-APP): hold-Center ≥500ms opens the
     // quick-actions panel (the same panel MENU opens); short-tap Center keeps
-    // play/pause. KeyUp suppression lives in CenterHold.up().
+    // play/pause. KeyUp suppression lives in CenterHold.up(); the held open
+    // additionally makes the panel swallow its own release KeyUp (issue #3).
     val centerHold =
         remember(scope) {
-            CenterHold { actionsFor = gifs.getOrNull(index) }
+            CenterHold {
+                actionsFor = gifs.getOrNull(index)
+                actionsViaHold = true
+            }
         }
 
     // D-pad events only reach onPreviewKeyEvent via a FOCUSED node inside the
     // hierarchy — the PlayerView never takes focus, so grab it on entry.
-    val playerFocus =
-        remember {
-            androidx.compose.ui.focus
-                .FocusRequester()
-        }
+    val playerFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { playerFocus.requestFocus() }
+    // Issue #24 retry/skip focusability: the root Column pins focus and its
+    // onPreviewKeyEvent pre-consumes Up/Down/Center, so the overlay's
+    // TextButtons can never win focus by traversal alone. On error the Retry
+    // button takes focus; when the overlay leaves (Skip settles / a new gif
+    // commits) root focus is restored. Same pattern as the batch-18
+    // shared-TextField requestInitialFocus fix.
+    val overlayRetryFocus = remember(gif.id) { FocusRequester() }
+    LaunchedEffect(playError) {
+        if (playError) {
+            overlayRetryFocus.requestFocus()
+        } else {
+            playerFocus.requestFocus()
+        }
+    }
     Column(
         modifier =
             Modifier
@@ -172,6 +199,12 @@ fun TvPlayerScreen(
                 .onPreviewKeyEvent { e ->
                     // Player text auto-hide: any key re-reveals the cluster.
                     if (e.type == KeyEventType.KeyUp) textVisible = true
+                    // Issue #24: while the Retry/Skip overlay is up, every key
+                    // falls through to the focused overlay buttons (Up/Down walk
+                    // Retry↔Skip, CENTER/ENTER activates, BACK stays the Root
+                    // BackHandler = exit player). The gif does NOT advance with
+                    // Up/Down while a video is failing — the honest behavior.
+                    if (playError) return@onPreviewKeyEvent false
                     // Keymap rule 4: hold repeats its own key's action. Seek keys
                     // act on KeyDown so the OS key-repeat (held key) yields
                     // progressive ±10s steps; everything else stays KeyUp-only
@@ -272,6 +305,7 @@ fun TvPlayerScreen(
                         // with the mobile player overflow sheet).
                         Key.Menu -> {
                             actionsFor = gifs.getOrNull(index)
+                            actionsViaHold = false
                             true
                         }
                         else -> false
@@ -279,9 +313,29 @@ fun TvPlayerScreen(
                 },
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
+            // Poster under the surface (issue #8): the player_view.xml
+            // TextureView + transparent shutter stays see-through until the
+            // first video frame, so the switch/prepare window shows this poster
+            // instead of the default black. Poster-null gifs: nothing renders
+            // and the black background stays the truthful state (no invented
+            // placeholder).
+            AsyncImage(
+                model = gif.posterUrl,
+                contentScale = ContentScale.Fit,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+            )
             AndroidView(
                 factory = { ctx ->
-                    PlayerView(ctx).apply { useController = false }
+                    (
+                        android.view.LayoutInflater
+                            .from(ctx)
+                            .inflate(
+                                com.rjbiermann.giffyviewer.tv.R.layout.player_view,
+                                null,
+                                false,
+                            ) as PlayerView
+                    ).apply { useController = false }
                 },
                 update = { view ->
                     view.player = player
@@ -348,7 +402,7 @@ fun TvPlayerScreen(
                                 textVisible = true
                                 scope.launch {
                                     val resume = db.watchHistoryDao().byGif(gif.id)?.positionMs ?: 0L
-                                    player.playGif(gif, dataSaver, resumeMs = resume)
+                                    player.playGif(gif, dataSaver, resumeMs = resume, videoQuality = videoQuality)
                                 }
                             },
                             colors =
@@ -356,7 +410,7 @@ fun TvPlayerScreen(
                                     .textButtonColors(
                                         contentColor = MaterialTheme.colorScheme.secondary,
                                     ),
-                            modifier = Modifier.giffyFocus(retryInteraction),
+                            modifier = Modifier.focusRequester(overlayRetryFocus).giffyFocus(retryInteraction),
                             interactionSource = retryInteraction,
                         ) { Text("Retry", style = MaterialTheme.typography.labelLarge) }
                         val skipInteraction = remember { MutableInteractionSource() }
@@ -459,7 +513,13 @@ fun TvPlayerScreen(
     // resume + tracking (outside the Column so they survive gif switches)
     LaunchedEffect(gif.id, dataSaver) {
         val resume = db.watchHistoryDao().byGif(gif.id)?.positionMs ?: 0L
-        player.playGif(gif, dataSaver, resumeMs = resume)
+        // Clear-on-switch (issue #16, user report: aspect warp for a few
+        // moments at every D-pad switch): the outgoing frame re-warps under
+        // the new gif's seeded aspect until the new first frame lands.
+        // stop() first — letter-for-letter the FeedScreen inline rule; the
+        // issue #8 poster plane covers the cleared beat instead of black.
+        if (player.currentGifId.value != gif.id) player.stop()
+        player.playGif(gif, dataSaver, resumeMs = resume, videoQuality = videoQuality)
     }
 
     // Position sampling (mobile player parity) + teardown flush (2026-10 user
@@ -533,7 +593,11 @@ fun TvPlayerScreen(
                     },
                     onToggleAutoSwipe = { scope.launch { settings.setAutoSwipe(!autoSwipeOn) } },
                 ),
-            onDismiss = { actionsFor = null },
+            onDismiss = {
+                actionsFor = null
+                actionsViaHold = false
+            },
+            openViaHold = actionsViaHold,
             onOpenCreator = { username ->
                 onBack()
                 onOpenCreator(username)

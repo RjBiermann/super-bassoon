@@ -622,14 +622,29 @@ fun FeedScreen(
                 // writes (sampling stays in PlayerScreen); 1 stream fetch per
                 // settled tile (rate-limit invariant).
                 val autoplayOn = gridColumns == 1 && feedAutoplay && !dataSaver
+                // Inline player ownership (issue #9, AGENTS-PLAYER): the shared
+                // preview player is VM-owned — adopt a parked one (from FeedScreen
+                // leave or PlayerScreen exit) so the settled tile continues the
+                // SAME warm instance; a fresh one is built when nothing is parked.
+                // The player type here is platform-owned, never saveable: process
+                // death legitimately drops it (fresh build on return).
                 val inlinePlayer =
                     if (autoplayOn && playerFactory != null) {
-                        remember(playerFactory) { playerFactory?.create(context) }
+                        viewModel.recallInlinePlayer() ?: playerFactory.create(context).also(viewModel::returnInlinePlayer)
                     } else {
                         null
                     }
                 DisposableEffect(inlinePlayer) {
-                    onDispose { inlinePlayer?.release() }
+                    if (inlinePlayer == null) {
+                        // Autoplay off / non-1-col: nothing may park in the VM
+                        // (the previous DisposableEffect released on this condition).
+                        viewModel.dropInlinePlayer()
+                    }
+                    onDispose {
+                        // Pass-through to the VM (issue #9): leaving composition
+                        // parks (not releases) — PlayerScreen adopts immediately.
+                        viewModel.returnInlinePlayer(inlinePlayer)
+                    }
                 }
                 var inlineIndex by remember(source.keyBase) { mutableStateOf<Int?>(null) }
                 if (inlinePlayer != null) {

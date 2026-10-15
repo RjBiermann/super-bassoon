@@ -28,6 +28,8 @@ dependencies {
     implementation(project(":core:auth"))
     implementation(project(":feature:auth"))
     implementation(project(":core:database"))
+    // Video quality value set shared from core/model VideoQuality (§5 issue #4).
+    implementation(project(":core:model"))
     implementation(project(":core:datastore"))
     implementation(project(":core:ui"))
     // Favorites-cache invalidation rides FeedRepository (shared rule with the

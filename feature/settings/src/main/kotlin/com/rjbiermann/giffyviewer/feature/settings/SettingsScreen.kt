@@ -45,6 +45,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rjbiermann.giffyviewer.core.model.VideoQuality
 import com.rjbiermann.giffyviewer.core.ui.GiffyScaffold
 import com.rjbiermann.giffyviewer.core.ui.giffyFocus
 import kotlinx.coroutines.launch
@@ -402,7 +403,10 @@ fun SettingsScreen(
                 }
             }
             item(key = "video-fit") {
-                // §5 Video fit: Fit (default) · Crop · Stretch — both players.
+                // §5 Video fit: Fit (default) · Crop — both players (Stretch
+                // retired, issue #21: RESIZE_MODE_FILL removed; a legacy stored
+                // "stretch" renders as Fit). Keep the focusGroup chip-row shape
+                // (batch-12 TV chip-skip fix) untouched.
                 val videoFit by viewModel.videoFit.collectAsStateWithLifecycle("fit")
                 Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
                     Text("Video fit", style = MaterialTheme.typography.titleSmall)
@@ -418,12 +422,50 @@ fun SettingsScreen(
                                 .fillMaxWidth()
                                 .padding(top = 8.dp),
                     ) {
-                        listOf("Fit" to "fit", "Crop" to "crop", "Stretch" to "stretch").forEach { (label, value) ->
+                        listOf("Fit" to "fit", "Crop" to "crop").forEach { (label, value) ->
                             val src = remember { MutableInteractionSource() }
                             FilterChip(
                                 selected = videoFit == value,
                                 onClick = { viewModel.setVideoFit(value) },
                                 label = { Text(label) },
+                                interactionSource = src,
+                                // giffyFocus ring: M3 chips draw nothing on D-pad focus.
+                                modifier =
+                                    Modifier
+                                        .giffyFocus(src)
+                                        .padding(end = 6.dp),
+                            )
+                        }
+                    }
+                }
+            }
+            item(key = "video-quality") {
+                // §5 Preferred quality (issue #4): the value list lives in
+                // core/model VideoQuality (THE one place; players + pref read
+                // the same constants). Only available choices depend on the
+                // video — Auto is the default; a single-rendition stream makes
+                // the height caps honest no-ops (clamp guard in GiffyPlayer).
+                val videoQuality by viewModel.videoQuality.collectAsStateWithLifecycle(VideoQuality.AUTO)
+                Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+                    Text("Video quality", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "Available choices depend on the video; Auto is the default",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(
+                        modifier =
+                            Modifier
+                                .focusGroup()
+                                .fillMaxWidth()
+                                .padding(top = 8.dp),
+                    ) {
+                        VideoQuality.VALUES.forEach { value ->
+                            val src = remember { MutableInteractionSource() }
+                            FilterChip(
+                                selected = videoQuality == value,
+                                onClick = { viewModel.setVideoQuality(value) },
+                                label = { Text(VideoQuality.label(value)) },
                                 interactionSource = src,
                                 // giffyFocus ring: M3 chips draw nothing on D-pad focus.
                                 modifier =

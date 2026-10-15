@@ -22,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,6 +32,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -43,6 +45,7 @@ import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
 import com.rjbiermann.giffyviewer.feature.feed.customRefSummary
 import com.rjbiermann.giffyviewer.feature.feed.gifFeedRefs
 import com.rjbiermann.giffyviewer.feature.feed.orderNichesByTagMatch
+import kotlinx.coroutines.launch
 import androidx.compose.material3.Surface as M3Surface
 
 /** Player-only panel rows (mobile overflow parity): Like · Mute · Speed · Auto-swipe. */
@@ -80,6 +83,12 @@ fun TvQuickActionsDialog(
     addableFeedRef: String? = null,
     /** Non-null in the player: adds Like/Mute/Speed/Auto-swipe rows. */
     playerActions: TvPlayerActions? = null,
+    /** Issue #3: opened via a HELD Center key. The hold's release KeyUp is
+     *  routed into this dialog window — a focused row activates on Center
+     *  KeyUp, so without a swallow the release closes the panel AND fires
+     *  the first row. The preview phase swallows exactly ONE Center KeyUp
+     *  on open; MENU-opened panels behave exactly as today. */
+    openViaHold: Boolean = false,
     /** Slice 10: the HOME row's feed source — the main pane gains an
      *  "Open feed" row that opens it full-page (TvSourceFeedScreen). Rows
      *  without an openable source (Surprise pool) pass null → no row. */
@@ -99,11 +108,30 @@ fun TvQuickActionsDialog(
     val customFeeds by feedViewModel.customFeeds.collectAsStateWithLifecycle(emptyList())
     val collections by feedViewModel.collections.collectAsStateWithLifecycle(emptyList())
     val joinedNiches by feedViewModel.joinedNiches.collectAsStateWithLifecycle(emptyList())
+    // Issue #3: the hold-open's own release KeyUp is routed into this new
+    // dialog window — the still-scheduled Center KeyUp would activate the
+    // focused first row (accidental like + onDismiss closes). Preview phase
+    // eats exactly ONE Center KeyUp when the panel opened via a hold; a
+    // MENU-opened panel keeps today's behavior (no key to swallow).
+    var swallowNextCenterUp by remember { mutableStateOf(openViaHold) }
+    // Follow row (issue #27): the write is awaited — failure keeps the panel
+    // open (row stays in its pre-toggle state; no silent fire-and-close).
+    val sheetScope = rememberCoroutineScope()
     Dialog(onDismissRequest = onDismiss) {
         M3Surface(
             shape = MaterialTheme.shapes.medium,
             tonalElevation = 6.dp,
-            modifier = Modifier.width(420.dp),
+            modifier =
+                Modifier
+                    .width(420.dp)
+                    .onPreviewKeyEvent { e ->
+                        if (swallowNextCenterUp && e.type == KeyEventType.KeyUp && e.key == Key.DirectionCenter) {
+                            swallowNextCenterUp = false
+                            true
+                        } else {
+                            false
+                        }
+                    },
         ) {
             Column(
                 modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState()),
@@ -273,8 +301,9 @@ fun TvQuickActionsDialog(
                                 "Follow @${gif.userName}"
                             },
                         onClick = {
-                            feedViewModel.toggleFollowCreator(gif.userName)
-                            onDismiss()
+                            sheetScope.launch {
+                                if (feedViewModel.toggleFollowCreator(gif.userName)) onDismiss()
+                            }
                         },
                     )
                 }

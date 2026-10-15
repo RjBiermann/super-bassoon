@@ -342,31 +342,55 @@ class FeedViewModel
         private val _followedCreators = MutableStateFlow<Set<String>>(emptySet())
         val followedCreators: StateFlow<Set<String>> = _followedCreators
 
+        /** Follow-row single-flight (issue #27 race fix): while a toggle is in
+         *  flight the sheet-open refresh must not overwrite the optimistic
+         *  flip with its pre-write server list (last-write-wins race). */
+        private val followToggleInFlight = MutableStateFlow(false)
+
         fun refreshFollowedCreators() {
             viewModelScope.launch {
                 if (tokenStore.tokenOrNull() == null) return@launch
                 runCatching { withContext(Dispatchers.IO) { api.followedCreators() } }
-                    .onSuccess { _followedCreators.value = it.map(String::lowercase).toSet() }
+                    .onSuccess {
+                        // Race guard: a toggle in flight owns the set right now.
+                        if (!followToggleInFlight.value) {
+                            _followedCreators.value = it.map(String::lowercase).toSet()
+                        }
+                    }
             }
         }
 
         /** PUT v1/me/follows/{username} / DELETE → 204 (verified), JSON body
          *  {source, source_id, position}. Optimistic flip only on success —
-         *  signed-out users never reach here (the row is hidden). */
-        fun toggleFollowCreator(username: String) {
-            viewModelScope.launch {
-                if (tokenStore.tokenOrNull() == null) return@launch
+         *  signed-out users never reach here (the row is hidden). Single-
+         *  flight: overlapping toggles would race the same wasFollowing read.
+         *  Returns true when the write succeeded (the caller may dismiss);
+         *  on failure the row keeps its pre-toggle state and stays open —
+         *  no silent fire-and-close (issue #27). */
+        suspend fun toggleFollowCreator(username: String): Boolean {
+            if (tokenStore.tokenOrNull() == null) return false
+            if (!followToggleInFlight.compareAndSet(expect = false, update = true)) return false
+            try {
                 val wasFollowing = username.lowercase() in _followedCreators.value
-                runCatching {
-                    if (wasFollowing) {
-                        api.unfollowCreator(username)
-                    } else {
-                        api.followCreator(username)
+                val wrote =
+                    runCatching {
+                        if (wasFollowing) {
+                            api.unfollowCreator(username)
+                        } else {
+                            api.followCreator(username)
+                        }
                     }
-                }.onSuccess {
+                if (wrote.isSuccess) {
                     _followedCreators.value =
-                        if (wasFollowing) _followedCreators.value - username.lowercase() else _followedCreators.value + username.lowercase()
+                        if (wasFollowing) {
+                            _followedCreators.value - username.lowercase()
+                        } else {
+                            _followedCreators.value + username.lowercase()
+                        }
                 }
+                return wrote.isSuccess
+            } finally {
+                followToggleInFlight.value = false
             }
         }
 
@@ -487,6 +511,45 @@ class FeedViewModel
                 pendingForce.value = pendingForce.value + source.baseKey
                 open(source.withSort(sort))
             }
+        }
+
+        /** Shared inline preview player (issue #9, AGENTS-PLAYER): VM-owned so it
+         *  parks in the VM across the FeedScreen↔PlayerScreen route swap (both
+         *  compose under the same Activity-scoped hiltViewModel()) — the warm
+         *  player is adopted at tap-to-open instead of released while its
+         *  successor is built. NEVER saveable state (a player must not
+         *  persist; process death falls back to a fresh player). */
+        private var inlinePlayer: com.rjbiermann.giffyviewer.core.player.GiffyPlayer? = null
+
+        /** Adopt: hand the parked player out (caller parks it back on exit). */
+        fun recallInlinePlayer(): com.rjbiermann.giffyviewer.core.player.GiffyPlayer? = inlinePlayer.also { inlinePlayer = null }
+
+        /** Park an adopted player again (PlayerScreen exit / FeedScreen leave).
+         *  Re-arms the inline preview profile (the knobs FeedScreen's settle
+         *  block asserts while attached) and pauses — a parked player decodes
+         *  nothing. Null = nothing to park. */
+        fun returnInlinePlayer(player: com.rjbiermann.giffyviewer.core.player.GiffyPlayer?) {
+            val p = player ?: return
+            inlinePlayer = p
+            p.pause()
+            p.volume = 0f
+            p.repeatMode = androidx.media3.common.Player.REPEAT_MODE_ONE
+            p.setPlaybackSpeed(1f)
+        }
+
+        /** Autoplay-off / 2-3-col state must not park anything (the previous
+         *  DisposableEffect released on exactly this condition; issue #9 keeps
+         *  the release discipline — it must not become an immortal decoder).
+         *  No-op when nothing is parked. */
+        fun dropInlinePlayer() {
+            inlinePlayer?.release()
+            inlinePlayer = null
+        }
+
+        override fun onCleared() {
+            super.onCleared()
+            inlinePlayer?.release()
+            inlinePlayer = null
         }
 
         /** Verified-only (2026-10): drives the filtered-empty grid state. */

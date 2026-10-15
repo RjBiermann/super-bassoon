@@ -25,16 +25,31 @@ Media3/ExoPlayer + SimpleCache (cache-first rules formerly PLAN.md §5).
 - **Inline feed autoplay** (1-column mobile feed, BUILT 2026-10-02): see
   the "Inline feed autoplay" section below — one shared player, muted+looped
   (`REPEAT_MODE_ONE`), no watch_history writes, data-saver forces off.
-- **Video fit:** user setting Fit / Crop / Stretch →
-  `PlayerView.resizeMode` = `RESIZE_MODE_FIT` / `RESIZE_MODE_ZOOM` / `RESIZE_MODE_FILL`
-  (default Fit). One shared DataStore pref consumed by both `PlayerScreen.kt` (mobile,
-  currently sets FIT explicitly) and `TvPlayerScreen.kt` (TV, currently default FIT).
-  Crop/Stretch apply before any pinch-zoom (`graphicsLayer` scale multiplies on top).
+- **Video fit (updated 2026-10, issue #21 — Stretch REMOVED):** user setting
+  Fit / Crop → `PlayerView.resizeMode` = `RESIZE_MODE_FIT` / `RESIZE_MODE_ZOOM`
+  (default Fit). One shared DataStore pref consumed by both `PlayerScreen.kt`
+  (mobile) and `TvPlayerScreen.kt` (TV); a legacy stored `"stretch"` de-maps to
+  Fit (no migration — the pref is free-form and FILL is retired as a destructive
+  distortion mode). Crop applies before any pinch-zoom (`graphicsLayer` scale
+  multiplies on top).
   - **TV note (2026-10-02, user decision):** TV default stays **Fit** — for vertical
   gifs the fullscreen-fill alternative (`RESIZE_MODE_ZOOM`, fill width on a 16:9
   panel) shows more screen but crops ~9:16 content heavily; it works as a user
   choice via this pref, not as a TV-forced default. Keep it available to pick on TV
   (the shared SettingsScreen already covers both apps).
+- **Preferred video quality (issue #4, built with the plugin+clamp guard; LIVE
+  probe still open):** DataStore `video_quality` = `auto | highest | 720 | 480`
+  (value list owned by `core/model VideoQuality` — THE one place for the menu
+  list; Settings row sits under the video-fit block on the shared screen).
+  Data-saver keeps its first rule (forces SD); Auto/Highest equal today's URL
+  pick and leave ABR free; 720/480 ride a `TrackSelectionParameters`
+  `.maxVideoHeight` cap applied in `GiffyPlayer.applyVideoQuality` (re-applied
+  mid-stream on pref change, no re-prepare) with the no-selected-track clamp
+  guard: `onTracksChanged` tracks the smallest known rendition height and lifts
+  a cap below every rendition to that height (a single-rendition MP4 is an
+  honest no-op). OPEN: what `urls.hd` actually is (direct MP4 vs HLS ladder)
+  decides whether the discrete caps are meaningful; until probed the plumbing
+  is safe-by-construction.
 
 ## Verified end-to-end (emulator, 2026-09)
 - Feed tile → PlayerScreen → ExoPlayer playback → 5s position sample → `watch_history` row
@@ -101,8 +116,14 @@ Implementation (FeedScreen + GifTile):
   fallback rule if a live verify ever proves the single player too heavy).
 - **Tap → `onOpenPlayer(index)`** as today; inline view is a preview, not a
   feature-complete player (controls/sound/like/speed/all live in PlayerScreen).
-  FeedScreen leaves composition under PlayerScreen (MainActivity else-chain) →
-  inline player released.
+  **Ownership (issue #9, 2026-10): the shared player is VM-owned now** — the
+  ONE player parks in `FeedViewModel` (recall/return/drop, released on
+  `onCleared`); tap-to-open ADOPTS it in PlayerScreen (the same
+  `currentGifId` → no re-prepare, position continues), exiting the player
+  parks it back for the grid. Autoplay-off/2-3-col states release via
+  `dropInlinePlayer()` (the old DisposableEffect release discipline — a
+  parked player must never become an immortal decoder). Player-muting is
+  re-keyed on the player instance so an adopted preview gets the user pref.
 - **Watch history: inline plays write NOTHING** — Continue Watching would fill
   with 2-second drive-bys; sampling stays solely in PlayerScreen.
 - **Data saver forces inline off** (static poster), same rule the player uses.
@@ -120,6 +141,15 @@ Implementation (FeedScreen + GifTile):
 
 ## TV player (Phase 6, verified on TV36 emulator 2026-09)
 - D-pad: down/right = next gif, up/left = previous, BACK = exit (BackHandler in Root).
+- **SDR-pinned playback (issue #20):** the TV `GiffyPlayerFactory` is built
+  with `sdrPlayback = true` — a codec-level filter (`MediaCodecSelector` via
+  `DefaultPreloadManager.Builder.setRenderersFactory`, verified API on
+  media3 1.11.1 — NO parameters-level HDR knob exists there) drops decoders
+  that cannot serve SDR (Dolby Vision path / HDR-only profile sets).
+  media3 1.11.1 has no TrackSelectionParameters HDR exclusion (AAR-verified);
+  a decoder that claims BOTH SDR and HDR profiles still serves SDR (residual
+  HDR-variant window awaits the live probe — whether any gif stream even
+  presents HDR variants is unprobed).
 - `TvPlayerScreen` mirrors mobile resume + 5s `watch_history` sampling — verified live
   (gif 22.3s played → `watched=1`).
 - TV image has no `sqlite3` in run-as — pull `giffy.db` + `-wal` + `-shm` and read on host.

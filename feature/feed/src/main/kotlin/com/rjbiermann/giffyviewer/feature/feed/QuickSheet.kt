@@ -31,6 +31,7 @@ import com.rjbiermann.giffyviewer.feature.feed.orderNichesByTagMatch
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 
 /** PLAN §9 quick sheet: block creator / tags / keyword / don't block. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalCoroutinesApi::class)
@@ -52,6 +53,9 @@ internal fun QuickBlockSheet(
     // Follow state (site parity "Follow ↔ Following"): server read on open,
     // toggled in place. Anonymous users see no row (a write would 401).
     androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.refreshFollowedCreators() }
+    // Issue #27: the follow write is awaited in a sheet-level scope — failure
+    // keeps the sheet open (row stays in its pre-toggle state).
+    val sheetScope = androidx.compose.runtime.rememberCoroutineScope()
     val followedCreators by viewModel.followedCreators.collectAsState(initial = emptySet())
     // Hoisted for the AddToCustomFeedDialog scope below.
     val customFeeds by viewModel.customFeeds.collectAsState(initial = emptyList())
@@ -133,6 +137,9 @@ internal fun QuickBlockSheet(
                         onDismiss()
                         onOpenFeed()
                     }
+                    // Issue #27: the write is awaited — on failure the sheet
+                    // stays open with the row in its pre-toggle state (no
+                    // silent fire-and-close).
                     if (viewModel.loggedIn) {
                         listStyle(
                             if (gif.userName.lowercase() in followedCreators) {
@@ -141,8 +148,9 @@ internal fun QuickBlockSheet(
                                 "Follow @${gif.userName}"
                             },
                         ) {
-                            viewModel.toggleFollowCreator(gif.userName)
-                            onDismiss()
+                            sheetScope.launch {
+                                if (viewModel.toggleFollowCreator(gif.userName)) onDismiss()
+                            }
                         }
                     }
                     val pinnedCreators by viewModel.pinnedCreators.collectAsState(initial = emptySet())

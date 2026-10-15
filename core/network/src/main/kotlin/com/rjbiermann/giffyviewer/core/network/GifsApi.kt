@@ -180,7 +180,12 @@ interface GifsApi {
         @Body body: FollowBody = FollowBody(),
     )
 
-    @DELETE("v1/me/follows/{username}")
+    // Issue #27: the last plain @DELETE+@Body shape left — the documented
+    // like-write normalization (@HTTP hasBody, unlike's live fix) applied here
+    // too; unreachable otherwise when Retrofit drops/mangles the DELETE body
+    // (server 400s a bare DELETE → runCatching swallows → "unfollow does
+    // nothing"). Harmless if redundant against modern Retrofit.
+    @HTTP(method = "DELETE", path = "v1/me/follows/{username}", hasBody = true)
     suspend fun unfollowCreator(
         @Path("username") username: String,
         @Body body: FollowBody = FollowBody(),
@@ -195,7 +200,9 @@ interface GifsApi {
         @Body body: EmptyBody = EmptyBody(),
     )
 
-    @DELETE("v2/niches/{id}/subscription")
+    // Same @HTTP hasBody normalization as unfollowCreator (same lesson,
+    // same pass — the only other DELETE+@Body in this file).
+    @HTTP(method = "DELETE", path = "v2/niches/{id}/subscription", hasBody = true)
     suspend fun unsubscribeNiche(
         @Path("id") nicheId: String,
         @Body body: EmptyBody = EmptyBody(),

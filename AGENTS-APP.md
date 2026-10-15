@@ -762,6 +762,12 @@ in AGENTS-UX-PATTERNS.md "No-button-limitation rule"; spec here (graduation step
 - **KeyUp suppression:** when the long press fired, that same KeyUp must NOT also run the
   surface's Center action (play/pause toggle in the player, card open). Track the press
   start per press; reset on KeyUp.
+  - **Panel KeyUp swallow (2026-10, user report #3):** the hold-open's own release
+  KeyUp is routed into the NEW TvQuickActionsDialog window — a focused row activates
+  on Center KeyUp, so the release closed the panel AND fired its first row (accidental
+  like). The dialog now swallows exactly ONE Center KeyUp when opened via a hold
+  (`openViaHold` flag threaded from every open surface: player CenterHold, GifCard
+  hold path — MENU-opened panels keep today's behavior).
 - **TvNiches row:** hold-Center = `viewModel.togglePin(niche)` (the row's MENU action);
   no panel there.
 - **TvPlayerScreen note:** Center KeyDown is currently unconsumed (KeyUp-only) — the
@@ -771,6 +777,15 @@ in AGENTS-UX-PATTERNS.md "No-button-limitation rule"; spec here (graduation step
   hold ≥500ms opens the panel in the player, on a focused home card, and on a niche row;
   panel closes with BACK before navigation; MENU (where present) still opens the same
   panel.
+- **TV player error overlay is D-pad-operable (2026-10, user report #24):
+  previously Retry/Skip existed but could never win focus** — the root Column pinned
+  focus and its onPreviewKeyEvent pre-consumed Up/Down/Center. Now: when the overlay
+  appears the Retry button takes focus (`LaunchedEffect(playError)`), EVERY key
+  falls through to the overlay while it is up (`if (playError) return false` at the top
+  of the root key handler — Up/Down walk Retry↔Skip, CENTER/ENTER activates, BACK stays
+  the Root BackHandler = exit player), and overlay close restores root focus. While the
+  overlay is up the gif does NOT advance with Up/Down — the honest behavior for a
+  failing video.
 [BUILT 2026-10-02 batch 17 — `CenterHold` (app-tv): per-focused-node hold state;
 REWORKED 2026-10-04 (user expectation: standard long-press semantics — the panel must
 OPEN at the 500ms threshold WHILE STILL HOLDING, not on KeyUp). Fire-while-held:

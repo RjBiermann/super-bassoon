@@ -7,7 +7,8 @@ import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.preload.DefaultPreloadManager
 import com.rjbiermann.giffyviewer.core.model.Gif
-import com.rjbiermann.giffyviewer.core.model.streamUrl
+import com.rjbiermann.giffyviewer.core.model.VideoQuality
+import com.rjbiermann.giffyviewer.core.model.qualityStreamUrl
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,12 +27,19 @@ class GiffyPlayer internal constructor(
     private val mutableCurrentGifId = MutableStateFlow<String?>(null)
     val currentGifId: StateFlow<String?> = mutableCurrentGifId.asStateFlow()
 
+    /**
+     * Preferred quality (§5, issue #4) picks the stream URL via the shared
+     * [Gif.qualityStreamUrl] (dataSaver keeps its first rule; the probe-closed
+     * sd/hd vocabulary is a stream-URL pick, no track machinery). The custom
+     * cache key stays the gif ID — a pref flip re-picks the URL, not the key.
+     */
     fun playGif(
         gif: Gif,
         dataSaver: Boolean,
         resumeMs: Long = 0L,
+        videoQuality: String = VideoQuality.AUTO,
     ) {
-        val url = gif.streamUrl(dataSaver) ?: return
+        val url = gif.qualityStreamUrl(dataSaver, videoQuality) ?: return
         mutableCurrentGifId.value = gif.id
         val item =
             MediaItem
@@ -55,16 +63,18 @@ class GiffyPlayer internal constructor(
     /**
      * Adjacent-item prefetch (PLAN §9): prepare next/prev sources so the swipe
      * starts without the manifest-load stutter. Sources are reused by the
-     * player (same factory) — no double prepare.
+     * player (same factory) — no double prepare. Preload honors the same
+     * quality pick as playback so the cache holds the bits the player plays.
      */
     fun preloadNeighbors(
         gifs: List<Gif>,
         dataSaver: Boolean,
+        videoQuality: String = VideoQuality.AUTO,
     ) {
         preloaded.forEach { preloadManager.remove(it) }
         preloaded =
             gifs.mapNotNull { gif ->
-                gif.streamUrl(dataSaver)?.let { url ->
+                gif.qualityStreamUrl(dataSaver, videoQuality)?.let { url ->
                     MediaItem
                         .Builder()
                         .setUri(url)

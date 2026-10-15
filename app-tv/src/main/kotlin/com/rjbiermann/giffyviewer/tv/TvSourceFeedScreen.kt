@@ -80,6 +80,9 @@ fun TvSourceFeedScreen(
     }
     // MENU quick actions (mobile QuickBlockSheet parity) — any pinned feed.
     var actionsFor by remember { mutableStateOf<Gif?>(null) }
+    // Issue #3: a HELD Center open must make the panel swallow its own
+    // release KeyUp (MENU opens keep today's behavior).
+    var actionsViaHold by remember { mutableStateOf(false) }
     // §8 per-feed filter (same feedprefs storage as mobile; the shared dialog
     // is M3 and D-pad-focusable). Writing prefs restarts the pager.
     val feedPrefs by feedViewModel
@@ -157,7 +160,10 @@ fun TvSourceFeedScreen(
                             Modifier
                                 .then(if (i == 0) Modifier.focusRequester(firstCardFocus) else Modifier)
                                 .fillMaxWidth(),
-                        onMenu = { actionsFor = gif },
+                        onMenu = { viaHold ->
+                            actionsFor = gif
+                            actionsViaHold = viaHold
+                        },
                         preview = preview,
                         dataSaver = dataSaver,
                         onClick = { onOpenGif(snapshot(gifs), gifs.indexOf(gif.id)) },
@@ -186,7 +192,11 @@ fun TvSourceFeedScreen(
             gif = gif,
             feedViewModel = feedViewModel,
             addableFeedRef = (source as? FeedSource.Niche)?.let { packNicheRef(it.id, it.name, prefixed = true) },
-            onDismiss = { actionsFor = null },
+            onDismiss = {
+                actionsFor = null
+                actionsViaHold = false
+            },
+            openViaHold = actionsViaHold,
             onOpenNiche = onOpenNiche,
         )
     }

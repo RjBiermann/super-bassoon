@@ -117,8 +117,10 @@ object TvAppModule {
 
     @Provides
     @Singleton
+    // Issue #20: TV is the 10-foot set-top surface — SDR-pinned playback
+    // (HDR-only decoders excluded); mobile keeps the default.
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
-    fun playerFactory(cache: SimpleCache): GiffyPlayerFactory = GiffyPlayerFactory(cache)
+    fun playerFactory(cache: SimpleCache): GiffyPlayerFactory = GiffyPlayerFactory(cache, sdrPlayback = true)
 
     @Provides
     @Singleton

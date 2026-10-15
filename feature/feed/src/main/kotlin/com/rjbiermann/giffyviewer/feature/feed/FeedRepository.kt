@@ -13,6 +13,7 @@ import com.rjbiermann.giffyviewer.core.model.resolutionMatches
 import com.rjbiermann.giffyviewer.core.network.GifsApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flatMapLatest
@@ -144,6 +145,11 @@ class FeedRepository
                         settings.orientationFilter,
                         settings.verifiedOnly,
                     ) { o, v -> o to v }
+                    // DataStore re-emits the WHOLE Preferences map on any key
+                    // write (user #26: mute flips restarted the pager — any
+                    // unrelated pref write too). Dedupe on the combine EXIT
+                    // (structural equality) so only a REAL filter move restarts.
+                    .distinctUntilChanged()
                     .flatMapLatest { (o, v) ->
                         Pager(
                             config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = 10, enablePlaceholders = false),
@@ -163,6 +169,8 @@ class FeedRepository
                         settings.orientationFilter,
                         settings.verifiedOnly,
                     ) { o, v -> o to v }
+                    // Same DataStore identity-emission dedupe as Liked (#26).
+                    .distinctUntilChanged()
                     .flatMapLatest { (o, v) ->
                         Pager(
                             config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = 10, enablePlaceholders = false),
@@ -193,6 +201,9 @@ class FeedRepository
                         settings.verifiedOnly,
                         settings.feedPrefs(feed.baseKey),
                     ) { o, v, p -> Triple(o, v, p) }
+                    // Same DataStore identity-emission dedupe as Liked (#26);
+                    // FeedPrefs is a data class — structural equality holds.
+                    .distinctUntilChanged()
                     .flatMapLatest { (o, v, p) ->
                         cachedPager(feed, forceRefresh, p, o, v)
                     }
@@ -214,6 +225,8 @@ class FeedRepository
                     settings.verifiedOnly,
                     settings.feedPrefs(FeedSource.Continue.keyBase),
                 ) { o, v, p -> Triple(o, v, p) }
+                // Same DataStore identity-emission dedupe as the cached branch (#26).
+                .distinctUntilChanged()
                 .flatMapLatest { (o, v, p) ->
                     Pager(
                         config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = 10, enablePlaceholders = false),

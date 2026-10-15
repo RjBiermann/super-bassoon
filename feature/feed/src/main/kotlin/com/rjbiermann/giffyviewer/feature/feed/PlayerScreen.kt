@@ -70,6 +70,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -89,10 +90,12 @@ import androidx.media3.common.Player
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import androidx.paging.compose.collectAsLazyPagingItems
+import coil3.compose.AsyncImage
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.database.WatchHistoryEntity
 import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
 import com.rjbiermann.giffyviewer.core.model.Gif
+import com.rjbiermann.giffyviewer.core.model.VideoQuality
 import com.rjbiermann.giffyviewer.core.model.contentAspectRatio
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayer
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
@@ -155,8 +158,24 @@ fun PlayerScreen(
     val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle(false)
     val autoSwipe by settings.autoSwipe.collectAsStateWithLifecycle(false)
     val videoFit by settings.videoFit.collectAsStateWithLifecycle("fit")
+    // Preferred quality (§5, issue #4): auto | highest | sd — the pick is the
+    // stream URL at prepare time (probe-closed single-rendition MP4 vocabulary;
+    // see VideoQuality.kt).
+    val videoQuality by settings.videoQuality.collectAsStateWithLifecycle(VideoQuality.AUTO)
     val muteScope = rememberCoroutineScope()
-    val player = remember { playerFactory.create(context) }
+    // Player adoption (issue #9): the shared inline preview player parks in the
+    // FeedViewModel across the FeedScreen→PlayerScreen route swap (a `when`
+    // branch change, not navigation). Adopt if offered — codec init + buffer
+    // stay warm; a fresh player is built when nothing is parked (2/3-col
+    // grids, autoplay off, data saver). The imperative remember holds the
+    // player AND whether it was adopted; the dispose below releases or
+    // returns accordingly. A GiffyPlayer must never reach saveable state —
+    // process death mid-adoption legitimately falls back to a fresh player.
+    val playerHold =
+        remember {
+            viewModel.recallInlinePlayer()?.let { it to true } ?: (playerFactory.create(context) to false)
+        }
+    val player = playerHold.first
 
     // playback speed: session-only — resets when the player is released (PLAN §9).
     // holdSpeed (hold-to-2×) overrides it while the long-press is held; the single
@@ -201,7 +220,10 @@ fun PlayerScreen(
     }
     DisposableEffect(Unit) {
         onDispose {
-            player.release()
+            val (p, adopted) = playerHold
+            // Adopted player → return to the VM (parks it for the feed again,
+            // issue #9); a player built here releases as before (no owner).
+            if (adopted) viewModel.returnInlinePlayer(p) else p.release()
             val window = (context as? Activity)?.window
             window?.let { WindowCompat.getInsetsController(it, view).show(WindowInsetsCompat.Type.systemBars()) }
         }
@@ -214,8 +236,10 @@ fun PlayerScreen(
             controlsVisible = false
         }
     }
-    // mute applies to the single active player instance (PLAN §9)
-    LaunchedEffect(muted) { player.volume = if (muted) 0f else 1f }
+    // mute applies to the single active player instance (PLAN §9); keyed on the
+    // player too so an adopted inline preview (issue #9, volume 0) gets the
+    // user's pref re-asserted on entry.
+    LaunchedEffect(muted, player) { player.volume = if (muted) 0f else 1f }
     // error surface + end-of-media: one listener on the shared player
     val pagerScope = rememberCoroutineScope()
     DisposableEffect(player, autoSwipe, dataSaver) {
@@ -304,14 +328,14 @@ fun PlayerScreen(
         }
     }
     // adjacent-item prefetch (PLAN §9): prepare next/prev on settle
-    LaunchedEffect(pagerState.currentPage, dataSaver) {
+    LaunchedEffect(pagerState.currentPage, dataSaver, videoQuality) {
         val page = pagerState.currentPage
         val neighbors =
             buildList {
                 if (page > 0) add(items[page - 1])
                 if (page + 1 < items.itemCount) add(items[page + 1])
             }
-        player.preloadNeighbors(neighbors.filterNotNull(), dataSaver)
+        player.preloadNeighbors(neighbors.filterNotNull(), dataSaver, videoQuality)
     }
     // errors belong to the current item; a swipe resets the overlay + the
     // pending pool-end advance (a manual swipe supersedes it)
@@ -375,10 +399,11 @@ fun PlayerScreen(
                     autoSwipeOn = autoSwipe && !dataSaver,
                     onToggleAutoSwipe = { muteScope.launch { settings.setAutoSwipe(!autoSwipe) } },
                     skipResume = skipResume,
+                    videoQuality = videoQuality,
                     playError = playError && page == pagerState.currentPage,
                     onRetry = {
                         playError = false
-                        player.playGif(gif, dataSaver)
+                        player.playGif(gif, dataSaver, videoQuality = videoQuality)
                     },
                     onSkip = { playError = false },
                     videoFit = videoFit,
@@ -456,6 +481,8 @@ private fun PlayerPage(
     onShare: () -> Unit,
     onOverflow: () -> Unit,
     skipResume: androidx.compose.runtime.MutableState<Boolean>,
+    /** §5 preferred quality (auto | highest | 720 | 480) at prepare time. */
+    videoQuality: String,
     autoSwipeOn: Boolean,
     onToggleAutoSwipe: () -> Unit,
     playError: Boolean,
@@ -472,10 +499,12 @@ private fun PlayerPage(
 ) {
     // React to the shared player's media swaps (attach gating below).
     val playingId by player.currentGifId.collectAsStateWithLifecycle()
+    // §5 video fit: user choice (Fit default · Crop). A legacy stored
+    // "stretch" value de-maps to Fit (RESIZE_MODE_FILL removed, issue #21 —
+    // destructive distortion mode retired; no data migration needed).
     val videoFitMode =
         when (videoFit) {
             "crop" -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-            "stretch" -> AspectRatioFrameLayout.RESIZE_MODE_FILL
             else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
         }
     var popAt by remember { mutableStateOf<Offset?>(null) }
@@ -495,7 +524,14 @@ private fun PlayerPage(
                     history?.watched == true -> 0L
                     else -> history?.positionMs ?: 0L
                 }
-            player.playGif(gif, dataSaver, resumeMs = resume)
+            if (player.currentGifId.value == gif.id) {
+                // Adopted inline preview already playing THIS gif (tap-to-open on
+                // the settled 1-col tile, issue #9): keep the live position and
+                // buffer — no re-prepare; the sampling below continues from the
+                // live position.
+            } else {
+                player.playGif(gif, dataSaver, resumeMs = resume, videoQuality = videoQuality)
+            }
             onPlayingChanged(true)
         }
         // resume tracking: sample position every 5s
@@ -574,9 +610,11 @@ private fun PlayerPage(
                         }
                     }
                 }
-                // single tap: reveal UI when hidden, pause/play when shown;
-                // double tap: like/unlike + heart pop (PLAN §9); hold: 2× while
-                // held (UX-PATTERNS candidate). Non-consuming (no
+                // single tap: TOGGLES UI VISIBILITY ONLY — never stops playback
+                // (pause/play lives on the visible control row; user issue #2 —
+                // TikTok-style tap-pause rejected). Always-on thin progress line
+                // below. Double tap: like/unlike + heart pop (PLAN §9); hold:
+                // 2× while held (UX-PATTERNS candidate). Non-consuming (no
                 // detectTapGestures) — it would eat the down event and starve
                 // the VerticalPager's drag gesture.
                 .pointerInput(controlsVisible, active, liked) {
@@ -655,36 +693,18 @@ private fun PlayerPage(
                             if (!liked) onToggleLike()
                             popAt = down.position
                         } else {
-                            if (controlsVisible) {
-                                if (player.isPlaying) player.pause() else player.playOrRestart()
-                            } else {
-                                onShowControls()
-                            }
+                            if (controlsVisible) onHideControls() else onShowControls()
                         }
                     }
                 },
     ) {
-        AndroidView(
-            factory = { ctx ->
-                PlayerView(ctx).apply {
-                    useController = false
-                    // §5 video fit: user choice (Fit default · Crop · Stretch).
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                }
-            },
-            update = { view ->
-                // Attach ONLY when the shared player is already (about to be)
-                // playing THIS page's gif — otherwise the new page renders the
-                // previous video's last frame for a beat (user report).
-                view.player = if (active && playingId == gif.id) player else null
-                view.resizeMode = videoFitMode
-                // SLICE-16 (stale-aspect guard, TV SLICE-14 parity): re-seed from
-                // the gif's own metadata on every attach/switch — an unknown
-                // gif aspect (0) CLEARS the frame's aspect instead of leaving
-                // the previous video's, so no frame renders with a stale
-                // aspect; the live videoSize update overrides when it arrives.
-                view.seedContentAspectRatio(gif.contentAspectRatio())
-            },
+        // Poster + surface share the zoom subtree (issue #8): the poster is
+        // a placeholder, not pixel-perfect (Fit framing may differ slightly
+        // from the seeded/rendered video box — acceptable). It zooms WITH the
+        // video so pinch-zoom never contrasts a static poster against a
+        // zooming surface. Poster-null gifs: nothing renders and the black
+        // background stays the truthful state (no invented placeholder).
+        Box(
             modifier =
                 Modifier
                     .fillMaxSize()
@@ -694,7 +714,49 @@ private fun PlayerPage(
                         translationX = pan.x
                         translationY = pan.y
                     },
-        )
+        ) {
+            AsyncImage(
+                model = gif.posterUrl,
+                contentScale = ContentScale.Fit,
+                contentDescription = null,
+                modifier = Modifier.matchParentSize(),
+            )
+            AndroidView(
+                factory = { ctx ->
+                    // player_page_view.xml: texture_view + transparent shutter
+                    // (issue #8) — transparent until the first video frame, so
+                    // this poster shows through the whole prepare window.
+                    (
+                        android.view.LayoutInflater
+                            .from(ctx)
+                            .inflate(
+                                com.rjbiermann.giffyviewer.feature.feed.R.layout.player_page_view,
+                                null,
+                                false,
+                            ) as PlayerView
+                    ).apply {
+                        useController = false
+                        // §5 video fit: user choice (Fit default · Crop);
+                        // re-asserted per update below so the pref wins.
+                        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    }
+                },
+                update = { view ->
+                    // Attach ONLY when the shared player is already (about to be)
+                    // playing THIS page's gif — otherwise the new page renders the
+                    // previous video's last frame for a beat (user report).
+                    view.player = if (active && playingId == gif.id) player else null
+                    view.resizeMode = videoFitMode
+                    // SLICE-16 (stale-aspect guard, TV SLICE-14 parity): re-seed from
+                    // the gif's own metadata on every attach/switch — an unknown
+                    // gif aspect (0) CLEARS the frame's aspect instead of leaving
+                    // the previous video's, so no frame renders with a stale
+                    // aspect; the live videoSize update overrides when it arrives.
+                    view.seedContentAspectRatio(gif.contentAspectRatio())
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
         // Bottom gradient scrim (audit H5 / AGENTS-UX-PATTERNS): text and rail
         // stay legible on bright content; fades with the controls.
         AnimatedVisibility(
