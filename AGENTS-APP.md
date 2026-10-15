@@ -196,14 +196,10 @@ unscheduled — a user slice picks.
 - ~~NicheAboutScreen swallow failures~~ — CLOSED 2026-10-01: detail failure shows
   error EmptyState + Retry (loadAbout() local fun shared by initial + retry); section
   fetches degrade to empty sections.
-- System back from an opened feed exits the app: MainActivity's BackHandler covers only the
-  overlay flags (settings/search/collections/…), but feeds opened inside FeedScreen via
-  `viewModel.open(...)` (creator chip, More ▾ item, search submit, Explore/Following/Niche
-  hops) set no flag — back gesture finishes the activity. The doc's "no back stack" posture
-  covers Settings, not this: from a creator feed the only escape is the Trending chip.
-  Minimal fix spec'd in the links audit below (FeedViewModel source history + BackHandler).
-  [BUILT 2026-10-01: open() remembers the prior source; canGoBack StateFlow +
-  FeedScreen BackHandler pops one level; verified compile + code-review.]
+- ~~System back from an opened feed exits the app~~ — **OBSOLETED 2026-10 (issue #13 nav wave):**
+  the one-level source-history stopgap (open() remembers the prior source; canGoBack +
+  FeedScreen BackHandler pops one level) was the nav-library trigger firing; the whole hand-rolled
+  stack is gone. See "NAVIGATION migration (issue #13)" below.
 
 **Medium**
 - ~~CustomFeedsScreen delete has NO confirm dialog~~ — CLOSED 2026-10-01: confirm-first
@@ -307,27 +303,84 @@ architecture.
 
 **Back-stack prerequisite (ties into round 3 High):** wiring @user links on mobile exposes the
 back problem immediately — open a creator feed from a tile and system back exits the app.
-Minimal standard fix BEFORE/with the link wiring: a small source history in FeedViewModel
+~~Minimal standard fix BEFORE/with the link wiring: a small source history in FeedViewModel
 (`List<FeedSource>`; `open()` appends, a `BackHandler` inside FeedScreen pops it, disabled on
-home) — platform-native Compose mechanism, ~20 lines, no dependency.
+home) — platform-native Compose mechanism, ~20 lines, no dependency.~~ (Built 2026-10-01, then
+SUPERSEDED by the nav migration below — the nav stack owns feed-hop history.)
 
-**Navigation library decision: NOT now (revisit on trigger).**
-Reasoning, ladder-style:
-- The links do not need it — `FeedSource` + `open()` already navigate; a nav library would
-  route the same hops through a controller with identical in-place semantics.
-- Deep links — the library's biggest freebie — are excluded by §0 (viewer-only, share-only).
-- The screen-shell flags (MainActivity/TvMainActivity) are confined and TV's BackHandler
-  already covers every state; the ONE back bug lives in FeedScreen's in-place source, which
-  a nav library wouldn't naturally own either (feeds are state, not destinations — the
-  chip-tab model).
-- New dependency cost is real: no navigation-compose today; adopting typed routes means
-  re-plumbing both shells + splitting FeedScreen into home vs source-feed destinations
-  (the TV's TvSourceFeedScreen shape) — a week-shaped restructure to fix one ~20-line bug.
-**Revisit triggers:** (a) a second multi-hop navigation pain appears (e.g. nested About →
-related-niche chains losing position), (b) screen arguments need serialization guarantees
-beyond `rememberSaveable` booleans, (c) the shells' flag lists keep growing. If adopted:
-Navigation Compose typed routes (kotlinx-serialization) in `:app-mobile` first; TV follows
-only if its shell grows (its leanback back behavior is already correct).
+**Navigation library decision: ~~NOT now (revisit on trigger).~~ ADOPTED (issue #13).**
+The NOT-now block is kept as the decision trail; its own revisit triggers (a) nested multi-hop
+navigation losing position and (c) the shells' flag lists growing BOTH fired, and the user
+decided `androidx.navigation:navigation-compose` (STABLE, not navigation-3). Full migration
+record: "NAVIGATION migration (issue #13)" section below (DESIGN-nav-stream.md).
+
+## NAVIGATION migration (issue #13) — BUILT 2026-10 nav stream
+Both shells run `androidx.navigation:navigation-compose` (catalog pin `navigationCompose =
+"2.10.2"`, stable 2.10 line per the design doc's live Maven check; `hiltViewModel()` API
+unchanged). Type-safe routes are `@Serializable` classes: app modules gained the
+kotlinx-serialization plugin; `:feature:feed`'s `FeedSource` and `:core:model`'s `Gif`/`NicheRef`
+are annotated (route/saved-state payloads ONLY — comment on the annotated types says so;
+`:core:network` DTOs stay out).
+
+**Mobile routes** (`MainActivity.kt`, package `mobile`): `MainFeed(source: FeedSource? = null)`
+= start destination (`null` resolves the shared FeedViewModel's seeded default — For-You/
+Trending cold-start rule untouched), `MainPlayer(startIndex)` (feed-scoped player, pages the
+SHARED pager), `MainSearch`, `MainNiches`, `MainNicheAbout(id, name)`, `MainFollowing`,
+`MainCollections`, `MainCustomFeeds`, `MainSettings`. `MainExplore` from the design doc does
+NOT exist — the search stream deleted ExploreScreen pre-migration.
+
+**TV routes** (`TvMainActivity.kt`, package `tv`): `TvHome` (start), `TvFeed(source: FeedSource)`,
+`TvPlayer(gifs: List<Gif>, startIndex)` (the loaded window in saved state — Gif is
+`@Serializable`; ~tens of records, R3-fallback deliberately NOT built), `TvNiches`,
+`TvNicheAbout(about: FeedSource.Niche)`, `TvSearch`, `TvCollections`, `TvCustomFeeds`,
+`TvSettings`.
+
+**ViewModel scoping (the §3.3 rule — keep this invariant in future edits):** the SHARED
+`FeedViewModel` stays ACTIVITY-scoped — acquired with an explicit `hiltViewModel()` at
+NavHost scope BEFORE `NavHost { }` and passed by parameter. Inside destination content,
+`hiltViewModel()` means NavBackStackEntry scope: only naturally-per-visit models use it
+(Collections/CustomFeeds/Following/Search/Niches/NicheAbout models, TV's
+`TvNicheFeedViewModel`, TvHome's home model).
+
+**Every MainFeed/TvFeed entry re-asserts its source on (re)composition**
+(`LaunchedEffect(src) { if (vm.source != src) vm.open(src) }`) — covered-entry history works
+while the VM stays single-sourced. Feed hop seams: FeedScreen's strip/chips/tile-caption/
+changed-sort go through `onFeedNav(source) → navigate(MainFeed(source))` (changed sort = its
+own back entry; setSort still persists + one-shot-forces). TV feed swaps (= onSwitchFeed) push;
+CHANGED sort replaces the current entry (`popUpTo(entry.id) { inclusive = true }`).
+
+**Player cluster opens are route pushes now:** PlayerScreen gained `onOpenFeed: (FeedSource) ->
+Unit` (replaces in-place `viewModel.open` + onBack); the host INSERTS the feed while popping
+the player entry — BACK lands the covered feed at its scroll position (pre-nav semantics:
+open-then-close). TV keeps "exits the player" the same way. QuickBlockSheet's seam renamed to
+`onOpenFeed: (FeedSource) -> Unit` likewise.
+
+**Gone with the migration (bookkeeping superseded):** the 8/9 parallel `rememberSaveable` route
+flags + the two when-chain BackHandlers; FeedViewModel's `previousSource`/`canGoBack`/`back()`;
+FeedScreen's hop BackHandler; TV's Root hoisted `homeListState`/`feedGridState` (per-entry
+saveable states now); TV's non-saveable `openFeed`/`player` Root pairs (process death also
+covered now, §8.5). AgeGate/PinLock stay OUTSIDE the NavHost; GiffyScaffold, ContentFilter,
+CenterHold/FocusPreview/focus rings, E's in-screen SettingsPage panels are NOT migrated.
+Mobile FLAG_KEEP_SCREEN_ON keys on `destination.hasRoute<MainPlayer>()` (a covered player
+keeps it — onOpenAccount-over-player is finally reachable, §8.6).
+
+**TV focus restore (the "focus position" ask, §4.3):** scroll restores free via nav per-entry
+saveable states; focus is explicit — `focusTargetFor(savedFocusItem, itemCount)` (app-tv,
+FocusRestore.kt + unit test) picks the re-arm card; the grid effect re-arms once per content
+delivery (boolean key — appends never re-grab); home rows save (rowTitle, itemIndex) pairs in
+the TvHome destination and each FeedRow/CreatorRow re-arms its saved card with a non-saveable
+per-appear latch; header-pill initial focus runs only while no saved row focus exists
+(process death keeps the saved pair — PIN demanded fresh, §8.15 unchanged).
+
+**Search-submit semantics under nav:** stay-on-stack (BACK returns to the draft/history, §8.4);
+Niches/Following/About/CustomFeeds opens also stay on the stack (no manual clears).
+
+**Owed device gates (implementation can't run them):** design §8's 15-step list on both
+emulators — full pass before closing the issue. Known device-sensitive bits: MainFeed source
+re-assert + S3 reset-emit must not flash the grid on pop; player pop keeps the feed's grid
+ position; TV D-pad focus walk after restore (R8); the >1MB-serialized-route risk (R3) stays
+ theoretical.
+
 
 **Feature audit (2026-10-02) — parity writes unchanged; corrections**
 - GifsApi has `POST v2/me/collections` (create) + `DELETE v2/me/collections/{id}` but NO

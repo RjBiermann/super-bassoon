@@ -46,10 +46,9 @@ internal fun QuickBlockSheet(
     onSpeedChange: (Float) -> Unit = {},
     /** Surfaced when the OPEN feed itself is addable (e.g. a niche). */
     addableFeedRef: String? = null,
-    /** Links audit #3: "Open @user's feed" — player entry must exit the player first
-     *  (swapping the source under the live pager is the soak-crash class); grid entry
-     *  navigates in place. */
-    onOpenFeed: () -> Unit = {},
+    /** Links audit #3: "Open @user's feed" — the caller navigates (issue #13:
+     *  a route push; the player pops itself first via the nav replacement). */
+    onOpenFeed: (FeedSource) -> Unit = {},
 ) {
     // Follow state (site parity "Follow ↔ Following"): server read on open,
     // toggled in place. Anonymous users see no row (a write would 401).
@@ -134,9 +133,8 @@ internal fun QuickBlockSheet(
                     }
                     // Links audit #3: the most basic navigation act on a creator.
                     listStyle("Open @${gif.userName}'s feed") {
-                        viewModel.open(FeedSource.Creator(username = gif.userName))
                         onDismiss()
-                        onOpenFeed()
+                        onOpenFeed(FeedSource.Creator(username = gif.userName))
                     }
                     // Issue #27: the write is awaited — on failure the sheet
                     // stays open with the row in its pre-toggle state (no

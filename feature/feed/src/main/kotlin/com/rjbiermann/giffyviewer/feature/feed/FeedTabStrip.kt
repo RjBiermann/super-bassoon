@@ -64,11 +64,12 @@ internal fun isInFeedGroup(source: FeedSource): Boolean = source in FEED_GROUP
  * only, NOT persisted).
  * State arrives as plain parameters (zero ViewModel coupling — the caller
  * collects from its own FeedViewModel); [onOpen] is the feed-switch seam:
- * mobile wires `viewModel.open` (in-place swap), TV wires the full-page
- * openFeed path. The Explore/Following/Niches/Collections/CustomFeeds rows
- * are SCREEN seams — null hides the row (TV hosts Niches/Collections/
- * CustomFeeds on Root browser states; Explore/Following have no TV host
- * surface today). No Surprise seam — that feature was removed from the app.
+ * mobile wires the onFeedNav route push (MainFeed, issue #13), TV the
+ * TvFeed full-page destination push. The Explore/Following/Niches/
+ * Collections/CustomFeeds rows are SCREEN seams — null hides the row (both
+ * hosts route them to destinations; TV hosts Niches/Collections/
+ * CustomFeeds but not Explore/Following — no host surface today). No
+ * Surprise seam — that feature was removed from the app.
  */
 @Composable
 fun FeedTabStrip(

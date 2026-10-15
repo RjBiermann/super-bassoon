@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -101,6 +102,11 @@ fun FeedScreen(
     onOpenFollowing: () -> Unit = {},
     onOpenCollections: () -> Unit = {},
     onOpenCustomFeeds: () -> Unit = {},
+    /** Issue #13 §3.4: the grid's own feed hops (strip chips, creator chips,
+     *  tile captions, a changed sort) are back-stack entries now — one route
+     *  push per hop, BACK restores the previous feed + its scroll. The VM
+     *  keeps no source history. */
+    onFeedNav: (FeedSource) -> Unit = {},
     /** Inline feed autoplay (AGENTS-PLAYER spec): the 1-column feed's settled
      *  tile plays a muted+looped preview. Null factory = no inline preview. */
     playerFactory: GiffyPlayerFactory? = null,
@@ -131,10 +137,9 @@ fun FeedScreen(
     val globalOrientation by viewModel.orientationFilter.collectAsStateWithLifecycle("any")
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    // System back returns to the prior feed before exiting (round-3 audit:
-    // chip/More/search-opened feeds set no overlay flag — back killed the app).
-    val canGoBack by viewModel.canGoBack.collectAsStateWithLifecycle()
-    androidx.activity.compose.BackHandler(enabled = canGoBack) { viewModel.back() }
+    // Issue #13: system back is owned by the NavHost — the one-level hop-back
+    // machinery this file used to carry (BackHandler + canGoBack) is gone; a
+    // hop is a route push and BACK pops it with per-entry scroll state.
 
     LaunchedEffect(showBlockHint) {
         if (showBlockHint) {
@@ -175,7 +180,7 @@ fun FeedScreen(
                 favoritedFeeds = favoritedFeeds,
                 pinnedCreators = pinnedCreators,
                 customFeeds = customFeeds,
-                onOpen = { viewModel.open(it) },
+                onOpen = onFeedNav,
                 lastGroupSub = viewModel.lastGroupSub(),
                 onOpenFollowing = onOpenFollowing,
                 onOpenNiches = onOpenNiches,
@@ -196,7 +201,7 @@ fun FeedScreen(
                 ) {
                     creators.forEach { creator ->
                         SuggestionChip(
-                            onClick = { viewModel.open(FeedSource.Creator(username = creator.username)) },
+                            onClick = { onFeedNav(FeedSource.Creator(username = creator.username)) },
                             label = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     CreatorLabel(creator.username, creator.verified)
@@ -308,6 +313,11 @@ fun FeedScreen(
                         // Sort persistence rides the EXISTING setSort path
                         // (pendingForce one-shot bypass + adoption on open).
                         viewModel.setSort(source, sort)
+                        // Issue #13 §3.4: a CHANGED sort is its own back-stack
+                        // entry — BACK returns to the pre-sort feed, at its
+                        // scroll position (the sort simply re-identifies the
+                        // feed, so no in-place reset exists anymore).
+                        if (sort != activeSort) onFeedNav(source.withSort(sort))
                         showFilter = false
                     },
                     onDismiss = { showFilter = false },
@@ -420,13 +430,11 @@ fun FeedScreen(
                 // Pull-to-refresh owns revalidate (same path as the TTL
                 // revalidate); the scroll-up icon is NAVIGATION only (#23 — no
                 // network action on click, one floating control over media).
-                // Fresh state per feed/sort: a sort change starts at the top
-                // (user report — the grid kept the old scroll offset).
-                val gridState =
-                    remember(source.keyBase) {
-                        androidx.compose.foundation.lazy.staggeredgrid
-                            .LazyStaggeredGridState()
-                    }
+                // Issue #13: scroll state is saveable and scoped to the nav
+                // entry (back into a covered entry restores it). A CHANGED
+                // sort is a DIFFERENT entry now (new route), so it still starts
+                // at the top — the old keyBase-keyed reset is superseded.
+                val gridState = rememberLazyStaggeredGridState()
                 val showPill by rememberScrollingUp(gridState, SCROLL_TO_TOP_THRESHOLD)
                 // Inline feed autoplay (AGENTS-PLAYER spec; live-parity verified
                 // 2026-10-02 — the site's own 1-col feed runs ONE shared muted+
@@ -547,7 +555,7 @@ fun FeedScreen(
                                         onClick = { onOpenPlayer(index) },
                                         onLongPress = { sheetFor = gif },
                                         onOpenCreator = {
-                                            viewModel.open(FeedSource.Creator(username = gif.userName))
+                                            onFeedNav(FeedSource.Creator(username = gif.userName))
                                         },
                                         inlinePlayer = inlinePlayer,
                                         inlineAttached = inlineIndex == index,
@@ -559,6 +567,8 @@ fun FeedScreen(
                                             viewModel = viewModel,
                                             addableFeedRef =
                                                 (source as? FeedSource.Niche)?.let { packNicheRef(it.id, it.name, prefixed = true) },
+                                            // Issue #13: the sheet's creator row is a route push.
+                                            onOpenFeed = onFeedNav,
                                         )
                                     }
                                 }

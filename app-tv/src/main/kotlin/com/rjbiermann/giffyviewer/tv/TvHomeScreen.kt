@@ -29,6 +29,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
@@ -81,6 +83,14 @@ fun TvHomeScreen(
     listState: androidx.compose.foundation.lazy.LazyListState =
         androidx.compose.foundation.lazy
             .rememberLazyListState(),
+    /** Issue #13 §4.3: saveable D-pad focus position routed through the host
+     *  destination — (row title, item index). Nav restores SCROLL for free
+     *  via the saveable list state; focus is composition-transient, so the
+     *  ROWS save the last focused card here and re-arm it on re-entry (per-
+     *  row latch). Blank row = fresh entry (the header keeps initial focus). */
+    focusRow: String = "",
+    focusItem: Int = -1,
+    onFocusSaved: (String, Int) -> Unit = { _, _ -> },
 ) {
     // Row-height setting (slice 11): DataStore pref → effective card height.
     val tvRowHeightPref by homeViewModel.tvRowHeight.collectAsStateWithLifecycle("default")
@@ -171,6 +181,9 @@ fun TvHomeScreen(
                     rowHeight = rowHeight,
                     source = FeedSource.ForYou,
                     orientation = forYouOrientation,
+                    rowKey = "For You",
+                    restoredItem = if (focusRow == "For You") focusItem else -1,
+                    onFocusSaved = { i -> onFocusSaved("For You", i) },
                 )
             }
         }
@@ -185,10 +198,24 @@ fun TvHomeScreen(
                 rowHeight = rowHeight,
                 source = FeedSource.Trending,
                 orientation = trendingOrientation,
+                rowKey = "Trending",
+                restoredItem = if (focusRow == "Trending") focusItem else -1,
+                onFocusSaved = { i -> onFocusSaved("Trending", i) },
             )
         }
         // Explore = Top Creators (§9 lingo) — creators row, tap → creator feed.
-        item { CreatorRow("Explore", exploreCreators, onOpenCreator, failed = exploreFailed, onRetry = { homeViewModel.refreshExplore() }) }
+        item {
+            CreatorRow(
+                "Explore",
+                exploreCreators,
+                onOpenCreator,
+                failed = exploreFailed,
+                onRetry = { homeViewModel.refreshExplore() },
+                rowKey = "Explore",
+                restoredItem = if (focusRow == "Explore") focusItem else -1,
+                onFocusSaved = { i -> onFocusSaved("Explore", i) },
+            )
+        }
         item {
             FeedRow(
                 "Top This Week",
@@ -200,6 +227,9 @@ fun TvHomeScreen(
                 rowHeight = rowHeight,
                 source = FeedSource.TopThisWeek,
                 orientation = topThisWeekOrientation,
+                rowKey = "Top This Week",
+                restoredItem = if (focusRow == "Top This Week") focusItem else -1,
+                onFocusSaved = { i -> onFocusSaved("Top This Week", i) },
             )
         }
         // Empty-state rule: no blank favorites row when nothing is favorited.
@@ -215,6 +245,9 @@ fun TvHomeScreen(
                     rowHeight = rowHeight,
                     source = FeedSource.Favorites,
                     orientation = favoritesOrientation,
+                    rowKey = "Favorites",
+                    restoredItem = if (focusRow == "Favorites") focusItem else -1,
+                    onFocusSaved = { i -> onFocusSaved("Favorites", i) },
                 )
             }
         }
@@ -231,9 +264,21 @@ fun TvHomeScreen(
                     rowHeight = rowHeight,
                     source = FeedSource.Liked,
                     orientation = likedOrientation,
+                    rowKey = "Liked GIFs & Images",
+                    restoredItem = if (focusRow == "Liked GIFs & Images") focusItem else -1,
+                    onFocusSaved = { i -> onFocusSaved("Liked GIFs & Images", i) },
                 )
             }
-            item { CreatorRow("Following", followingCreators.map { it }, onOpenCreator) }
+            item {
+                CreatorRow(
+                    "Following",
+                    followingCreators.map { it },
+                    onOpenCreator,
+                    rowKey = "Following",
+                    restoredItem = if (focusRow == "Following") focusItem else -1,
+                    onFocusSaved = { i -> onFocusSaved("Following", i) },
+                )
+            }
         }
     }
 
@@ -270,7 +315,32 @@ private fun CreatorRow(
     onOpenCreator: (String) -> Unit,
     failed: Boolean = false,
     onRetry: (() -> Unit)? = null,
+    /** Issue #13 §4.3 focus seam: stable row id + the saved item this row must
+     *  re-arm on re-entry (-1 = not this row) + the host save callback. */
+    rowKey: String = "",
+    restoredItem: Int = -1,
+    onFocusSaved: (Int) -> Unit = {},
 ) {
+    // Focused-row centering (#14 §B) — declared first so the §4.3 restore
+    // effect can anchor on the same row state (its saveable LazyListState
+    // also restores the horizontal offset on re-entry for free).
+    val (centeringState, onCardFocus) = rememberCenteringRow(loading = false)
+    // Issue #13 §4.3: re-arm the saved card once per entry appearance (the
+    // latch is deliberately NOT saveable — it must reset per re-entry while
+    // the saved index rides the host's saveables).
+    var focusRearmed by remember { mutableStateOf(false) }
+    val rowFocus = remember { FocusRequester() }
+    LaunchedEffect(restoredItem, creators.size) {
+        // Index guard covers the unsaved state too (no saved index = -1 →
+        // nothing to re-arm); scrollToItem's Range constraint is then trivially
+        // satisfied — no silent re-focus across rows.
+        if (focusRearmed || restoredItem !in creators.indices) return@LaunchedEffect
+        focusRearmed = true
+        // Scroll is suspend: the saved card is composed when this returns.
+        centeringState.scrollToItem(restoredItem.coerceAtLeast(0))
+        runCatching { rowFocus.requestFocus() }
+    }
+
     // Same reservation rule as FeedRow: loading rows hold their space.
     Column(modifier = Modifier.padding(vertical = 8.dp).heightIn(min = ROW_RESERVED_HEIGHT)) {
         RowTitle(title)
@@ -287,7 +357,6 @@ private fun CreatorRow(
                 }
             }
         }
-        val (centeringState, onCardFocus) = rememberCenteringRow(loading = false)
         androidx.compose.foundation.lazy.LazyRow(
             state = centeringState,
             contentPadding = PaddingValues(horizontal = 16.dp),
@@ -297,7 +366,13 @@ private fun CreatorRow(
                 val creator = creators[i]
                 Card(
                     onClick = { onOpenCreator(creator.username) },
-                    modifier = Modifier.onFocusChanged { focus -> onCardFocus(i, focus.isFocused) },
+                    modifier =
+                        Modifier
+                            .then(if (i == restoredItem) Modifier.focusRequester(rowFocus) else Modifier)
+                            .onFocusChanged { focus ->
+                                onCardFocus(i, focus.isFocused)
+                                if (focus.isFocused && rowKey.isNotEmpty()) onFocusSaved(i)
+                            },
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(10.dp)) {
                         AsyncImage(
@@ -347,7 +422,30 @@ private fun FeedRow(
      *  honest filtered-empty copy ("any" → generic hint, strict value → names
      *  the actual filter, per-feed pref vs global Settings distinguished). */
     orientation: String = "any",
+    /** Issue #13 §4.3 focus seam: stable row id + the saved item this row must
+     *  re-arm on re-entry (-1 = not this row) + the host save callback. */
+    rowKey: String = "",
+    restoredItem: Int = -1,
+    onFocusSaved: (Int) -> Unit = {},
 ) {
+    // Focused-row centering (#14 §B) — declared first so the §4.3 restore
+    // effect can anchor on the same row state (its saveable LazyListState
+    // also restores the horizontal offset on re-entry for free).
+    val (centeringState, onCardFocus) =
+        rememberCenteringRow(loading = gifs.loadState.refresh is LoadState.Loading)
+    // Issue #13 §4.3: re-arm the saved card once per entry appearance. The
+    // latch is deliberately NOT saveable — it resets per re-entry, while the
+    // saved index itself rides the host's saveables (savedItem -1 = fresh
+    // entry: the header-pill initial focus owns that case).
+    var focusRearmed by remember { mutableStateOf(false) }
+    val rowFocus = remember { FocusRequester() }
+    LaunchedEffect(restoredItem, gifs.itemCount) {
+        if (restoredItem < 0 || focusRearmed || gifs.itemCount <= restoredItem) return@LaunchedEffect
+        focusRearmed = true
+        // Scroll is suspend: the saved card is composed when this returns.
+        centeringState.scrollToItem(restoredItem.coerceAtLeast(0))
+        runCatching { rowFocus.requestFocus() }
+    }
     // Reserve the row's space while paging loads — a zero-height row that pops
     // to full height shoves every row below (homepage UI drift, user report).
     // A strict global pref (orientation "horizontal" over an all-portrait pool,
@@ -382,11 +480,8 @@ private fun FeedRow(
                 modifier = Modifier.padding(start = 8.dp),
             ) { Text("Retry") }
         }
-        // Focused-row centering (#14 §B): row-loaded guard rides the paging
-        // refresh state — skip re-anchoring while pages load, recompute on settle
-        // (the loading flag is the effect's second key).
-        val (centeringState, onCardFocus) =
-            rememberCenteringRow(loading = gifs.loadState.refresh is LoadState.Loading)
+        // (#14 §B centering declaration moved to the top: the §4.3 restore
+        // effect anchors on the same row state.)
         LazyRow(
             state = centeringState,
             contentPadding = PaddingValues(horizontal = 16.dp),
@@ -396,9 +491,14 @@ private fun FeedRow(
                 gifs[i]?.let { gif ->
                     GifCard(
                         gif,
-                        Modifier.width(cardWidth(gif, rowHeight)),
+                        Modifier
+                            .width(cardWidth(gif, rowHeight))
+                            .then(if (i == restoredItem) Modifier.focusRequester(rowFocus) else Modifier),
                         onMenu = { viaHold -> onMenu(gif, source, viaHold) },
-                        onFocusChange = { focused -> onCardFocus(i, focused) },
+                        onFocusChange = { focused ->
+                            onCardFocus(i, focused)
+                            if (focused && rowKey.isNotEmpty()) onFocusSaved(i)
+                        },
                         onClick = { onOpenGif(snapshot(gifs), gifs.indexOf(gif.id)) },
                         preview = preview,
                         dataSaver = dataSaver,

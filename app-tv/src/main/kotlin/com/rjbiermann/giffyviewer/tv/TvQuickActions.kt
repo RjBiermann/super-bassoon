@@ -103,7 +103,8 @@ fun TvQuickActionsDialog(
      *  adds the "Refresh feed" row. Home contexts omit it (home rows are
      *  separate pagers; the full-page feed owns refresh). */
     onRefresh: (() -> Unit)? = null,
-    /** Slice 10 navigation hook — TvMainActivity swaps `openFeed`. */
+    /** Slice 10 navigation hook — the TvFeed nav destination navigates
+     *  (issue #13: BACK relands home at its rows). */
     onOpenFeed: (FeedSource) -> Unit = {},
 ) {
     var showAddToFeed by remember { mutableStateOf(false) }

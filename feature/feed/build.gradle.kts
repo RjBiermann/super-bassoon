@@ -2,6 +2,8 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    // FeedSource subtypes are nav route/saved-state payloads (issue #13 §2).
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.ktlint)
     alias(libs.plugins.detekt)
@@ -34,6 +36,7 @@ dependencies {
     implementation(libs.material.icons.extended)
     implementation(project(":core:ui"))
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.paging.runtime)
     implementation(libs.paging.compose)
     // retrofit2.HttpException is caught in the paging sources (pool-cap 400 →

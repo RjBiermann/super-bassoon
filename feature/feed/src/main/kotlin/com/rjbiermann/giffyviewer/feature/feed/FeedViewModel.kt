@@ -67,6 +67,11 @@ class FeedViewModel
          *  the cached Trending grid still renders (airplane-mode gate 3). */
         private val seededForYou = FeedRepository.defaultLandingSource(tokenStore.token.value != null)
 
+        /** Issue #13 §3.4: the NavHost start route (MainFeed(source = null))
+         *  resolves the seeded default through this — the VM remains the one
+         *  owner of the For-You/Trending cold-start rule. */
+        val seedSource: FeedSource get() = seededForYou
+
         private val mutableSource = MutableStateFlow<FeedSource>(seededForYou)
         val source: StateFlow<FeedSource> = mutableSource.asStateFlow()
 
@@ -82,7 +87,10 @@ class FeedViewModel
          *  [currentSourceError] is re-observed at call time (A2 stale-error
          *  guard): a latched Error from the previous pager must not act on a
          *  source swap — A1's reset-emit clears it within the same delivery,
-         *  and this re-read skips the residual same-frame window. */
+         *  and this re-read skips the residual same-frame window.
+         *  Issue #13: “manual opens set the navigation guard” is the nav
+         *  route now (every MainFeed entry asserts its source) — the revert
+         *  itself is unchanged. */
         fun notifyRefreshError(
             hasContent: Boolean,
             currentSourceError: () -> Boolean,
@@ -91,7 +99,6 @@ class FeedViewModel
             if (!FeedRepository.shouldRevertToTrending(source.value, userNavigated, hasContent)) return
             userNavigated = false
             mutableSource.value = FeedSource.Trending
-            _canGoBack.value = false
         }
 
         /** Bumped by pull-to-refresh / the "Refresh feed" pill: restarts the pager
@@ -138,20 +145,6 @@ class FeedViewModel
             refreshGen.value = refreshGen.value + 1
         }
 
-        /** One-level back (audit round 3): feeds opened from chips/More/hops set
-         *  no overlay flag, so system back exited the app. open() remembers the
-         *  prior source; FeedScreen's BackHandler pops it before back exits. */
-        private var previousSource: FeedSource? = null
-
-        private val _canGoBack = MutableStateFlow(false)
-        val canGoBack: StateFlow<Boolean> = _canGoBack.asStateFlow()
-
-        fun back() {
-            previousSource?.let { mutableSource.value = it }
-            previousSource = null
-            _canGoBack.value = false
-        }
-
         /** #25 Feeds-group last-sub memory (in-memory, source-lifespan): the
          *  last group member opened, so the Feeds chip re-opens it from any
          *  non-group source. Click-time read only — a plain var is correct
@@ -173,12 +166,12 @@ class FeedViewModel
                 // value — group members are sortless, so this equals the feed).
                 if (next in FEED_GROUP) lastGroupSub = next
                 if (next != mutableSource.value) {
-                    previousSource = mutableSource.value
-                    // Any explicit open (chip/More/hop) is user navigation —
-                    // the seeded-default offline fallback no longer applies.
+                    // Any explicit open (nav route/chip/More) is user
+                    // navigation — the seeded-default offline fallback no
+                    // longer applies. Source history is the nav stack's job
+                    // (issue #13); the VM keeps no duplicate of it.
                     userNavigated = true
                 }
-                _canGoBack.value = next != mutableSource.value && previousSource != null
                 mutableSource.value = next
             }
         }

@@ -6,13 +6,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -21,8 +21,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -30,6 +32,11 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import androidx.tv.material3.Border
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
@@ -41,11 +48,56 @@ import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.ui.Feature
 import com.rjbiermann.giffyviewer.core.ui.GiffyTheme
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
+import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
 import com.rjbiermann.giffyviewer.feature.feed.parseNicheRef
 import com.rjbiermann.giffyviewer.feature.settings.SettingsScreen
+import com.rjbiermann.giffyviewer.search.SearchScreen
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.serialization.Serializable
 import javax.inject.Inject
 import androidx.tv.material3.Text as TvText
+
+/**
+ * Issue #13 nav routes (TV). TV keeps D-pad semantics throughout: the nav
+ * stack only changes WHICH composable hosts a screen; CenterHold/FocusPreview/
+ * focus rings inside a screen are untouched. The player payload is the loaded
+ * window (§4.1): Gif is @Serializable, the route JSON lives in nav saved state
+ * only — a fallback startIndex-only route is deliberately NOT built (R3/YAGNI).
+ */
+@Serializable
+data object TvCollections
+
+@Serializable
+data object TvCustomFeeds
+
+@Serializable
+data object TvHome
+
+@Serializable
+data class TvNicheAbout(
+    val about: FeedSource.Niche,
+)
+
+@Serializable
+data object TvNiches
+
+@Serializable
+data class TvFeed(
+    val source: FeedSource,
+)
+
+/** One-shot per opened window: BACK relands the covered grid/list resume-free. */
+@Serializable
+data class TvPlayer(
+    val gifs: List<Gif>,
+    val startIndex: Int,
+)
+
+@Serializable
+data object TvSearch
+
+@Serializable
+data object TvSettings
 
 @AndroidEntryPoint
 class TvMainActivity : ComponentActivity() {
@@ -97,67 +149,11 @@ class TvMainActivity : ComponentActivity() {
     @Composable
     private fun Root() {
         val confirmed by settings.ageConfirmed.collectAsStateWithLifecycle(initialValue = false)
-        var player: Pair<List<Gif>, Int>? by remember { mutableStateOf(null) }
-        var showSettings by remember { mutableStateOf(false) }
-        var showNiches by remember { mutableStateOf(false) }
-        // TV parity gaps closed (AGENTS-APP.md): shared :feature:* screens hosted
-        // the same way Settings/Auth already are.
-        var showSearch by remember { mutableStateOf(false) }
-        var showCollections by remember { mutableStateOf(false) }
-        var showCustomFeeds by remember { mutableStateOf(false) }
-        var nicheAbout: FeedSource.Niche? by remember { mutableStateOf(null) }
-        var openFeed: FeedSource? by remember { mutableStateOf(null) }
-        val pinnedNiches by settings.pinnedNiches.collectAsStateWithLifecycle(initialValue = emptySet())
-        val pinnedCreators by settings.pinnedCreators.collectAsStateWithLifecycle(initialValue = emptySet())
-        // Preview-on-focus gates on data-saver (posters only — same rule as the
-        // mobile inline autoplay).
-        val dataSaver by settings.dataSaver.collectAsStateWithLifecycle(false)
-        // Custom feed pills (PLAN §7 builder) — from Room, ordered by creation.
-        val customFeeds by db
-            .customFeedDao()
-            .all()
-            .collectAsStateWithLifecycle(initialValue = emptyList())
-
-        // D-pad BACK pops the top screen instead of exiting the activity
-        val screenOpen =
-            player != null ||
-                showSettings ||
-                showNiches ||
-                openFeed != null ||
-                showSearch ||
-                showCollections ||
-                showCustomFeeds ||
-                nicheAbout != null
-        androidx.activity.compose.BackHandler(
-            enabled = screenOpen,
-        ) {
-            when {
-                player != null -> player = null
-                openFeed != null -> openFeed = null
-                showSearch -> showSearch = false
-                showCollections -> showCollections = false
-                showCustomFeeds -> showCustomFeeds = false
-                nicheAbout != null -> nicheAbout = null
-                showNiches -> showNiches = false
-                showSettings -> showSettings = false
-                else -> showSettings = false
-            }
-        }
-
+        // Issue #13 §4.2: age gate + PIN stay OUTSIDE the NavHost (gating, not
+        // navigation). unlocked is deliberately NOT saveable — same as today,
+        // a PIN demands re-entry after process death (§8.15).
         val pinHash by settings.pinHash.collectAsStateWithLifecycle(initialValue = null)
         var unlocked by remember { mutableStateOf(false) }
-
-        // Ribbon-state hoisting (2026-10 user report: back from a full-screen
-        // surface lost the feed's scroll position — home/feed are `when`
-        // branches, so their remember-ed scroll states died with the branch).
-        // Both states live at Root scope: they survive every branch swap
-        // (player, settings, full-page feed, search…) so BACK lands the user
-        // where they were. The paging data itself refills from Room instantly.
-        val homeListState = rememberLazyListState()
-        // #15: the source-feed grid is a staggered one now — same hoisting seam,
-        // BACK from the player keeps exactly the same scroll position.
-        val feedGridState = rememberLazyStaggeredGridState()
-
         // PLAN §1: 5% overscan margins on TV — content never touches the bezel.
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 48.dp, vertical = 27.dp)) {
             when {
@@ -172,257 +168,308 @@ class TvMainActivity : ComponentActivity() {
                         onExit = ::finishAffinity,
                         requestInitialFocus = true,
                     )
-                player != null -> {
-                    val (gifs, start) = player ?: listOf<Gif>() to 0
-                    TvPlayerScreen(
-                        gifs = gifs,
-                        startIndex = start,
-                        playerFactory = playerFactory,
-                        settings = settings,
-                        db = db,
-                        feedViewModel = hiltViewModel(),
-                        onBack = { player = null },
-                        onOpenCreator = { username -> openFeed = FeedSource.Creator(username = username) },
-                        onOpenNiche = { niche -> openFeed = niche },
+                else -> TvNav()
+            }
+        }
+    }
+
+    @Composable
+    private fun TvNav() {
+        val navController = rememberNavController()
+        // Issue #13 §4.2: FeedViewModel (quick-action/model for prefs, strip
+        // data, likes, favorites) stays ACTIVITY-scoped — acquired at NavHost
+        // scope, passed by parameter. Inside a destination hiltViewModel()
+        // would silently scope to the NavBackStackEntry.
+        val quickVm: FeedViewModel = hiltViewModel()
+        NavHost(navController, startDestination = TvHome) {
+            composable<TvHome> {
+                TvHomeDestination(navController)
+            }
+            composable<TvFeed> { entry ->
+                val route = entry.toRoute<TvFeed>()
+                val dataSaver by settings.dataSaver.collectAsStateWithLifecycle(false)
+                // Per-feed pager model — entry-scoped now (§4.2): one fresh
+                // TvNicheFeedViewModel per pushed feed (the flow pins the
+                // source via remember(source.keyBase) inside the screen).
+                val feedVm: TvNicheFeedViewModel = hiltViewModel()
+                // Batch-22 hoisted grid state is REPLACED: per-entry saveable
+                // state (BACK from player keeps exactly this entry's position).
+                val gridState = rememberLazyStaggeredGridState()
+                // Issue #13 §4.3: saveable grid focus position — BACK from a
+                // player re-arms D-pad focus on the same card (TvSourceFeedScreen
+                // owns the restore; the header initial focus must yield to it).
+                var focusItem by rememberSaveable { mutableIntStateOf(-1) }
+                TvSourceFeedScreen(
+                    source = route.source,
+                    onOpenGif = { gifs, index -> navController.navigate(TvPlayer(gifs, index)) },
+                    viewModel = feedVm,
+                    feedViewModel = quickVm,
+                    onOpenNiche = { niche -> navController.navigate(TvFeed(niche)) },
+                    // #18: the dialog's sort half re-identifies the feed — a
+                    // CHANGED sort REPLACES this entry (no stacking per tap).
+                    onSortChange = { sorted ->
+                        navController.navigate(TvFeed(sorted)) {
+                            popUpTo(entry.id) { inclusive = true }
+                        }
+                    },
+                    // #19 tab strip: a tab swap is its own full-page entry (same
+                    // family as the strip opens — BACK walks them one by one).
+                    onSwitchFeed = { source -> navController.navigate(TvFeed(source)) },
+                    onOpenNiches = { navController.navigate(TvNiches) },
+                    onOpenCollections = { navController.navigate(TvCollections) },
+                    onOpenCustomFeeds = { navController.navigate(TvCustomFeeds) },
+                    playerFactory = playerFactory,
+                    dataSaver = dataSaver,
+                    gridState = gridState,
+                    savedFocusItem = focusItem,
+                    onFocusSaved = { focusItem = it },
+                )
+            }
+            composable<TvPlayer> { entry ->
+                val route = entry.toRoute<TvPlayer>()
+                TvPlayerScreen(
+                    gifs = route.gifs,
+                    startIndex = route.startIndex,
+                    playerFactory = playerFactory,
+                    settings = settings,
+                    db = db,
+                    feedViewModel = quickVm,
+                    onBack = { navController.popBackStack() },
+                    // Doc comment keeps its "exits the player" semantics: the
+                    // popped-entry replace puts the feed where the player was,
+                    // BACK lands the covered surface (home rows / taking grid).
+                    onOpenCreator = { username ->
+                        navController.navigate(TvFeed(FeedSource.Creator(username = username))) {
+                            popUpTo(entry.id) { inclusive = true }
+                        }
+                    },
+                    onOpenNiche = { niche ->
+                        navController.navigate(TvFeed(niche)) {
+                            popUpTo(entry.id) { inclusive = true }
+                        }
+                    },
+                )
+            }
+            composable<TvNiches> {
+                TvNichesScreen(
+                    onOpenNiche = { niche -> navController.navigate(TvFeed(niche)) },
+                    onOpenNicheAbout = { id, name ->
+                        navController.navigate(TvNicheAbout(FeedSource.Niche(id, name)))
+                    },
+                )
+            }
+            composable<TvNicheAbout> { entry ->
+                val about = entry.toRoute<TvNicheAbout>().about
+                com.rjbiermann.giffyviewer.feature.feed.NicheAboutScreen(
+                    nicheId = about.id,
+                    nicheName = about.name,
+                    onBack = { navController.popBackStack() },
+                    onOpenCreator = { username ->
+                        navController.navigate(TvFeed(FeedSource.Creator(username = username)))
+                    },
+                    onOpenNiche = { niche -> navController.navigate(TvFeed(niche)) },
+                    viewModel = hiltViewModel(),
+                    joinViewModel = hiltViewModel(),
+                )
+            }
+            composable<TvSearch> {
+                SearchScreen(
+                    onBack = { navController.popBackStack() },
+                    onSubmit = { q -> navController.navigate(TvFeed(FeedSource.Search(query = q))) },
+                    onOpenCreator = { username ->
+                        navController.navigate(TvFeed(FeedSource.Creator(username = username)))
+                    },
+                    onOpenNiche = { id, name -> navController.navigate(TvFeed(FeedSource.Niche(id, name))) },
+                    onOpenFeed = { source -> navController.navigate(TvFeed(source)) },
+                    viewModel = hiltViewModel(),
+                )
+            }
+            composable<TvCollections> {
+                com.rjbiermann.giffyviewer.feature.feed.CollectionsScreen(
+                    onBack = { navController.popBackStack() },
+                    viewModel = hiltViewModel(),
+                )
+            }
+            composable<TvCustomFeeds> {
+                com.rjbiermann.giffyviewer.feature.feed.CustomFeedsScreen(
+                    onBack = { navController.popBackStack() },
+                    requestInitialFocus = true,
+                    onOpenFeed = { feed -> navController.navigate(TvFeed(feed)) },
+                    viewModel = hiltViewModel(),
+                )
+            }
+            composable<TvSettings> {
+                SettingsScreen(
+                    onBack = { navController.popBackStack() },
+                    showGridColumns = false,
+                    showFeedAutoplay = false,
+                    // TV home has its own row-height setting (mobile grid
+                    // columns section is hidden here; this row SHOWS on TV).
+                    showTvRowHeight = true,
+                    requestInitialFocus = true,
+                )
+            }
+        }
+    }
+
+    /** Home rows, pills + More ▾ menu — the standing surface the hosts feed
+     *  and Player entries cover (emphasis: home row D-pad focus restore §4.3
+     *  uses (rowTitle, itemIndex) saveables; blank row = fresh entry). */
+    @Composable
+    private fun TvHomeDestination(navController: NavHostController) {
+        // §9 TV horizontal pills — pinned niches parse from DataStore refs.
+        val pinnedNiches by settings.pinnedNiches.collectAsStateWithLifecycle(initialValue = emptySet())
+        val pinnedCreators by settings.pinnedCreators.collectAsStateWithLifecycle(initialValue = emptySet())
+        // Preview-on-focus gates on data-saver (posters only — same rule as the
+        // mobile inline autoplay).
+        val dataSaver by settings.dataSaver.collectAsStateWithLifecycle(false)
+        // Custom feed pills (PLAN §7 builder) — from Room, ordered by creation.
+        val customFeeds by db
+            .customFeedDao()
+            .all()
+            .collectAsStateWithLifecycle(initialValue = emptyList())
+        val focusRequester = remember { FocusRequester() }
+        // Issue #13 §4.3: (rowTitle, itemIndex) saveables — the row restore
+        // wiring lives inside TvHomeScreen; the header-pill initial focus only
+        // grabs when no saved row focus exists (fresh entry).
+        var focusRow by rememberSaveable { mutableStateOf("") }
+        var focusItem by rememberSaveable { mutableIntStateOf(-1) }
+        LaunchedEffect(Unit) {
+            if (focusRow.isEmpty() || focusItem < 0) focusRequester.requestFocus()
+        }
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Pinned niches = TV's version of the mobile home chip tabs;
+            // pills scroll horizontally like the mobile chip row.
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                item {
+                    TvHeaderPill(
+                        text = "Settings",
+                        onClick = { navController.navigate(TvSettings) },
+                        modifier = Modifier.padding(6.dp).focusRequester(focusRequester),
                     )
                 }
-                openFeed != null -> {
-                    val source = openFeed
-                    if (source != null) {
-                        val feedVm: TvNicheFeedViewModel = hiltViewModel()
-                        val quickVm: com.rjbiermann.giffyviewer.feature.feed.FeedViewModel = hiltViewModel()
-                        TvSourceFeedScreen(
-                            source = source,
-                            onOpenGif = { gifs, index -> player = gifs to index },
-                            viewModel = feedVm,
-                            feedViewModel = quickVm,
-                            onOpenNiche = { niche -> openFeed = niche },
-                            // #18: the dialog's sort half re-identifies the feed;
-                            // the screen drives the forced generation itself.
-                            onSortChange = { sorted -> openFeed = sorted },
-                            // #19 tab strip: a tab swaps the full feed (the same
-                            // openFeed path); the strip's Niches/Collections/My
-                            // feeds rows open the Root browser surfaces (openFeed
-                            // cleared so the browser branch composes). Explore/
-                            // Following have no TV host today — strip hides them.
-                            onSwitchFeed = { openFeed = it },
-                            onOpenNiches = {
-                                openFeed = null
-                                showNiches = true
-                            },
-                            onOpenCollections = {
-                                openFeed = null
-                                showCollections = true
-                            },
-                            onOpenCustomFeeds = {
-                                openFeed = null
-                                showCustomFeeds = true
-                            },
-                            playerFactory = playerFactory,
-                            dataSaver = dataSaver,
-                            gridState = feedGridState,
+                item {
+                    TvHeaderPill(
+                        text = "Niches",
+                        onClick = { navController.navigate(TvNiches) },
+                        modifier = Modifier.padding(6.dp),
+                    )
+                }
+                item {
+                    TvHeaderPill(
+                        text = "Search",
+                        onClick = { navController.navigate(TvSearch) },
+                        modifier = Modifier.padding(6.dp),
+                    )
+                }
+                items(pinnedNiches.toList().mapNotNull { parseNicheRef(it) }) { (id, name) ->
+                    TvHeaderPill(
+                        text = name,
+                        onClick = { navController.navigate(TvFeed(FeedSource.Niche(id, name))) },
+                        modifier = Modifier.padding(6.dp),
+                    )
+                }
+                // Custom feeds + pinned tabs consolidated under a More ▾ menu
+                // (user: pinned pills made the row unusable) — D-pad opens the
+                // dropdown.
+                item {
+                    Box {
+                        var moreOpen by remember { mutableStateOf(false) }
+                        TvHeaderPill(
+                            text = "More ▾",
+                            onClick = { moreOpen = true },
+                            modifier = Modifier.padding(6.dp),
                         )
-                    }
-                }
-                nicheAbout != null -> {
-                    val about = nicheAbout
-                    if (about != null) {
-                        com.rjbiermann.giffyviewer.feature.feed.NicheAboutScreen(
-                            nicheId = about.id,
-                            nicheName = about.name,
-                            onBack = { nicheAbout = null },
-                            onOpenCreator = { username ->
-                                nicheAbout = null
-                                openFeed = FeedSource.Creator(username = username)
-                            },
-                            onOpenNiche = { niche ->
-                                nicheAbout = null
-                                openFeed = niche
-                            },
-                            viewModel = hiltViewModel(),
-                            joinViewModel = hiltViewModel(),
-                        )
-                    }
-                }
-                showNiches -> {
-                    TvNichesScreen(
-                        onOpenNiche = { niche -> openFeed = niche },
-                        onOpenNicheAbout = { id, name -> nicheAbout = FeedSource.Niche(id, name) },
-                    )
-                }
-                showSearch ->
-                    com.rjbiermann.giffyviewer.search.SearchScreen(
-                        onBack = { showSearch = false },
-                        onSubmit = { q ->
-                            showSearch = false
-                            openFeed = FeedSource.Search(query = q)
-                        },
-                        onOpenCreator = { username ->
-                            showSearch = false
-                            openFeed = FeedSource.Creator(username = username)
-                        },
-                        onOpenNiche = { id, name ->
-                            showSearch = false
-                            openFeed = FeedSource.Niche(id, name)
-                        },
-                        onOpenFeed = { source ->
-                            showSearch = false
-                            openFeed = source
-                        },
-                        viewModel = hiltViewModel(),
-                    )
-                showCollections ->
-                    com.rjbiermann.giffyviewer.feature.feed.CollectionsScreen(
-                        onBack = { showCollections = false },
-                        viewModel = hiltViewModel(),
-                    )
-                showCustomFeeds ->
-                    com.rjbiermann.giffyviewer.feature.feed.CustomFeedsScreen(
-                        onBack = { showCustomFeeds = false },
-                        requestInitialFocus = true,
-                        onOpenFeed = { feed ->
-                            showCustomFeeds = false
-                            openFeed = feed
-                        },
-                        viewModel = hiltViewModel(),
-                    )
-                showSettings ->
-                    SettingsScreen(
-                        onBack = { showSettings = false },
-                        showGridColumns = false,
-                        showFeedAutoplay = false,
-                        // TV home has its own row-height setting (mobile grid
-                        // columns section is hidden here; this row SHOWS on TV).
-                        showTvRowHeight = true,
-                        requestInitialFocus = true,
-                    )
-                else -> {
-                    val home: TvHomeViewModel = hiltViewModel()
-                    val focusRequester = remember { FocusRequester() }
-                    // No initial D-pad focus otherwise — header buttons were unreachable
-                    // until the user tabbed into a row blindly.
-                    LaunchedEffect(Unit) { focusRequester.requestFocus() }
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        // Pinned niches = TV's version of the mobile home chip tabs;
-                        // pills scroll horizontally like the mobile chip row.
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        androidx.compose.material3.DropdownMenu(
+                            expanded = moreOpen,
+                            onDismissRequest = { moreOpen = false },
                         ) {
-                            item {
-                                TvHeaderPill(
-                                    text = "Settings",
-                                    onClick = { showSettings = true },
-                                    modifier = Modifier.padding(6.dp).focusRequester(focusRequester),
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { androidx.compose.material3.Text("Collections") },
+                                onClick = {
+                                    moreOpen = false
+                                    navController.navigate(TvCollections)
+                                },
+                            )
+                            // Custom feeds (#10): builder + management disabled
+                            // for now; DB rows and the BLOCKED-feed filter stage
+                            // keep working underneath (Feature.CUSTOM_FEEDS).
+                            if (Feature.CUSTOM_FEEDS) {
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { androidx.compose.material3.Text("My feeds") },
+                                    onClick = {
+                                        moreOpen = false
+                                        navController.navigate(TvCustomFeeds)
+                                    },
                                 )
-                            }
-                            item {
-                                TvHeaderPill(
-                                    text = "Niches",
-                                    onClick = { showNiches = true },
-                                    modifier = Modifier.padding(6.dp),
-                                )
-                            }
-                            item {
-                                TvHeaderPill(
-                                    text = "Search",
-                                    onClick = { showSearch = true },
-                                    modifier = Modifier.padding(6.dp),
-                                )
-                            }
-                            items(pinnedNiches.toList().mapNotNull { parseNicheRef(it) }) { (id, name) ->
-                                TvHeaderPill(
-                                    text = name,
-                                    onClick = { openFeed = FeedSource.Niche(id, name) },
-                                    modifier = Modifier.padding(6.dp),
-                                )
-                            }
-                            // Custom feeds + pinned tabs consolidated under a
-                            // More ▾ menu (user: pinned pills made the row
-                            // unusable) — D-pad opens the dropdown.
-                            item {
-                                androidx.compose.foundation.layout.Box {
-                                    var moreOpen by remember { mutableStateOf(false) }
-                                    TvHeaderPill(
-                                        text = "More ▾",
-                                        onClick = { moreOpen = true },
-                                        modifier = Modifier.padding(6.dp),
-                                    )
-                                    androidx.compose.material3.DropdownMenu(
-                                        expanded = moreOpen,
-                                        onDismissRequest = { moreOpen = false },
-                                    ) {
-                                        androidx.compose.material3.DropdownMenuItem(
-                                            text = { androidx.compose.material3.Text("Collections") },
-                                            onClick = {
-                                                moreOpen = false
-                                                showCollections = true
-                                            },
-                                        )
-                                        // Custom feeds (#10): builder + management disabled
-                                        // for now; DB rows and the BLOCKED-feed filter stage
-                                        // keep working underneath (Feature.CUSTOM_FEEDS).
-                                        if (Feature.CUSTOM_FEEDS) {
-                                            androidx.compose.material3.DropdownMenuItem(
-                                                text = { androidx.compose.material3.Text("My feeds") },
-                                                onClick = {
-                                                    moreOpen = false
-                                                    showCustomFeeds = true
-                                                },
+                                customFeeds.toList().forEach { def ->
+                                    androidx.compose.material3.DropdownMenuItem(
+                                        text = { androidx.compose.material3.Text(def.name) },
+                                        onClick = {
+                                            moreOpen = false
+                                            navController.navigate(
+                                                TvFeed(
+                                                    FeedSource.Custom(
+                                                        def.id,
+                                                        def.name,
+                                                        def.sourcesJson.split(',').filter { it.isNotBlank() },
+                                                    ),
+                                                ),
                                             )
-                                            customFeeds.toList().forEach { def ->
-                                                androidx.compose.material3.DropdownMenuItem(
-                                                    text = { androidx.compose.material3.Text(def.name) },
-                                                    onClick = {
-                                                        moreOpen = false
-                                                        openFeed =
-                                                            FeedSource.Custom(
-                                                                def.id,
-                                                                def.name,
-                                                                def.sourcesJson.split(',').filter { it.isNotBlank() },
-                                                            )
+                                        },
+                                    )
+                                }
+                            }
+                            val pinnedEntries =
+                                pinnedNiches.mapNotNull { parseNicheRef(it) } +
+                                    pinnedCreators.map { Pair("user:${it.lowercase()}", "@$it") }
+                            if (pinnedEntries.isNotEmpty()) {
+                                androidx.compose.material3.HorizontalDivider()
+                                pinnedEntries.forEach { (ref, name) ->
+                                    androidx.compose.material3.DropdownMenuItem(
+                                        text = { androidx.compose.material3.Text(name) },
+                                        onClick = {
+                                            moreOpen = false
+                                            navController.navigate(
+                                                TvFeed(
+                                                    if (ref.startsWith("user:")) {
+                                                        FeedSource.Creator(ref.removePrefix("user:"))
+                                                    } else {
+                                                        FeedSource.Niche(ref, name)
                                                     },
-                                                )
-                                            }
-                                        }
-                                        val pinnedEntries =
-                                            pinnedNiches.mapNotNull { parseNicheRef(it) } +
-                                                pinnedCreators.map { Pair("user:${it.lowercase()}", "@$it") }
-                                        if (pinnedEntries.isNotEmpty()) {
-                                            androidx.compose.material3.HorizontalDivider()
-                                            pinnedEntries.forEach { (ref, name) ->
-                                                androidx.compose.material3.DropdownMenuItem(
-                                                    text = { androidx.compose.material3.Text(name) },
-                                                    onClick = {
-                                                        moreOpen = false
-                                                        openFeed =
-                                                            if (ref.startsWith("user:")) {
-                                                                FeedSource.Creator(ref.removePrefix("user:"))
-                                                            } else {
-                                                                FeedSource.Niche(ref, name)
-                                                            }
-                                                    },
-                                                )
-                                            }
-                                        }
-                                    }
+                                                ),
+                                            )
+                                        },
+                                    )
                                 }
                             }
                         }
-                        TvHomeScreen(
-                            onOpenGif = { gifs, index -> player = gifs to index },
-                            onOpenCreator = { username -> openFeed = FeedSource.Creator(username = username) },
-                            onOpenNiche = { niche -> openFeed = niche },
-                            // Slice 10: quick-actions "Open feed" full-page path.
-                            onOpenFeed = { source -> openFeed = source },
-                            playerFactory = playerFactory,
-                            dataSaver = dataSaver,
-                            homeViewModel = home,
-                            listState = homeListState,
-                        )
                     }
                 }
             }
+            TvHomeScreen(
+                onOpenGif = { gifs, index -> navController.navigate(TvPlayer(gifs, index)) },
+                onOpenCreator = { username ->
+                    navController.navigate(TvFeed(FeedSource.Creator(username = username)))
+                },
+                onOpenNiche = { niche -> navController.navigate(TvFeed(niche)) },
+                // Slice 10: quick-actions "Open feed" full-page path.
+                onOpenFeed = { source -> navController.navigate(TvFeed(source)) },
+                playerFactory = playerFactory,
+                dataSaver = dataSaver,
+                homeViewModel = hiltViewModel(),
+                focusRow = focusRow,
+                focusItem = focusItem,
+                onFocusSaved = { row, item ->
+                    if (focusRow != row || focusItem != item) {
+                        focusRow = row
+                        focusItem = item
+                    }
+                },
+            )
         }
     }
 }

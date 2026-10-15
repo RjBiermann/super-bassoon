@@ -1,13 +1,21 @@
 package com.rjbiermann.giffyviewer.core.model
 
+import kotlinx.serialization.Serializable
+
+// @Serializable is carried for the nav route/saved-state payloads ONLY (issue
+// #13 §2 — TV player carries the gif window, FeedSource rides MainFeed/TvFeed
+// routes); the API/DB layer never serializes this type (DTO mapping stays).
+
 /** Niche membership on a gif: id for routing, name for the chip label
  *  (payload carries both; Room stores ids + a name map — DB v9). */
+@Serializable
 data class NicheRef(
     val id: String,
     val name: String,
 )
 
 /** A single upstream gif — everything the UI needs, nothing it doesn't. */
+@Serializable
 data class Gif(
     val id: String,
     val userName: String,

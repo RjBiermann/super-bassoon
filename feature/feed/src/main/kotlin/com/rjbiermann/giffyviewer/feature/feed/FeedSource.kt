@@ -1,9 +1,18 @@
 package com.rjbiermann.giffyviewer.feature.feed
 
+import kotlinx.serialization.Serializable
+
 /**
  * Feed identity = cache key base (PLAN §7). Sort/range changes produce distinct
  * bases ("trend:v2:pop:sort=top_week"), client-side ops don't.
+ *
+ * @Serializable carries the subtypes as nav route/saved-state payload (issue
+ * #13 §2 the route JSON lives only inside nav saved state, never a public
+ * format). Keyed members (keyBase/baseKey/ttlMs) are computed getters, NOT
+ * serializable fields — a route arg is exactly the subtype's constructor
+ * params (derived members re-derive from them on decode).
  */
+@Serializable
 sealed interface FeedSource {
     /** Base cache key for page keys "base:p<n>". */
     val keyBase: String
@@ -14,35 +23,39 @@ sealed interface FeedSource {
     /** TTL in ms: REFRESH re-hits the API only when stale (PLAN §5). */
     val ttlMs: Long
 
+    @Serializable
     data object Trending : FeedSource {
-        override val keyBase = "trend:v2:pop"
-        override val ttlMs = TTL_TRENDING
+        override val keyBase: String get() = "trend:v2:pop"
+        override val ttlMs: Long get() = TTL_TRENDING
     }
 
+    @Serializable
     data class Search(
         val query: String,
         val sort: String = "",
     ) : FeedSource {
-        override val keyBase = "search:${query.lowercase().trim()}" + if (sort.isEmpty()) "" else ":sort=$sort"
-        override val baseKey = "search:${query.lowercase().trim()}"
-        override val ttlMs = TTL_SEARCH
+        override val keyBase: String get() = "search:${query.lowercase().trim()}" + if (sort.isEmpty()) "" else ":sort=$sort"
+        override val baseKey: String get() = "search:${query.lowercase().trim()}"
+        override val ttlMs: Long get() = TTL_SEARCH
     }
 
     /** Niche feed — v2/niches/{id}/gifs (live-verified, anonymous OK). */
+    @Serializable
     data class Niche(
         val id: String,
         val name: String,
         val sort: String = "",
     ) : FeedSource {
-        override val keyBase = "niche:$id" + if (sort.isEmpty()) "" else ":sort=$sort"
-        override val baseKey = "niche:$id"
-        override val ttlMs = TTL_SEARCH
+        override val keyBase: String get() = "niche:$id" + if (sort.isEmpty()) "" else ":sort=$sort"
+        override val baseKey: String get() = "niche:$id"
+        override val ttlMs: Long get() = TTL_SEARCH
     }
 
     /** Top This Week = trending/popular?order=top_week (live-verified). */
+    @Serializable
     data object TopThisWeek : FeedSource {
-        override val keyBase = "topweek:v1"
-        override val ttlMs = TTL_TRENDING
+        override val keyBase: String get() = "topweek:v1"
+        override val ttlMs: Long get() = TTL_TRENDING
     }
 
     /** Site-wide ranged top pool (issue #11, live-verified 2026-10-15): a
@@ -50,6 +63,7 @@ sealed interface FeedSource {
      *  verified top set — top7 = week, top28 = month, top = all-time
      *  (top_week/top_month/etc. are BadOrder here; that wording only lives
      *  on trending/popular). Feeds through the standard cache-first pager. */
+    @Serializable
     data class TopRanged(
         val range: String,
     ) : FeedSource {
@@ -57,8 +71,8 @@ sealed interface FeedSource {
             require(range in RANGES) { "unverified top range: $range" }
         }
 
-        override val keyBase = "top:$range"
-        override val ttlMs = TTL_TRENDING
+        override val keyBase: String get() = "top:$range"
+        override val ttlMs: Long get() = TTL_TRENDING
 
         companion object {
             /** The search endpoint's BadOrder-verified top orders (2026-10-15). */
@@ -67,26 +81,29 @@ sealed interface FeedSource {
     }
 
     /** Logged-in personalized personalized server feed (PLAN §7); chip hidden when logged out. */
+    @Serializable
     data object ForYou : FeedSource {
-        override val keyBase = "foryou:v1"
-        override val ttlMs = TTL_TRENDING
+        override val keyBase: String get() = "foryou:v1"
+        override val ttlMs: Long get() = TTL_TRENDING
     }
 
     /** Recency round-robin over favorited creators (PLAN §7). */
+    @Serializable
     data object Favorites : FeedSource {
-        override val keyBase = "fav:v1"
-        override val ttlMs = TTL_TRENDING
+        override val keyBase: String get() = "fav:v1"
+        override val ttlMs: Long get() = TTL_TRENDING
     }
 
     /** Single creator feed — v2/users/{username}/gifs (same call the Favorites
      *  round-robin already uses). Pinned creator tabs (PLAN §7 pin-to-tabs). */
+    @Serializable
     data class Creator(
         val username: String,
         val sort: String = "",
     ) : FeedSource {
-        override val keyBase = "user:${username.lowercase().trim()}" + if (sort.isEmpty()) "" else ":sort=$sort"
-        override val baseKey = "user:${username.lowercase().trim()}"
-        override val ttlMs = TTL_SEARCH
+        override val keyBase: String get() = "user:${username.lowercase().trim()}" + if (sort.isEmpty()) "" else ":sort=$sort"
+        override val baseKey: String get() = "user:${username.lowercase().trim()}"
+        override val ttlMs: Long get() = TTL_SEARCH
     }
 
     /** Custom feed (PLAN §7 builder): named blend of creators/tags/niches,
@@ -95,20 +112,22 @@ sealed interface FeedSource {
      *  tags from the v10 group migration count as tag refs) · "niche:<id>|<name>".
      *  Also carries the merged niche-group role via the DB `state` column:
      *  FAVORITED feeds pin as home tabs, BLOCKED feeds drive the ContentFilter. */
+    @Serializable
     data class Custom(
         val id: Long,
         val name: String,
         val refs: List<String>,
     ) : FeedSource {
-        override val keyBase = "custom:$id"
-        override val ttlMs = TTL_SEARCH
+        override val keyBase: String get() = "custom:$id"
+        override val ttlMs: Long get() = TTL_SEARCH
     }
 
     /** Liked gifs (PLAN §7, logged-in): network-LIVE — never cached (§5);
      *  pages have no cache keys and sorts are client-side only. */
+    @Serializable
     data object Liked : FeedSource {
-        override val keyBase = "liked:v1"
-        override val ttlMs = 0L
+        override val keyBase: String get() = "liked:v1"
+        override val ttlMs: Long get() = 0L
     }
 
     companion object {

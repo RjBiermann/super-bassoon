@@ -1,6 +1,7 @@
 package com.rjbiermann.giffyviewer.mobile
 
 import android.os.Bundle
+import android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -8,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -15,6 +18,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
@@ -24,23 +33,62 @@ import com.rjbiermann.giffyviewer.core.ui.LayoutHint
 import com.rjbiermann.giffyviewer.core.ui.PinLockScreen
 import com.rjbiermann.giffyviewer.core.ui.layoutHint
 import com.rjbiermann.giffyviewer.feature.feed.CollectionsScreen
-import com.rjbiermann.giffyviewer.feature.feed.CollectionsViewModel
 import com.rjbiermann.giffyviewer.feature.feed.CustomFeedsScreen
-import com.rjbiermann.giffyviewer.feature.feed.CustomFeedsViewModel
 import com.rjbiermann.giffyviewer.feature.feed.FeedScreen
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
 import com.rjbiermann.giffyviewer.feature.feed.FollowingScreen
-import com.rjbiermann.giffyviewer.feature.feed.FollowingViewModel
 import com.rjbiermann.giffyviewer.feature.feed.NicheAboutScreen
-import com.rjbiermann.giffyviewer.feature.feed.NicheJoinViewModel
 import com.rjbiermann.giffyviewer.feature.feed.NichesScreen
 import com.rjbiermann.giffyviewer.feature.feed.PlayerScreen
 import com.rjbiermann.giffyviewer.feature.settings.SettingsScreen
 import com.rjbiermann.giffyviewer.search.SearchScreen
-import com.rjbiermann.giffyviewer.search.SearchViewModel
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.serialization.Serializable
 import javax.inject.Inject
+
+/**
+ * Issue #13 nav routes (mobile). Route args are @Serializable
+ * (FeedSource/Gif/NicheRef carry the same annotation family); the serialized
+ * form lives only inside nav saved state — never a public format.
+ */
+@Serializable
+data object MainCollections
+
+/** The home feed as seeded (start destination) and every feed hop after it. */
+@Serializable
+data class MainFeed(
+    val source: FeedSource? = null,
+)
+
+@Serializable
+data object MainCustomFeeds
+
+@Serializable
+data object MainFollowing
+
+@Serializable
+data class MainNicheAbout(
+    val id: String,
+    val name: String,
+)
+
+@Serializable
+data object MainNiches
+
+/** Feed-scoped player: pages the SHARED FeedViewModel's live pager (§3.3). */
+@Serializable
+data class MainPlayer(
+    val startIndex: Int,
+)
+
+/** Stays on the stack after submit — BACK returns to the search draft (§8.4). */
+@Serializable
+data object MainSearch
+
+/** One destination; E's SettingsPage sub-panels stay in-screen (§6). */
+@Serializable
+data object MainSettings
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -71,51 +119,10 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun Host(hint: LayoutHint) {
         val confirmed by settings.ageConfirmed.collectAsStateWithLifecycle(initialValue = false)
-        // Route stack (best practice + PLAN §2 process-death rule): saveable so
-        // the open surface survives process death; one BackHandler pops the TOP
-        // route instead of letting system back kill the activity.
-        var playerStartIndex by rememberSaveable { mutableStateOf<Int?>(null) }
-        var showSettings by rememberSaveable { mutableStateOf(false) }
-        var showNiches by rememberSaveable { mutableStateOf(false) }
-        var showFollowing by rememberSaveable { mutableStateOf(false) }
-        var showCollections by rememberSaveable { mutableStateOf(false) }
-        var aboutNiche: Pair<String, String>? by rememberSaveable { mutableStateOf(null) }
-        var showSearch by rememberSaveable { mutableStateOf(false) }
-        var showCustomFeeds by rememberSaveable { mutableStateOf(false) }
-
-        androidx.activity.compose.BackHandler(
-            enabled =
-                playerStartIndex != null ||
-                    aboutNiche != null ||
-                    showSettings ||
-                    showNiches ||
-                    showFollowing ||
-                    showCollections ||
-                    showSearch ||
-                    showCustomFeeds,
-        ) {
-            when {
-                playerStartIndex != null -> playerStartIndex = null
-                aboutNiche != null -> aboutNiche = null
-                showSearch -> showSearch = false
-                showCustomFeeds -> showCustomFeeds = false
-                showFollowing -> showFollowing = false
-                showNiches -> showNiches = false
-                showCollections -> showCollections = false
-                else -> showSettings = false
-            }
-        }
-
-        // §9 player lifecycle: keep the screen on while the swipe player is up.
-        androidx.compose.runtime.DisposableEffect(playerStartIndex) {
-            val win = window
-            if (playerStartIndex != null) {
-                win.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            } else {
-                win.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            }
-            onDispose { win.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
-        }
+        // Age gate + PIN stay OUTSIDE the NavHost (issue #13 §3.2: they gate
+        // the app, not pages). The parallel rememberSaveable route flags and
+        // the when-chain BackHandler they served are replaced by route graph
+        // entries; route state survives process death through the nav stack.
         val pinHash by settings.pinHash.collectAsStateWithLifecycle(initialValue = null)
         var unlocked by rememberSaveable { mutableStateOf(false) }
         if (pinHash != null && !unlocked) {
@@ -123,121 +130,148 @@ class MainActivity : ComponentActivity() {
                 onUnlock = { unlocked = true },
                 verifyPin = { settings.verifyPin(it) },
             )
-        } else if (confirmed && playerStartIndex != null) {
-            val start = playerStartIndex ?: 0
-            PlayerScreen(
-                startIndex = start,
-                onBack = { playerStartIndex = null },
-                onOpenAccount = { showSettings = true },
-                viewModel = hiltViewModel(),
-                playerFactory = playerFactory,
-                settings = settings,
-                db = db,
-            )
-        } else if (confirmed && showCollections) {
-            val collectionsVm: CollectionsViewModel = hiltViewModel()
-            CollectionsScreen(
-                onBack = { showCollections = false },
-                viewModel = collectionsVm,
-            )
-        } else if (confirmed && aboutNiche != null) {
-            val (id, name) = aboutNiche ?: Pair("", "")
-            val aboutFeedVm: FeedViewModel = hiltViewModel()
-            val joinVm: NicheJoinViewModel = hiltViewModel()
-            NicheAboutScreen(
-                nicheId = id,
-                nicheName = name,
-                onBack = { aboutNiche = null },
-                onOpenCreator = { username ->
-                    aboutNiche = null
-                    aboutFeedVm.open(FeedSource.Creator(username = username))
-                },
-                onOpenNiche = { niche ->
-                    aboutNiche = null
-                    aboutFeedVm.open(niche)
-                },
-                viewModel = hiltViewModel(),
-                joinViewModel = joinVm,
-            )
-        } else if (confirmed && showFollowing) {
-            val followingVm: FollowingViewModel = hiltViewModel()
-            val feedVm: FeedViewModel = hiltViewModel()
-            FollowingScreen(
-                onBack = { showFollowing = false },
-                onOpenCreator = { username ->
-                    showFollowing = false
-                    feedVm.open(FeedSource.Creator(username = username))
-                },
-                onOpenNiche = { niche ->
-                    showFollowing = false
-                    feedVm.open(niche)
-                },
-                viewModel = followingVm,
-            )
-        } else if (confirmed && showCustomFeeds) {
-            val customFeedsVm: CustomFeedsViewModel = hiltViewModel()
-            val feedViewModel: FeedViewModel = hiltViewModel()
-            CustomFeedsScreen(
-                onBack = { showCustomFeeds = false },
-                onOpenFeed = { custom ->
-                    showCustomFeeds = false
-                    feedViewModel.open(custom)
-                },
-                viewModel = customFeedsVm,
-            )
-        } else if (confirmed && showSearch) {
-            val searchViewModel: SearchViewModel = hiltViewModel()
-            val feedViewModel: FeedViewModel = hiltViewModel()
-            SearchScreen(
-                onBack = { showSearch = false },
-                onSubmit = { q ->
-                    showSearch = false
-                    feedViewModel.open(FeedSource.Search(query = q))
-                },
-                onOpenCreator = { username ->
-                    showSearch = false
-                    feedViewModel.open(FeedSource.Creator(username = username))
-                },
-                onOpenNiche = { id, name ->
-                    showSearch = false
-                    feedViewModel.open(FeedSource.Niche(id, name))
-                },
-                onOpenFeed = { source ->
-                    showSearch = false
-                    feedViewModel.open(source)
-                },
-                viewModel = searchViewModel,
-            )
-        } else if (confirmed && showNiches) {
-            val feedViewModel: FeedViewModel = hiltViewModel()
-            NichesScreen(
-                onBack = { showNiches = false },
-                onOpenNiche = { niche: FeedSource.Niche ->
-                    showNiches = false
-                    feedViewModel.open(niche)
-                },
-                onOpenAbout = { id, name -> aboutNiche = id to name },
-            )
-        } else if (confirmed && showSettings) {
-            SettingsScreen(onBack = { showSettings = false })
         } else if (confirmed) {
-            FeedScreen(
-                modifier = Modifier.fillMaxSize(),
-                gridColumns = hint.gridColumns,
-                onOpenPlayer = { index -> playerStartIndex = index },
-                playerFactory = playerFactory,
-                onOpenSettings = { showSettings = true },
-                onOpenSearch = { showSearch = true },
-                onOpenNiches = { showNiches = true },
-                onOpenCustomFeeds = { showCustomFeeds = true },
-                onOpenFollowing = { showFollowing = true },
-                onOpenCollections = { showCollections = true },
-            )
+            MobileNavHost(hint)
         } else {
             AgeGate(
                 onConfirmed = { settings.confirmAge() },
                 onExit = ::finishAffinity,
             )
+        }
+    }
+
+    @Composable
+    private fun MobileNavHost(hint: LayoutHint) {
+        // ONE FeedViewModel, ACTIVITY-scoped (issue #13 §3.3): acquired at
+        // NavHost scope and passed by parameter — inside a destination's
+        // content hiltViewModel() defaults to the NavBackStackEntry store,
+        // which would break the PlayerScreen pager/likes seams overnight.
+        val feedViewModel: FeedViewModel = hiltViewModel()
+        val navController = rememberNavController()
+        val backStackEntry by navController.currentBackStackEntryAsState()
+        // §9 player lifecycle (was keyed on the playerStartIndex flag): the
+        // screen stays on while the swipe player destination is on top; a
+        // covered player still holds the flag — settings overlays may appear
+        // above it via onOpenAccount (§8.6) without toggling the flag.
+        DisposableEffect(backStackEntry?.destination?.hasRoute<MainPlayer>() == true) {
+            if (backStackEntry?.destination?.hasRoute<MainPlayer>() == true) {
+                window.addFlags(FLAG_KEEP_SCREEN_ON)
+            } else {
+                window.clearFlags(FLAG_KEEP_SCREEN_ON)
+            }
+            onDispose { window.clearFlags(FLAG_KEEP_SCREEN_ON) }
+        }
+        NavHost(navController, startDestination = MainFeed(source = null)) {
+            composable<MainFeed> { entry ->
+                val src = entry.toRoute<MainFeed>().source ?: feedViewModel.seedSource
+                // Issue #13 §3.3: every MainFeed entry re-asserts its source on
+                // (re)composition — the VM stays single-sourced (sort adoption,
+                // userNavigated, lastGroupSub semantics all inside open()) while
+                // each entry keeps its own scroll state. Back into a covered
+                // entry whose source already matches is a no-op (same-value
+                // StateFlow write → no pager restart, no grid flash).
+                LaunchedEffect(src) { if (feedViewModel.source.value != src) feedViewModel.open(src) }
+                FeedScreen(
+                    modifier = Modifier.fillMaxSize(),
+                    gridColumns = hint.gridColumns,
+                    onOpenPlayer = { index -> navController.navigate(MainPlayer(index)) },
+                    onOpenSettings = { navController.navigate(MainSettings) },
+                    onOpenSearch = { navController.navigate(MainSearch) },
+                    onOpenNiches = { navController.navigate(MainNiches) },
+                    onOpenFollowing = { navController.navigate(MainFollowing) },
+                    onOpenCollections = { navController.navigate(MainCollections) },
+                    onOpenCustomFeeds = { navController.navigate(MainCustomFeeds) },
+                    onFeedNav = { source -> navController.navigate(MainFeed(source)) },
+                    playerFactory = playerFactory,
+                    viewModel = feedViewModel,
+                )
+            }
+            composable<MainPlayer> { entry ->
+                val start = entry.toRoute<MainPlayer>().startIndex
+                PlayerScreen(
+                    startIndex = start,
+                    onBack = { navController.popBackStack() },
+                    onOpenAccount = { navController.navigate(MainSettings) },
+                    onOpenFeed = { source ->
+                        // §3.3: the overlay opens ARE exits (pre-nav semantics:
+                        // onOpen→onBack). Push the feed and pop this player
+                        // entry — BACK then lands the covered feed with its
+                        // scroll state, not the dead slot this player left.
+                        navController.navigate(MainFeed(source)) {
+                            popUpTo(entry.id) { inclusive = true }
+                        }
+                    },
+                    viewModel = feedViewModel,
+                    playerFactory = playerFactory,
+                    settings = settings,
+                    db = db,
+                )
+            }
+            composable<MainSearch> {
+                // Issue #13 §8.4: submit STAYS on the stack — the second BACK
+                // returns to the draft/history instead of home (pre-nav anyway
+                // rendered the feed in place); creator/niche/strip rows open
+                // feeds over the preserved search state the same way.
+                SearchScreen(
+                    onBack = { navController.popBackStack() },
+                    onSubmit = { q -> navController.navigate(MainFeed(FeedSource.Search(query = q))) },
+                    onOpenCreator = { username ->
+                        navController.navigate(MainFeed(FeedSource.Creator(username = username)))
+                    },
+                    onOpenNiche = { id, name -> navController.navigate(MainFeed(FeedSource.Niche(id, name))) },
+                    onOpenFeed = { source -> navController.navigate(MainFeed(source)) },
+                    viewModel = hiltViewModel(),
+                )
+            }
+            composable<MainNiches> {
+                NichesScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenNiche = { niche -> navController.navigate(MainFeed(niche)) },
+                    onOpenAbout = { id, name -> navController.navigate(MainNicheAbout(id, name)) },
+                )
+            }
+            composable<MainNicheAbout> { entry ->
+                val about = entry.toRoute<MainNicheAbout>()
+                NicheAboutScreen(
+                    nicheId = about.id,
+                    nicheName = about.name,
+                    onBack = { navController.popBackStack() },
+                    // Issue #13: no manual flag clears — the About screen stays
+                    // on the stack and BACK walks it before the feed below.
+                    onOpenCreator = { username ->
+                        navController.navigate(MainFeed(FeedSource.Creator(username = username)))
+                    },
+                    onOpenNiche = { niche -> navController.navigate(MainFeed(niche)) },
+                    viewModel = hiltViewModel(),
+                    joinViewModel = hiltViewModel(),
+                )
+            }
+            composable<MainFollowing> {
+                FollowingScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenCreator = { username ->
+                        navController.navigate(MainFeed(FeedSource.Creator(username = username)))
+                    },
+                    onOpenNiche = { niche -> navController.navigate(MainFeed(niche)) },
+                    viewModel = hiltViewModel(),
+                )
+            }
+            composable<MainCollections> {
+                CollectionsScreen(
+                    onBack = { navController.popBackStack() },
+                    viewModel = hiltViewModel(),
+                )
+            }
+            composable<MainCustomFeeds> {
+                CustomFeedsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenFeed = { feed -> navController.navigate(MainFeed(feed)) },
+                    viewModel = hiltViewModel(),
+                )
+            }
+            composable<MainSettings> {
+                SettingsScreen(onBack = { navController.popBackStack() })
+            }
         }
     }
 }

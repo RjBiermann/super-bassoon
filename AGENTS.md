@@ -326,8 +326,8 @@ Compiled + ktlint + detekt + unit tests + lint green on all touched modules.
     for release hardening.
   - `edge-to-edge` / `adaptive` — insets + window-size classes, relevant to the
     responsive-first mobile shell.
-  - `navigation-3` / `navigation-event` — only if navigation is ever migrated; not a
-    current ask (app uses its own nav).
+  - `navigation-3` / `navigation-event` — only if navigation is ever migrated; navigation
+    went to STABLE navigation-compose 2.10.2 instead (issue #13, 2026-10) — N3 stays declined.
   - `testing-setup` — if unit-coverage is ever expanded beyond the one-test rule.
 - **Not relevant / skip:** ml-kit-genai-prompt-api (LLM on-device — app rule: no such
   feature), appfunctions (exposes app to agents; privacy surface — skip), engage-sdk,
@@ -428,9 +428,10 @@ Compiled + ktlint + detekt + unit tests + lint green on all touched modules.
 
 ### Session 2026-10-02 batch 11 (doc-only — adaptive/responsive audit via adaptive skill; no code changes)
 - Audited the responsive-first rule (AGENTS root) against the skill's adaptive
-  playbook. Prereq check: Compose-only ✓; Navigation 3 ✗ (app uses its own
-  saveable route-stack + BackHandler — deliberate, spec'd, not a gap to fix
-  without a user ask; skill's N3 suggestion noted-and-declined).
+  playbook. Prereq check: Compose-only ✓; Navigation 3 ✗ (app used its own
+  saveable route-stack + BackHandler — deliberate at audit time; SUPERSEDED
+  2026-10 by the issue-#13 wave: androidx.navigation:navigation-compose 2.10.2
+  type-safe routes in BOTH shells — Navigation 3 stays declined).
 - **Passes:**
   - One adaptive seam exactly as the skill prescribes: `LayoutHint` —
     `calculateWindowSizeClass` once in MainActivity → gridColumns ladder

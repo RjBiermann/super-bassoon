@@ -131,6 +131,11 @@ fun PlayerScreen(
     onBack: () -> Unit,
     /** Like while logged out → open Settings (holds the account section). */
     onOpenAccount: () -> Unit,
+    /** Issue #13 §3.3: cluster opens (creator/tag/niche from the overlay) are
+     *  route pushes now — the host pops this player entry while pushing, so
+     *  BACK lands the covered feed at its scroll position. The shared
+     *  FeedViewModel keeps paging this route's source meanwhile. */
+    onOpenFeed: (FeedSource) -> Unit,
     viewModel: FeedViewModel,
     playerFactory: GiffyPlayerFactory,
     settings: SettingsRepository,
@@ -400,16 +405,13 @@ fun PlayerScreen(
                     onSkip = { playError = false },
                     videoFit = videoFit,
                     onOpenCreator = {
-                        viewModel.open(FeedSource.Creator(username = gif.userName))
-                        onBack()
+                        onOpenFeed(FeedSource.Creator(username = gif.userName))
                     },
                     onOpenTag = { tag ->
-                        viewModel.open(FeedSource.Search(query = tag))
-                        onBack()
+                        onOpenFeed(FeedSource.Search(query = tag))
                     },
                     onOpenNiche = { id, name ->
-                        viewModel.open(FeedSource.Niche(id = id, name = name))
-                        onBack()
+                        onOpenFeed(FeedSource.Niche(id = id, name = name))
                     },
                     onHoldSpeed = { holdSpeed = it },
                 )
@@ -441,7 +443,7 @@ fun PlayerScreen(
             showSpeed = true,
             currentSpeed = speed,
             onSpeedChange = { newSpeed -> speed = newSpeed },
-            onOpenFeed = onBack,
+            onOpenFeed = onOpenFeed,
         )
     }
 }

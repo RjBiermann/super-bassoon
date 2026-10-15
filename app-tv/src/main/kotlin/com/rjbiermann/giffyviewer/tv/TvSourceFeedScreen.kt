@@ -90,16 +90,23 @@ fun TvSourceFeedScreen(
     /** Preview-on-focus (AGENTS-UX-PATTERNS): null factory = no previews. */
     playerFactory: com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory? = null,
     dataSaver: Boolean = false,
-    /** #19 tab strip: a tab opens that feed full-page (the openFeed path the
-     *  issue names) — wired in TvMainActivity. */
+    /** #19 tab strip: a tab opens that feed full-page — the TV nav host
+     *  pushes a TvFeed entry (issue #13). */
     onSwitchFeed: (FeedSource) -> Unit = {},
-    /** #19 strip seams to Root browser states (openFeed cleared so the browser
-     *  branch composes); Explore/Following have no TV host today — hidden. */
+    /** #19 strip seams to the TV nav destinations (Niches/Collections/
+     *  CustomFeeds pushed over this feed); Explore/Following have no TV host
+     *  today — hidden. */
     onOpenNiches: () -> Unit = {},
     onOpenCollections: () -> Unit = {},
     onOpenCustomFeeds: () -> Unit = {},
-    /** Hoisted at TvMainActivity Root so BACK from the player keeps scroll. */
+    /** Issue #13 §4.2: per-entry saveable state (the Root hoist is replaced
+     *  by the destination's rememberLazyStaggeredGridState()). */
     gridState: LazyStaggeredGridState = rememberLazyStaggeredGridState(),
+    /** Issue #13 §4.3: saveable grid focus position — BACK into a covered
+     *  entry must land the SAME card (nav restores scroll; focus is
+     *  composition-transient). -1 = fresh entry (first-card focus). */
+    savedFocusItem: Int = -1,
+    onFocusSaved: (Int) -> Unit = {},
 ) {
     val gifs = remember(source.keyBase) { viewModel.gifs(source) }.collectAsLazyPagingItems()
     val scope = rememberCoroutineScope()
@@ -132,11 +139,19 @@ fun TvSourceFeedScreen(
         )
     var showFilter by remember { mutableStateOf(false) }
     // Initial D-pad focus (AGENTS-APP pattern): the grid's first card takes
-    // focus on open — no blind first press.
+    // focus on open — no blind first press. Issue #13 §4.3: the "first" card
+    // is the SAVED focus on a re-entry (BACK from a player restores D-pad
+    // focus, not just visual position) — one requester, one effect: on the
+    // first content delivery, scroll to the target (no scroll for a fresh
+    // entry at card 0) and grab focus. Keyed on the boolean so appends (item
+    // count growth during a scroll session) can never re-grab focus.
     val firstCardFocus =
         remember { FocusRequester() }
     LaunchedEffect(gifs.itemCount > 0) {
-        if (gifs.itemCount > 0) firstCardFocus.requestFocus()
+        if (gifs.itemCount == 0) return@LaunchedEffect
+        val target = focusTargetFor(savedFocusItem, gifs.itemCount)
+        if (target > 0) gridState.scrollToItem(target)
+        runCatching { firstCardFocus.requestFocus() }
     }
 
     // §6/#22 refresh helper: forced generation + re-anchor to the top (instant
@@ -260,6 +275,10 @@ fun TvSourceFeedScreen(
             // variable heights, same 4 columns / 16dp padding / 10dp spacing.
             // The state type changed with it (LazyStaggeredGridState) — hoisted
             // at Root and threaded; BACK-position parity lives there.
+            // §4.3: the focus-requester target follows the saved card until the
+            // user moves focus (then it rides the host's saveable). The
+            // focus effect above consumes it once per content delivery.
+            val focusTarget = focusTargetFor(savedFocusItem, gifs.itemCount)
             LazyVerticalStaggeredGrid(
                 state = gridState,
                 columns = StaggeredGridCells.Fixed(4),
@@ -274,8 +293,9 @@ fun TvSourceFeedScreen(
                             gif = gif,
                             modifier =
                                 Modifier
-                                    .then(if (i == 0) Modifier.focusRequester(firstCardFocus) else Modifier)
+                                    .then(if (i == focusTarget) Modifier.focusRequester(firstCardFocus) else Modifier)
                                     .fillMaxWidth(),
+                            onFocusChange = { focused -> if (focused) onFocusSaved(i) },
                             onMenu = { viaHold ->
                                 actionsFor = gif
                                 actionsViaHold = viaHold
@@ -345,10 +365,15 @@ fun TvSourceFeedScreen(
             selectedSort = source.activeSort.ifEmpty { savedSort },
             onApply = { next, sort ->
                 feedViewModel.setFeedPrefs(source.baseKey, next)
+                // Issue #13: the sort change REPLACES the entry via onSortChange
+                // (host popUpTo replace); the old VM's refresh() is gone with it.
+                // A fresh keyBase has its own cache — a re-applied sort inside the
+                // shared TTL may serve the cached order (stale-while-revalidate;
+                // the immediate-refetch the old refresh() gave applies when the
+                // base is cold, as before).
                 feedViewModel.setSort(source, sort)
                 if (sort != source.activeSort) {
                     onSortChange(source.withSort(sort))
-                    viewModel.refresh()
                 }
                 scope.launch { gridState.scrollToItem(0) }
                 showFilter = false
