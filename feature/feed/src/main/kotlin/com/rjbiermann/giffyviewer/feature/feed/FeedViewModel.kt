@@ -132,7 +132,8 @@ class FeedViewModel
                     }
                 }.cachedIn(viewModelScope)
 
-        /** Pull-to-refresh / pill: bump the generation → fresh REFRESH, TTL bypassed. */
+        /** Refresh control (pull-to-refresh; mobile scroll-up is navigation-only
+         *  now, #23): bump the generation → fresh REFRESH, TTL bypassed. */
         fun forceRefresh() {
             refreshGen.value = refreshGen.value + 1
         }
@@ -461,17 +462,6 @@ class FeedViewModel
 
         fun togglePinnedCreator(username: String) {
             viewModelScope.launch { settings.togglePinnedCreator(username) }
-        }
-
-        /** "Surprise me" (§8): refresh the random unwatched pool + open it as a
-         *  feed source. Returns true when a pool landed (the host opens the
-         *  surface; empty = nothing cached or everything watched). */
-        fun surpriseMe(onReady: (SurpriseResult) -> Unit) {
-            viewModelScope.launch {
-                val result = repository.refreshSurprise()
-                if (result == SurpriseResult.OK) open(FeedSource.Surprise)
-                onReady(result)
-            }
         }
 
         /** §8 per-feed filter prefs (duration/resolution/orientation). */

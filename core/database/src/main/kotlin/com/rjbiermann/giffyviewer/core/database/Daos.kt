@@ -10,14 +10,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface GifDao {
-    /** "Surprise me" (§8): random unwatched cached gifs — excludes watch history. */
-    @Query(
-        "SELECT * FROM gifs " +
-            "WHERE id NOT IN (SELECT gifId FROM watch_history) " +
-            "ORDER BY RANDOM() LIMIT :limit",
-    )
-    suspend fun randomUnwatched(limit: Int): List<GifEntity>
-
     @Upsert
     suspend fun upsertAll(gifs: List<GifEntity>)
 
@@ -133,22 +125,6 @@ interface LikedIdsDao {
 
     @Query("DELETE FROM liked_ids")
     suspend fun clear()
-}
-
-@Dao
-interface WatchHistoryDao {
-    @Upsert
-    suspend fun upsert(entry: WatchHistoryEntity)
-
-    @Query("SELECT * FROM watch_history WHERE gifId = :gifId")
-    suspend fun byGif(gifId: String): WatchHistoryEntity?
-
-    @Query("SELECT * FROM watch_history WHERE watched = 1 ORDER BY updatedAt DESC LIMIT :limit")
-    fun recent(limit: Int): Flow<List<WatchHistoryEntity>>
-
-    /** Partially watched — the TV "Continue Watching" row (PLAN §8). */
-    @Query("SELECT * FROM watch_history WHERE watched = 0 AND positionMs > 0 ORDER BY updatedAt DESC LIMIT :limit")
-    fun continueWatching(limit: Int): Flow<List<WatchHistoryEntity>>
 }
 
 @Dao

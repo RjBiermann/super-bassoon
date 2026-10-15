@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -42,6 +43,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -49,7 +51,6 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil3.compose.AsyncImage
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
-import com.rjbiermann.giffyviewer.core.database.WatchHistoryEntity
 import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.model.VideoQuality
@@ -64,7 +65,8 @@ import kotlinx.coroutines.launch
 
 /**
  * 10-foot player: one gif at a time, D-pad up/down (left/right too) walks the
- * list, back exits. Resume + 5s position sampling mirrors the mobile player.
+ * list, back exits. Every play starts at 0 (watch-history/resume removed with
+ * the feature); the end-of-feed popup (#22) covers the snapshot end.
  */
 @Composable
 fun TvPlayerScreen(
@@ -121,24 +123,6 @@ fun TvPlayerScreen(
 
     val gif = gifs[index]
 
-    /** One watch-history write — shared by the 5s sampler and the teardown
-     *  flush (finally). Reads [player] and [gif] at call time; key-change
-     *  cancellations capture the OUTGOING gif (correct row). */
-    suspend fun flushWatchPosition() {
-        val pos = player.currentPositionMs
-        // ≥3s playback floor — the watch-history write policy (DB doc).
-        if (pos >= WATCH_POSITION_MIN_MS) {
-            db.watchHistoryDao().upsert(
-                WatchHistoryEntity(
-                    gifId = gif.id,
-                    positionMs = pos,
-                    updatedAt = System.currentTimeMillis(),
-                    watched = player.durationMs > 0 && pos > player.durationMs * 0.8,
-                ),
-            )
-        }
-    }
-
     // Seek feedback: "1:23 / 2:45" flashes while seeking (TV keymap §).
     var seekFlash by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(seekFlash) {
@@ -158,6 +142,9 @@ fun TvPlayerScreen(
     // the current gif, Skip advances. Keyed to the gif so moving past a failed
     // item clears the overlay instead of leaving it stuck.
     var playError by remember(gif.id) { mutableStateOf(false) }
+    // End-of-feed popup (#22): manual next at the LAST gif opens it (the
+    // snapshot is a static load — "Start over" loops it, "Back to feed" exits).
+    var endDialog by remember { mutableStateOf(false) }
 
     // Menu-less-remote keymap (AGENTS-APP): hold-Center ≥500ms opens the
     // quick-actions panel (the same panel MENU opens); short-tap Center keeps
@@ -265,8 +252,10 @@ fun TvPlayerScreen(
                         android.view.KeyEvent.KEYCODE_MEDIA_REWIND,
                         -> Unit
                         // Media-key remotes: next/prev walk the list (up/down parity).
+                        // #22: manual next at the LAST gif opens the end-of-feed
+                        // popup instead of silently doing nothing.
                         android.view.KeyEvent.KEYCODE_MEDIA_NEXT -> {
-                            if (index < gifs.size - 1) index++
+                            if (index < gifs.size - 1) index++ else endDialog = true
                         }
                         android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
                             if (index > 0) index--
@@ -274,7 +263,7 @@ fun TvPlayerScreen(
                     }
                     when (e.key) {
                         Key.DirectionDown -> {
-                            if (index < gifs.size - 1) index++
+                            if (index < gifs.size - 1) index++ else endDialog = true
                             true
                         }
                         Key.DirectionUp -> {
@@ -400,10 +389,7 @@ fun TvPlayerScreen(
                             onClick = {
                                 playError = false
                                 textVisible = true
-                                scope.launch {
-                                    val resume = db.watchHistoryDao().byGif(gif.id)?.positionMs ?: 0L
-                                    player.playGif(gif, dataSaver, resumeMs = resume, videoQuality = videoQuality)
-                                }
+                                scope.launch { player.playGif(gif, dataSaver, videoQuality = videoQuality) }
                             },
                             colors =
                                 ButtonDefaults
@@ -510,37 +496,16 @@ fun TvPlayerScreen(
         }
     }
 
-    // resume + tracking (outside the Column so they survive gif switches)
+    // Playback start (outside the Column so it survives gif switches): every
+    // play begins at 0 — watch-history/resume removed with the feature (#1).
     LaunchedEffect(gif.id, dataSaver) {
-        val resume = db.watchHistoryDao().byGif(gif.id)?.positionMs ?: 0L
         // Clear-on-switch (issue #16, user report: aspect warp for a few
         // moments at every D-pad switch): the outgoing frame re-warps under
         // the new gif's seeded aspect until the new first frame lands.
         // stop() first — letter-for-letter the FeedScreen inline rule; the
         // issue #8 poster plane covers the cleared beat instead of black.
         if (player.currentGifId.value != gif.id) player.stop()
-        player.playGif(gif, dataSaver, resumeMs = resume, videoQuality = videoQuality)
-    }
-
-    // Position sampling (mobile player parity) + teardown flush (2026-10 user
-    // report: BACK from the player lost the clicked video's playback position
-    // — the sampler died on every effect cancellation without a final write,
-    // so up to 5s of playback was never recorded). The non-cancellable
-    // finally writes on BOTH cancellation shapes: a gif switch (next/prev/
-    // auto-swipe) and the player screen leaving composition (BACK) — reopen
-    // then resumes from the real last position via byGif().positionMs. The
-    // 3s floor mirrors the watch-history write policy (DB doc).
-    LaunchedEffect(gif.id) {
-        try {
-            while (true) {
-                kotlinx.coroutines.delay(5_000)
-                flushWatchPosition()
-            }
-        } finally {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                flushWatchPosition()
-            }
-        }
+        player.playGif(gif, dataSaver, videoQuality = videoQuality)
     }
     val muted by settings.muted.collectAsStateWithLifecycle(false)
     val autoSwipeOn by settings.autoSwipe.collectAsStateWithLifecycle(false)
@@ -608,10 +573,60 @@ fun TvPlayerScreen(
             },
         )
     }
+    if (endDialog) {
+        // #22 player end-of-feed popup: D-pad button rows on the
+        // TvQuickActionsDialog pattern (giffyFocus ring + first-row focus).
+        val endFocus = remember { FocusRequester() }
+        LaunchedEffect(Unit) {
+            endFocus.requestFocus()
+        }
+        Dialog(
+            onDismissRequest = { endDialog = false },
+        ) {
+            androidx.compose.material3.Surface(
+                shape = MaterialTheme.shapes.medium,
+                tonalElevation = 6.dp,
+                modifier = Modifier.width(320.dp),
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = "End of feed",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                    val restartInteraction = remember { MutableInteractionSource() }
+                    TextButton(
+                        onClick = {
+                            endDialog = false
+                            textVisible = true
+                            index = 0
+                            playerFocus.requestFocus()
+                        },
+                        interactionSource = restartInteraction,
+                        colors =
+                            ButtonDefaults.textButtonColors(
+                                contentColor = MaterialTheme.colorScheme.secondary,
+                            ),
+                        modifier = Modifier.giffyFocus(restartInteraction).focusRequester(endFocus),
+                    ) { Text("Start over", style = MaterialTheme.typography.labelLarge) }
+                    val backInteraction = remember { MutableInteractionSource() }
+                    TextButton(
+                        onClick = onBack,
+                        interactionSource = backInteraction,
+                        colors =
+                            ButtonDefaults.textButtonColors(
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                            ),
+                        modifier = Modifier.giffyFocus(backInteraction),
+                    ) { Text("Back to feed", style = MaterialTheme.typography.labelLarge) }
+                }
+            }
+        }
+    }
 }
-
-/** Watch-history write floor: record only after ≥3s playback (DB doc policy). */
-private const val WATCH_POSITION_MIN_MS = 3_000L
 
 /** ±10s step with a "1:23 / 2:45" flash; hold-repeat = progressive seek. */
 private fun seekBy(

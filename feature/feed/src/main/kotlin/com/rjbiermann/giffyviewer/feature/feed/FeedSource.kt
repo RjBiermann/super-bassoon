@@ -83,27 +83,10 @@ sealed interface FeedSource {
         override val ttlMs = TTL_SEARCH
     }
 
-    /** "Surprise me" (§8): a random unwatched pool the repository refreshes
-     *  per open — session-only, no Room rows, TTL 0 (always regenerate). */
-    data object Surprise : FeedSource {
-        override val keyBase = "surprise:v1"
-        override val ttlMs = 0L
-    }
-
     /** Liked gifs (PLAN §7, logged-in): network-LIVE — never cached (§5);
      *  pages have no cache keys and sorts are client-side only. */
     data object Liked : FeedSource {
         override val keyBase = "liked:v1"
-        override val ttlMs = 0L
-    }
-
-    /** "Continue Watching" (§8, app-only label): partially watched gifs from
-     *  Room watch_history — Room-only, no API fetch, no feed_pages cache;
-     *  TTL 0 (the Room flow itself invalidates). Filter chain mirrors TV's
-     *  ContinueWatchingViewModel: ContentFilter + verified-only + orientation
-     *  (+ §8 per-feed prefs on mobile). */
-    data object Continue : FeedSource {
-        override val keyBase = "continue:v1"
         override val ttlMs = 0L
     }
 
@@ -133,8 +116,6 @@ fun FeedSource.title(): String =
         is FeedSource.Custom -> this.name
         is FeedSource.Search -> "Search: $query"
         is FeedSource.Favorites -> "Favorites"
-        is FeedSource.Surprise -> "Surprise me"
-        is FeedSource.Continue -> "Continue Watching"
     }
 
 /** Active server sort of this source ("" = the surface's default). */

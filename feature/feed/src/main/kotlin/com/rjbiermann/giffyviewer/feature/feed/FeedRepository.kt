@@ -6,23 +6,14 @@ import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import com.rjbiermann.giffyviewer.core.database.ContentFilter
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
-import com.rjbiermann.giffyviewer.core.database.toModel
 import com.rjbiermann.giffyviewer.core.model.Gif
-import com.rjbiermann.giffyviewer.core.model.matchesOrientation
-import com.rjbiermann.giffyviewer.core.model.resolutionMatches
 import com.rjbiermann.giffyviewer.core.network.GifsApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
-
-/** "Surprise me" outcome (§8) — copy-differentiation on the feed's snackbar. */
-enum class SurpriseResult { OK, EMPTY, FILTERED_EMPTY }
 
 /**
  * Cache-first feed access (PLAN §5). UI reads Room via [FeedPagingSource];
@@ -89,33 +80,6 @@ class FeedRepository
             db.feedPageDao().evictFavorites()
         }
 
-        /** "Surprise me" pool (§8) — session-only, regenerated per request. */
-        private val surprisePool = MutableStateFlow<List<Gif>?>(null)
-
-        /** "Surprise me" result (§8): OK = pool landed; FILTERED_EMPTY = cached
-         *  rows existed but every candidate was dropped by ContentFilter /
-         *  verified-only / orientation (the batch-14 all-portrait-pool shape —
-         *  honest but mistitled as "nothing cached"); EMPTY = no unwatched
-         *  rows at all (fresh install or everything watched). */
-        suspend fun refreshSurprise(): SurpriseResult {
-            val orientation = settings.orientationFilter.first()
-            val verifiedOnly = settings.verifiedOnly.first()
-            contentFilter.refreshFrom(db.contentPrefsDao())
-            contentFilter.refreshBlockedFeeds(db.customFeedDao())
-            val raw = db.gifDao().randomUnwatched(PAGE_SIZE * 2).map { it.toModel() }
-            val pool =
-                raw
-                    .filter { contentFilter.allow(it.userName, it.tags, it.description) }
-                    .filter { !verifiedOnly || it.verified }
-                    .filter { it.matchesOrientation(orientation) }
-            surprisePool.value = pool.ifEmpty { null }
-            return when {
-                pool.isNotEmpty() -> SurpriseResult.OK
-                raw.isNotEmpty() -> SurpriseResult.FILTERED_EMPTY
-                else -> SurpriseResult.EMPTY
-            }
-        }
-
         /** SLICE-12 hint sink: effective orientation for a feed's base key —
          *  the per-feed §8 pref merged over the global §6 pref (same semantics as
          *  FeedPagingSource's read chain / FeedScreen's B3 predicate). Composed
@@ -133,12 +97,7 @@ class FeedRepository
             feed: FeedSource,
             forceRefresh: Boolean = false,
         ): Flow<PagingData<Gif>> =
-            if (feed is FeedSource.Surprise) {
-                Pager(
-                    config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = 10, enablePlaceholders = false),
-                    pagingSourceFactory = { SurprisePoolPagingSource(surprisePool) },
-                ).flow
-            } else if (feed is FeedSource.Liked) {
+            if (feed is FeedSource.Liked) {
                 // Network-live, never cached (PLAN §7); no RemoteMediator, no Room.
                 kotlinx.coroutines.flow
                     .combine(
@@ -186,8 +145,6 @@ class FeedRepository
                             },
                         ).flow
                     }
-            } else if (feed is FeedSource.Continue) {
-                continueWatchingPager()
             } else {
                 // Orientation (global) + §8 per-feed prefs BOTH restart the pager:
                 // combine them so either change re-reads cached pages through the
@@ -205,64 +162,33 @@ class FeedRepository
                     // FeedPrefs is a data class — structural equality holds.
                     .distinctUntilChanged()
                     .flatMapLatest { (o, v, p) ->
+                        if (feed is FeedSource.Favorites && forceRefresh) {
+                            // #5 shuffle-on-refresh: every forced generation
+                            // (pull-to-refresh + the TV refresh control) re-rotates
+                            // the round-robin and evicts pages cached under the old
+                            // mapping — REFRESH re-fetches page 1 only, so untouched
+                            // later pages would keep serving the old rotation
+                            // until the TTL lapses.
+                            reshuffleFavorites()
+                        }
                         cachedPager(feed, forceRefresh, p, o, v)
                     }
             }
 
-        /** "Continue Watching" (§8, mobile): Room-only read through the SAME
-         *  read-time chain TV's ContinueWatchingViewModel applies — ContentFilter
-         *  (leak-zero) + verified-only + orientation + §8 per-feed prefs (the
-         *  Filter ▾ dialog stays honest on this surface). DataStore prefs ride
-         *  the combine → pager restart; Room-table changes (a block written on
-         *  this surface, a finished video) ride the source's invalidation-tracker
-         *  observer → per-load re-derivation. NO hide-count increment: the filter
-         *  counted these at watch time — a recount would double-count (TV's
-         *  ContinueWatchingViewModel comment). */
-        private fun continueWatchingPager(): Flow<PagingData<Gif>> =
-            kotlinx.coroutines.flow
-                .combine(
-                    settings.orientationFilter,
-                    settings.verifiedOnly,
-                    settings.feedPrefs(FeedSource.Continue.keyBase),
-                ) { o, v, p -> Triple(o, v, p) }
-                // Same DataStore identity-emission dedupe as the cached branch (#26).
-                .distinctUntilChanged()
-                .flatMapLatest { (o, v, p) ->
-                    Pager(
-                        config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = 10, enablePlaceholders = false),
-                        pagingSourceFactory = {
-                            ContinueWatchingPagingSource(db) {
-                                continueWatchingEntries(o, v, p)
-                            }
-                        },
-                    ).flow
-                }
-
-        /** Derivation per load: watch_history → gifs, filtered read-time.
-         *  Per-feed orientation "" = follow the global §6 pref (§8). */
-        private suspend fun continueWatchingEntries(
-            orientationPref: String,
-            verifiedOnly: Boolean,
-            prefs: com.rjbiermann.giffyviewer.core.datastore.FeedPrefs,
-        ): List<Gif> {
-            contentFilter.refreshFrom(db.contentPrefsDao())
-            contentFilter.refreshBlockedFeeds(db.customFeedDao())
-            val orientation = prefs.orientation.ifEmpty { orientationPref }
-            val rows = db.watchHistoryDao().continueWatching(limit = CONTINUE_LIMIT).first()
-            val byId =
-                db
-                    .gifDao()
-                    .byIds(rows.map { it.gifId })
-                    .associateBy { it.id }
-            return rows
-                .mapNotNull { row -> byId[row.gifId]?.toModel() }
-                .filter { contentFilter.allow(it.userName, it.tags, it.description) }
-                .filter { !verifiedOnly || it.verified }
-                .filter { it.matchesOrientation(orientation) }
-                .filter { durationIn(it.durationSeconds, prefs.duration) }
-                .filter { it.resolutionMatches(prefs.resolution) }
-                .let { shuffleOrdered(it, prefs.shuffleSeed) }
+        /** #5 shuffle-on-refresh: a fresh volatile seed + eviction of pages
+         *  cached under the old rotation. Never persisted — the seed dies with
+         *  the process, so the first open after a restart is rotation-free:
+         *  deterministic until the user refreshes, the requested semantics. */
+        suspend fun reshuffleFavorites() {
+            val next = java.util.Random(System.nanoTime()).nextLong()
+            favoritesShuffleSeed = if (next == 0L) 1L else next
+            db.feedPageDao().evictFavorites()
         }
+
+        /** @Volatile so the pager builder and the shuffle-seed lambdas read the
+         *  freshest rotation the moment a forced generation re-seeds it. */
+        @Volatile
+        private var favoritesShuffleSeed = 0L
 
         private fun cachedPager(
             feed: FeedSource,
@@ -283,6 +209,7 @@ class FeedRepository
                         pageSize = PAGE_SIZE,
                         force = forceRefresh,
                         favorites = { db.contentPrefsDao().favoriteCreators() },
+                        favoritesSeed = { favoritesShuffleSeed },
                     ),
                 pagingSourceFactory = {
                     FeedPagingSource(
@@ -302,6 +229,7 @@ class FeedRepository
                             api,
                             PAGE_SIZE,
                             favorites = { db.contentPrefsDao().favoriteCreators() },
+                            favoritesSeed = { favoritesShuffleSeed },
                         ),
                         orientation = { orientation },
                         verifiedOnly = { verifiedOnly },
@@ -335,9 +263,6 @@ class FeedRepository
         companion object {
             const val PAGE_SIZE = 20
             private const val CTX_TTL_MS = 5 * 60_000L
-
-            /** "Continue Watching" row length — TV's ContinueWatchingViewModel uses 20. */
-            private const val CONTINUE_LIMIT = 20
 
             // Session-wide ids ever returned per feed — DELETED (2026-10, pull-to
             // -refresh blanking): the static map survived pager restarts, so a

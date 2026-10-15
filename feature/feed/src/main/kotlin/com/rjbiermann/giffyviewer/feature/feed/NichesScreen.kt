@@ -1,6 +1,7 @@
 package com.rjbiermann.giffyviewer.feature.feed
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.outlined.Info
@@ -25,12 +27,20 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rjbiermann.giffyviewer.core.ui.GiffyScaffold
+import com.rjbiermann.giffyviewer.core.ui.SCROLL_TO_TOP_THRESHOLD
+import com.rjbiermann.giffyviewer.core.ui.ScrollToTopFab
+import com.rjbiermann.giffyviewer.core.ui.rememberReducedMotion
+import com.rjbiermann.giffyviewer.core.ui.rememberScrollingUp
+import com.rjbiermann.giffyviewer.core.ui.scrollToTop
+import kotlinx.coroutines.launch
 
 /**
  * Niches browser (PLAN §7 groups groundwork): paginated taxonomy from
@@ -58,6 +68,12 @@ fun NichesScreen(
     val endReached by viewModel.endReached.collectAsStateWithLifecycle()
     val loadFailed by viewModel.loadFailed.collectAsStateWithLifecycle()
     var sortMenuOpen by remember { mutableStateOf(false) }
+    // Scroll-to-top fab (#23): the taxonomy pages can run deep; same thresholds
+    // as the main feed, navigation-only.
+    val listState = rememberLazyListState()
+    val showFab by rememberScrollingUp(listState, SCROLL_TO_TOP_THRESHOLD)
+    val reducedMotion = rememberReducedMotion()
+    val scope = rememberCoroutineScope()
 
     GiffyScaffold(
         title = "Niches",
@@ -90,100 +106,107 @@ fun NichesScreen(
             }
         },
     ) { padding ->
-        LazyColumn(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-        ) {
-            // Site-parity filter chips: All + one chip per niche category.
-            item {
-                LazyRow(
-                    contentPadding =
-                        androidx.compose.foundation.layout
-                            .PaddingValues(horizontal = 12.dp),
-                    horizontalArrangement =
-                        androidx.compose.foundation.layout.Arrangement
-                            .spacedBy(8.dp),
-                ) {
-                    item {
-                        FilterChip(
-                            selected = category == null,
-                            onClick = { viewModel.selectCategory(null) },
-                            label = { Text("All") },
-                        )
-                    }
-                    items(categories) { cat ->
-                        FilterChip(
-                            selected = category == cat,
-                            onClick = { viewModel.selectCategory(if (category == cat) null else cat) },
-                            label = { Text(cat) },
-                        )
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                state = listState,
+            ) {
+                // Site-parity filter chips: All + one chip per niche category.
+                item {
+                    LazyRow(
+                        contentPadding =
+                            androidx.compose.foundation.layout
+                                .PaddingValues(horizontal = 12.dp),
+                        horizontalArrangement =
+                            androidx.compose.foundation.layout.Arrangement
+                                .spacedBy(8.dp),
+                    ) {
+                        item {
+                            FilterChip(
+                                selected = category == null,
+                                onClick = { viewModel.selectCategory(null) },
+                                label = { Text("All") },
+                            )
+                        }
+                        items(categories) { cat ->
+                            FilterChip(
+                                selected = category == cat,
+                                onClick = { viewModel.selectCategory(if (category == cat) null else cat) },
+                                label = { Text(cat) },
+                            )
+                        }
                     }
                 }
-            }
-            items(niches.size, key = { niches[it].id }) { index ->
-                val niche = niches[index]
-                ListItem(
-                    headlineContent = { Text(niche.name) },
-                    supportingContent = { Text("${niche.gifs} gifs · ${niche.subscribers} subscribers") },
-                    trailingContent = {
-                        Row {
-                            // §9 lingo: Join Niche / Leave Niche (logged-in only).
-                            if (joinViewModel.loggedIn) {
-                                TextButton(onClick = { joinViewModel.toggle(niche.id) }) {
-                                    Text(if (niche.id in joined) "Leave" else "Join")
+                items(niches.size, key = { niches[it].id }) { index ->
+                    val niche = niches[index]
+                    ListItem(
+                        headlineContent = { Text(niche.name) },
+                        supportingContent = { Text("${niche.gifs} gifs · ${niche.subscribers} subscribers") },
+                        trailingContent = {
+                            Row {
+                                // §9 lingo: Join Niche / Leave Niche (logged-in only).
+                                if (joinViewModel.loggedIn) {
+                                    TextButton(onClick = { joinViewModel.toggle(niche.id) }) {
+                                        Text(if (niche.id in joined) "Leave" else "Join")
+                                    }
+                                }
+                                IconButton(onClick = { onOpenAbout(niche.id, niche.name) }) {
+                                    Icon(Icons.Outlined.Info, contentDescription = "about ${niche.name}")
+                                }
+                                IconButton(onClick = { viewModel.togglePin(niche) }) {
+                                    Icon(
+                                        imageVector =
+                                            if (pinned.any { it.startsWith("${niche.id}|") }) {
+                                                Icons.Filled.PushPin
+                                            } else {
+                                                Icons.Outlined.PushPin
+                                            },
+                                        contentDescription = if (pinned.any { it.startsWith("${niche.id}|") }) "unpin" else "pin",
+                                    )
                                 }
                             }
-                            IconButton(onClick = { onOpenAbout(niche.id, niche.name) }) {
-                                Icon(Icons.Outlined.Info, contentDescription = "about ${niche.name}")
-                            }
-                            IconButton(onClick = { viewModel.togglePin(niche) }) {
-                                Icon(
-                                    imageVector =
-                                        if (pinned.any { it.startsWith("${niche.id}|") }) {
-                                            Icons.Filled.PushPin
-                                        } else {
-                                            Icons.Outlined.PushPin
-                                        },
-                                    contentDescription = if (pinned.any { it.startsWith("${niche.id}|") }) "unpin" else "pin",
-                                )
-                            }
-                        }
-                    },
-                    modifier = Modifier.clickable { onOpenNiche(FeedSource.Niche(niche.id, niche.name)) },
-                )
-            }
-            if (loadFailed) {
-                item(key = "error") {
-                    com.rjbiermann.giffyviewer.core.ui.EmptyState(
-                        message = "Couldn't load niches",
-                        hint = "Check your connection and retry",
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    )
-                    TextButton(
-                        onClick = { viewModel.loadMore() },
-                        modifier = Modifier.padding(16.dp),
-                    ) { Text("Retry") }
-                }
-            }
-            if (!endReached) {
-                item(key = "load-more") {
-                    TextButton(
-                        onClick = { viewModel.loadMore() },
-                        modifier = Modifier.padding(16.dp),
-                    ) { Text("Load more") }
-                }
-            } else {
-                item(key = "end") {
-                    Text(
-                        "That's all ${niches.size} niches",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(16.dp),
+                        },
+                        modifier = Modifier.clickable { onOpenNiche(FeedSource.Niche(niche.id, niche.name)) },
                     )
                 }
+                if (loadFailed) {
+                    item(key = "error") {
+                        com.rjbiermann.giffyviewer.core.ui.EmptyState(
+                            message = "Couldn't load niches",
+                            hint = "Check your connection and retry",
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        )
+                        TextButton(
+                            onClick = { viewModel.loadMore() },
+                            modifier = Modifier.padding(16.dp),
+                        ) { Text("Retry") }
+                    }
+                }
+                if (!endReached) {
+                    item(key = "load-more") {
+                        TextButton(
+                            onClick = { viewModel.loadMore() },
+                            modifier = Modifier.padding(16.dp),
+                        ) { Text("Load more") }
+                    }
+                } else {
+                    item(key = "end") {
+                        Text(
+                            "That's all ${niches.size} niches",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(16.dp),
+                        )
+                    }
+                }
             }
+            ScrollToTopFab(
+                visible = showFab,
+                onClick = {
+                    scope.launch { listState.scrollToTop(reducedMotion) }
+                },
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
         }
     }
 }

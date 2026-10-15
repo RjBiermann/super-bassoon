@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
+import com.rjbiermann.giffyviewer.core.ui.Feature
 import com.rjbiermann.giffyviewer.feature.feed.orderNichesByTagMatch
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flatMapLatest
@@ -164,7 +165,11 @@ internal fun QuickBlockSheet(
                         viewModel.togglePinnedCreator(gif.userName)
                         onDismiss()
                     }
-                    if (customFeeds.isNotEmpty()) {
+                    // Add targets (#10 gate + opportunistic fix): custom feeds
+                    // (flag-dependent) OR a token (Collection/Niche adds) — the
+                    // pane hosts all three, so a signed-in user with only
+                    // collections still reaches it.
+                    if ((Feature.CUSTOM_FEEDS && customFeeds.isNotEmpty()) || viewModel.loggedIn) {
                         listStyle("Add to…") { view = "addto" }
                     }
                     if (gif.tags.isNotEmpty()) {
@@ -174,8 +179,12 @@ internal fun QuickBlockSheet(
                     listStyle("Close", onDismiss)
                 }
                 "addto" -> {
-                    // Picker dialogs stay the second level (same depth as today).
-                    listStyle("Add to custom feed…") { showAddToFeed = true }
+                    // Picker dialogs stay the second level (same depth as today);
+                    // the custom row rides the #10 feature flag (Collection/Niche
+                    // rows stay reachable beneath it).
+                    if (Feature.CUSTOM_FEEDS) {
+                        listStyle("Add to custom feed…") { showAddToFeed = true }
+                    }
                     listStyle("Add to a Collection…") {
                         viewModel.refreshCollections()
                         showAddToCollection = true

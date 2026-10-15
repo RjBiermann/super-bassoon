@@ -22,13 +22,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import com.rjbiermann.giffyviewer.core.datastore.FeedPrefs
 
-/** §8 per-feed filter dialog: duration / resolution / orientation chips. */
+/**
+ * One popup per feed (§8 + #18): SORT (first row — only where the server
+ * accepts an `order`, i.e. non-empty [sortOptions]) + duration / resolution /
+ * orientation chips. Persistence rides onApply: the host applies BOTH the
+ * FeedPrefs AND the selected sort (existing server-sort machinery).
+ */
 @Composable
 fun FeedFilterDialog(
     isTagBundle: Boolean = false,
-    prefs: com.rjbiermann.giffyviewer.core.datastore.FeedPrefs,
-    onApply: (com.rjbiermann.giffyviewer.core.datastore.FeedPrefs) -> Unit,
+    prefs: FeedPrefs,
+    /** Server-verified orders ONLY (FeedSource.sortOptions); empty = no row. */
+    sortOptions: List<Pair<String, String>> = emptyList(),
+    /** The feed's effective saved sort ("" = the surface default). */
+    selectedSort: String = "",
+    onApply: (
+        prefs: FeedPrefs,
+        sort: String,
+    ) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var duration by remember { mutableStateOf(prefs.duration) }
@@ -36,11 +49,20 @@ fun FeedFilterDialog(
     var orientation by remember { mutableStateOf(prefs.orientation) }
     var shuffleSeed by remember { mutableStateOf(prefs.shuffleSeed) }
     var untaggedOnly by remember { mutableStateOf(prefs.untaggedOnly) }
+    var sort by remember { mutableStateOf(selectedSort) }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Filter feed") },
+        title = { Text("Sort & filter") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (sortOptions.isNotEmpty()) {
+                    Text("Sort", style = MaterialTheme.typography.titleSmall)
+                    Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        sortOptions.forEach { (label, value) ->
+                            FilterChip(selected = sort == value, onClick = { sort = value }, label = { Text(label) })
+                        }
+                    }
+                }
                 Text("Duration", style = MaterialTheme.typography.titleSmall)
                 Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf(
@@ -121,18 +143,30 @@ fun FeedFilterDialog(
                         FilterChip(selected = orientation == value, onClick = { orientation = value }, label = { Text(label) })
                     }
                 }
+                // #18: one Clear for EVERYTHING — filters AND the per-feed sort
+                // reset together (the mobile chips' Clear, now TV parity too).
+                TextButton(
+                    onClick = {
+                        onApply(
+                            FeedPrefs(),
+                            "",
+                        )
+                    },
+                    modifier = Modifier.align(Alignment.End),
+                ) { Text("Clear filters") }
             }
         },
         confirmButton = {
             androidx.compose.material3.TextButton(onClick = {
                 onApply(
-                    com.rjbiermann.giffyviewer.core.datastore.FeedPrefs(
+                    FeedPrefs(
                         duration = duration,
                         resolution = resolution,
                         orientation = orientation,
                         shuffleSeed = shuffleSeed,
                         untaggedOnly = untaggedOnly,
                     ),
+                    sort,
                 )
             }) { Text("Apply") }
         },

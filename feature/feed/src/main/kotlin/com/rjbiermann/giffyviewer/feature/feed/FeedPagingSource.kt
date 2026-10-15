@@ -33,7 +33,7 @@ internal fun untagged(
  *  yields ONE global order across all pages (stable across recomposition;
  *  Reshuffle = new seed). Seed mixed via splitmix-style XOR: affine keys
  *  (h+c, h*c) sort identically for every seed — XOR of a seed-scaled constant
- *  actually permutes the order. Shared with the repository's Continue branch. */
+ *  actually permutes the order. */
 internal fun shuffleOrdered(
     gifs: List<Gif>,
     seed: Long,

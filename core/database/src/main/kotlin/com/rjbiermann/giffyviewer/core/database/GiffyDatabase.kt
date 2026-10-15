@@ -17,14 +17,13 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SearchHistoryEntity::class,
         TagEntity::class,
         LikedIdsEntity::class,
-        WatchHistoryEntity::class,
         CreatorPrefEntity::class,
         TagPrefEntity::class,
         KeywordBlockEntity::class,
         HideCountEntity::class,
         CustomFeedEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
 )
 @TypeConverters(ListConverters::class, MapStringStringConverter::class)
@@ -38,8 +37,6 @@ abstract class GiffyDatabase : RoomDatabase() {
     abstract fun tagDao(): TagDao
 
     abstract fun likedIdsDao(): LikedIdsDao
-
-    abstract fun watchHistoryDao(): WatchHistoryDao
 
     abstract fun contentPrefsDao(): ContentPrefsDao
 
@@ -152,6 +149,21 @@ abstract class GiffyDatabase : RoomDatabase() {
                     )
                     db.execSQL("DROP TABLE IF EXISTS `niche_groups`")
                     db.execSQL("DELETE FROM `feed_pages` WHERE `pageKey` LIKE 'group:%'")
+                }
+            }
+
+        /** v11: watch_history DROPPED (2026-10 stream, #1/#12) — the
+         *  "Continue Watching" and "Surprise me" features and the resume-position
+         *  reads/writes were removed with them, leaving the table with zero
+         *  readers, zero writers, and no backup entry. DESTRUCTIVE AND DELIBERATE
+         *  (the positions are exactly the data the user deleted); a future resume
+         *  feature would re-add the entity as a NEW schema version. Idempotent:
+         *  Room wraps the migration in a transaction, DROP TABLE IF EXISTS
+         *  tolerates a partially-applied retry. */
+        val MIGRATION_10_11 =
+            object : Migration(10, 11) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("DROP TABLE IF EXISTS `watch_history`")
                 }
             }
     }

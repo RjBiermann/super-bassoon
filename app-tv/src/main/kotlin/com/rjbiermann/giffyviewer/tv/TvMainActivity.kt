@@ -21,7 +21,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -34,13 +33,12 @@ import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
+import com.rjbiermann.giffyviewer.core.ui.Feature
 import com.rjbiermann.giffyviewer.core.ui.GiffyTheme
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
-import com.rjbiermann.giffyviewer.feature.feed.SurpriseResult
 import com.rjbiermann.giffyviewer.feature.feed.parseNicheRef
 import com.rjbiermann.giffyviewer.feature.settings.SettingsScreen
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -52,8 +50,6 @@ class TvMainActivity : ComponentActivity() {
     @Inject lateinit var db: GiffyDatabase
 
     @Inject lateinit var tokenStore: TokenStore
-
-    @Inject lateinit var repository: com.rjbiermann.giffyviewer.feature.feed.FeedRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -193,6 +189,9 @@ class TvMainActivity : ComponentActivity() {
                             viewModel = feedVm,
                             feedViewModel = quickVm,
                             onOpenNiche = { niche -> openFeed = niche },
+                            // #18: the dialog's sort half re-identifies the feed;
+                            // the screen drives the forced generation itself.
+                            onSortChange = { sorted -> openFeed = sorted },
                             playerFactory = playerFactory,
                             dataSaver = dataSaver,
                             gridState = feedGridState,
@@ -269,8 +268,6 @@ class TvMainActivity : ComponentActivity() {
                     )
                 else -> {
                     val home: TvHomeViewModel = hiltViewModel()
-                    val continueVm: ContinueWatchingViewModel = hiltViewModel()
-                    val homeScope = rememberCoroutineScope()
                     val focusRequester = remember { FocusRequester() }
                     // No initial D-pad focus otherwise — header buttons were unreachable
                     // until the user tabbed into a row blindly.
@@ -326,43 +323,37 @@ class TvMainActivity : ComponentActivity() {
                                         onDismissRequest = { moreOpen = false },
                                     ) {
                                         androidx.compose.material3.DropdownMenuItem(
-                                            text = { androidx.compose.material3.Text("Surprise me") },
-                                            onClick = {
-                                                moreOpen = false
-                                                homeScope.launch {
-                                                    val result = repository.refreshSurprise()
-                                                    if (result == SurpriseResult.OK) openFeed = FeedSource.Surprise
-                                                }
-                                            },
-                                        )
-                                        androidx.compose.material3.HorizontalDivider()
-                                        androidx.compose.material3.DropdownMenuItem(
-                                            text = { androidx.compose.material3.Text("My feeds") },
-                                            onClick = {
-                                                moreOpen = false
-                                                showCustomFeeds = true
-                                            },
-                                        )
-                                        androidx.compose.material3.DropdownMenuItem(
                                             text = { androidx.compose.material3.Text("Collections") },
                                             onClick = {
                                                 moreOpen = false
                                                 showCollections = true
                                             },
                                         )
-                                        customFeeds.toList().forEach { def ->
+                                        // Custom feeds (#10): builder + management disabled
+                                        // for now; DB rows and the BLOCKED-feed filter stage
+                                        // keep working underneath (Feature.CUSTOM_FEEDS).
+                                        if (Feature.CUSTOM_FEEDS) {
                                             androidx.compose.material3.DropdownMenuItem(
-                                                text = { androidx.compose.material3.Text(def.name) },
+                                                text = { androidx.compose.material3.Text("My feeds") },
                                                 onClick = {
                                                     moreOpen = false
-                                                    openFeed =
-                                                        FeedSource.Custom(
-                                                            def.id,
-                                                            def.name,
-                                                            def.sourcesJson.split(',').filter { it.isNotBlank() },
-                                                        )
+                                                    showCustomFeeds = true
                                                 },
                                             )
+                                            customFeeds.toList().forEach { def ->
+                                                androidx.compose.material3.DropdownMenuItem(
+                                                    text = { androidx.compose.material3.Text(def.name) },
+                                                    onClick = {
+                                                        moreOpen = false
+                                                        openFeed =
+                                                            FeedSource.Custom(
+                                                                def.id,
+                                                                def.name,
+                                                                def.sourcesJson.split(',').filter { it.isNotBlank() },
+                                                            )
+                                                    },
+                                                )
+                                            }
                                         }
                                         val pinnedEntries =
                                             pinnedNiches.mapNotNull { parseNicheRef(it) } +
@@ -397,7 +388,6 @@ class TvMainActivity : ComponentActivity() {
                             playerFactory = playerFactory,
                             dataSaver = dataSaver,
                             homeViewModel = home,
-                            continueViewModel = continueVm,
                             listState = homeListState,
                         )
                     }

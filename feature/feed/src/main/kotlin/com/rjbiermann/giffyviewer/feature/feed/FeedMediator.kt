@@ -29,9 +29,11 @@ class FeedMediator(
     private val force: Boolean = false,
     private val now: () -> Long = System::currentTimeMillis,
     private val favorites: suspend () -> List<String> = { emptyList() },
+    /** #5 shuffle-on-refresh rotation seed (Favorites only; 0 = DB order). */
+    private val favoritesSeed: () -> Long = { 0L },
 ) : RemoteMediator<Int, com.rjbiermann.giffyviewer.core.model.Gif>() {
     private val fetcher =
-        FeedPageFetcher(feed, gifDao, pageDao, api, pageSize, now, favorites)
+        FeedPageFetcher(feed, gifDao, pageDao, api, pageSize, now, favorites, favoritesSeed)
 
     override suspend fun load(
         loadType: LoadType,

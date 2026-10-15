@@ -92,7 +92,6 @@ import androidx.media3.ui.PlayerView
 import androidx.paging.compose.collectAsLazyPagingItems
 import coil3.compose.AsyncImage
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
-import com.rjbiermann.giffyviewer.core.database.WatchHistoryEntity
 import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.model.VideoQuality
@@ -113,7 +112,8 @@ import kotlin.math.roundToInt
 
 /**
  * TikTok-style swipe player (PLAN §9): vertical pager, only the active page
- * plays. Resume positions go to `watch_history`; SimpleCache writes under the
+ * plays; every play starts at 0 (watch-history/resume removed with the feature,
+ * 2026-10 stream); SimpleCache writes under the
  * gif ID. Controls: single tap reveals the overlay / pauses, auto-hide after
  * idle, always-on thin progress bar with remaining-time chip, draggable scrub, two-finger pinch zoom (1x–3x) that
  * resets on swipe (PLAN §9 revised 2026-09-30), and the right action rail
@@ -187,9 +187,6 @@ fun PlayerScreen(
     }
     // playback failure overlay (PLAN §9): Retry re-resolves, Skip advances
     var playError by remember { mutableStateOf(false) }
-    // auto-advance plays the next item from 0 — a watched neighbor resuming
-    // near its end would end instantly and cascade swipes (user report)
-    val skipResume = remember { mutableStateOf(false) }
     // Ended at the last LOADED page: the video sits ended while the next page
     // fetches — an ended video fires no further ended event, so the advance
     // must be re-driven when the page lands (user: "keep swiping until there
@@ -259,11 +256,9 @@ fun PlayerScreen(
                     }
                     // NOTE: this block was once wrapped in a bare lambda — a bare
                     // `{ }` is an expression statement and never runs, so the
-                    // auto-advance silently no-op'd (live-proven: video parked at
-                    // end, watch_history frozen).
+                    // auto-advance silently no-op'd (live-proven).
                     val next = pagerState.currentPage + 1
                     if (next < items.itemCount) {
-                        skipResume.value = true
                         // instant when the system reduced-motion scale is 0
                         val reduced =
                             android.provider.Settings.Global.getFloat(
@@ -295,7 +290,6 @@ fun PlayerScreen(
         when {
             next < items.itemCount -> {
                 pendingAdvance.value = false
-                skipResume.value = true
                 val reduced =
                     android.provider.Settings.Global.getFloat(
                         context.contentResolver,
@@ -371,7 +365,6 @@ fun PlayerScreen(
                     active = page == pagerState.currentPage,
                     player = player,
                     dataSaver = dataSaver,
-                    watchHistory = db.watchHistoryDao(),
                     onPlayingChanged = { isPlaying = it },
                     controlsVisible = controlsVisible,
                     onHideControls = { controlsVisible = false },
@@ -398,7 +391,6 @@ fun PlayerScreen(
                     onOverflow = { sheetFor = gif },
                     autoSwipeOn = autoSwipe && !dataSaver,
                     onToggleAutoSwipe = { muteScope.launch { settings.setAutoSwipe(!autoSwipe) } },
-                    skipResume = skipResume,
                     videoQuality = videoQuality,
                     playError = playError && page == pagerState.currentPage,
                     onRetry = {
@@ -460,7 +452,6 @@ private fun PlayerPage(
     active: Boolean,
     player: GiffyPlayer,
     dataSaver: Boolean,
-    watchHistory: com.rjbiermann.giffyviewer.core.database.WatchHistoryDao,
     onPlayingChanged: (Boolean) -> Unit,
     controlsVisible: Boolean,
     onHideControls: () -> Unit,
@@ -480,8 +471,7 @@ private fun PlayerPage(
     onToggleMute: (Boolean) -> Unit,
     onShare: () -> Unit,
     onOverflow: () -> Unit,
-    skipResume: androidx.compose.runtime.MutableState<Boolean>,
-    /** §5 preferred quality (auto | highest | 720 | 480) at prepare time. */
+    /** §5 preferred quality (auto | highest | sd) at prepare time. */
     videoQuality: String,
     autoSwipeOn: Boolean,
     onToggleAutoSwipe: () -> Unit,
@@ -509,48 +499,18 @@ private fun PlayerPage(
         }
     var popAt by remember { mutableStateOf<Offset?>(null) }
     if (active) {
-        // resume: stored position per gif, EXCEPT (a) auto-advance always starts
-        // at 0, and (b) fully-watched gifs restart at 0 — a near-end resume would
-        // hit STATE_ENDED instantly and cascade auto-swipes mid-video
-        // (keyed on gif.id only, so the flag flip doesn't restart playback)
+        // Every play starts at 0 (watch-history/resume removed with the
+        // feature — #1 stream): keyed on gif.id so a swap re-fires it.
         LaunchedEffect(gif.id, dataSaver) {
-            val history = watchHistory.byGif(gif.id)
-            val resume =
-                when {
-                    skipResume.value -> {
-                        skipResume.value = false
-                        0L
-                    }
-                    history?.watched == true -> 0L
-                    else -> history?.positionMs ?: 0L
-                }
             if (player.currentGifId.value == gif.id) {
                 // Adopted inline preview already playing THIS gif (tap-to-open on
                 // the settled 1-col tile, issue #9): keep the live position and
                 // buffer — no re-prepare; the sampling below continues from the
                 // live position.
             } else {
-                player.playGif(gif, dataSaver, resumeMs = resume, videoQuality = videoQuality)
+                player.playGif(gif, dataSaver, resumeMs = 0L, videoQuality = videoQuality)
             }
             onPlayingChanged(true)
-        }
-        // resume tracking: sample position every 5s
-        LaunchedEffect(gif.id) {
-            while (true) {
-                kotlinx.coroutines.delay(5_000)
-                val pos = player.currentPositionMs
-                if (pos > 0) {
-                    val watched = player.durationMs > 0 && pos > player.durationMs * 0.8
-                    watchHistory.upsert(
-                        WatchHistoryEntity(
-                            gifId = gif.id,
-                            positionMs = pos,
-                            updatedAt = System.currentTimeMillis(),
-                            watched = watched,
-                        ),
-                    )
-                }
-            }
         }
     }
 

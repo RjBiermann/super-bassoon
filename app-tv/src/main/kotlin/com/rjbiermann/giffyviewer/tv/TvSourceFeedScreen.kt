@@ -6,21 +6,28 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +37,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import androidx.paging.LoadState
+import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.rjbiermann.giffyviewer.core.model.Gif
@@ -38,9 +47,19 @@ import com.rjbiermann.giffyviewer.feature.feed.FeedFilterDialog
 import com.rjbiermann.giffyviewer.feature.feed.FeedRepository
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
+import com.rjbiermann.giffyviewer.feature.feed.activeSort
 import com.rjbiermann.giffyviewer.feature.feed.packNicheRef
+import com.rjbiermann.giffyviewer.feature.feed.sortOptions
 import com.rjbiermann.giffyviewer.feature.feed.title
+import com.rjbiermann.giffyviewer.feature.feed.withSort
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
@@ -56,6 +75,10 @@ fun TvSourceFeedScreen(
     feedViewModel: com.rjbiermann.giffyviewer.feature.feed.FeedViewModel,
     /** Show-more pane niche rows — the feed swaps (same semantics as onOpenCreator). */
     onOpenNiche: (com.rjbiermann.giffyviewer.feature.feed.FeedSource.Niche) -> Unit = {},
+    /** #18 sort apply: the host re-identifies the feed with the sorted source
+     *  (mobile's shared-VM open() path is unavailable on TV — the grid pager
+     *  lives in [TvNicheFeedViewModel], which the screen itself forces). */
+    onSortChange: (FeedSource) -> Unit = {},
     /** Preview-on-focus (AGENTS-UX-PATTERNS): null factory = no previews. */
     playerFactory: com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory? = null,
     dataSaver: Boolean = false,
@@ -65,6 +88,7 @@ fun TvSourceFeedScreen(
             .rememberLazyGridState(),
 ) {
     val gifs = remember(source.keyBase) { viewModel.gifs(source) }.collectAsLazyPagingItems()
+    val scope = rememberCoroutineScope()
     // Preview-on-focus (same FocusPreview shape as the home rows).
     val previewContext = androidx.compose.ui.platform.LocalContext.current
     val preview =
@@ -95,9 +119,20 @@ fun TvSourceFeedScreen(
     var showFilter by remember { mutableStateOf(false) }
     // Initial D-pad focus (AGENTS-APP pattern): the grid's first card takes
     // focus on open — no blind first press.
-    val firstCardFocus = remember { FocusRequester() }
+    val firstCardFocus =
+        remember { FocusRequester() }
     LaunchedEffect(gifs.itemCount > 0) {
         if (gifs.itemCount > 0) firstCardFocus.requestFocus()
+    }
+
+    // §6/#22 refresh helper: forced generation + re-anchor to the top (instant
+    // — TV lists reset) with the first card re-focused.
+    fun refreshAndReturnToTop() {
+        viewModel.refresh()
+        scope.launch {
+            gridState.scrollToItem(0)
+            firstCardFocus.requestFocus()
+        }
     }
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         // Title + creator stats (v1/users — site-profile counts, tiles-only feeds).
@@ -129,21 +164,45 @@ fun TvSourceFeedScreen(
                 }
             }
         }
-        // Focus ring (unified BrandRed, AGENTS-APP): M3 FilterChip's own focus
-        // state is subtle on 10-foot — the shared giffyFocus border marks it.
-        val chipInteraction =
-            remember { MutableInteractionSource() }
-        androidx.compose.material3.FilterChip(
-            selected = showFilter,
-            onClick = { showFilter = true },
-            interactionSource = chipInteraction,
-            label = { Text("Filter") },
+        // Top-end icon row (§6 #22 + #18): Refresh (forced generation) and the
+        // ONE Sort & filter entry (sort + filters + clear inside the shared
+        // FeedFilterDialog). Focus ring (unified BrandRed, AGENTS-APP): M3
+        // IconButton's own focus state is subtle on 10-foot — the shared
+        // giffyFocus border marks it.
+        Row(
             modifier =
                 Modifier
-                    .giffyFocus(chipInteraction, shape = RoundedCornerShape(8.dp))
                     .align(Alignment.TopEnd)
                     .padding(end = 16.dp, top = 8.dp),
-        )
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            val refreshInteraction = remember { MutableInteractionSource() }
+            androidx.compose.material3.IconButton(
+                onClick = { refreshAndReturnToTop() },
+                interactionSource = refreshInteraction,
+                modifier =
+                    Modifier
+                        .giffyFocus(refreshInteraction, shape = RoundedCornerShape(8.dp)),
+            ) {
+                androidx.compose.material3.Icon(
+                    Icons.Filled.Refresh,
+                    contentDescription = "Refresh feed",
+                )
+            }
+            val sortInteraction = remember { MutableInteractionSource() }
+            androidx.compose.material3.IconButton(
+                onClick = { showFilter = true },
+                interactionSource = sortInteraction,
+                modifier =
+                    Modifier
+                        .giffyFocus(sortInteraction, shape = RoundedCornerShape(8.dp)),
+            ) {
+                androidx.compose.material3.Icon(
+                    Icons.AutoMirrored.Filled.Sort,
+                    contentDescription = "Sort & filter",
+                )
+            }
+        }
         LazyVerticalGrid(
             state = gridState,
             columns = GridCells.Fixed(4),
@@ -170,9 +229,43 @@ fun TvSourceFeedScreen(
                     )
                 }
             }
+            // End-of-feed footer (#22): composed AFTER the item slots, keyed off
+            // load states — never a pager item, never inside snapshot(). The
+            // button reuses the §6 refresh plumbing.
+            val refreshSettled = gifs.loadState.refresh is LoadState.NotLoading
+            val append = gifs.loadState.append as? LoadState.NotLoading
+            if (refreshSettled && append != null && (append.endOfPaginationReached || gifs.itemCount == 0)) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            text = "End of feed",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        val endInteraction = remember { MutableInteractionSource() }
+                        TextButton(
+                            onClick = { refreshAndReturnToTop() },
+                            interactionSource = endInteraction,
+                            modifier =
+                                Modifier
+                                    .giffyFocus(endInteraction)
+                                    .padding(top = 4.dp),
+                        ) { Text("Refresh") }
+                    }
+                }
+            }
         }
     }
     if (showFilter) {
+        // TV sort affordance (#18): the saved sort rides the SAME settings the
+        // mobile VM persists; a CHANGED sort re-identifies the feed via the
+        // host callback and forces one generation (below), so the grid's cached
+        // unsorted pages don't serve the new order until the TTL lapses.
+        val savedSort by remember(source.baseKey) { feedViewModel.sortFor(source.baseKey) }
+            .collectAsState(initial = "")
         FeedFilterDialog(
             // §8 strict-tags chip: tag-bundle custom feeds only (the merged groups).
             isTagBundle =
@@ -180,8 +273,16 @@ fun TvSourceFeedScreen(
                     source.refs.isNotEmpty() &&
                     source.refs.all { !it.startsWith("creator:") && !it.startsWith("niche:") },
             prefs = feedPrefs,
-            onApply = { next ->
+            sortOptions = source.sortOptions(),
+            selectedSort = source.activeSort.ifEmpty { savedSort },
+            onApply = { next, sort ->
                 feedViewModel.setFeedPrefs(source.baseKey, next)
+                feedViewModel.setSort(source, sort)
+                if (sort != source.activeSort) {
+                    onSortChange(source.withSort(sort))
+                    viewModel.refresh()
+                }
+                scope.launch { gridState.scrollToItem(0) }
                 showFilter = false
             },
             onDismiss = { showFilter = false },
@@ -198,15 +299,38 @@ fun TvSourceFeedScreen(
             },
             openViaHold = actionsViaHold,
             onOpenNiche = onOpenNiche,
+            onRefresh = { refreshAndReturnToTop() },
         )
     }
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class TvNicheFeedViewModel
     @Inject
     constructor(
         private val repository: FeedRepository,
     ) : ViewModel() {
-        fun gifs(source: FeedSource) = repository.paging(source).cachedIn(viewModelScope)
+        /** Feed-refresh generation (§6): mirrors mobile's one-shot TTL bypass —
+         *  the forced flag is consumed by the FIRST pager build of the
+         *  generation, so a later rebuild in the same generation (source swap,
+         *  preview re-attach) doesn't inherit it (stale-while-revalidate holds). */
+        private val refreshGen = MutableStateFlow(0)
+        private var consumedGen = -1
+
+        /** The Refresh icon / "Refresh feed" quick-action row / end-of-feed
+         *  footer: one forced generation for the open source. */
+        fun refresh() {
+            refreshGen.value = refreshGen.value + 1
+        }
+
+        /** The screen pins the flow to [source] via remember(source.keyBase);
+         *  the combine keeps generation bumps live inside that flow. */
+        fun gifs(source: FeedSource): Flow<PagingData<Gif>> =
+            combine(flowOf(source), refreshGen) { src, gen -> src to gen }
+                .flatMapLatest { (src, gen) ->
+                    val forced = gen > 0 && consumedGen != gen
+                    consumedGen = gen
+                    repository.paging(src, forceRefresh = forced).cachedIn(viewModelScope)
+                }
     }

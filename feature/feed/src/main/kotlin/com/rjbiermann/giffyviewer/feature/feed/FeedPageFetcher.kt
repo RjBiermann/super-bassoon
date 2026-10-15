@@ -23,27 +23,42 @@ class FeedPageFetcher(
     private val pageSize: Int,
     private val now: () -> Long = System::currentTimeMillis,
     private val favorites: suspend () -> List<String> = { emptyList() },
+    /** #5 shuffle-on-refresh rotation seed (Favorites only; 0 = DB order). */
+    private val favoritesSeed: () -> Long = { 0L },
 ) {
     /** Fetches and caches [page]; false = nothing fetched (empty/degenerate). */
     suspend fun fill(page: Int): Boolean {
+        // Favorites rotation size (#5): one local DB read per fill — read
+        // separately from fetch's pool read, so the END decision below uses the
+        // same size the cached row's mapping assumed. A mid-fill favorites edit
+        // shifts the mapping entirely (accepted — a new generation refetches).
+        val rotationSize = if (feed is FeedSource.Favorites) favorites().size else 0
         val dto = fetch(page)
         val gifs = dto.gifs.map { it.toModel().toEntity(now()) }
-        if (gifs.isEmpty() && page == 1 && feed is FeedSource.Favorites) {
+        if (feed is FeedSource.Favorites && gifs.isEmpty() && rotationSize == 0) {
             // Nothing favorited → don't pin an empty "no favorites" row (§5).
             return false
         }
         val nowMs = now()
         gifDao.upsertAll(gifs)
-        val nextPage = if (gifs.isEmpty()) null else feedPageKey(feed, page + 1)
+        // #5 empty-slot semantics: an empty page EARLY in a rotation is not the
+        // feed's end — a later rotation slot may still carry inner pages. The
+        // row chains forward (nextPageKey = page + 1) so the source's filter
+        // walk and the mediator's APPEND keep advancing; an empty LAST slot of
+        // a rotation is the honest end (one API call per fetch: the next
+        // rotation's first slot is not probed — bounded by the walk budget).
+        val more =
+            gifs.isNotEmpty() ||
+                (feed is FeedSource.Favorites && rotationSize > 0 && page % rotationSize != 0)
         pageDao.upsert(
             FeedPageEntity(
                 pageKey = feedPageKey(feed, page),
                 gifIds = gifs.map { it.id },
-                nextPageKey = nextPage,
+                nextPageKey = if (more) feedPageKey(feed, page + 1) else null,
                 fetchedAt = nowMs,
             ),
         )
-        return gifs.isNotEmpty()
+        return more
     }
 
     private suspend fun fetch(page: Int): GifsPageDto =
@@ -63,14 +78,16 @@ class FeedPageFetcher(
                 // self-fills unfetched pages too — a fresh install with zero favorited
                 // creators walks an unfetched Favorites page → degenerate empty page,
                 // not a divide-by-zero (live-proven on TV36).
-                val creators = favorites()
-                if (creators.isEmpty()) {
+                // #5 shuffle-on-refresh: the seed rotates the creator ORDER; the
+                // inner-page math (page n → slots (n-1)/size + 1) is unchanged.
+                val rotated = rotateCreators(favorites(), favoritesSeed())
+                if (rotated.isEmpty()) {
                     GifsPageDto()
                 } else {
                     api.userGifs(
-                        username = creators[(page - 1) % creators.size],
+                        username = rotated[(page - 1) % rotated.size],
                         count = pageSize,
-                        page = (page - 1) / creators.size + 1,
+                        page = (page - 1) / rotated.size + 1,
                     )
                 }
             }
@@ -126,4 +143,21 @@ class FeedPageFetcher(
             is FeedSource.TopThisWeek -> api.trendingPopular(order = "top_week", count = pageSize, page = page)
             else -> api.trendingPopular(count = pageSize, page = page)
         }
+}
+
+/** #5 shuffle-on-refresh rotation: creators rotated forward by
+ *  ((seed % size) + size) % size — modulo-safe for negative seeds. Rotation
+ *  preserves the round-robin inner-page math (page n still maps to slots
+ *  (n-1)/size + 1); only the creator ORDER of the mapping rotates. Seed 0 =
+ *  plain DB order (the pre-rotation first-load behavior). The seed is volatile
+ *  repository state (reshuffleFavorites) and never persisted. */
+internal fun rotateCreators(
+    creators: List<String>,
+    seed: Long,
+): List<String> {
+    if (creators.isEmpty() || seed == 0L) return creators
+    val at =
+        (((seed % creators.size) + creators.size) % creators.size)
+            .toInt()
+    return creators.drop(at) + creators.take(at)
 }

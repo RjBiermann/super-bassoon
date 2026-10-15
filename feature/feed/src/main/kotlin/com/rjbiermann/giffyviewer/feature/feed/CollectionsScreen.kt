@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Delete
@@ -24,12 +25,20 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rjbiermann.giffyviewer.core.ui.GiffyScaffold
+import com.rjbiermann.giffyviewer.core.ui.SCROLL_TO_TOP_THRESHOLD
+import com.rjbiermann.giffyviewer.core.ui.ScrollToTopFab
+import com.rjbiermann.giffyviewer.core.ui.rememberReducedMotion
+import com.rjbiermann.giffyviewer.core.ui.rememberScrollingUp
+import com.rjbiermann.giffyviewer.core.ui.scrollToTop
+import kotlinx.coroutines.launch
 
 /**
  * Saved Collections (PLAN §7, site wording verified 2026-10-01): header
@@ -47,6 +56,12 @@ fun CollectionsScreen(
     var renameFor by remember { mutableStateOf<com.rjbiermann.giffyviewer.core.network.CollectionDto?>(null) }
     var deleteFor by remember { mutableStateOf<com.rjbiermann.giffyviewer.core.network.CollectionDto?>(null) }
     LaunchedEffect(Unit) { viewModel.refresh() }
+    // Scroll-to-top fab (#23): Collections paging runs deep (page-limit 50 per
+    // request); same thresholds as the main feed, navigation-only.
+    val listState = rememberLazyListState()
+    val showFab by rememberScrollingUp(listState, SCROLL_TO_TOP_THRESHOLD)
+    val reducedMotion = rememberReducedMotion()
+    val scope = rememberCoroutineScope()
 
     GiffyScaffold(
         title = "Saved Collections",
@@ -57,38 +72,45 @@ fun CollectionsScreen(
             }
         },
     ) { padding ->
-        LazyColumn(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-        ) {
-            items(collections, key = { it.folderId }) { collection ->
-                ListItem(
-                    headlineContent = { Text(collection.folderName ?: "Untitled") },
-                    supportingContent = { Text("${collection.contentCount} items") },
-                    trailingContent = {
-                        Row {
-                            IconButton(onClick = { renameFor = collection }) {
-                                Icon(Icons.Outlined.Edit, contentDescription = "rename ${collection.folderName}")
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                state = listState,
+            ) {
+                items(collections, key = { it.folderId }) { collection ->
+                    ListItem(
+                        headlineContent = { Text(collection.folderName ?: "Untitled") },
+                        supportingContent = { Text("${collection.contentCount} items") },
+                        trailingContent = {
+                            Row {
+                                IconButton(onClick = { renameFor = collection }) {
+                                    Icon(Icons.Outlined.Edit, contentDescription = "rename ${collection.folderName}")
+                                }
+                                IconButton(onClick = { deleteFor = collection }) {
+                                    Icon(Icons.Outlined.Delete, contentDescription = "delete ${collection.folderName}")
+                                }
                             }
-                            IconButton(onClick = { deleteFor = collection }) {
-                                Icon(Icons.Outlined.Delete, contentDescription = "delete ${collection.folderName}")
-                            }
-                        }
-                    },
-                )
-            }
-            if (collections.isEmpty()) {
-                item(key = "empty") {
-                    Text(
-                        "No collections yet — Create New Collection, then long-press a tile → ⋯ → Add to a Collection.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(16.dp),
+                        },
                     )
                 }
+                if (collections.isEmpty()) {
+                    item(key = "empty") {
+                        Text(
+                            "No collections yet — Create New Collection, then long-press a tile → ⋯ → Add to a Collection.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(16.dp),
+                        )
+                    }
+                }
             }
+            ScrollToTopFab(
+                visible = showFab,
+                onClick = {
+                    scope.launch { listState.scrollToTop(reducedMotion) }
+                },
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
         }
     }
 

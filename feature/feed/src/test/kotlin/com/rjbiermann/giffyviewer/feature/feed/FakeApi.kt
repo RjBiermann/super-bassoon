@@ -10,8 +10,9 @@ import com.rjbiermann.giffyviewer.core.network.NicheAddBody
 import com.rjbiermann.giffyviewer.core.network.dto.GifsPageDto
 import com.rjbiermann.giffyviewer.core.network.dto.TemporaryTokenDto
 
-/** In-memory GifsApi for unit tests; shared by the mediator + liked-feed tests. */
-internal class FakeApi : GifsApi {
+/** In-memory GifsApi for unit tests; shared by the mediator + liked-feed
+ *  tests. Open so feed-specific tests can override one endpoint. */
+internal open class FakeApi : GifsApi {
     var userGifsCalls = 0
     var searchCalls = 0
     var nicheGifsCalls = 0
@@ -57,7 +58,7 @@ internal class FakeApi : GifsApi {
         return GifsPageDto(gifs = listOf(gifDtoShell("s$searchCalls", searchText)))
     }
 
-    override suspend fun userGifs(
+    open override suspend fun userGifs(
         username: String,
         count: Int,
         page: Int,

@@ -20,7 +20,7 @@ Media3/ExoPlayer + SimpleCache (cache-first rules formerly PLAN.md §5).
 - Playback speed (0.5×–2×) is **session-only** — resets to 1× on player exit.
 
 ## Playback
-- Resume positions read/write `watch_history` (Room) — feed "Continue Watching" and "Surprise me" exclusion.
+- ~~Resume positions read/write `watch_history` (Room) — feed "Continue Watching" and "Surprise me" exclusion.~~ REMOVED with the features (2026-10 stream): `watch_history` dropped (`MIGRATION_10_11`, DB v11) — both players now start every gif at 0.
 - Data-saver toggle: prefer SD stream when on.
 - **Inline feed autoplay** (1-column mobile feed, BUILT 2026-10-02): see
   the "Inline feed autoplay" section below — one shared player, muted+looped

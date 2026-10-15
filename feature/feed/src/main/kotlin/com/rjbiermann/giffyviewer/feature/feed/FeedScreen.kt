@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.DropdownMenu
@@ -75,13 +76,16 @@ import com.rjbiermann.giffyviewer.core.player.GiffyPlayer
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.ui.AudioBadge
 import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
+import com.rjbiermann.giffyviewer.core.ui.Feature
 import com.rjbiermann.giffyviewer.core.ui.GiffyScaffold
-import com.rjbiermann.giffyviewer.core.ui.RefreshFeedPill
+import com.rjbiermann.giffyviewer.core.ui.SCROLL_TO_TOP_THRESHOLD
+import com.rjbiermann.giffyviewer.core.ui.ScrollToTopFab
 import com.rjbiermann.giffyviewer.core.ui.avgColorOr
+import com.rjbiermann.giffyviewer.core.ui.rememberReducedMotion
 import com.rjbiermann.giffyviewer.core.ui.rememberScrollingUp
+import com.rjbiermann.giffyviewer.core.ui.scrollToTop
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -115,15 +119,8 @@ fun FeedScreen(
     // scrolling): M3 enterAlways — the bar collapses on scroll-down, re-reveals
     // on scroll-up, wired to the staggered grid via nestedScroll. The behavior
     // flattens to a static bar when motion is scaled to 0 (reduced-motion rule,
-    // same pattern as the RefreshFeedPill scroll-to-top).
-    val reducedMotion =
-        remember {
-            android.provider.Settings.Global.getFloat(
-                context.contentResolver,
-                android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
-                1f,
-            ) == 0f
-        }
+    // same pattern as the ScrollToTopFab scroll-to-top).
+    val reducedMotion = rememberReducedMotion()
     val scrollBehavior =
         if (reducedMotion) {
             TopAppBarDefaults.pinnedScrollBehavior()
@@ -213,7 +210,6 @@ fun FeedScreen(
                         selected =
                             source is FeedSource.TopThisWeek ||
                                 source is FeedSource.Liked ||
-                                source is FeedSource.Continue ||
                                 source is FeedSource.Custom ||
                                 (source is FeedSource.Niche) ||
                                 source is FeedSource.Creator,
@@ -221,32 +217,6 @@ fun FeedScreen(
                         label = { Text("More ▾") },
                     )
                     DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
-                        DropdownMenuItem(
-                            text = { Text("Surprise me") },
-                            onClick = {
-                                moreOpen = false
-                                viewModel.surpriseMe { result ->
-                                    if (result != SurpriseResult.OK) {
-                                        scope.launch {
-                                            snackbarHostState.showSnackbar(
-                                                when (result) {
-                                                    SurpriseResult.FILTERED_EMPTY ->
-                                                        "Everything in the cache is filtered out — loosen blocks/filters"
-                                                    else -> "Nothing cached yet"
-                                                },
-                                            )
-                                        }
-                                    }
-                                }
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Continue Watching") },
-                            onClick = {
-                                moreOpen = false
-                                viewModel.open(FeedSource.Continue)
-                            },
-                        )
                         DropdownMenuItem(
                             text = { Text("Top This Week") },
                             onClick = {
@@ -291,39 +261,57 @@ fun FeedScreen(
                                 onOpenNiches()
                             },
                         )
-                        // Always reachable: the builder is the ONLY way to create
-                        // a feed, so "New feed…" must not be gated on having any
-                        // (fresh install would otherwise never reach the screen).
-                        if (customFeeds.isNotEmpty()) {
-                            HorizontalDivider()
-                            Text(
-                                "Custom feeds",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                            )
-                            customFeeds.forEach { def ->
-                                DropdownMenuItem(
-                                    text = { Text(def.name) },
-                                    onClick = {
-                                        moreOpen = false
-                                        viewModel.open(FeedSource.Custom(def.id, def.name, parseCustomRefs(def.sourcesJson)))
-                                    },
+                        // Custom feeds (#10): the builder + management surfaces are
+                        // disabled for now — DB rows and the BLOCKED-feed filter
+                        // stage keep working underneath (Feature.CUSTOM_FEEDS).
+                        if (Feature.CUSTOM_FEEDS) {
+                            // Always reachable: the builder is the ONLY way to
+                            // create a feed, so "New feed…" must not be gated on
+                            // having any (fresh install would otherwise never
+                            // reach the screen).
+                            if (customFeeds.isNotEmpty()) {
+                                HorizontalDivider()
+                                Text(
+                                    "Custom feeds",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                                 )
+                                customFeeds.forEach { def ->
+                                    DropdownMenuItem(
+                                        text = { Text(def.name) },
+                                        onClick = {
+                                            moreOpen = false
+                                            viewModel.open(FeedSource.Custom(def.id, def.name, parseCustomRefs(def.sourcesJson)))
+                                        },
+                                    )
+                                }
                             }
+                            DropdownMenuItem(
+                                text = { Text(if (customFeeds.isEmpty()) "New custom feed…" else "New feed…") },
+                                onClick = {
+                                    moreOpen = false
+                                    onOpenCustomFeeds()
+                                },
+                            )
                         }
-                        DropdownMenuItem(
-                            text = { Text(if (customFeeds.isEmpty()) "New custom feed…" else "New feed…") },
-                            onClick = {
-                                moreOpen = false
-                                onOpenCustomFeeds()
-                            },
-                        )
                         val pinnedSection =
                             pinnedNiches.map { it as FeedSource } +
-                                favoritedFeeds.filter { it.state == "FAVORITED" }.map {
-                                    FeedSource.Custom(it.id, it.name, parseCustomRefs(it.sourcesJson)) as FeedSource
-                                } +
+                                (
+                                    if (Feature.CUSTOM_FEEDS) {
+                                        favoritedFeeds
+                                            .filter { it.state == "FAVORITED" }
+                                            .map {
+                                                FeedSource.Custom(
+                                                    it.id,
+                                                    it.name,
+                                                    parseCustomRefs(it.sourcesJson),
+                                                ) as FeedSource
+                                            }
+                                    } else {
+                                        emptyList()
+                                    }
+                                ) +
                                 pinnedCreators.map { FeedSource.Creator(it) as FeedSource }
                         if (pinnedSection.isNotEmpty()) {
                             HorizontalDivider()
@@ -418,9 +406,10 @@ fun FeedScreen(
                 }
             }
 
-            // Per-feed server sort chips (§8) + Filter/Clear — ONE row (round-3
-            // audit #7: five stacked chrome rows starved the grid on a 360dp
-            // phone; sorts scroll under the fixed right-aligned Filter pair).
+            // One sort+filter entry (§8, #18): the sort chips row is gone — the
+            // dialog carries sort AND filters AND "Clear filters". Badge
+            // semantics ride the tint (chips' selected state): a saved non-default
+            // sort or an active filter lights the icon.
             var showFilter by remember { mutableStateOf(false) }
             val feedPrefs by remember(source.baseKey) { viewModel.feedPrefs(source.baseKey) }
                 .collectAsStateWithLifecycle(
@@ -429,6 +418,9 @@ fun FeedScreen(
                 )
             val filtersActive =
                 listOf(feedPrefs.duration, feedPrefs.resolution, feedPrefs.orientation).any { it.isNotEmpty() }
+            val savedSort by remember(source.baseKey) { viewModel.sortFor(source.baseKey) }
+                .collectAsStateWithLifecycle("")
+            val activeSort = source.activeSort.ifEmpty { savedSort }
             Row(
                 modifier =
                     Modifier
@@ -437,45 +429,17 @@ fun FeedScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                val sortOptions = source.sortOptions()
-                if (sortOptions.isNotEmpty()) {
-                    val savedSort by remember(source.baseKey) { viewModel.sortFor(source.baseKey) }
-                        .collectAsStateWithLifecycle("")
-                    val activeSort = source.activeSort.ifEmpty { savedSort }
-                    Row(
-                        modifier =
-                            Modifier
-                                .weight(1f)
-                                .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        sortOptions.forEach { (label, order) ->
-                            FilterChip(
-                                selected = activeSort == order,
-                                onClick = { viewModel.setSort(source, order) },
-                                label = { Text(label) },
-                            )
-                        }
-                    }
-                } else {
-                    Spacer(Modifier.weight(1f))
-                }
-                FilterChip(
-                    selected = filtersActive,
-                    onClick = { showFilter = true },
-                    label = { Text("Filter ▾") },
-                )
-                if (filtersActive) {
-                    FilterChip(
-                        selected = false,
-                        onClick = {
-                            viewModel.setFeedPrefs(
-                                source.baseKey,
-                                com.rjbiermann.giffyviewer.core.datastore
-                                    .FeedPrefs(),
-                            )
-                        },
-                        label = { Text("Clear") },
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = { showFilter = true }) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Sort,
+                        contentDescription = "Sort & filter",
+                        tint =
+                            if (filtersActive || activeSort.isNotEmpty()) {
+                                MaterialTheme.colorScheme.secondary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
                     )
                 }
             }
@@ -489,8 +453,13 @@ fun FeedScreen(
                 FeedFilterDialog(
                     isTagBundle = tagBundle,
                     prefs = feedPrefs,
-                    onApply = { next ->
+                    sortOptions = source.sortOptions(),
+                    selectedSort = activeSort,
+                    onApply = { next, sort ->
                         viewModel.setFeedPrefs(source.baseKey, next)
+                        // Sort persistence rides the EXISTING setSort path
+                        // (pendingForce one-shot bypass + adoption on open).
+                        viewModel.setSort(source, sort)
                         showFilter = false
                     },
                     onDismiss = { showFilter = false },
@@ -578,8 +547,7 @@ fun FeedScreen(
                 (
                     source is FeedSource.Favorites ||
                         source is FeedSource.ForYou ||
-                        source is FeedSource.Custom ||
-                        source is FeedSource.Continue
+                        source is FeedSource.Custom
                 )
             ) {
                 // UX: helpful empty state, never a blank screen (shared EmptyState).
@@ -587,7 +555,6 @@ fun FeedScreen(
                     when {
                         source is FeedSource.ForYou -> "Your For You feed is empty"
                         source is FeedSource.Custom -> "This feed is empty"
-                        source is FeedSource.Continue -> "Nothing to continue yet"
                         else -> "No favorites yet"
                     }
                 val hint =
@@ -597,15 +564,14 @@ fun FeedScreen(
                         // point at the player's overflow sheet instead.
                         source is FeedSource.Custom ->
                             "long-press a tile or use ⋯ in the player → “Add to custom feed…”"
-                        source is FeedSource.Continue ->
-                            "watch any video partway — it shows up here to resume"
                         else -> "open any video and use ⋯ → “Favorite @creator”"
                     }
                 com.rjbiermann.giffyviewer.core.ui
                     .EmptyState(modifier = Modifier.fillMaxSize(), message = msg, hint = hint)
             } else {
-                // §9 Refresh-feed: pull-to-refresh (same path as TTL revalidate) +
-                // scroll-up "Refresh feed" pill = scroll-to-top + force revalidate.
+                // Pull-to-refresh owns revalidate (same path as the TTL
+                // revalidate); the scroll-up icon is NAVIGATION only (#23 — no
+                // network action on click, one floating control over media).
                 // Fresh state per feed/sort: a sort change starts at the top
                 // (user report — the grid kept the old scroll offset).
                 val gridState =
@@ -613,14 +579,14 @@ fun FeedScreen(
                         androidx.compose.foundation.lazy.staggeredgrid
                             .LazyStaggeredGridState()
                     }
-                val showPill by rememberScrollingUp(gridState, SCROLL_PILL_THRESHOLD)
+                val showPill by rememberScrollingUp(gridState, SCROLL_TO_TOP_THRESHOLD)
                 // Inline feed autoplay (AGENTS-PLAYER spec; live-parity verified
                 // 2026-10-02 — the site's own 1-col feed runs ONE shared muted+
                 // looped <video> on the settled tile): one shared player, first
                 // tile ≥50% visible after a 150ms settle, paused on scroll/
                 // off-view. Data-saver forces static posters; NO watch-history
-                // writes (sampling stays in PlayerScreen); 1 stream fetch per
-                // settled tile (rate-limit invariant).
+                // infrastructure remains (feature removed, 2026-10 stream); 1
+                // stream fetch per settled tile (rate-limit invariant).
                 val autoplayOn = gridColumns == 1 && feedAutoplay && !dataSaver
                 // Inline player ownership (issue #9, AGENTS-PLAYER): the shared
                 // preview player is VM-owned — adopt a parked one (from FeedScreen
@@ -750,18 +716,10 @@ fun FeedScreen(
                                 }
                             }
                         }
-                        // One action: scroll-to-top + force revalidate (PLAN §9).
-                        RefreshFeedPill(
+                        ScrollToTopFab(
                             visible = showPill,
                             onClick = {
-                                viewModel.forceRefresh()
-                                scope.launch {
-                                    if (reducedMotion) {
-                                        gridState.scrollToItem(0)
-                                    } else {
-                                        gridState.animateScrollToItem(0)
-                                    }
-                                }
+                                scope.launch { gridState.scrollToTop(reducedMotion) }
                             },
                             modifier = Modifier.align(Alignment.BottomCenter),
                         )
@@ -771,9 +729,6 @@ fun FeedScreen(
         }
     }
 }
-
-/** Pill appears after ~10 items scrolled (PLAN §9). */
-private const val SCROLL_PILL_THRESHOLD = 10
 
 /** Inline-preview settle grace before playback starts (AGENTS-PLAYER spec
  *  calibration knob — the site's threshold observed at ~a frame; 150ms skips

@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
@@ -61,8 +60,8 @@ import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 
 /**
  * 10-foot UI (PLAN §8 TV): vertical stack of rows, D-pad navigates rows and
- * cards; center opens the player. Rows: Trending · Top This Week · Continue
- * Watching (Favorites/group/Explore rows land in Phase 7 with those features).
+ * cards; center opens the player. Logged-in For You leads (site home order);
+ * Favorites/Explore/Following/Liked rows follow.
  */
 @Composable
 fun TvHomeScreen(
@@ -76,7 +75,6 @@ fun TvHomeScreen(
     playerFactory: com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory? = null,
     dataSaver: Boolean = false,
     homeViewModel: TvHomeViewModel,
-    continueViewModel: ContinueWatchingViewModel,
     /** Hoisted at TvMainActivity Root so BACK from a player/full feed keeps
      *  scroll position (branch swaps otherwise discard remember-ed states). */
     listState: androidx.compose.foundation.lazy.LazyListState =
@@ -109,7 +107,6 @@ fun TvHomeScreen(
     val favoritesOrientation by homeViewModel.favoritesOrientation.collectAsStateWithLifecycle("any")
     val likedOrientation by homeViewModel.likedOrientation.collectAsStateWithLifecycle("any")
     val forYouOrientation by homeViewModel.forYouOrientation.collectAsStateWithLifecycle("any")
-    val continueEntries by continueViewModel.entries.collectAsStateWithLifecycle(initialValue = emptyList())
     val hasFavorites by homeViewModel.hasFavorites.collectAsStateWithLifecycle(initialValue = false)
 
     // Remote MENU key on a focused card opens creator quick actions.
@@ -236,31 +233,6 @@ fun TvHomeScreen(
                 )
             }
             item { CreatorRow("Following", followingCreators.map { it }, onOpenCreator) }
-        }
-        item {
-            Column(modifier = Modifier.padding(vertical = 12.dp)) {
-                RowTitle("Continue Watching")
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    items(continueEntries, key = { it.gif.id }) { entry ->
-                        GifCard(
-                            entry.gif,
-                            Modifier.width(cardWidth(entry.gif, rowHeight)),
-                            onMenu = { viaHold ->
-                                openActions(
-                                    entry.gif,
-                                    com.rjbiermann.giffyviewer.feature.feed.FeedSource.Continue,
-                                    viaHold,
-                                )
-                            },
-                            onClick = { onOpenGif(listOf(entry.gif), 0) },
-                            rowHeight = rowHeight,
-                        )
-                    }
-                }
-            }
         }
     }
 

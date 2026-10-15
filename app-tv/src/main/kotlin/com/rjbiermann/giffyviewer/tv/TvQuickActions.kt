@@ -91,8 +91,12 @@ fun TvQuickActionsDialog(
     openViaHold: Boolean = false,
     /** Slice 10: the HOME row's feed source — the main pane gains an
      *  "Open feed" row that opens it full-page (TvSourceFeedScreen). Rows
-     *  without an openable source (Surprise pool) pass null → no row. */
+     *  without an openable source pass null → no row. */
     feedSource: FeedSource? = null,
+    /** #6: the full-page-feed CONTEXTS' refresh action — a non-null callback
+     *  adds the "Refresh feed" row. Home contexts omit it (home rows are
+     *  separate pagers; the full-page feed owns refresh). */
+    onRefresh: (() -> Unit)? = null,
     /** Slice 10 navigation hook — TvMainActivity swaps `openFeed`. */
     onOpenFeed: (FeedSource) -> Unit = {},
 ) {
@@ -173,9 +177,24 @@ fun TvQuickActionsDialog(
                         return@M3Surface
                     }
                     "addto" -> {
-                        // Always listed — with no custom feeds yet the empty
-                        // picker says so (parity with Add to a Collection).
-                        QuickAction(text = "Add to custom feed…", first = first) { showAddToFeed = true }
+                        // Custom-add row rides the #10 feature flag; the
+                        // Collection/Niche rows stay reachable beneath it.
+                        if (com.rjbiermann.giffyviewer.core.ui.Feature.CUSTOM_FEEDS) {
+                            QuickAction(text = "Add to custom feed…", first = first) { showAddToFeed = true }
+                        } else {
+                            // Keep the pane's first row taking initial focus when
+                            // the custom row is hidden.
+                            QuickAction(text = "Add to a Collection…", first = first) {
+                                feedViewModel.refreshCollections()
+                                showAddToCollection = true
+                            }
+                            QuickAction(text = "Add to a Niche…") {
+                                feedViewModel.refreshJoinedNiches()
+                                showAddToNiche = true
+                            }
+                            QuickAction(text = "‹ Back") { view = "main" }
+                            return@M3Surface
+                        }
                         QuickAction(text = "Add to a Collection…") {
                             feedViewModel.refreshCollections()
                             showAddToCollection = true
@@ -283,6 +302,14 @@ fun TvQuickActionsDialog(
                     QuickAction(text = "Open feed") {
                         onDismiss()
                         onOpenFeed(feedSource)
+                    }
+                }
+                // #6: full-page-feed contexts only (a grid-passed onRefresh);
+                // home rows are separate pagers — they don't get the row.
+                if (onRefresh != null) {
+                    QuickAction(text = "Refresh feed") {
+                        onDismiss()
+                        onRefresh?.invoke()
                     }
                 }
                 // Links audit #3: the most basic navigation act on a creator.

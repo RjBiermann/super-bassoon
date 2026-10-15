@@ -60,15 +60,6 @@ data class LikedIdsEntity(
     val syncedAt: Long,
 )
 
-/** Resume positions + "surprise me" exclusion set (PLAN §5, §8). */
-@Entity(tableName = "watch_history")
-data class WatchHistoryEntity(
-    @PrimaryKey val gifId: String,
-    val positionMs: Long,
-    val updatedAt: Long,
-    val watched: Boolean,
-)
-
 /** Content controls (PLAN §6): state ∈ BLOCKED | FAVORITED. */
 @Entity(tableName = "creator_prefs")
 data class CreatorPrefEntity(
