@@ -27,6 +27,9 @@ kotlin {
 
 dependencies {
     implementation(project(":core:model"))
+    // Issue #11: the empty-state "Browse all" strips open browseable feeds —
+    // the callback hands the host a FeedSource (one-way dep, no cycle).
+    implementation(project(":feature:feed"))
     implementation(project(":core:database"))
     implementation(project(":core:network"))
     implementation(project(":core:ui"))

@@ -45,6 +45,27 @@ sealed interface FeedSource {
         override val ttlMs = TTL_TRENDING
     }
 
+    /** Site-wide ranged top pool (issue #11, live-verified 2026-10-15): a
+     *  BARE gifs/search (no query) whose order is one of the endpoint's
+     *  verified top set — top7 = week, top28 = month, top = all-time
+     *  (top_week/top_month/etc. are BadOrder here; that wording only lives
+     *  on trending/popular). Feeds through the standard cache-first pager. */
+    data class TopRanged(
+        val range: String,
+    ) : FeedSource {
+        init {
+            require(range in RANGES) { "unverified top range: $range" }
+        }
+
+        override val keyBase = "top:$range"
+        override val ttlMs = TTL_TRENDING
+
+        companion object {
+            /** The search endpoint's BadOrder-verified top orders (2026-10-15). */
+            val RANGES = listOf("top7", "top28", "top")
+        }
+    }
+
     /** Logged-in personalized personalized server feed (PLAN §7); chip hidden when logged out. */
     data object ForYou : FeedSource {
         override val keyBase = "foryou:v1"
@@ -111,6 +132,12 @@ fun FeedSource.title(): String =
         is FeedSource.ForYou -> "For You"
         is FeedSource.Liked -> "Liked GIFs & Images"
         is FeedSource.TopThisWeek -> "Top This Week"
+        is FeedSource.TopRanged ->
+            when (this.range) {
+                "top7" -> "Top This Week"
+                "top28" -> "Top This Month"
+                else -> "Top of All Time"
+            }
         is FeedSource.Niche -> this.name
         is FeedSource.Creator -> "@${this.username}"
         is FeedSource.Custom -> this.name
@@ -138,19 +165,22 @@ fun FeedSource.withSort(sort: String): FeedSource =
     }
 
 /**
- * Server sort options per feed surface — ONLY orders verified live 2026-09-30
- * (BadOrder otherwise): search {trending,latest,top7,top28,score}, creator
- * {trending,oldest,latest,top7,top28}, niche {trending,oldest,latest,best,hot}.
- * Empty sort = the surface's default (trending).
+ * Server sort options per feed surface — ONLY orders verified live (BadOrder
+ * otherwise): search {trending,latest,top7,top28,top(2026-10-15),score},
+ * creator {trending,oldest,latest,top7,top28}, niche
+ * {trending,oldest,latest,best,hot}. Empty sort = the surface's default
+ * (trending).
  */
 fun FeedSource.sortOptions(): List<Pair<String, String>> =
     when (this) {
         is FeedSource.Search ->
             listOf(
-                // Site tag/search sort wording (§8, verified 2026-10-01).
+                // Site tag/search sort wording (§8, verified 2026-10-01);
+                // "top" = all-time (BadOrder-verified 2026-10-15, issue #11).
                 "Latest" to "latest",
                 "Top This Week" to "top7",
                 "Top This Month" to "top28",
+                "Top of All Time" to "top",
                 "Most liked" to "score", // app-only; no site equivalent
             )
         is FeedSource.Creator ->

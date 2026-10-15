@@ -259,7 +259,7 @@ architecture.
 **Already linked (working today):**
 | Entity | Surface | Destination |
 |---|---|---|
-| Creator | FollowingScreen / ExploreScreen rows, NicheAbout top-creators | creator feed |
+| Creator | FollowingScreen rows, search-page creator strip (explore strip, issue #11 — ExploreScreen deleted 2026-10), NicheAbout top-creators | creator feed |
 | Niche | FollowingScreen rows, NichesScreen rows, NicheAbout related | niche feed |
 | Creator (search results) | FeedScreen creator-chips row (above search results) | creator feed |
 | Group / Custom feed / Pinned | chips, More ▾, TV pills + dropdown | their feeds |
@@ -467,12 +467,14 @@ Bounded scan of feature:*/app-*/core:ui composables only. Adds to the executed
    (visual change on TV: centered instead of top-160, pill button instead of
    plain M3 Button).
 3. **PONYSAIL-ONLY — list-screen skeleta converge at the 4th instance.**
-   NichesScreen / ExploreScreen / FollowingScreen are three hand-rolled
-   "paged rows" skeleta (VM + `remember`-ish fetch state machine + error/empty
-   branch). Two audits already caught the cost (NichesScreen
+   NichesScreen / FollowingScreen are hand-rolled "paged rows" skeleta
+   (VM + `remember`-ish fetch state machine + error/empty branch);
+   ExploreScreen's third copy died with it (deleted 2026-10, issue #11 — the
+   paging machine moved to SearchViewModel's explore creator strip). Two
+   audits already caught the cost (NichesScreen
    `remember{}`-fetch bug, each surface's missing error branch per the critical
-   audit item). `ponytail:` consolidation threshold n=4: until a fourth list
-   screen lands, three flat copies beat one abstraction nobody has tuned.
+   audit item). `ponytail:` consolidation threshold n=4: until another list
+   screen lands, flat copies beat one abstraction nobody has tuned.
 
 Scanned-and-rejected (documented so the next audit doesn't re-derive them):
 - **FeedScreen.kt 42K / PlayerScreen.kt 44K** — large but cohesive (one surface;

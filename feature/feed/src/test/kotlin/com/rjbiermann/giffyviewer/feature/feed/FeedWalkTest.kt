@@ -152,5 +152,28 @@ class FeedWalkTest {
             assertEquals(1, api.trendingCalls.size)
         }
 
+    @Test
+    fun `TopRanged fill hits the bare ranged search and caches under the range key`() =
+        runBlocking {
+            val api = FakeApi()
+            val pageDao = FakeFeedPageDao()
+            val fetcher =
+                FeedPageFetcher(FeedSource.TopRanged("top7"), FakeGifDao(), pageDao, api, 20)
+
+            assertTrue(fetcher.fill(1))
+            assertTrue(fetcher.fill(2))
+
+            // Cache-key shape: "top:<range>:p<n>" (FeedSource identity contract).
+            assertEquals(
+                setOf("top:top7:p1", "top:top7:p2"),
+                pageDao.pages.keys,
+            )
+            val p1 = pageDao.pages["top:top7:p1"]!!
+            assertEquals(listOf("s1"), p1.gifIds)
+            assertEquals("top:top7:p2", p1.nextPageKey)
+            // BARE ranged search: no search_text — the order IS the pool.
+            assertEquals(listOf("" to 1, "" to 2), api.searchArgs)
+        }
+
     private fun pageWithGif(vararg ids: String): GifsPageDto = GifsPageDto(gifs = ids.map { gifDtoShell(it, "some.creator") })
 }

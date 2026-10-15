@@ -27,7 +27,6 @@ import com.rjbiermann.giffyviewer.feature.feed.CollectionsScreen
 import com.rjbiermann.giffyviewer.feature.feed.CollectionsViewModel
 import com.rjbiermann.giffyviewer.feature.feed.CustomFeedsScreen
 import com.rjbiermann.giffyviewer.feature.feed.CustomFeedsViewModel
-import com.rjbiermann.giffyviewer.feature.feed.ExploreScreen
 import com.rjbiermann.giffyviewer.feature.feed.FeedScreen
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
@@ -79,7 +78,6 @@ class MainActivity : ComponentActivity() {
         var playerStartIndex by rememberSaveable { mutableStateOf<Int?>(null) }
         var showSettings by rememberSaveable { mutableStateOf(false) }
         var showNiches by rememberSaveable { mutableStateOf(false) }
-        var showExplore by rememberSaveable { mutableStateOf(false) }
         var showFollowing by rememberSaveable { mutableStateOf(false) }
         var showCollections by rememberSaveable { mutableStateOf(false) }
         var aboutNiche: Pair<String, String>? by rememberSaveable { mutableStateOf(null) }
@@ -92,7 +90,6 @@ class MainActivity : ComponentActivity() {
                     aboutNiche != null ||
                     showSettings ||
                     showNiches ||
-                    showExplore ||
                     showFollowing ||
                     showCollections ||
                     showSearch ||
@@ -104,7 +101,6 @@ class MainActivity : ComponentActivity() {
                 showSearch -> showSearch = false
                 showCustomFeeds -> showCustomFeeds = false
                 showFollowing -> showFollowing = false
-                showExplore -> showExplore = false
                 showNiches -> showNiches = false
                 showCollections -> showCollections = false
                 else -> showSettings = false
@@ -138,16 +134,6 @@ class MainActivity : ComponentActivity() {
                 playerFactory = playerFactory,
                 settings = settings,
                 db = db,
-            )
-        } else if (confirmed && showExplore) {
-            val feedViewModel: FeedViewModel = hiltViewModel()
-            ExploreScreen(
-                onBack = { showExplore = false },
-                onOpenCreator = { username ->
-                    showExplore = false
-                    feedViewModel.open(FeedSource.Creator(username = username))
-                },
-                viewModel = hiltViewModel(),
             )
         } else if (confirmed && showCollections) {
             val collectionsVm: CollectionsViewModel = hiltViewModel()
@@ -217,6 +203,10 @@ class MainActivity : ComponentActivity() {
                     showSearch = false
                     feedViewModel.open(FeedSource.Niche(id, name))
                 },
+                onOpenFeed = { source ->
+                    showSearch = false
+                    feedViewModel.open(source)
+                },
                 viewModel = searchViewModel,
             )
         } else if (confirmed && showNiches) {
@@ -241,7 +231,6 @@ class MainActivity : ComponentActivity() {
                 onOpenSearch = { showSearch = true },
                 onOpenNiches = { showNiches = true },
                 onOpenCustomFeeds = { showCustomFeeds = true },
-                onOpenExplore = { showExplore = true },
                 onOpenFollowing = { showFollowing = true },
                 onOpenCollections = { showCollections = true },
             )

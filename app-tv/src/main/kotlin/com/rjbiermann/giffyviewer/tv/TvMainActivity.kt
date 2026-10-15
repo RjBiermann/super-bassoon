@@ -239,6 +239,10 @@ class TvMainActivity : ComponentActivity() {
                             showSearch = false
                             openFeed = FeedSource.Niche(id, name)
                         },
+                        onOpenFeed = { source ->
+                            showSearch = false
+                            openFeed = source
+                        },
                         viewModel = hiltViewModel(),
                     )
                 showCollections ->

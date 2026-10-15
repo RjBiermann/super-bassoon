@@ -102,7 +102,6 @@ fun FeedScreen(
     onOpenSettings: () -> Unit = {},
     onOpenSearch: () -> Unit = {},
     onOpenNiches: () -> Unit = {},
-    onOpenExplore: () -> Unit = {},
     onOpenFollowing: () -> Unit = {},
     onOpenCollections: () -> Unit = {},
     onOpenCustomFeeds: () -> Unit = {},
@@ -222,13 +221,6 @@ fun FeedScreen(
                             onClick = {
                                 moreOpen = false
                                 viewModel.open(FeedSource.TopThisWeek)
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Explore") },
-                            onClick = {
-                                moreOpen = false
-                                onOpenExplore()
                             },
                         )
                         if (isLoggedIn) {

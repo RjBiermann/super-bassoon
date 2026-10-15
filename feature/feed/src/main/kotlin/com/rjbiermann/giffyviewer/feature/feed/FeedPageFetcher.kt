@@ -141,6 +141,10 @@ class FeedPageFetcher(
                 }
             }
             is FeedSource.TopThisWeek -> api.trendingPopular(order = "top_week", count = pageSize, page = page)
+            is FeedSource.TopRanged ->
+                // Bare ranged search (issue #11, live-verified 2026-10-15):
+                // no query — the order IS the pool selection.
+                api.search(searchText = "", order = feed.range, count = pageSize, page = page)
             else -> api.trendingPopular(count = pageSize, page = page)
         }
 }

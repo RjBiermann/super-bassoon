@@ -121,6 +121,14 @@ interface GifsApi {
         @Query("page") page: Int = 1,
     ): CreatorPreviewsDto
 
+    /** Trending niches (live-verified 2026-10-15, anonymous OK): the site's
+     *  own Explore/empty-search source. Response parses into NichesPageDto
+     *  (ignoreUnknownKeys drops the extra fields). */
+    @GET("v2/niches/trending/search")
+    suspend fun nichesTrendingSearch(
+        @Query("count") count: Int = 12,
+    ): NichesPageDto
+
     /** Niche preview tiles (same spec): {niche, gif} rows — owner unused. */
     @GET("v2/niches/search/previews")
     suspend fun nicheSearchPreviews(

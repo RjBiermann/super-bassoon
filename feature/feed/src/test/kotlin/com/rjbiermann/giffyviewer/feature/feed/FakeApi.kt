@@ -94,6 +94,8 @@ internal open class FakeApi : GifsApi {
 
     override suspend fun tagsMatch(query: String): List<String> = throw NotImplementedError()
 
+    override suspend fun nichesTrendingSearch(count: Int) = throw NotImplementedError()
+
     override suspend fun niches(
         count: Int,
         page: Int,
