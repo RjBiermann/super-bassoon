@@ -152,6 +152,16 @@ class FeedViewModel
             _canGoBack.value = false
         }
 
+        /** #25 Feeds-group last-sub memory (in-memory, source-lifespan): the
+         *  last group member opened, so the Feeds chip re-opens it from any
+         *  non-group source. Click-time read only — a plain var is correct
+         *  (no StateFlow wiring, no composition read), and its lifespan is
+         *  deliberately the same as the feed source itself (NOT persisted:
+         *  a DataStore key would outlive the source it must agree with). */
+        private var lastGroupSub: FeedSource = FeedSource.Trending
+
+        fun lastGroupSub(): FeedSource = lastGroupSub
+
         fun open(feed: FeedSource) {
             viewModelScope.launch {
                 // Per-feed sort persistence (§8): a fresh source adopts its saved sort.
@@ -159,6 +169,9 @@ class FeedViewModel
                 val sortable = feed is FeedSource.Search || feed is FeedSource.Creator || feed is FeedSource.Niche
                 val adopt = sortable && saved.isNotEmpty() && sourceIsUnsorted(feed)
                 val next = if (adopt) feed.withSort(saved) else feed
+                // #25: remember the last-open group sub (post-sort-adoption
+                // value — group members are sortless, so this equals the feed).
+                if (next in FEED_GROUP) lastGroupSub = next
                 if (next != mutableSource.value) {
                     previousSource = mutableSource.value
                     // Any explicit open (chip/More/hop) is user navigation —

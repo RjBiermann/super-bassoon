@@ -235,6 +235,9 @@ fun TvSourceFeedScreen(
                 pinnedCreators = pinnedCreators,
                 customFeeds = customFeeds,
                 onOpen = onSwitchFeed,
+                // #25: the shared FeedViewModel outlives openFeed swaps (activity
+                // scope) — the group-chip memory lives with the feed source itself.
+                lastGroupSub = feedViewModel.lastGroupSub(),
                 onOpenNiches = onOpenNiches,
                 onOpenCollections = onOpenCollections,
                 onOpenCustomFeeds = onOpenCustomFeeds,

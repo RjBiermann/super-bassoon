@@ -176,6 +176,7 @@ fun FeedScreen(
                 pinnedCreators = pinnedCreators,
                 customFeeds = customFeeds,
                 onOpen = { viewModel.open(it) },
+                lastGroupSub = viewModel.lastGroupSub(),
                 onOpenFollowing = onOpenFollowing,
                 onOpenNiches = onOpenNiches,
                 onOpenCollections = onOpenCollections,
