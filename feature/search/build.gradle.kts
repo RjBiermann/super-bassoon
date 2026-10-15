@@ -30,6 +30,9 @@ dependencies {
     implementation(project(":core:database"))
     implementation(project(":core:network"))
     implementation(project(":core:ui"))
+    // Explore/search merge (issue #11): the screen hosts FeedSource rows and
+    // hands opened feeds back through onOpenFeed(FeedSource).
+    implementation(project(":feature:feed"))
     implementation(libs.material.icons)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.hilt.android)

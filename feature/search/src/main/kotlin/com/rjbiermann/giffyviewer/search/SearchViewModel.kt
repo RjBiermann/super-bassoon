@@ -7,7 +7,9 @@ import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.database.SearchHistoryEntity
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.model.NicheRef
+import com.rjbiermann.giffyviewer.core.network.CreatorSearchItemDto
 import com.rjbiermann.giffyviewer.core.network.GifsApi
+import com.rjbiermann.giffyviewer.core.network.NicheDto
 import com.rjbiermann.giffyviewer.core.network.SuggestDto
 import com.rjbiermann.giffyviewer.core.network.TrendingTagDto
 import com.rjbiermann.giffyviewer.core.network.TrendingTagsDto
@@ -191,6 +193,116 @@ class SearchViewModel
             }
         }
 
+        // --- Empty-state explorer sections (issue #11: search page = explorer; site parity
+        // 2026-10-15: the site's empty search page fires these same pools). Load-on-first-
+        // visibility per section; VM-cached, no Room writes for strip previews.
+
+        /** Ranged Top strips (bare search pools top7/top28/top), keyed by range —
+         *  12 tiles per fetch, one request on the chip's first visit, capped map
+         *  like the scope maps; rows flow the ContentFilter (leak-zero). */
+        private val _topRanged = MutableStateFlow<Map<String, List<Gif>>>(emptyMap())
+        val topRanged: StateFlow<Map<String, List<Gif>>> = _topRanged.asStateFlow()
+
+        /** Trending photos (bare image search, static poster tiles). One fetch per
+         *  VM on first collection; failure degrades to an absent section. */
+        val trendingPhotos: StateFlow<List<Gif>> =
+            flow {
+                filter.refreshFrom(db.contentPrefsDao())
+                filter.refreshBlockedFeeds(db.customFeedDao())
+                emit(
+                    api.search(searchText = "", order = "trending", type = "i", count = TOP_STRIP_COUNT)
+                        .toModels()
+                        .filter { filter.allow(it.userName, it.tags, it.description) },
+                )
+            }.catch { emit(emptyList()) }
+                .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+        /** Trending niches row (v2/niches/trending/search). One fetch per VM. */
+        val trendingNiches: StateFlow<List<NicheDto>> =
+            flow {
+                emit(api.nichesTrendingSearch(count = TOP_STRIP_COUNT).niches)
+            }.catch { emit(emptyList()) }
+                .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+        /** Creators strip (moved from ExploreScreen, same paging machine: dedup by
+         *  username, no-growth end detection, one request per approach). Rows of
+         *  blocked creators drop (leak-zero, same stand-in filter as niche rows). */
+        private val _exploreCreators = MutableStateFlow<List<CreatorSearchItemDto>>(emptyList())
+        val exploreCreators: StateFlow<List<CreatorSearchItemDto>> = _exploreCreators.asStateFlow()
+
+        private val _exploreEndReached = MutableStateFlow(false)
+        val exploreEndReached: StateFlow<Boolean> = _exploreEndReached.asStateFlow()
+
+        private val _exploreLoadFailed = MutableStateFlow(false)
+        val exploreLoadFailed: StateFlow<Boolean> = _exploreLoadFailed.asStateFlow()
+
+        private var exploreNextPage = 1
+        private var exploreLoading = false
+
+        /** Fetches the next creators page (guards make repeated calls no-ops); the
+         *  strip's row-end observation re-fires as the user scrolls. */
+        fun loadMoreCreators() {
+            if (exploreLoading || exploreNextPage <= 0 || _exploreEndReached.value) return
+            exploreLoading = true
+            viewModelScope.launch {
+                _exploreLoadFailed.value = false
+                if (exploreNextPage == 1) {
+                    filter.refreshFrom(db.contentPrefsDao())
+                    filter.refreshBlockedFeeds(db.customFeedDao())
+                }
+                runCatching { api.verifiedCreators(page = exploreNextPage) }
+                    .onSuccess { pageDto ->
+                        val (rows, grew) =
+                            mergeCreatorPage(_exploreCreators.value, pageDto.creators) {
+                                filter.allow(it.username, emptyList(), null)
+                            }
+                        // Upstream pagination overlaps: page n re-lists page n-1 rows —
+                        // dedup by username or the row keys collide (crashed live).
+                        _exploreCreators.value = rows
+                        exploreNextPage++
+                        // Server repeats the tail when exhausted and carries no page
+                        // count — no growth means the list is complete.
+                        if (!grew) _exploreEndReached.value = true
+                    }.onFailure { _exploreLoadFailed.value = true }
+                exploreLoading = false
+            }
+        }
+
+        /** Matched tag names per query (v1/tags/match, GIFs-tab chips); same
+         *  12-entry cap as the scope maps. */
+        private val _matchedTags = MutableStateFlow<Map<String, List<String>>>(emptyMap())
+        val matchedTags: StateFlow<Map<String, List<String>>> = _matchedTags.asStateFlow()
+
+        /** One ranged-Top strip fill per range, on the chip's first visit
+         *  (VM-cached, 12 tiles, 1 request). Runs in the caller's coroutine —
+         *  the screen's LaunchedEffect cancels it on query changes, so only the
+         *  settled empty state's request completes. */
+        suspend fun loadTopRanged(range: String) {
+            // Session reload: the choke point's block sets before filtering (same
+            // prelude as [loadScope]).
+            filter.refreshFrom(db.contentPrefsDao())
+            filter.refreshBlockedFeeds(db.customFeedDao())
+            if (range in _topRanged.value) return
+            runCatching { api.search(searchText = "", order = range, count = TOP_STRIP_COUNT) }
+                .onSuccess { page ->
+                    _topRanged.value =
+                        cappedInsert(
+                            _topRanged.value,
+                            range,
+                            page.toModels().filter { filter.allow(it.userName, it.tags, it.description) },
+                        )
+                }
+        }
+
+        /** Matches tag names for the typed query while it is typed (GIFs tab);
+         *  silent failure = no chips (same stance as the scope loads). */
+        suspend fun loadMatchedTags(rawQuery: String) {
+            val q = rawQuery.trim()
+            if (q.isEmpty() || q in _matchedTags.value) return
+            runCatching { api.tagsMatch(query = q) }
+                .onSuccess { tags -> _matchedTags.value = cappedInsert(_matchedTags.value, q, tags) }
+        }
+
         companion object {
             const val SUGGEST_DEBOUNCE = 300L
             const val SUGGEST_LIMIT = 8
@@ -200,8 +312,21 @@ class SearchViewModel
             const val SCOPE_IMAGES = "images"
             const val SCOPE_CREATORS = "creators"
             const val SCOPE_NICHES = "niches"
+            const val TOP_STRIP_COUNT = 12
         }
     }
+
+/** Merges a fetched strip page into the creators list: dedup by username
+ *  (upstream pagination overlaps rows), leak-zero ([allow] drops blocked
+ *  creators); `false` = the page brought nothing new (end of the list). */
+internal fun mergeCreatorPage(
+    current: List<CreatorSearchItemDto>,
+    page: List<CreatorSearchItemDto>,
+    allow: (CreatorSearchItemDto) -> Boolean,
+): Pair<List<CreatorSearchItemDto>, Boolean> {
+    val merged = (current + page).distinctBy { it.username }
+    return merged.filter(allow) to (merged.size != current.size)
+}
 
 /** VM map cap: results for the 12 most recent queries survive a tab revisit. */
 internal fun <T> cappedInsert(

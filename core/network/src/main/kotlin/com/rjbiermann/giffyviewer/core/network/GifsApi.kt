@@ -105,6 +105,14 @@ interface GifsApi {
         @Query("query") query: String,
     ): List<SuggestDto>
 
+    /** Trending niches (live-verified 2026-10-15, anonymous OK): the site
+     *  Explore/search empty-state row; shape = `{page, pages, total, niches}` —
+     *  parses into the standard [NichesPageDto] (ignoreUnknownKeys drops `total`). */
+    @GET("v2/niches/trending/search")
+    suspend fun nichesTrendingSearch(
+        @Query("count") count: Int = 12,
+    ): NichesPageDto
+
     /** Trending tags (live-verified 2026-10-02): the site search "Tags" tab. */
     @GET("v2/tags/trending")
     suspend fun trendingTags(

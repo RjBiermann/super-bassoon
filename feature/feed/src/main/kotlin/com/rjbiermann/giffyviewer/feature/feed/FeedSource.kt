@@ -45,6 +45,16 @@ sealed interface FeedSource {
         override val ttlMs = TTL_TRENDING
     }
 
+    /** Ranged site-wide Top pool = BARE search (search_text="" + order=<range>,
+     *  live-verified 2026-10-15: the search endpoint's accepted orders are
+     *  top/top7/top28/latest/score/trending per its own BadOrder legend, and the
+     *  bare ranged pools differ per range). Room-cached like any feed
+     *  (cache keys "top:<range>:p<n>", TTL = trending). */
+    data class TopRanged(val range: String) : FeedSource {
+        override val keyBase = "top:$range"
+        override val ttlMs = TTL_TRENDING
+    }
+
     /** Logged-in personalized personalized server feed (PLAN §7); chip hidden when logged out. */
     data object ForYou : FeedSource {
         override val keyBase = "foryou:v1"
@@ -128,6 +138,12 @@ fun FeedSource.title(): String =
         is FeedSource.ForYou -> "For You"
         is FeedSource.Liked -> "Liked GIFs & Images"
         is FeedSource.TopThisWeek -> "Top This Week"
+        is FeedSource.TopRanged ->
+            when (this.range) {
+                "top7" -> "Top This Week"
+                "top28" -> "Top This Month"
+                else -> "Top of All Time"
+            }
         is FeedSource.Niche -> this.name
         is FeedSource.Creator -> "@${this.username}"
         is FeedSource.Custom -> this.name
@@ -170,6 +186,7 @@ fun FeedSource.sortOptions(): List<Pair<String, String>> =
                 "Latest" to "latest",
                 "Top This Week" to "top7",
                 "Top This Month" to "top28",
+                "Top of All Time" to "top", // verified 2026-10-15 (search BadOrder legend)
                 "Most liked" to "score", // app-only; no site equivalent
             )
         is FeedSource.Creator ->
