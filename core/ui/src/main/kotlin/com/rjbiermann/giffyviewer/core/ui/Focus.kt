@@ -26,16 +26,20 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 
 /**
- * TV focus treatment (PLAN §9 TV: accent outline on focus; the borrowed
- * hover-fill pattern → focus-fill). No-op on touch (focus only lands via
- * D-pad/keyboard). Pass the row's [interactionSource] when the node is also
- * clickable — two focusable modifiers in one chain race and the inner one
- * never sees focus (the missing-border bug).
+ * TV focus treatment for M3 components hosted on TV (issue-#7 focus tokens,
+ * DESIGN-theme-stream.md §3.1: focused fill = `primaryContainer` #7D0030,
+ * focused border/glow = `primary` #FF668F; M3 chips draw their own rest
+ * ring at `outlineVariant` #51444A). tv-material components carry these
+ * tokens natively — this modifier remains ONLY where tv-material has no
+ * shared-module counterpart (SettingsScreen/CustomFeedsScreen chip rows).
+ * No-op on touch (focus only lands via D-pad/keyboard). Pass the row's
+ * [interactionSource] when the node is also clickable — two focusable
+ * modifiers in one chain race and the inner one never sees focus (the
+ * missing-border bug).
  */
 fun Modifier.giffyFocus(
     interactionSource: MutableInteractionSource? = null,
     shape: Shape = RoundedCornerShape(12.dp),
-    fillOnFocus: Color? = null,
 ): Modifier =
     composed {
         val interaction =
@@ -47,7 +51,7 @@ fun Modifier.giffyFocus(
             label = "giffyFocusBorder",
         )
         val fill by animateColorAsState(
-            if (focused) fillOnFocus ?: Color.Transparent else Color.Transparent,
+            if (focused) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
             label = "giffyFocusFill",
         )
         this
@@ -74,16 +78,22 @@ fun GiffyPillButton(
         shape = MaterialTheme.shapes.extraLarge,
         colors =
             ButtonDefaults.buttonColors(
-                // Rest = primaryContainer fill + TextHigh (audit: red-on-black was
-                // 3.5:1 < AA); focus = brand red fill + inverse text. Role reads
-                // (audit batch 15, F5) — no direct palette access.
+                // Rest = neutral fill (+ onSurface text; audit: red-on-black was
+                // 3.5:1 < AA); focus = primaryContainer fill + onPrimaryContainer
+                // text — the issue-#7 focus tokens (DESIGN-theme-stream.md §3.1).
+                // Role reads (audit batch 15, F5) — no direct palette access.
                 containerColor =
                     if (focused) {
-                        MaterialTheme.colorScheme.primary
+                        MaterialTheme.colorScheme.primaryContainer
                     } else {
                         MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
                     },
-                contentColor = if (focused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                contentColor =
+                    if (focused) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
             ),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),

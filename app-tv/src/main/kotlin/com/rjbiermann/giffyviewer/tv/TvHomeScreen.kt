@@ -20,7 +20,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.FilterChip
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,6 +46,7 @@ import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
+import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
@@ -436,9 +436,11 @@ private fun RowTitle(text: String) {
  * labels as the mobile FeedScreen selector row, writing the SAME
  * settings.forYouScope pref through TvHomeViewModel (mobile FeedViewModel
  * parity — no duplicated pref logic). Renders under the For You row title.
- * M3 FilterChip + the shared giffyFocus ring (the TvSourceFeedScreen
- * FilterChip D-pad pattern).
+ * Focus: issue-#7 tokens on tv-material FilterChip (§3.1) — focused fill
+ * primaryContainer/onPrimaryContainer, focused border primary, unfocused
+ * ring outlineVariant; the giffyFocus ring is retired here.
  */
+@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun ForYouScopeRow(homeViewModel: TvHomeViewModel) {
     val scope by homeViewModel.forYouScope.collectAsStateWithLifecycle("all")
@@ -448,7 +450,7 @@ private fun ForYouScopeRow(homeViewModel: TvHomeViewModel) {
     ) {
         listOf("All" to "all", "Creators" to "creators", "Niches" to "niches").forEach { (label, value) ->
             val interaction = remember { MutableInteractionSource() }
-            FilterChip(
+            androidx.compose.material3.FilterChip(
                 selected = scope == value,
                 onClick = { homeViewModel.setForYouScope(value) },
                 label = { Text(label) },

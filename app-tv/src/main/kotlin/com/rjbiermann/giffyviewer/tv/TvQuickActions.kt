@@ -1,7 +1,8 @@
 package com.rjbiermann.giffyviewer.tv
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
@@ -37,9 +38,13 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.tv.material3.Border
+import androidx.tv.material3.Button
+import androidx.tv.material3.ButtonDefaults
+import androidx.tv.material3.ClickableSurfaceDefaults
+import androidx.tv.material3.Surface
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
-import com.rjbiermann.giffyviewer.core.ui.giffyFocus
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
 import com.rjbiermann.giffyviewer.feature.feed.customRefSummary
@@ -47,6 +52,7 @@ import com.rjbiermann.giffyviewer.feature.feed.gifFeedRefs
 import com.rjbiermann.giffyviewer.feature.feed.orderNichesByTagMatch
 import kotlinx.coroutines.launch
 import androidx.compose.material3.Surface as M3Surface
+import androidx.tv.material3.Text as TvText
 
 /** Player-only panel rows (mobile overflow parity): Like · Mute · Speed · Auto-swipe. */
 data class TvPlayerActions(
@@ -403,17 +409,16 @@ private fun QuickAction(
     first: FocusRequester? = null,
     onClick: () -> Unit,
 ) {
-    // Focus ring: M3 Buttons draw nothing on D-pad focus — the shared
-    // giffyFocus BrandRed border is the unified TV focus treatment.
+    // Focus: issue-#7 tokens on tv-material Button (DESIGN-theme-stream.md
+    // §3.1) — focused fill primaryContainer/onPrimaryContainer, focused
+    // border primary; the old giffyFocus ring is retired here.
     val interaction = remember { MutableInteractionSource() }
-    Button(
+    TvButton(
+        text = text,
+        first = first,
         onClick = onClick,
-        interactionSource = interaction,
-        modifier =
-            (first?.let { Modifier.focusRequester(it) } ?: Modifier)
-                .fillMaxWidth()
-                .giffyFocus(interaction),
-    ) { Text(text) }
+        interaction = interaction,
+    )
 }
 
 /**
@@ -423,8 +428,8 @@ private fun QuickAction(
  * key-repeat) and UP/normal traversal leaves the row; CENTER opens nothing
  * (display-only row — the click is intentionally a no-op, the value lives
  * in the label). The consumed KeyDown prevents directional focus moves out
- * of the row; the shared giffyFocus ring keeps the batch-12 visible-focus
- * treatment.
+ * of the row; the issue-#7 focus tokens on the tv-material Button keep the
+ * visible-focus treatment.
  */
 @Composable
 private fun SpeedAdjustRow(
@@ -432,32 +437,64 @@ private fun SpeedAdjustRow(
     onAdjust: (Float) -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
-    Button(
+    TvButton(
+        text = "Speed " + String.format(java.util.Locale.US, "%.2f", speed) + "× — ‹ › to adjust",
         onClick = { /* display-only: adjust lives on LEFT/RIGHT (SLICE-13) */ },
+        interaction = interaction,
+        onKeyEvent = { e ->
+            when {
+                e.type != KeyEventType.KeyDown -> false
+                e.key == Key.DirectionLeft -> {
+                    onAdjust(-SPEED_STEP)
+                    true
+                }
+                e.key == Key.DirectionRight -> {
+                    onAdjust(SPEED_STEP)
+                    true
+                }
+                else -> false
+            }
+        },
+    )
+}
+
+/**
+ * The panel's row button: tv-material Button carrying the issue-#7 focus
+ * tokens (§3.1) — at rest the old M3 fill (scheme primary/onPrimary), on
+ * focus primaryContainer/onPrimaryContainer + a 3dp primary border. The
+ * interactionSource stays shared so the caller-owned D-pad key handling
+ * (CenterHold semantics, SpeedAdjustRow's LEFT/RIGHT) keeps working.
+ */
+@Composable
+private fun TvButton(
+    text: String,
+    modifier: Modifier = Modifier,
+    first: FocusRequester? = null,
+    interaction: MutableInteractionSource,
+    enabled: Boolean = true,
+    onKeyEvent: (KeyEvent) -> Boolean = { false },
+    onClick: () -> Unit,
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        colors =
+            ButtonDefaults.colors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                focusedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            ),
+        border =
+            ButtonDefaults.border(
+                focusedBorder = Border(BorderStroke(3.dp, MaterialTheme.colorScheme.primary)),
+            ),
         interactionSource = interaction,
         modifier =
-            Modifier
+            (first?.let { Modifier.focusRequester(it) } ?: Modifier)
                 .fillMaxWidth()
-                .giffyFocus(interaction)
-                .onKeyEvent { e ->
-                    if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
-                    when (e.key) {
-                        Key.DirectionLeft -> {
-                            onAdjust(-SPEED_STEP)
-                            true
-                        }
-                        Key.DirectionRight -> {
-                            onAdjust(SPEED_STEP)
-                            true
-                        }
-                        else -> false
-                    }
-                },
-    ) {
-        // Locale.US: comma-decimal locales read "0,50×" — and the speed steps
-        // are 0.25, so 2 decimals is real precision.
-        Text("Speed " + String.format(java.util.Locale.US, "%.2f", speed) + "× — ‹ › to adjust")
-    }
+                .onKeyEvent(onKeyEvent),
+    ) { TvText(text) }
 }
 
 /** SLICE-13: quarter-step; [0.5, 2.0] clamp = the mobile slider's range. */
@@ -497,62 +534,97 @@ private fun TvAddToFeedDialog(
                 if (customFeeds.isEmpty()) {
                     Text("No custom feeds yet — create one on the phone (“Custom feeds”).")
                 } else {
+                    // Picker rows: tv-material Surface carrying the issue-#7
+                    // focus tokens (§3.1); radio/checkbox stay M3, the label
+                    // flips to onPrimaryContainer under the focused fill.
                     customFeeds.forEach { def ->
                         val src = remember { MutableInteractionSource() }
-                        Row(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .giffyFocus(src)
-                                    .clickable(interactionSource = src, indication = null) {
-                                        feedId = def.id
-                                    },
-                            verticalAlignment = Alignment.CenterVertically,
+                        val focused by src.collectIsFocusedAsState()
+                        Surface(
+                            onClick = { feedId = def.id },
+                            interactionSource = src,
+                            colors =
+                                ClickableSurfaceDefaults.colors(
+                                    containerColor = MaterialTheme.colorScheme.background,
+                                    contentColor = MaterialTheme.colorScheme.onSurface,
+                                    focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    focusedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                ),
+                            border =
+                                ClickableSurfaceDefaults.border(
+                                    focusedBorder =
+                                        Border(BorderStroke(3.dp, MaterialTheme.colorScheme.primary)),
+                                ),
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
-                            RadioButton(selected = feedId == def.id, onClick = { feedId = def.id })
-                            Text(def.name)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                RadioButton(selected = feedId == def.id, onClick = { feedId = def.id })
+                                Text(
+                                    def.name,
+                                    color =
+                                        if (focused) {
+                                            MaterialTheme.colorScheme.onPrimaryContainer
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurface
+                                        },
+                                )
+                            }
                         }
                     }
                     HorizontalDivider()
                     refs.forEach { ref ->
                         val label = customRefSummary(ref)
                         val src = remember { MutableInteractionSource() }
-                        Row(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .giffyFocus(src)
-                                    .clickable(interactionSource = src, indication = null) {
-                                        if (ref in selected) selected.remove(ref) else selected.add(ref)
-                                    },
-                            verticalAlignment = Alignment.CenterVertically,
+                        val focused by src.collectIsFocusedAsState()
+                        Surface(
+                            onClick = {
+                                if (ref in selected) selected.remove(ref) else selected.add(ref)
+                            },
+                            interactionSource = src,
+                            colors =
+                                ClickableSurfaceDefaults.colors(
+                                    containerColor = MaterialTheme.colorScheme.background,
+                                    contentColor = MaterialTheme.colorScheme.onSurface,
+                                    focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    focusedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                ),
+                            border =
+                                ClickableSurfaceDefaults.border(
+                                    focusedBorder =
+                                        Border(BorderStroke(3.dp, MaterialTheme.colorScheme.primary)),
+                                ),
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Checkbox(checked = ref in selected, onCheckedChange = { checked ->
-                                if (checked) selected.add(ref) else selected.remove(ref)
-                            })
-                            Text(label)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(checked = ref in selected, onCheckedChange = { checked ->
+                                    if (checked) selected.add(ref) else selected.remove(ref)
+                                })
+                                Text(
+                                    label,
+                                    color =
+                                        if (focused) {
+                                            MaterialTheme.colorScheme.onPrimaryContainer
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurface
+                                        },
+                                )
+                            }
                         }
                     }
                 }
                 val addSrc = remember { MutableInteractionSource() }
-                Button(
+                TvButton(
+                    text = "Add",
                     enabled = feedId != null && selected.isNotEmpty(),
                     onClick = { feedId?.let { id -> selected.forEach { ref -> onAdd(id, ref) } } },
-                    interactionSource = addSrc,
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .giffyFocus(addSrc),
-                ) { Text("Add") }
+                    interaction = addSrc,
+                )
                 val cancelSrc = remember { MutableInteractionSource() }
-                Button(
+                TvButton(
+                    text = "Cancel",
                     onClick = onDismiss,
-                    interactionSource = cancelSrc,
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .giffyFocus(cancelSrc),
-                ) { Text("Cancel") }
+                    interaction = cancelSrc,
+                )
             }
         }
     }

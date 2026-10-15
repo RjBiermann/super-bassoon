@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -13,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -28,6 +30,9 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.tv.material3.Border
+import androidx.tv.material3.Button
+import androidx.tv.material3.ButtonDefaults
 import com.rjbiermann.giffyviewer.core.auth.TokenStore
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
@@ -40,6 +45,7 @@ import com.rjbiermann.giffyviewer.feature.feed.parseNicheRef
 import com.rjbiermann.giffyviewer.feature.settings.SettingsScreen
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import androidx.tv.material3.Text as TvText
 
 @AndroidEntryPoint
 class TvMainActivity : ComponentActivity() {
@@ -304,28 +310,28 @@ class TvMainActivity : ComponentActivity() {
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             item {
-                                com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
+                                TvHeaderPill(
                                     text = "Settings",
                                     onClick = { showSettings = true },
                                     modifier = Modifier.padding(6.dp).focusRequester(focusRequester),
                                 )
                             }
                             item {
-                                com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
+                                TvHeaderPill(
                                     text = "Niches",
                                     onClick = { showNiches = true },
                                     modifier = Modifier.padding(6.dp),
                                 )
                             }
                             item {
-                                com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
+                                TvHeaderPill(
                                     text = "Search",
                                     onClick = { showSearch = true },
                                     modifier = Modifier.padding(6.dp),
                                 )
                             }
                             items(pinnedNiches.toList().mapNotNull { parseNicheRef(it) }) { (id, name) ->
-                                com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
+                                TvHeaderPill(
                                     text = name,
                                     onClick = { openFeed = FeedSource.Niche(id, name) },
                                     modifier = Modifier.padding(6.dp),
@@ -337,7 +343,7 @@ class TvMainActivity : ComponentActivity() {
                             item {
                                 androidx.compose.foundation.layout.Box {
                                     var moreOpen by remember { mutableStateOf(false) }
-                                    com.rjbiermann.giffyviewer.core.ui.GiffyPillButton(
+                                    TvHeaderPill(
                                         text = "More ▾",
                                         onClick = { moreOpen = true },
                                         modifier = Modifier.padding(6.dp),
@@ -418,5 +424,43 @@ class TvMainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+}
+
+/**
+ * TV home-header pill. Issue-#7 §4 component audit: the shared
+ * GiffyPillButton is replaced on TV by the tv-material Button (native D-pad
+ * focus states). Rest look keeps today's: neutral 8% fill + 1dp primary
+ * border; focus carries the issue tokens (§3.1): primaryContainer fill,
+ * onPrimaryContainer content, 3dp primary border.
+ */
+@Composable
+private fun TvHeaderPill(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Button(
+        onClick = onClick,
+        colors =
+            ButtonDefaults.colors(
+                containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                focusedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            ),
+        border =
+            ButtonDefaults.border(
+                border = Border(BorderStroke(1.dp, MaterialTheme.colorScheme.primary)),
+                focusedBorder = Border(BorderStroke(3.dp, MaterialTheme.colorScheme.primary)),
+            ),
+        shape =
+            ButtonDefaults.shape(
+                shape = RoundedCornerShape(28.dp), // = GiffyShapes.extraLarge
+            ),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
+        modifier = modifier,
+    ) {
+        TvText(text)
     }
 }

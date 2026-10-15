@@ -29,7 +29,6 @@ class SettingsRepository
             val DATA_SAVER = booleanPreferencesKey("data_saver")
             val BLOCK_HINT_SHOWN = booleanPreferencesKey("block_hint_shown")
             val AMOLED = booleanPreferencesKey("amoled")
-            val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
             val MUTED = booleanPreferencesKey("muted")
             val AUTO_SWIPE = booleanPreferencesKey("auto_swipe")
             val PIN_HASH = stringPreferencesKey("pin_hash")
@@ -75,10 +74,9 @@ class SettingsRepository
             dataStore.edit { it[Keys.BLOCK_HINT_SHOWN] = true }
         }
 
-        /** PLAN §9 theme options: true-black AMOLED, opt-in dynamic color. */
+        /** PLAN §9 theme option: true-black AMOLED (dynamic color retired
+         *  with the issue-#7 rebrand — seed-derived tones are scheme-owned). */
         val amoled: Flow<Boolean> = dataStore.data.map { it[Keys.AMOLED] ?: false }
-
-        val dynamicColor: Flow<Boolean> = dataStore.data.map { it[Keys.DYNAMIC_COLOR] ?: false }
 
         suspend fun setAmoled(enabled: Boolean) {
             dataStore.edit { it[Keys.AMOLED] = enabled }
@@ -238,10 +236,6 @@ class SettingsRepository
         }
 
         suspend fun verifyPin(pin: String): Boolean = pinHash.first() == pin.sha256()
-
-        suspend fun setDynamicColor(enabled: Boolean) {
-            dataStore.edit { it[Keys.DYNAMIC_COLOR] = enabled }
-        }
     }
 
 private fun String.sha256(): String =

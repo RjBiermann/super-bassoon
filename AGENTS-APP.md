@@ -1118,3 +1118,55 @@ supplies the scale. No invented sizes, no invented shapes, palette stays borrowe
 Skipped by design: no light theme (stays dark-only — root AGENTS.md decision stands),
 no new dynamic-color work (existing opt-in), no font swap (DM Sans stays), no TV
 overscan changes (leanback skill's 48dp rule — separate D-pad device work, untouched).
+
+## Issue-#7 theme rebrand (DESIGN-theme-stream.md, landed 2026-10) — palette + focus tokens
+
+The borrowed-site palette was retired wholesale for the issue's M3 dark
+scheme: seed **#E5194D** (reserved — brand moments only, never a ColorScheme
+member; in-scheme accent is #FF668F) over background seed #161617. `GiffyColors`
+(Theme.kt) is now the token table itself; every role derives from it. What
+changed where:
+
+- **Values only on the accent surfaces** — the lime retirement was a scheme
+  swap, zero call-site color edits: former secondary-lime surfaces (liked
+  heart, tags/niche pills, speed chips, progress fill) ride #E3BDC4; verified
+  tick is `tertiary` gold #E7C16B (tertiary stays badge-only — exactly these
+  sites, no new ones); GiffyPillButton border/fill + giffyFocus ring ride
+  `primary` #FF668F.
+- **Dynamic color REMOVED** (issue §1.5): parameter, branch, pref plumbing
+  (settings switch row + SettingsRepository flow + ViewModel expose) and the
+  MainActivity wiring — seed-derived neutrality is not user-selectable anymore.
+- **AMOLED:** `giffyColors(amoled)` overwrites background/surface/surfaceVariant
+  + the surface-container ladder to pure black; accent-container rows untouched
+  (the batch-16 collapse shape preserved verbatim). TV cards
+  ride the collapsed compose scheme through `giffyTvColors` — no TV-specific
+  neutral logic (batch-16 F3 rule intact).
+- **TV focus tokens (§3.1, giffyFocus retired in app-tv)** — focused fill
+  `primaryContainer` **#7D0030**, focused content `onPrimaryContainer`
+  **#FFD9E1**, focused border/glow `primary` **#FF668F**, unfocused rings
+  `outlineVariant` **#51444A** (tv border/borderVariant now map exactly these).
+  Migrated to tv-material components (verified from the 1.0.1 AAR): TvNiches
+  row + TvQuickActions picker rows → `Surface` (colors + focused border);
+  TvQuickActions QuickAction/SpeedAdjustRow/add-cancel + TvPlayerScreen
+  Retry·Skip·Start-over·Back-to-feed → `Button`; TvPlayerScreen niche pills →
+  `Surface` pill; TvHomeScreen For You chips + TvSourceFeedScreen Refresh/Sort
+  IconButtons → tv `FilterChip`/`IconButton` (tv FilterChip carries
+  @ExperimentalTvMaterial3Api in 1.0.1 — @OptIn per call site); TvMainActivity
+  header pills replaced GiffyPillButton per the §4 audit (shared widget stays
+  for mobile AgeGate, rest-look parity via §3.1 tokens).
+- **Documented exception (the one giffyFocus survivor):** the SHARED feature
+  screens hosted on TV (SettingsScreen/CustomFeedsScreen) cannot carry
+  tv-material deps, so their M3 chip/button rows keep `giffyFocus` in :core:ui,
+  recolored to the same trio (focused fill primaryContainer + primary border;
+  M3 chips keep their own outlineVariant rest ring). GiffyFocus's
+  `fillOnFocus` parameter is gone — primaryContainer is the default fill.
+- **Scrims (§7):** PlayerOverlay.scrim keeps 55% black (inside the issue's
+  40–60% art-scrim band); `secondaryOnVideo` tint moved white → onSurface
+  #F7E9EC@70% (desc text on both players, bookkeeping for the issue's
+  onSurface wording). Bare-white glyphs (seek flash, action rail) stay white
+  (media icons, not themed text) per the audit.
+- Device gates still owed (this landing is code+host checks only): TV36 focus
+  pixel check on every migrated row (fill = #7D0030-family, never a purple/blue
+  default), CenterHold/MENU/quick-actions re-walk, overscan 48dp + ≥48dp target
+  sweep, Medium_Phone AMOLED/Settings/player-accent pass + onSurfaceVariant
+  only-at-large-sizes walkthrough (§3.4).

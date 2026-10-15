@@ -1,16 +1,13 @@
 package com.rjbiermann.giffyviewer.core.ui
 
-import android.os.Build
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -18,64 +15,94 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * Borrowed design tokens — PLAN §9 (exact values verified from the source
- * site's CSS via Playwright, 2026-09-30). Palette only, no trade dress.
- * AMOLED option collapses page/chrome/widget to true black.
+ * Issue-#7 theme tokens (DESIGN-theme-stream.md §1.1, transcribed verbatim
+ * from the issue's token table, dark-first seed #E5194D / background seed
+ * #161617). Single color source feeding `giffyColors`; composables read
+ * scheme ROLES only (batch-15 F5 rule).
  */
 object GiffyColors {
-    val Page = Color(0xFF0F0F0F)
-    val Chrome = Color(0xFF090909)
-    val Widget = Color(0xFF191919)
-    val BrandRed = Color(0xFFD70003)
-    val Lime = Color(0xFFEBFA63)
-    val LimeHover = Color(0xFFDAF02B)
-    val LimePressed = Color(0xFF92AB05)
-    val TextHigh = Color(0xFFEFEEF0)
-    val TextMid = Color(0xFFBAB9C0)
-    val TextLow = Color(0xFF94939D)
-    val OutlineSoft = Color(0x66FFFFFF)
-    val Success = Color(0xFF00D3A3)
-    val Error = Color(0xFFFF575A)
-    val Info = Color(0xFF59C2E5)
-    val Warning = Color(0xFFFFC815)
+    /** Issue seed — reserved for BRAND MOMENTS ONLY (splash/hero/logo); it
+     *  never enters the ColorScheme (in-scheme dark accent is #FF668F). */
+    val Seed = Color(0xFFE5194D)
+    val Primary = Color(0xFFFF668F)
+    val OnPrimary = Color(0xFF5E0B25)
+    val PrimaryContainer = Color(0xFF7D0030)
+    val OnPrimaryContainer = Color(0xFFFFD9E1)
+    val InversePrimary = Color(0xFFB3003C)
+    val Secondary = Color(0xFFE3BDC4)
+    val OnSecondary = Color(0xFF432930)
+    val SecondaryContainer = Color(0xFF5E4349)
+    val OnSecondaryContainer = Color(0xFFFBD9E1)
+    val Tertiary = Color(0xFFE7C16B)
+    val OnTertiary = Color(0xFF3F2D00)
+    val TertiaryContainer = Color(0xFF5B4200)
+    val OnTertiaryContainer = Color(0xFFFFE08D)
+    val Error = Color(0xFFFFB4AB)
+    val OnError = Color(0xFF690005)
+    val ErrorContainer = Color(0xFF93000A)
+    val OnErrorContainer = Color(0xFFFFDAD6)
+    val Background = Color(0xFF161617)
+    val OnSurface = Color(0xFFF7E9EC)
+    val Surface = Color(0xFF161617)
+    val SurfaceVariant = Color(0xFF3E2429)
+    val OnSurfaceVariant = Color(0xFFDCA1AB)
+    val Outline = Color(0xFF9C7A80)
+    val OutlineVariant = Color(0xFF51444A)
+    val InverseSurface = Color(0xFFF7E9EC)
+    val InverseOnSurface = Color(0xFF37292C)
 }
 
+/**
+ * Issue-#7 darkColorScheme (DESIGN-theme-stream.md §1.1/§1.2): the issue's
+ * token table verbatim. Rows the issue does NOT specify (surfaceContainer*
+ * ladder, surfaceTint, onBackground/onSurface defaults) stay at the standard
+ * M3 darkColorScheme derivations — nothing invented. AMOLED keeps today's
+ * collapse SHAPE: background/surface + surfaceVariant + the whole surface
+ * container ladder to pure black; accent + on-color rows never collapse.
+ */
 private fun giffyColors(amoled: Boolean): ColorScheme {
+    val scheme =
+        darkColorScheme(
+            primary = GiffyColors.Primary,
+            onPrimary = GiffyColors.OnPrimary,
+            primaryContainer = GiffyColors.PrimaryContainer,
+            onPrimaryContainer = GiffyColors.OnPrimaryContainer,
+            inversePrimary = GiffyColors.InversePrimary,
+            secondary = GiffyColors.Secondary,
+            onSecondary = GiffyColors.OnSecondary,
+            secondaryContainer = GiffyColors.SecondaryContainer,
+            onSecondaryContainer = GiffyColors.OnSecondaryContainer,
+            tertiary = GiffyColors.Tertiary,
+            onTertiary = GiffyColors.OnTertiary,
+            tertiaryContainer = GiffyColors.TertiaryContainer,
+            onTertiaryContainer = GiffyColors.OnTertiaryContainer,
+            error = GiffyColors.Error,
+            onError = GiffyColors.OnError,
+            errorContainer = GiffyColors.ErrorContainer,
+            onErrorContainer = GiffyColors.OnErrorContainer,
+            background = GiffyColors.Background,
+            onBackground = GiffyColors.OnSurface,
+            surface = GiffyColors.Surface,
+            onSurface = GiffyColors.OnSurface,
+            surfaceVariant = GiffyColors.SurfaceVariant,
+            onSurfaceVariant = GiffyColors.OnSurfaceVariant,
+            outline = GiffyColors.Outline,
+            outlineVariant = GiffyColors.OutlineVariant,
+            inverseSurface = GiffyColors.InverseSurface,
+            inverseOnSurface = GiffyColors.InverseOnSurface,
+            scrim = Color.Black,
+        )
+    if (!amoled) return scheme
     val black = Color(0xFF000000)
-    val page = if (amoled) black else GiffyColors.Page
-    val chrome = if (amoled) black else GiffyColors.Chrome
-    val widget = if (amoled) black else GiffyColors.Widget
-    return darkColorScheme(
-        primary = GiffyColors.BrandRed,
-        onPrimary = Color(0xFFFFFFFF),
-        primaryContainer = Color(0xFF4A0001),
-        onPrimaryContainer = GiffyColors.TextHigh,
-        secondary = GiffyColors.Lime,
-        onSecondary = Color(0xFF0F0F0F),
-        secondaryContainer = Color(0xFF31331A),
-        onSecondaryContainer = GiffyColors.Lime,
-        tertiary = GiffyColors.Info,
-        onTertiary = Color(0xFF0F0F0F),
-        tertiaryContainer = Color(0xFF0E3A4C),
-        onTertiaryContainer = GiffyColors.Info,
-        background = page,
-        onBackground = GiffyColors.TextHigh,
-        surface = page,
-        onSurface = GiffyColors.TextHigh,
-        surfaceVariant = widget,
-        onSurfaceVariant = GiffyColors.TextMid,
-        surfaceContainerLowest = chrome,
-        surfaceContainerLow = chrome,
-        surfaceContainer = widget,
-        surfaceContainerHigh = widget,
-        surfaceContainerHighest = widget,
-        outline = GiffyColors.OutlineSoft,
-        outlineVariant = Color(0x1AFFFFFF),
-        error = GiffyColors.Error,
-        onError = Color(0xFF0F0F0F),
-        inverseSurface = GiffyColors.TextHigh,
-        inverseOnSurface = page,
-        inversePrimary = GiffyColors.BrandRed,
+    return scheme.copy(
+        background = black,
+        surface = black,
+        surfaceVariant = black,
+        surfaceContainerLowest = black,
+        surfaceContainerLow = black,
+        surfaceContainer = black,
+        surfaceContainerHigh = black,
+        surfaceContainerHighest = black,
     )
 }
 
@@ -125,24 +152,18 @@ private val GiffyShapes =
     )
 
 /**
- * Material 3 theming (m3.material.io): dark-first borrowed theme (PLAN §9),
- * AMOLED true-black option, dynamic color as opt-in override on Android 12+.
+ * Material 3 theming (m3.material.io): dark-first issue-#7 theme, AMOLED
+ * true-black option. Dynamic color is DISABLED by the issue rebrand
+ * (§1.5, DESIGN-theme-stream.md): seed-derived neutrality is no longer
+ * user-selectable; the seed #E5194D stays reserved for brand moments.
  */
 @Composable
 fun GiffyTheme(
     amoled: Boolean = false,
-    dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val context = LocalContext.current
-    val colorScheme =
-        if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            dynamicDarkColorScheme(context)
-        } else {
-            giffyColors(amoled)
-        }
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = giffyColors(amoled),
         typography = dmSansTypography(),
         shapes = GiffyShapes,
         content = content,

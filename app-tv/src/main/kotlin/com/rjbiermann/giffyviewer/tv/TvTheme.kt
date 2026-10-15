@@ -1,7 +1,6 @@
 package com.rjbiermann.giffyviewer.tv
 
 import com.rjbiermann.giffyviewer.core.ui.DmSans
-import com.rjbiermann.giffyviewer.core.ui.GiffyColors
 
 /**
  * FULL borrowed-palette mapping for androidx.tv.material3 (PLAN §9): every
@@ -39,8 +38,12 @@ fun giffyTvColors(c: androidx.compose.material3.ColorScheme): androidx.tv.materi
         onError = c.onError,
         errorContainer = c.errorContainer,
         onErrorContainer = c.onErrorContainer,
-        border = GiffyColors.OutlineSoft,
-        borderVariant = GiffyColors.BrandRed,
+        // Issue-#7 TV focus tokens (DESIGN-theme-stream.md §3.1): focused
+        // border/glow color = primary #FF668F (tv focus rings/glows derive
+        // from borderVariant), unfocused rings/borders = outlineVariant
+        // #51444A. Last non-Theme.kt palette read is gone.
+        border = c.outlineVariant,
+        borderVariant = c.primary,
     )
 
 /**

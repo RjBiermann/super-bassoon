@@ -1,5 +1,6 @@
 package com.rjbiermann.giffyviewer.tv
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -15,13 +16,11 @@ import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -34,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -42,8 +42,13 @@ import androidx.paging.LoadState
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.tv.material3.Border
+import androidx.tv.material3.Button
+import androidx.tv.material3.ButtonDefaults
+import androidx.tv.material3.Icon
+import androidx.tv.material3.IconButton
+import androidx.tv.material3.IconButtonDefaults
 import com.rjbiermann.giffyviewer.core.model.Gif
-import com.rjbiermann.giffyviewer.core.ui.giffyFocus
 import com.rjbiermann.giffyviewer.feature.feed.FeedFilterDialog
 import com.rjbiermann.giffyviewer.feature.feed.FeedRepository
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
@@ -63,6 +68,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import androidx.tv.material3.Text as TvText
 
 /**
  * Pinned-feed screen (niche or creator — any FeedSource, grid + player).
@@ -179,9 +185,9 @@ fun TvSourceFeedScreen(
                 }
                 // Top-end icon row (§6 #22 + #18): Refresh (forced generation) and the
                 // ONE Sort & filter entry (sort + filters + clear inside the shared
-                // FeedFilterDialog). Focus ring (unified BrandRed, AGENTS-APP): M3
-                // IconButton's own focus state is subtle on 10-foot — the shared
-                // giffyFocus border marks it.
+                // FeedFilterDialog). Focus = issue-#7 tokens on tv-material
+                // IconButton (§3.1, tinted via the scheme); the old giffyFocus
+                // ring is retired.
                 Row(
                     modifier =
                         Modifier
@@ -190,30 +196,38 @@ fun TvSourceFeedScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     val refreshInteraction = remember { MutableInteractionSource() }
-                    androidx.compose.material3.IconButton(
+                    IconButton(
                         onClick = { refreshAndReturnToTop() },
                         interactionSource = refreshInteraction,
-                        modifier =
-                            Modifier
-                                .giffyFocus(refreshInteraction, shape = RoundedCornerShape(8.dp)),
+                        colors =
+                            IconButtonDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                focusedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            ),
+                        border =
+                            IconButtonDefaults.border(
+                                focusedBorder =
+                                    Border(BorderStroke(3.dp, MaterialTheme.colorScheme.primary)),
+                            ),
                     ) {
-                        androidx.compose.material3.Icon(
-                            Icons.Filled.Refresh,
-                            contentDescription = "Refresh feed",
-                        )
+                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh feed")
                     }
                     val sortInteraction = remember { MutableInteractionSource() }
-                    androidx.compose.material3.IconButton(
+                    IconButton(
                         onClick = { showFilter = true },
                         interactionSource = sortInteraction,
-                        modifier =
-                            Modifier
-                                .giffyFocus(sortInteraction, shape = RoundedCornerShape(8.dp)),
+                        colors =
+                            IconButtonDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                focusedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            ),
+                        border =
+                            IconButtonDefaults.border(
+                                focusedBorder =
+                                    Border(BorderStroke(3.dp, MaterialTheme.colorScheme.primary)),
+                            ),
                     ) {
-                        androidx.compose.material3.Icon(
-                            Icons.AutoMirrored.Filled.Sort,
-                            contentDescription = "Sort & filter",
-                        )
+                        Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort & filter")
                     }
                 }
             }
@@ -290,14 +304,23 @@ fun TvSourceFeedScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             val endInteraction = remember { MutableInteractionSource() }
-                            TextButton(
+                            Button(
                                 onClick = { refreshAndReturnToTop() },
                                 interactionSource = endInteraction,
-                                modifier =
-                                    Modifier
-                                        .giffyFocus(endInteraction)
-                                        .padding(top = 4.dp),
-                            ) { Text("Refresh") }
+                                colors =
+                                    ButtonDefaults.colors(
+                                        containerColor = Color.Transparent,
+                                        contentColor = MaterialTheme.colorScheme.onSurface,
+                                        focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        focusedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    ),
+                                border =
+                                    ButtonDefaults.border(
+                                        focusedBorder =
+                                            Border(BorderStroke(3.dp, MaterialTheme.colorScheme.primary)),
+                                    ),
+                                modifier = Modifier.padding(top = 4.dp),
+                            ) { TvText("Refresh") }
                         }
                     }
                 }

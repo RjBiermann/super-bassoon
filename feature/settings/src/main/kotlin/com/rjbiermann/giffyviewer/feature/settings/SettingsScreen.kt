@@ -1,6 +1,5 @@
 package com.rjbiermann.giffyviewer.feature.settings
 
-import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -97,7 +96,6 @@ fun SettingsScreen(
     val blockedFeeds by viewModel.blockedFeeds.collectAsStateWithLifecycle(emptyList())
     val dataSaver by viewModel.dataSaver.collectAsStateWithLifecycle()
     val amoled by viewModel.amoled.collectAsStateWithLifecycle()
-    val dynamicColor by viewModel.dynamicColor.collectAsStateWithLifecycle()
     val pinHash by viewModel.pinHash.collectAsStateWithLifecycle(null)
     val orientationPref by viewModel.orientationFilter.collectAsStateWithLifecycle("any")
     val authViewModel: AuthViewModel = hiltViewModel()
@@ -223,7 +221,6 @@ fun SettingsScreen(
                     modifier = listModifier,
                     pinHash = pinHash,
                     amoled = amoled,
-                    dynamicColor = dynamicColor,
                     showGridColumns = showGridColumns,
                     showFeedAutoplay = showFeedAutoplay,
                     showTvRowHeight = showTvRowHeight,
@@ -346,7 +343,7 @@ private fun LazyListScope.settingsRow(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .giffyFocus(rowInteraction, fillOnFocus = MaterialTheme.colorScheme.surfaceVariant)
+                    .giffyFocus(rowInteraction)
                     .clickable(
                         interactionSource = rowInteraction,
                         indication = ripple(),
@@ -379,7 +376,6 @@ private fun GeneralPanel(
     viewModel: SettingsViewModel,
     pinHash: String?,
     amoled: Boolean,
-    dynamicColor: Boolean,
     showGridColumns: Boolean,
     showFeedAutoplay: Boolean,
     showTvRowHeight: Boolean,
@@ -557,31 +553,6 @@ private fun GeneralPanel(
                         )
                     }
                     Switch(checked = amoled, onCheckedChange = null)
-                }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    // Last Switch-only row → whole-row toggleable (a11y parity).
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(top = 8.dp)
-                                .toggleable(
-                                    value = dynamicColor,
-                                    role = Role.Switch,
-                                    onValueChange = { viewModel.setDynamicColor(it) },
-                                ),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Dynamic color", style = MaterialTheme.typography.titleSmall)
-                            Text(
-                                "Wallpaper-based Material You palette (Android 12+)",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Switch(checked = dynamicColor, onCheckedChange = null)
-                    }
                 }
             }
         }

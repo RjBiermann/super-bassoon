@@ -858,3 +858,61 @@ User drove tasks 1-22 live; all edit work ran behind read-only investigation wor
   unquoted `name: Guard: ...` plain scalar with a colon), shell steps
   shellcheck-reviewed by hand, version-math dry-run verified (v0.4.0 → v0.5.0,
   code 400 → 500). Gradle not run — no Kotlin touched.
+
+### Session 2026-10 batch 24 (THEME-REBRAND stream — issue-#7 M3 dark scheme landed; no builds run in-session)
+User slice: implement DESIGN-theme-stream.md (issue #7 "Theme Spec" rebrand, seed
+#E5194D / background #161617). Host-only edits + greps; gradle/ktlint/detekt/device
+walks were NOT runnable this session — see the Deviations/risks block in
+STREAM-REPORT-theme.md.
+- **Step 1 Theme.kt:** `GiffyColors` rewritten to the issue's token table verbatim
+  (single source feeding `giffyColors(amoled)`); palette members Page/Chrome/Widget/
+  BrandRed/Lime family/TextHigh/Mid/Low/OutlineSoft/Success/Info/Warning are gone;
+  `Seed` #E5194D added as the reserved brand-moment token (never a scheme member —
+  §1.5). `giffyColors` builds the §1.1 darkColorScheme verbatim; un-specified rows
+  (surfaceContainer ladder, surfaceTint) stay at M3 defaults; AMOLED collapses
+  background/surface/surfaceVariant + the whole surface-container ladder to black
+  via `scheme.copy(...)` (batch-16 collapse shape preserved; accent-container rows
+  never collapse). Contrast fill-time checks passed host-side: onPrimary #5E0B25/
+  #FF668F = 4.87:1, onPrimaryContainer #FFD9E1/#7D0030 = 8.49:1 (all other issue
+  pairs ≥6.7:1) — no escalation needed.
+- **Dynamic color REMOVED:** `GiffyTheme(dynamicColor)` parameter + branch +
+  SettingsRepository flow/key + SettingsViewModel expose + the Settings switch row
+  + MainActivity wiring. Stored `dynamic_color` DataStore entries just stay orphaned
+  (harmless; no migration needed).
+- **Step 2 TvTheme.kt:** border = `c.outlineVariant` (#51444A unfocused rings),
+  borderVariant = `c.primary` (#FF668F focus border/glow) — the last non-Theme.kt
+  palette reads are gone; all role passthroughs unchanged.
+- **Step 3 focus retirement (app-tv):** giffyFocus deleted from TvNiches/TvQuickActions/
+  TvPlayerScreen/TvHomeScreen/TvSourceFeedScreen/TvMainActivity. Migrated per §3.3,
+  using tv-material 1.0.1 components VERIFIED against the AAR in the gradle cache
+  (before building: ListItem/Button/IconButton/Surface/FilterChip bytecode-checked;
+  tv FilterChip carries @ExperimentalTvMaterial3Api → per-call-site @OptIn; default
+  colors/border/glow fallbacks decoded from bytecode where needed):
+  TvNiches row + TvQuickActions radio/checkbox picker rows + TvPlayerScreen niche
+  pills → tv `Surface` with the §3.1 tokens; TvQuickActions QuickAction/SpeedAdjustRow/
+  Add/Cancel + TvPlayerScreen Retry/Skip/Start-over/Back-to-feed (the end-of-feed
+  popup rows post-date the doc's grep inventory; migrated under the same rule since
+  giffyFocus must be gone everywhere) → tv `Button`; TvHomeScreen For You chips →
+  tv `FilterChip`; TvSourceFeedScreen Refresh/Sort IconButtons + end-of-feed Refresh
+  → tv `IconButton`/`Button`; TvMainActivity header pills → tv `Button` (TvHeaderPill,
+  rest-look parity with GiffyPillButton per the §4 audit; the shared widget stays for
+  mobile AgeGate). CenterHold/hold-Center keymap/FocusRequester wiring untouched;
+  content colors flip natively via tv LocalContentColor where possible (tv Text in
+  migrated buttons), conditional scheme reads elsewhere.
+- **Documented exception:** shared :feature: screens (SettingsScreen chips/blocklist
+  rows, CustomFeedsScreen cycle/delete) keep `giffyFocus` (:core:ui) — recolored to
+  the issue trio: focused fill = scheme.primaryContainer (new default; the
+  `fillOnFocus` parameter deleted), focused border = scheme.primary. M3 chips keep
+  their own outlineVariant rest ring.
+- **Scrims (§7):** PlayerOverlay.scrim stays 55% (inside the issue's 40–60% band);
+  `secondaryOnVideo` white → onSurface #F7E9EC@70% (desc text bookkeeping; track/
+  hairline strokes stay white as the F6a media standard). GiffyColors.OnSurface
+  feeds it — still scheme-source-clean.
+- Docs: AGENTS-APP.md gained the "Issue-#7 theme rebrand" section under the
+  design-system audit (tokens, migration map per surface, exception, owed device
+  gates). Typography/shapes untouched (batch-16 owns both; doc §5/§6 checklists pass).
+- Owed gates (runnable in a build session): compile+ktlint+detekt+unit tests on
+  :core:ui/:core:datastore/:feature:settings/:feature:feed/:app-mobile/:app-tv, then
+  the TV36 focus pixel check (fill #7D0030-family, no purple/blue), CenterHold/
+  MENU walks, GifCard focus-preview re-check, Medium_Phone AMOLED+player-accent pass,
+  release smoke, and the §3.4 onSurfaceVariant-only-large/overscan/48dp walkthroughs.

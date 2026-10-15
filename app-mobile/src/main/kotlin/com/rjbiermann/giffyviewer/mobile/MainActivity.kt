@@ -61,12 +61,11 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun ThemeHost() {
         val amoled by settings.amoled.collectAsStateWithLifecycle(initialValue = false)
-        val dynamicColor by settings.dynamicColor.collectAsStateWithLifecycle(initialValue = false)
         // One adaptive seam (PLAN §9): width class computed here, hint passed down.
         val windowSize = calculateWindowSizeClass(this)
         val columnsOverride by settings.gridColumns.collectAsStateWithLifecycle(initialValue = 0)
         val hint = layoutHint(windowSize.widthSizeClass, columnsOverride)
-        GiffyTheme(amoled = amoled, dynamicColor = dynamicColor) { Host(hint) }
+        GiffyTheme(amoled = amoled) { Host(hint) }
     }
 
     @Composable

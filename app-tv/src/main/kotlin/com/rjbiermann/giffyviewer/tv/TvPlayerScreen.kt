@@ -2,6 +2,7 @@
 
 package com.rjbiermann.giffyviewer.tv
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -16,10 +17,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -41,6 +40,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
@@ -49,6 +49,10 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import androidx.tv.material3.Border
+import androidx.tv.material3.Button
+import androidx.tv.material3.ButtonDefaults
+import androidx.tv.material3.ClickableSurfaceDefaults
 import coil3.compose.AsyncImage
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
@@ -59,9 +63,10 @@ import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.player.seedContentAspectRatio
 import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
 import com.rjbiermann.giffyviewer.core.ui.PlayerOverlay
-import com.rjbiermann.giffyviewer.core.ui.giffyFocus
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import kotlinx.coroutines.launch
+import androidx.tv.material3.Surface as TvSurface
+import androidx.tv.material3.Text as TvText
 
 /**
  * 10-foot player: one gif at a time, D-pad up/down (left/right too) walks the
@@ -164,7 +169,7 @@ fun TvPlayerScreen(
     LaunchedEffect(Unit) { playerFocus.requestFocus() }
     // Issue #24 retry/skip focusability: the root Column pins focus and its
     // onPreviewKeyEvent pre-consumes Up/Down/Center, so the overlay's
-    // TextButtons can never win focus by traversal alone. On error the Retry
+    // buttons can never win focus by traversal alone. On error the Retry
     // button takes focus; when the overlay leaves (Skip settles / a new gif
     // commits) root focus is restored. Same pattern as the batch-18
     // shared-TextField requestInitialFocus fix.
@@ -369,7 +374,7 @@ fun TvPlayerScreen(
             // Playback failure overlay (mobile PlayerScreen parity): centered
             // panel over the PlayerView, Retry re-calls the playGif path, Skip
             // advances the list index. Keys/items clear it; buttons carry the
-            // shared giffyFocus ring (the TvQuickActions D-pad pattern).
+            // issue-#7 focus tokens (TvFocusButton, DESIGN-theme-stream.md §3.1).
             if (playError) {
                 Column(
                     modifier =
@@ -385,35 +390,30 @@ fun TvPlayerScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         val retryInteraction = remember { MutableInteractionSource() }
-                        TextButton(
+                        TvFocusButton(
+                            label = "Retry",
+                            labelStyle = MaterialTheme.typography.labelLarge,
+                            contentColor = MaterialTheme.colorScheme.secondary,
+                            interaction = retryInteraction,
+                            focusRequester = overlayRetryFocus,
                             onClick = {
                                 playError = false
                                 textVisible = true
                                 scope.launch { player.playGif(gif, dataSaver, videoQuality = videoQuality) }
                             },
-                            colors =
-                                ButtonDefaults
-                                    .textButtonColors(
-                                        contentColor = MaterialTheme.colorScheme.secondary,
-                                    ),
-                            modifier = Modifier.focusRequester(overlayRetryFocus).giffyFocus(retryInteraction),
-                            interactionSource = retryInteraction,
-                        ) { Text("Retry", style = MaterialTheme.typography.labelLarge) }
+                        )
                         val skipInteraction = remember { MutableInteractionSource() }
-                        TextButton(
+                        TvFocusButton(
+                            label = "Skip",
+                            labelStyle = MaterialTheme.typography.labelLarge,
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                            interaction = skipInteraction,
                             onClick = {
                                 playError = false
                                 textVisible = true
                                 if (index < gifs.size - 1) index++
                             },
-                            colors =
-                                ButtonDefaults
-                                    .textButtonColors(
-                                        contentColor = MaterialTheme.colorScheme.onSurface,
-                                    ),
-                            modifier = Modifier.giffyFocus(skipInteraction),
-                            interactionSource = skipInteraction,
-                        ) { Text("Skip", style = MaterialTheme.typography.labelLarge) }
+                        )
                     }
                 }
             }
@@ -464,29 +464,39 @@ fun TvPlayerScreen(
                         )
                     }
                     // Niche pills (mobile-player parity, links audit #5): ≤3 payload
-                    // names; a pill opens the niche feed. D-pad: pills use the same
-                    // giffyFocus ring pattern as TvQuickActions rows; DOWN from the
-                    // player body walks into the row, CENTER presses, UP returns to
-                    // the player body (vertical = items per the keymap rules).
+                    // names; a pill opens the niche feed. D-pad: pills use the
+                    // issue-#7 focus trio (tv-material Surface, §3.1); DOWN from
+                    // the player body walks into the row, CENTER presses, UP
+                    // returns to the player body (vertical = keymap items).
                     if (gif.niches.isNotEmpty()) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             gif.niches.take(3).forEach { niche ->
+                                // Niche pill: tv-material Surface with the
+                                // issue-#7 focus trio (§3.1) — focused fill
+                                // primaryContainer, content onPrimaryContainer,
+                                // border/glow primary; the old
+                                // fillOnFocus=primary/secondary-text ring is
+                                // retired.
                                 val interaction = remember { MutableInteractionSource() }
-                                TextButton(
+                                TvSurface(
                                     onClick = { onOpenNiche(FeedSource.Niche(niche.id, niche.name)) },
-                                    modifier =
-                                        Modifier
-                                            .giffyFocus(
-                                                interactionSource = interaction,
-                                                fillOnFocus = MaterialTheme.colorScheme.primary,
-                                            ),
                                     interactionSource = interaction,
                                     colors =
-                                        ButtonDefaults.textButtonColors(
+                                        ClickableSurfaceDefaults.colors(
+                                            containerColor = Color.Transparent,
                                             contentColor = MaterialTheme.colorScheme.secondary,
+                                            focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                            focusedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        ),
+                                    border =
+                                        ClickableSurfaceDefaults.border(
+                                            focusedBorder =
+                                                Border(
+                                                    BorderStroke(3.dp, MaterialTheme.colorScheme.primary),
+                                                ),
                                         ),
                                 ) {
-                                    Text(niche.name, style = MaterialTheme.typography.labelMedium)
+                                    TvText(niche.name, style = MaterialTheme.typography.labelMedium)
                                 }
                             }
                         }
@@ -575,7 +585,7 @@ fun TvPlayerScreen(
     }
     if (endDialog) {
         // #22 player end-of-feed popup: D-pad button rows on the
-        // TvQuickActionsDialog pattern (giffyFocus ring + first-row focus).
+        // TvQuickActionsDialog pattern (§3.1 focus tokens + first-row focus).
         val endFocus = remember { FocusRequester() }
         LaunchedEffect(Unit) {
             endFocus.requestFocus()
@@ -598,30 +608,27 @@ fun TvPlayerScreen(
                         modifier = Modifier.padding(bottom = 8.dp),
                     )
                     val restartInteraction = remember { MutableInteractionSource() }
-                    TextButton(
+                    TvFocusButton(
+                        label = "Start over",
+                        labelStyle = MaterialTheme.typography.labelLarge,
+                        contentColor = MaterialTheme.colorScheme.secondary,
+                        interaction = restartInteraction,
+                        focusRequester = endFocus,
                         onClick = {
                             endDialog = false
                             textVisible = true
                             index = 0
                             playerFocus.requestFocus()
                         },
-                        interactionSource = restartInteraction,
-                        colors =
-                            ButtonDefaults.textButtonColors(
-                                contentColor = MaterialTheme.colorScheme.secondary,
-                            ),
-                        modifier = Modifier.giffyFocus(restartInteraction).focusRequester(endFocus),
-                    ) { Text("Start over", style = MaterialTheme.typography.labelLarge) }
+                    )
                     val backInteraction = remember { MutableInteractionSource() }
-                    TextButton(
+                    TvFocusButton(
+                        label = "Back to feed",
+                        labelStyle = MaterialTheme.typography.labelLarge,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        interaction = backInteraction,
                         onClick = onBack,
-                        interactionSource = backInteraction,
-                        colors =
-                            ButtonDefaults.textButtonColors(
-                                contentColor = MaterialTheme.colorScheme.onSurface,
-                            ),
-                        modifier = Modifier.giffyFocus(backInteraction),
-                    ) { Text("Back to feed", style = MaterialTheme.typography.labelLarge) }
+                    )
                 }
             }
         }
@@ -644,4 +651,44 @@ private fun seekBy(
     val dur = player.durationMs
     flash(if (dur > 0) "${fmt(target)} / ${fmt(dur)}" else fmt(target))
     // cleared by the LaunchedEffect below
+}
+
+/**
+ * Error/popup overlay button: tv-material Button carrying the issue-#7
+ * focus tokens (§3.1) — transparent fill at rest (the old text-button
+ * look), focused fill = primaryContainer / content = onPrimaryContainer
+ * / 3dp primary border. Content colors ride the tv LocalContentColor so
+ * the focus flip needs no per-state reads; [contentColor] sets the rest
+ * look (previous textButtonColors choices: secondary / onSurface).
+ */
+@Composable
+private fun TvFocusButton(
+    label: String,
+    labelStyle: TextStyle,
+    contentColor: Color,
+    interaction: MutableInteractionSource,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    focusRequester: FocusRequester? = null,
+) {
+    Button(
+        onClick = onClick,
+        colors =
+            ButtonDefaults.colors(
+                containerColor = Color.Transparent,
+                contentColor = contentColor,
+                focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                focusedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            ),
+        border =
+            ButtonDefaults.border(
+                focusedBorder = Border(BorderStroke(3.dp, MaterialTheme.colorScheme.primary)),
+            ),
+        interactionSource = interaction,
+        modifier =
+            (focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
+                .then(modifier),
+    ) {
+        TvText(label, style = labelStyle)
+    }
 }

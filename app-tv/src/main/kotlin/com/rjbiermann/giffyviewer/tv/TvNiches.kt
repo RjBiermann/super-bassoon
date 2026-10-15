@@ -1,8 +1,9 @@
 package com.rjbiermann.giffyviewer.tv
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.MaterialTheme
@@ -34,7 +36,9 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.rjbiermann.giffyviewer.core.ui.giffyFocus
+import androidx.tv.material3.Border
+import androidx.tv.material3.ClickableSurfaceDefaults
+import androidx.tv.material3.Surface
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import com.rjbiermann.giffyviewer.feature.feed.NichesViewModel
 
@@ -81,11 +85,7 @@ fun TvNichesScreen(
         ) {
             itemsIndexed(niches, key = { _, n -> n.id }) { index, niche ->
                 val isPinned = pinned.any { it.startsWith("${niche.id}|") }
-                val rowInteraction =
-                    remember {
-                        androidx.compose.foundation.interaction
-                            .MutableInteractionSource()
-                    }
+                val rowInteraction = remember { MutableInteractionSource() }
                 // Menu-less-remote keymap: long-press Center (≥500ms, fires on
                 // release) = the row's MENU action (toggle the home pin);
                 // short-tap Center opens the niche feed (same as the click).
@@ -101,16 +101,32 @@ fun TvNichesScreen(
                     // beside it as the second focusable — RIGHT moves to it,
                     // DOWN moves rows. The old full-row focusable swallowed
                     // the inner button (directional search never entered it).
-                    Column(
+                    // Focus = issue-#7 tokens on tv-material Surface (§3.1):
+                    // focused fill primaryContainer, focused border/glow primary;
+                    // the old surfaceVariant fill-on-focus is retired.
+                    val rowFocused by rowInteraction.collectIsFocusedAsState()
+                    Surface(
+                        onClick = { onOpenNiche(FeedSource.Niche(niche.id, niche.name)) },
+                        interactionSource = rowInteraction,
+                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
+                        colors =
+                            ClickableSurfaceDefaults.colors(
+                                containerColor = MaterialTheme.colorScheme.background,
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                                focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                focusedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            ),
+                        border =
+                            ClickableSurfaceDefaults.border(
+                                focusedBorder =
+                                    Border(
+                                        BorderStroke(3.dp, MaterialTheme.colorScheme.primary),
+                                    ),
+                            ),
                         modifier =
                             Modifier
                                 .weight(1f)
                                 .then(if (index == 0) Modifier.focusRequester(firstRowFocus) else Modifier)
-                                .giffyFocus(rowInteraction, fillOnFocus = MaterialTheme.colorScheme.surfaceVariant)
-                                .clickable(
-                                    interactionSource = rowInteraction,
-                                    indication = androidx.compose.material3.ripple(),
-                                ) { onOpenNiche(FeedSource.Niche(niche.id, niche.name)) }
                                 .onPreviewKeyEvent { event ->
                                     // MENU toggles the home pin (creator-quick-action pattern).
                                     if (event.type == KeyEventType.KeyUp && event.key == Key.Menu) {
@@ -138,12 +154,27 @@ fun TvNichesScreen(
                                 }.padding(vertical = 8.dp),
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = niche.name, style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                text = niche.name,
+                                style = MaterialTheme.typography.titleMedium,
+                                color =
+                                    if (rowFocused) {
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    },
+                            )
                             if (isPinned) {
                                 // Vector pin (emoji-prefix anti-pattern; announced oddly).
                                 androidx.compose.material3.Icon(
                                     imageVector = androidx.compose.material.icons.Icons.Filled.PushPin,
                                     contentDescription = "pinned",
+                                    tint =
+                                        if (rowFocused) {
+                                            MaterialTheme.colorScheme.onPrimaryContainer
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurface
+                                        },
                                     modifier = Modifier.padding(start = 6.dp).size(14.dp),
                                 )
                             }
@@ -151,7 +182,12 @@ fun TvNichesScreen(
                         Text(
                             text = "${niche.gifs} gifs · ${niche.subscribers} subscribers",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color =
+                                if (rowFocused) {
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
                         )
                     }
                     // Parity: mobile opens niche About from the player cluster;

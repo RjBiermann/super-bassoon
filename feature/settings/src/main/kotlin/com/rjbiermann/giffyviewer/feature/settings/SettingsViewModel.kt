@@ -189,20 +189,12 @@ class SettingsViewModel
             viewModelScope.launch { settings.setTvRowHeight(value) }
         }
 
-        /** PLAN §9 theme options. */
+        /** PLAN §9 theme option (dynamic color retired with the issue-#7 rebrand). */
         val amoled: StateFlow<Boolean> =
             settings.amoled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
-        val dynamicColor: StateFlow<Boolean> =
-            settings.dynamicColor
-                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
-
         fun setAmoled(enabled: Boolean) {
             viewModelScope.launch { settings.setAmoled(enabled) }
-        }
-
-        fun setDynamicColor(enabled: Boolean) {
-            viewModelScope.launch { settings.setDynamicColor(enabled) }
         }
 
         /** Gate 7: export/import all content controls as JSON. */
