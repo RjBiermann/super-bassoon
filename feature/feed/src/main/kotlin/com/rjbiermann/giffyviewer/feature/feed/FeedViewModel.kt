@@ -474,12 +474,14 @@ class FeedViewModel
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "all")
 
         fun setForYouScope(scope: String) {
-            viewModelScope.launch {
-                settings.setForYouScope(scope)
-                // Read-time filter lives in the paging source — restart the
-                // generation so pages re-read with the new scope.
-                refreshGen.value = refreshGen.value + 1
-            }
+            // #38 (2026-10 e2e): the scope pref is read-time — RE-KEYING is
+            // the repository's job now (settings.forYouScope rides the
+            // ForYouPagingKeys combine, both apps through the one choke
+            // point). The old VM-side refreshGen bump duplicated that restart
+            // as a FORCED generation (an extra reset-emit + a wasted page-1
+            // fetch) while the TV side never had it — the row visibly
+            // refetches on both shells through the repository alone.
+            viewModelScope.launch { settings.setForYouScope(scope) }
         }
 
         /** FAVORITED custom feeds → pinned tabs (PLAN §7; the merged niche-group

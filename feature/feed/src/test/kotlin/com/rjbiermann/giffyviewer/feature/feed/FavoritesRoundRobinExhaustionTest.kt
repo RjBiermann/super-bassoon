@@ -10,16 +10,19 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * #5 "infinite until nothing left": a Favorites page that comes back empty EARLY
- * in a rotation must NOT end the feed — the next rotation's slots still have
- * pages (the old behavior ended the feed on the FIRST empty creator slot). An
- * empty LAST slot of a rotation ends it (bounded: one API call per fetch, the
- * next rotation's first slot is not probed).
+ * #36 endless-favorites contract (2026-10 loop-reshuffle policy): the pager
+ * keeps serving pages while the pool still has UNFETCHED content — an empty
+ * slot (mid- or boundary) never ends the feed on its own; the feed ends one
+ * dead loop after the FULL previous loop came back empty (the bounded
+ * exhaustion cost), never while any unfetched inner page exists. Empty never
+ * becomes an infinite probe storm: the pre-check skips the probe of a loop
+ * whose predecessor was entirely empty. Loop 0 keeps the #5 rotation;
+ * every later loop re-shuffles its creator order with a NEW derived seed
+ * (favoritesLoopOrder) so the served creator-grouping sequence never repeats.
  */
 class FavoritesRoundRobinExhaustionTest {
     private class FakeGifDao : GifDao {
@@ -80,6 +83,7 @@ class FavoritesRoundRobinExhaustionTest {
         api: GifsApi,
         creators: List<String>,
         pageDao: FeedPageDao,
+        seed: Long = 0L,
     ) = FeedPageFetcher(
         FeedSource.Favorites,
         FakeGifDao(),
@@ -87,46 +91,69 @@ class FavoritesRoundRobinExhaustionTest {
         api,
         20,
         favorites = { creators },
+        favoritesSeed = { seed },
     )
 
     @Test
-    fun `empty slot mid-rotation chains forward and the feed ends at an empty last rotation slot`() =
+    fun `the pager serves every unfetched pool page and ends exactly one dead loop after the pool spends`() =
         runBlocking {
             val api = PoolApi()
+            // Pools: a has 3 inner pages, b has none, c has 1. Unequal pools are
+            // the old bug's trigger: the boundary slot's creator (c, exhausted
+            // after its page 1) used to END the feed while a's pages 2..3 were
+            // still unfetched.
             api.pool["a" to 1] = listOf("a1")
-            api.pool["c" to 1] = listOf("c1")
             api.pool["a" to 2] = listOf("a2")
+            api.pool["a" to 3] = listOf("a3")
+            api.pool["c" to 1] = listOf("c1")
             val pageDao = FakeFeedPageDao()
-            val fetcher = fetcher(api, listOf("a", "b", "c"), pageDao)
+            val fetcher = fetcher(api, listOf("a", "b", "c"), pageDao, seed = 7L)
 
-            // Rotation 1: fill() returns MORE (true = keep going) even when the
-            // page itself came back empty — b's slot is not the feed's end.
-            assertTrue(fetcher.fill(1))
-            assertTrue("b's empty slot must not end the feed (2 of 3 slots left)", fetcher.fill(2))
-            assertTrue(fetcher.fill(3))
-            // Rotation 2: a2 (content), b empty (mid → continue), c empty at the
-            // rotation boundary (page 6 % 3 == 0) → the honest end.
-            assertTrue(fetcher.fill(4))
-            assertTrue(fetcher.fill(5))
-            assertFalse("the empty LAST slot of a rotation ends the feed", fetcher.fill(6))
+            var page = 1
+            while (fetcher.fill(page)) {
+                page++
+                check(page < 40) { "the endless-favorites loop never ended (bounded exhaustion violated)" }
+            }
+            // Honest end, not an error: the NEXT page skips its probe entirely
+            // (the pre-check marks the full previous loop empty).
+            assertFalse("an empty pool must end the pager", fetcher.fill(page))
+            val callsAfterEnd = api.calls.size
+            assertFalse(fetcher.fill(page))
+            assertEquals("an ended pager must not re-probe", callsAfterEnd, api.calls.size)
 
-            // Mid-rotation empty rows chain to the next page (the source's walk
-            // keeps hopping); the terminal rotation-boundary row does not.
-            assertEquals("fav:v1:p3", pageDao.pages["fav:v1:p2"]!!.nextPageKey)
-            assertEquals("fav:v1:p6", pageDao.pages["fav:v1:p5"]!!.nextPageKey)
-            assertNull(pageDao.pages["fav:v1:p6"]!!.nextPageKey)
+            // No content was lost: ALL four pool gif pages reached a row. A
+            // reshuffled loop still visits every creator exactly once per loop,
+            // so unfetched content is reachable regardless of the loop order.
+            val served = pageDao.pages.values.flatMapTo(HashSet()) { it.gifIds }
+            assertEquals(setOf("a1", "a2", "a3", "c1"), served)
+
+            // Loop 0 kept the #5 rotation contract: seed 7 rotates [a,b,c] →
+            // [b,c,a] (offset 7 % 3 = 1). One API call per fill — the rate-limit
+            // invariant rides on the fetch count per page, unchanged.
+            assertEquals(listOf("b", "c", "a"), api.calls.take(3).map { it.first })
+            assertEquals("an early empty slot must still chain forward", "fav:v1:p2", pageDao.pages["fav:v1:p1"]!!.nextPageKey)
         }
 
     @Test
-    fun `single creator keeps today's end semantics (every empty page is terminal)`() =
+    fun `single creator serves every inner page, then one dead page, then ends`() =
         runBlocking {
             val api = PoolApi()
             api.pool["a" to 1] = listOf("a1")
+            api.pool["a" to 2] = listOf("a2")
+            api.pool["a" to 3] = listOf("a3")
             val pageDao = FakeFeedPageDao()
-            val fetcher = fetcher(api, listOf("a"), pageDao)
+            val fetcher = fetcher(api, listOf("a"), pageDao, seed = 5L)
+
             assertTrue(fetcher.fill(1))
-            assertFalse(fetcher.fill(2))
-            assertNull(pageDao.pages["fav:v1:p2"]!!.nextPageKey)
+            assertTrue(fetcher.fill(2))
+            assertTrue(fetcher.fill(3))
+            // The creator's pool ran dry: the slot right after the last content
+            // page MUST be probed (its previous loop page had content), then the
+            // next one is skipped via the fully-empty-previous-loop check.
+            assertTrue("one dead probe page is the bounded exhaustion cost", fetcher.fill(4))
+            assertFalse(fetcher.fill(5))
+            assertEquals(setOf("a1", "a2", "a3"), pageDao.pages.values.flatMapTo(HashSet()) { it.gifIds })
+            assertEquals(4, api.calls.size)
         }
 
     @Test

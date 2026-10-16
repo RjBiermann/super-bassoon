@@ -13,12 +13,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
@@ -568,14 +566,17 @@ fun FeedScreen(
                             state = gridState,
                             columns = StaggeredGridCells.Fixed(gridColumns),
                             modifier = Modifier.fillMaxSize(),
-                            // Tiles scroll under the system nav (edge-to-edge);
-                            // the inset is a contentPadding, not dead space.
+                            // Issue #40: GiffyScaffold's content padding ALREADY
+                            // carries the system nav-bar inset — a navBar-sized
+                            // trailing padding here doubled it to the blank band
+                            // below the feed while scrolled. 8dp is the grid's own
+                            // gutter; the single inset strip stays the app standard.
                             contentPadding =
                                 PaddingValues(
                                     start = 8.dp,
                                     end = 8.dp,
                                     top = 8.dp,
-                                    bottom = 8.dp + navBarDp(),
+                                    bottom = 8.dp,
                                 ),
                             verticalItemSpacing = 8.dp,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -712,6 +713,17 @@ private fun GifTile(
                                 isFocusable = false
                             }
                     },
+                    onRelease = { view ->
+                        // Leak H1/H2 (OOM sweep 2026-10-16): the AndroidView is
+                        // torn down on every settle-swap while the shared VM
+                        // player outlives it — PlayerView only detaches its
+                        // ComponentListener + TextureView surface via
+                        // setPlayer(null), so each detached tile anchors a whole
+                        // subtree to the player's listener set (monotone Java-heap
+                        // growth). The update{} path's setPlayer(B) detach of A
+                        // is handled by PlayerView itself.
+                        (view as PlayerView).player = null
+                    },
                     update = { view ->
                         (view as PlayerView).apply {
                             player = inlinePlayer
@@ -746,10 +758,3 @@ private fun GifTile(
         )
     }
 }
-
-/** System nav-bar inset as dp (density-based; the layout extension didn't resolve). */
-@Composable
-private fun navBarDp(): androidx.compose.ui.unit.Dp =
-    with(androidx.compose.ui.platform.LocalDensity.current) {
-        WindowInsets.navigationBars.getBottom(this).toDp()
-    }

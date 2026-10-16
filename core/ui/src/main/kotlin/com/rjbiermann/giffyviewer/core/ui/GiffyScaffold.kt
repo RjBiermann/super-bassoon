@@ -137,20 +137,30 @@ fun GiffyScaffold(
             // and drags landing in that uncovered strip hit no scrollable at
             // all (FeedScreen froze after one swipe). Measure the content
             // TALLER by the offset so it still reaches the screen bottom.
+            // Issue #40 trace (2026-10-16): the geometry here is exact by
+            // construction — a fill-max content's bottom edge lands exactly
+            // on the un-grown parent bottom for ANY collapse offset, so the
+            // collapse modifier contributes NO bottom gap at rest or while
+            // scrolled (encoded in [collapseLayout] + its unit test).
             val state = collapseState!!
             Box(
                 modifier =
                     Modifier.layout { measurable, constraints ->
-                        val extra = state.offsetPx
+                        val spec =
+                            collapseLayout(
+                                incomingMinHeight = constraints.minHeight,
+                                incomingMaxHeight = constraints.maxHeight,
+                                collapseOffsetPx = state.offsetPx,
+                            )
                         val placeable =
                             measurable.measure(
                                 constraints.copy(
-                                    minHeight = constraints.minHeight + extra,
-                                    maxHeight = constraints.maxHeight + extra,
+                                    minHeight = spec.measureMinHeight,
+                                    maxHeight = spec.measureMaxHeight,
                                 ),
                             )
                         layout(placeable.width, placeable.height) {
-                            placeable.place(0, -extra)
+                            placeable.place(0, spec.contentOffsetY)
                         }
                     },
             ) {
@@ -172,3 +182,27 @@ fun GiffyScaffold(
 /** Factory for the [GiffyCollapseState] a collapsing screen owns. */
 @Composable
 fun rememberGiffyCollapseState(): GiffyCollapseState = remember { GiffyCollapseState() }
+
+/** GiffyScaffold's collapse re-claim geometry in pure numbers (unit-tested —
+ *  issue #40 regression): the grown measure must EXACTLY match the consumed
+ *  collapse so a fill-max content ends at the un-grown parent bottom. */
+internal data class CollapseLayoutSpec(
+    /** Constraints handed down to the content for measuring. */
+    val measureMinHeight: Int,
+    val measureMaxHeight: Int,
+    /** Draw offset: the collapsed strip the topBar column paints over. */
+    val contentOffsetY: Int,
+)
+
+internal fun collapseLayout(
+    incomingMinHeight: Int,
+    incomingMaxHeight: Int,
+    collapseOffsetPx: Int,
+): CollapseLayoutSpec {
+    val extra = collapseOffsetPx.coerceAtLeast(0)
+    return CollapseLayoutSpec(
+        measureMinHeight = incomingMinHeight + extra,
+        measureMaxHeight = incomingMaxHeight + extra,
+        contentOffsetY = -extra,
+    )
+}

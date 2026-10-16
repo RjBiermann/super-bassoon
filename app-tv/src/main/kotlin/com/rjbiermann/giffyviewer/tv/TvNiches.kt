@@ -38,6 +38,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.Border
 import androidx.tv.material3.ClickableSurfaceDefaults
+import androidx.tv.material3.ClickableSurfaceScale
 import androidx.tv.material3.Surface
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import com.rjbiermann.giffyviewer.feature.feed.NichesViewModel
@@ -107,6 +108,7 @@ fun TvNichesScreen(
                     val rowFocused by rowInteraction.collectIsFocusedAsState()
                     Surface(
                         onClick = { onOpenNiche(FeedSource.Niche(niche.id, niche.name)) },
+                        scale = ClickableSurfaceScale.None,
                         interactionSource = rowInteraction,
                         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
                         colors =

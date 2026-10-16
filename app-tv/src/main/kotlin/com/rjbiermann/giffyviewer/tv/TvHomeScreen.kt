@@ -5,7 +5,6 @@
 
 package com.rjbiermann.giffyviewer.tv
 
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -38,7 +37,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -54,6 +52,7 @@ import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
+import androidx.tv.material3.CardScale
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -163,136 +162,141 @@ fun TvHomeScreen(
         onDispose { preview?.release() }
     }
 
-    LazyColumn(
-        // Paint the borrowed page color — the window background is a lighter gray.
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
-    ) {
-        item {
-            Text(
-                text = "Giffy Viewer",
-                // F8 (batch 15): same slot as mobile's GiffyScaffold title.
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp),
-            )
-        }
-        // Logged-in For You row goes FIRST (site home order, verified sweep);
-        // anonymous users never see it (the feed 401s anonymous). The scope
-        // chip row rides under THIS row's title only (§7 = feed-local pref).
-        if (isLoggedIn) {
+    // #35: the outer body column centers the focused row band vertically
+    // (RowCentering.CenteredColumn) — see RowCentering.kt. deadband 0 matches
+    // the horizontal rows' exact-centering rule.
+    CenteredColumn(deadband = 0.dp) {
+        LazyColumn(
+            // Paint the borrowed page color — the window background is a lighter gray.
+            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+        ) {
             item {
-                FeedRow(
-                    "For You",
-                    forYou,
-                    onOpenGif,
-                    onMenu = { gifEntry, feedSource, viaHold -> openActions(gifEntry, feedSource, viaHold) },
-                    preview = preview,
-                    dataSaver = dataSaver,
-                    videoFit = videoFit,
-                    scopeChips = { ForYouScopeRow(homeViewModel) },
-                    rowHeight = rowHeight,
-                    source = FeedSource.ForYou,
-                    orientation = forYouOrientation,
-                    rowKey = "For You",
-                    restoredItem = if (focusRow == "For You") focusItem else -1,
-                    onFocusSaved = { i -> onFocusSaved("For You", i) },
+                Text(
+                    text = "Giffy Viewer",
+                    // F8 (batch 15): same slot as mobile's GiffyScaffold title.
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp),
                 )
             }
-        }
-        item {
-            FeedRow(
-                "Trending",
-                trending,
-                onOpenGif,
-                onMenu = { gifEntry, feedSource, viaHold -> openActions(gifEntry, feedSource, viaHold) },
-                preview = preview,
-                dataSaver = dataSaver,
-                videoFit = videoFit,
-                rowHeight = rowHeight,
-                source = FeedSource.Trending,
-                orientation = trendingOrientation,
-                rowKey = "Trending",
-                restoredItem = if (focusRow == "Trending") focusItem else -1,
-                onFocusSaved = { i -> onFocusSaved("Trending", i) },
-            )
-        }
-        // Explore = Top Creators (§9 lingo) — creators row, tap → creator feed.
-        item {
-            CreatorRow(
-                "Explore",
-                exploreCreators,
-                onOpenCreator,
-                failed = exploreFailed,
-                onRetry = { homeViewModel.refreshExplore() },
-                rowKey = "Explore",
-                restoredItem = if (focusRow == "Explore") focusItem else -1,
-                onFocusSaved = { i -> onFocusSaved("Explore", i) },
-            )
-        }
-        item {
-            FeedRow(
-                "Top This Week",
-                topThisWeek,
-                onOpenGif,
-                onMenu = { gifEntry, feedSource, viaHold -> openActions(gifEntry, feedSource, viaHold) },
-                preview = preview,
-                dataSaver = dataSaver,
-                videoFit = videoFit,
-                rowHeight = rowHeight,
-                source = FeedSource.TopThisWeek,
-                orientation = topThisWeekOrientation,
-                rowKey = "Top This Week",
-                restoredItem = if (focusRow == "Top This Week") focusItem else -1,
-                onFocusSaved = { i -> onFocusSaved("Top This Week", i) },
-            )
-        }
-        // Empty-state rule: no blank favorites row when nothing is favorited.
-        if (hasFavorites) {
+            // Logged-in For You row goes FIRST (site home order, verified sweep);
+            // anonymous users never see it (the feed 401s anonymous). The scope
+            // chip row rides under THIS row's title only (§7 = feed-local pref).
+            if (isLoggedIn) {
+                item {
+                    FeedRow(
+                        "For You",
+                        forYou,
+                        onOpenGif,
+                        onMenu = { gifEntry, feedSource, viaHold -> openActions(gifEntry, feedSource, viaHold) },
+                        preview = preview,
+                        dataSaver = dataSaver,
+                        videoFit = videoFit,
+                        scopeChips = { ForYouScopeRow(homeViewModel) },
+                        rowHeight = rowHeight,
+                        source = FeedSource.ForYou,
+                        orientation = forYouOrientation,
+                        rowKey = "For You",
+                        restoredItem = if (focusRow == "For You") focusItem else -1,
+                        onFocusSaved = { i -> onFocusSaved("For You", i) },
+                    )
+                }
+            }
             item {
                 FeedRow(
-                    "Favorites",
-                    favorites,
+                    "Trending",
+                    trending,
                     onOpenGif,
                     onMenu = { gifEntry, feedSource, viaHold -> openActions(gifEntry, feedSource, viaHold) },
                     preview = preview,
                     dataSaver = dataSaver,
                     videoFit = videoFit,
                     rowHeight = rowHeight,
-                    source = FeedSource.Favorites,
-                    orientation = favoritesOrientation,
-                    rowKey = "Favorites",
-                    restoredItem = if (focusRow == "Favorites") focusItem else -1,
-                    onFocusSaved = { i -> onFocusSaved("Favorites", i) },
+                    source = FeedSource.Trending,
+                    orientation = trendingOrientation,
+                    rowKey = "Trending",
+                    restoredItem = if (focusRow == "Trending") focusItem else -1,
+                    onFocusSaved = { i -> onFocusSaved("Trending", i) },
                 )
             }
-        }
-        // Logged-in rows (§9 TV): Liked (network-live) + Following creators.
-        if (isLoggedIn) {
-            item {
-                FeedRow(
-                    "Liked GIFs & Images",
-                    liked,
-                    onOpenGif,
-                    onMenu = { gifEntry, feedSource, viaHold -> openActions(gifEntry, feedSource, viaHold) },
-                    preview = preview,
-                    dataSaver = dataSaver,
-                    videoFit = videoFit,
-                    rowHeight = rowHeight,
-                    source = FeedSource.Liked,
-                    orientation = likedOrientation,
-                    rowKey = "Liked GIFs & Images",
-                    restoredItem = if (focusRow == "Liked GIFs & Images") focusItem else -1,
-                    onFocusSaved = { i -> onFocusSaved("Liked GIFs & Images", i) },
-                )
-            }
+            // Explore = Top Creators (§9 lingo) — creators row, tap → creator feed.
             item {
                 CreatorRow(
-                    "Following",
-                    followingCreators.map { it },
+                    "Explore",
+                    exploreCreators,
                     onOpenCreator,
-                    rowKey = "Following",
-                    restoredItem = if (focusRow == "Following") focusItem else -1,
-                    onFocusSaved = { i -> onFocusSaved("Following", i) },
+                    failed = exploreFailed,
+                    onRetry = { homeViewModel.refreshExplore() },
+                    rowKey = "Explore",
+                    restoredItem = if (focusRow == "Explore") focusItem else -1,
+                    onFocusSaved = { i -> onFocusSaved("Explore", i) },
                 )
+            }
+            item {
+                FeedRow(
+                    "Top This Week",
+                    topThisWeek,
+                    onOpenGif,
+                    onMenu = { gifEntry, feedSource, viaHold -> openActions(gifEntry, feedSource, viaHold) },
+                    preview = preview,
+                    dataSaver = dataSaver,
+                    videoFit = videoFit,
+                    rowHeight = rowHeight,
+                    source = FeedSource.TopThisWeek,
+                    orientation = topThisWeekOrientation,
+                    rowKey = "Top This Week",
+                    restoredItem = if (focusRow == "Top This Week") focusItem else -1,
+                    onFocusSaved = { i -> onFocusSaved("Top This Week", i) },
+                )
+            }
+            // Empty-state rule: no blank favorites row when nothing is favorited.
+            if (hasFavorites) {
+                item {
+                    FeedRow(
+                        "Favorites",
+                        favorites,
+                        onOpenGif,
+                        onMenu = { gifEntry, feedSource, viaHold -> openActions(gifEntry, feedSource, viaHold) },
+                        preview = preview,
+                        dataSaver = dataSaver,
+                        videoFit = videoFit,
+                        rowHeight = rowHeight,
+                        source = FeedSource.Favorites,
+                        orientation = favoritesOrientation,
+                        rowKey = "Favorites",
+                        restoredItem = if (focusRow == "Favorites") focusItem else -1,
+                        onFocusSaved = { i -> onFocusSaved("Favorites", i) },
+                    )
+                }
+            }
+            // Logged-in rows (§9 TV): Liked (network-live) + Following creators.
+            if (isLoggedIn) {
+                item {
+                    FeedRow(
+                        "Liked GIFs & Images",
+                        liked,
+                        onOpenGif,
+                        onMenu = { gifEntry, feedSource, viaHold -> openActions(gifEntry, feedSource, viaHold) },
+                        preview = preview,
+                        dataSaver = dataSaver,
+                        videoFit = videoFit,
+                        rowHeight = rowHeight,
+                        source = FeedSource.Liked,
+                        orientation = likedOrientation,
+                        rowKey = "Liked GIFs & Images",
+                        restoredItem = if (focusRow == "Liked GIFs & Images") focusItem else -1,
+                        onFocusSaved = { i -> onFocusSaved("Liked GIFs & Images", i) },
+                    )
+                }
+                item {
+                    CreatorRow(
+                        "Following",
+                        followingCreators.map { it },
+                        onOpenCreator,
+                        rowKey = "Following",
+                        restoredItem = if (focusRow == "Following") focusItem else -1,
+                        onFocusSaved = { i -> onFocusSaved("Following", i) },
+                    )
+                }
             }
         }
     }
@@ -381,6 +385,9 @@ private fun CreatorRow(
                 val creator = creators[i]
                 Card(
                     onClick = { onOpenCreator(creator.username) },
+                    // #37: zero zoom anywhere — CardDefaults.scale() defaults to
+                    // 1.0/1.1/1.1 (AAR-verified Opted-in focused scale); pass None.
+                    scale = CardScale.None,
                     modifier =
                         Modifier
                             .then(if (i == restoredItem) Modifier.focusRequester(rowFocus) else Modifier)
@@ -659,9 +666,10 @@ internal fun GifCard(
      *  "fit" (default) changes nothing — the TV no-jump invariant. */
     videoFit: String = "fit",
 ) {
-    // 10-foot UX: focused card grows so the D-pad user always sees where focus is.
+    // Issue #37: the focus-zoom transform is gone — focus indication is the
+    // tv-material Card's own focused ring/glow (issue-#7 border tokens). The
+    // focused state itself stays: it drives the FocusPreview settle below.
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.08f else 1f, label = "cardScale")
     // Menu-less-remote keymap: hold-Center ≥500ms opens the quick-actions
     // panel (the same panel MENU opens); short-tap Center keeps the card open.
     val centerHold = remember { CenterHold(onHold = { onMenu(true) }) }
@@ -682,6 +690,10 @@ internal fun GifCard(
     }
     Card(
         onClick = onClick,
+        // #37: zero zoom anywhere — CardDefaults.scale() defaults to 1.0/1.1/1.1
+        // (focused scale AAR-verified; this replaced the app-owned 1.08 zoom) —
+        // pass None so the ONLY focus indication is the ring/glow below.
+        scale = CardScale.None,
         // Mobile tiles use 12dp rounded corners (GifTile in feature:feed).
         shape =
             androidx.tv.material3.CardDefaults.shape(
@@ -692,10 +704,7 @@ internal fun GifCard(
             ),
         modifier =
             modifier
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                }.onFocusChanged {
+                .onFocusChanged {
                     focused = it.isFocused
                     onFocusChange(it.isFocused)
                 }.onPreviewKeyEvent { event ->

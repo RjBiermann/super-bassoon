@@ -10,6 +10,7 @@ import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.network.GifsApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flatMapLatest
 import javax.inject.Inject
@@ -42,9 +43,13 @@ class FeedRepository
         @Volatile
         private var scopeCtx: ForYouContext? = null
 
-        private suspend fun forYouContext(): ForYouContext {
-            val scope = settings.forYouScope.firstOrNull() ?: "all"
-            scopeCtx?.takeIf { it.scope == scope && now() - it.at < CTX_TTL_MS }?.let { return it }
+        /** [scope] defaults to the live pref so the cached-path source's
+         *  per-page loader keeps today's behavior while the network-live
+         *  path hands in the re-keyed scope (#38). (Default resolved INSIDE —
+         *  Kotlin forbids suspend calls in default parameter values.) */
+        private suspend fun forYouContext(scope: String? = null): ForYouContext {
+            val scope = scope ?: settings.forYouScope.firstOrNull() ?: "all"
+            scopeCtx?.takeIf { isForYouMemoFresh(it, scope, now()) }?.let { return it }
             // Issue #30: a failed follows/niches fetch must NOT degrade to an
             // EMPTY scope filter — that dropped every row and rendered "Your
             // For You feed is empty" for the wrong reason (an auth hiccup read
@@ -130,28 +135,31 @@ class FeedRepository
                 // another user's glob. ForYou context (scope + follows) is
                 // fetched per page by the source (5-min repo memo makes
                 // per-page calls cheap; rate-limit invariant).
-                kotlinx.coroutines.flow
-                    .combine(
-                        settings.orientationFilter,
-                        settings.verifiedOnly,
-                    ) { o, v -> o to v }
-                    // Same DataStore identity-emission dedupe as Liked (#26).
-                    .distinctUntilChanged()
-                    .flatMapLatest { (o, v) ->
-                        Pager(
-                            config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = 10, enablePlaceholders = false),
-                            pagingSourceFactory = {
-                                ForYouNetworkPagingSource(
-                                    api,
-                                    contentFilter,
-                                    PAGE_SIZE,
-                                    forYouContext = { forYouContext() },
-                                    orientation = o,
-                                    verifiedOnly = v,
-                                )
-                            },
-                        ).flow
-                    }
+                // #38 (2026-10 e2e: scope chips did nothing): the scope choice
+                // re-keys the pager HERE — the repository choke point, so both
+                // apps' rows refetch and no VM-side re-key duplicates it. The
+                // 5-min context memo re-validates per request against THIS
+                // scope (isForYouMemoFresh), so the fresh generation reads
+                // freshly fetched follows, never a stale-scope memo.
+                forYouPagingKeys(
+                    settings.orientationFilter,
+                    settings.verifiedOnly,
+                    settings.forYouScope,
+                ).flatMapLatest { (o, v, s) ->
+                    Pager(
+                        config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = 10, enablePlaceholders = false),
+                        pagingSourceFactory = {
+                            ForYouNetworkPagingSource(
+                                api,
+                                contentFilter,
+                                PAGE_SIZE,
+                                forYouContext = { forYouContext(s) },
+                                orientation = o,
+                                verifiedOnly = v,
+                            )
+                        },
+                    ).flow
+                }
             } else {
                 // Orientation (global) + §8 per-feed prefs BOTH restart the pager:
                 // combine them so either change re-reads cached pages through the
@@ -203,73 +211,91 @@ class FeedRepository
             prefs: com.rjbiermann.giffyviewer.core.datastore.FeedPrefs,
             orientation: String,
             verifiedOnly: Boolean,
-        ): Flow<PagingData<Gif>> =
-            Pager(
-                config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = 10, enablePlaceholders = false),
-                initialKey = 1,
-                remoteMediator =
-                    FeedMediator(
-                        feed = feed,
-                        gifDao = db.gifDao(),
-                        pageDao = db.feedPageDao(),
-                        api = api,
-                        pageSize = PAGE_SIZE,
-                        force = forceRefresh,
-                        favorites = { db.contentPrefsDao().favoriteCreators() },
-                        favoritesSeed = { favoritesShuffleSeed },
-                    ),
-                pagingSourceFactory = {
-                    FeedPagingSource(
-                        db.contentPrefsDao(),
-                        db.customFeedDao(),
-                        feed,
-                        db.feedPageDao(),
-                        PAGE_SIZE,
-                        contentFilter,
-                        { forYouContext() },
-                        // The source self-fills unfetched pages (fast-scroll race);
-                        // same fetcher the mediator uses.
-                        FeedPageFetcher(
-                            feed,
-                            db.gifDao(),
-                            db.feedPageDao(),
-                            api,
-                            PAGE_SIZE,
+        ): Flow<PagingData<Gif>> {
+            // LEAK H3 (2026-10 OOM investigation): every pager generation used
+            // to add one Room InvalidationTracker.Observer with the tracker as
+            // a PROCESS-LIFETIME registry and zero removal call sites — each
+            // observer pinned its whole FeedPagingSource (DAOs, ContentFilter,
+            // the generation's dedup set) and kept the invalidation dispatch
+            // growing on every DB write (Room replaceAll straw in the sweep). A
+            // generation is replaced by INVALIDATION (a pref-table write → the
+            // factory builds the next source for the still-collecting flow) or
+            // by CANCELLATION of its collector (any re-key: orientation,
+            // verifiedOnly, per-feed prefs, tab switch) — the lease removes the
+            // observer on both paths, so the tracker's count returns to
+            // baseline after every swap. Deliberately NOT watching feed_pages
+            // (unchanged policy): every mediator write would invalidate every
+            // live pager — an endless background fetch storm (seen live on TV).
+            val lease =
+                PrefObservationLease(
+                    tables =
+                        listOf(
+                            "creator_prefs",
+                            "tag_prefs",
+                            "keyword_blocks",
+                            "custom_feeds",
+                        ),
+                    addObserver = { observer -> db.invalidationTracker.addObserver(observer) },
+                    removeObserver = { observer -> db.invalidationTracker.removeObserver(observer) },
+                )
+            val pager =
+                Pager(
+                    config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = 10, enablePlaceholders = false),
+                    initialKey = 1,
+                    remoteMediator =
+                        FeedMediator(
+                            feed = feed,
+                            gifDao = db.gifDao(),
+                            pageDao = db.feedPageDao(),
+                            api = api,
+                            pageSize = PAGE_SIZE,
+                            force = forceRefresh,
                             favorites = { db.contentPrefsDao().favoriteCreators() },
                             favoritesSeed = { favoritesShuffleSeed },
                         ),
-                        orientation = { orientation },
-                        verifiedOnly = { verifiedOnly },
-                        prefs = { prefs },
-                    ).also(::observePrefTables)
-                },
-            ).flow
-
-        /** Pref-table invalidation observer (moved from FeedPagingSource's init
-         *  so the source class stays free of the Room database handle): each
-         *  instance owns its observer; a pref-table write (block edit, custom
-         *  feed state, favorites toggle) invalidates the live pager instantly
-         *  (leak-zero re-filter). Deliberately NOT watching feed_pages: every
-         *  mediator write would invalidate every live pager — an endless
-         *  background fetch storm (seen live on TV). */
-        private fun observePrefTables(source: androidx.paging.PagingSource<Int, com.rjbiermann.giffyviewer.core.model.Gif>) {
-            db.invalidationTracker.addObserver(
-                object : androidx.room.InvalidationTracker.Observer(
-                    "creator_prefs",
-                    "tag_prefs",
-                    "keyword_blocks",
-                    "custom_feeds",
-                ) {
-                    override fun onInvalidated(tables: Set<String>) {
-                        source.invalidate()
-                    }
-                },
-            )
+                    pagingSourceFactory = {
+                        FeedPagingSource(
+                            db.contentPrefsDao(),
+                            db.customFeedDao(),
+                            feed,
+                            db.feedPageDao(),
+                            PAGE_SIZE,
+                            contentFilter,
+                            { forYouContext() },
+                            // The source self-fills unfetched pages (fast-scroll race);
+                            // same fetcher the mediator uses.
+                            FeedPageFetcher(
+                                feed,
+                                db.gifDao(),
+                                db.feedPageDao(),
+                                api,
+                                PAGE_SIZE,
+                                favorites = { db.contentPrefsDao().favoriteCreators() },
+                                favoritesSeed = { favoritesShuffleSeed },
+                            ),
+                            orientation = { orientation },
+                            verifiedOnly = { verifiedOnly },
+                            prefs = { prefs },
+                        ).also(lease::observe)
+                    },
+                )
+            // The factory only runs while the pager collects (paging's flow
+            // pipeline), so wrap the collection: when the generation's
+            // collector is cancelled, the builder's finally runs on the
+            // cancelled coroutine and releases the lease — removeObserver is
+            // a plain non-suspending call, cancellation-safe.
+            return kotlinx.coroutines.flow.flow {
+                try {
+                    emitAll(pager.flow)
+                } finally {
+                    lease.dispose()
+                }
+            }
         }
 
         companion object {
             const val PAGE_SIZE = 20
-            private const val CTX_TTL_MS = 5 * 60_000L
+            internal const val CTX_TTL_MS = 5 * 60_000L
 
             // Session-wide ids ever returned per feed — DELETED (2026-10, pull-to
             // -refresh blanking): the static map survived pager restarts, so a
@@ -295,3 +321,88 @@ class FeedRepository
             ): Boolean = source is FeedSource.ForYou && !userNavigated && !hasContent
         }
     }
+
+/** #38 (2026-10 e2e: For You scope chips did nothing — the scope pref never
+ *  re-keyed the pager): the ForYou paging-generation keys are the THREE
+ *  settings that change its read-time behavior — the orientation pref,
+ *  verified-only, and the §7 scope choice. Changing ANY of them must build
+ *  a fresh pager generation; unrelated DataStore identity re-emissions
+ *  collapse in the same dedupe-on-exit move the Liked pair uses (structural
+ *  equality; dedupe BEFORE consumption — the batch-26 watcher lesson). The
+ *  repository is the choke point on purpose: both apps' rows refetch through
+ *  this one combine, no VM-side re-key on top. */
+internal fun forYouPagingKeys(
+    orientationFilter: kotlinx.coroutines.flow.Flow<String>,
+    verifiedOnly: kotlinx.coroutines.flow.Flow<Boolean>,
+    forYouScope: kotlinx.coroutines.flow.Flow<String>,
+): kotlinx.coroutines.flow.Flow<Triple<String, Boolean, String>> =
+    kotlinx.coroutines.flow
+        .combine(
+            orientationFilter,
+            verifiedOnly,
+            forYouScope,
+        ) { o, v, s -> Triple(o, v, s) }
+        .distinctUntilChanged()
+
+/** #38 memo contract (pure, unit-tested): the 5-minute ForYou-context memo
+ *  (rate-limit-safe per-page loads) only serves for the SAME scope within
+ *  its TTL — a scope-chip switch invalidates it immediately even mid-TTL,
+ *  so the refetch the re-key above triggers reads freshly fetched follows,
+ *  never a stale-scope memo. Failures never write the memo (success-only
+ *  store), so a failed fetch replays on the next page load. */
+internal fun isForYouMemoFresh(
+    ctx: FeedRepository.ForYouContext?,
+    scope: String,
+    atMs: Long,
+): Boolean = ctx != null && ctx.scope == scope && atMs - ctx.at < FeedRepository.CTX_TTL_MS
+
+/** Generation-scoped owner of one cached pager's Room invalidation
+ *  observers (LEAK H3, see cachedPager): pairs every observer it adds with
+ *  removal on BOTH end-of-generation paths — the source's own invalidation
+ *  (pref-table write: the factory builds the next source for the
+ *  still-collecting flow, so the old observer must go immediately) and the
+ *  collector cancellation the wrapper's finally invokes dispose() for.
+ *  [addObserver]/[removeObserver] are injected so the lifecycle rules are
+ *  unit-testable without a Room database; they map 1:1 onto the tracker. */
+internal class PrefObservationLease(
+    private val tables: List<String>,
+    private val addObserver: (androidx.room.InvalidationTracker.Observer) -> Unit,
+    private val removeObserver: (androidx.room.InvalidationTracker.Observer) -> Unit,
+) {
+    /** Room-backed invalidation observer added at each add — removal is
+     *  idempotent (Room map.remove), so cleanup order races are free. */
+    private val tracked = java.util.concurrent.ConcurrentLinkedQueue<androidx.room.InvalidationTracker.Observer>()
+
+    /** Registers [source]'s generation observer; tracking happens BEFORE the
+     *  add so a cancellation racing this call can never strand an untracked
+     *  observer. */
+    fun observe(source: androidx.paging.PagingSource<Int, com.rjbiermann.giffyviewer.core.model.Gif>) {
+        // Room's Observer has no pure-vararg constructor (first table is a
+        // required positional param) — spread alone doesn't compile.
+        val observerTables = tables.toTypedArray()
+        val observer =
+            object :
+                androidx.room.InvalidationTracker.Observer(
+                    observerTables[0],
+                    *observerTables.copyOfRange(1, observerTables.size),
+                ) {
+                override fun onInvalidated(tables: Set<String>) {
+                    source.invalidate()
+                }
+            }
+        tracked.add(observer)
+        source.registerInvalidatedCallback {
+            tracked.remove(observer)
+            removeObserver(observer)
+        }
+        addObserver(observer)
+    }
+
+    /** End-of-generation cleanup: removes every still-tracked observer. */
+    fun dispose() {
+        while (true) {
+            val observer = tracked.poll() ?: break
+            removeObserver(observer)
+        }
+    }
+}

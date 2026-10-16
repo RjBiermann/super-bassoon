@@ -41,6 +41,7 @@ import androidx.navigation.toRoute
 import androidx.tv.material3.Border
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
+import androidx.tv.material3.ButtonScale
 import com.rjbiermann.giffyviewer.core.auth.TokenStore
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
@@ -247,12 +248,10 @@ class TvMainActivity : ComponentActivity() {
                             popUpTo(entry.id) { inclusive = true }
                         }
                     },
-                    // #19 tab strip: a tab swap is its own full-page entry (same
-                    // family as the strip opens — BACK walks them one by one).
-                    onSwitchFeed = { source -> navController.navigate(TvFeed(source)) },
-                    onOpenNiches = { navController.navigate(TvNiches) },
-                    onOpenCollections = { navController.navigate(TvCollections) },
-                    onOpenCustomFeeds = { navController.navigate(TvCustomFeeds) },
+                    // #39: no shared FeedTabStrip on TV (mobile main-tab chrome
+                    // reproduced as "TV was showing mobile ui") — the host seams
+                    // the strip consumed are gone with it; TV navigation stays
+                    // on the home header pills + quick-actions "Open feed".
                     playerFactory = playerFactory,
                     dataSaver = dataSaver,
                     gridState = gridState,
@@ -528,6 +527,7 @@ private fun TvHeaderPill(
 ) {
     Button(
         onClick = onClick,
+        scale = ButtonScale.None,
         colors =
             ButtonDefaults.colors(
                 containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),

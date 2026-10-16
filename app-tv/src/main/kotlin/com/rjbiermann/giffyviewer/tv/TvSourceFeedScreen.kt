@@ -45,6 +45,7 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.tv.material3.Border
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
+import androidx.tv.material3.ButtonScale
 import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButton
 import androidx.tv.material3.IconButtonDefaults
@@ -54,7 +55,6 @@ import com.rjbiermann.giffyviewer.feature.feed.CreatorFeedHeader
 import com.rjbiermann.giffyviewer.feature.feed.FeedFilterDialog
 import com.rjbiermann.giffyviewer.feature.feed.FeedRepository
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
-import com.rjbiermann.giffyviewer.feature.feed.FeedTabStrip
 import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
 import com.rjbiermann.giffyviewer.feature.feed.NicheFeedHeader
 import com.rjbiermann.giffyviewer.feature.feed.activeSort
@@ -94,15 +94,6 @@ fun TvSourceFeedScreen(
     /** Preview-on-focus (AGENTS-UX-PATTERNS): null factory = no previews. */
     playerFactory: com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory? = null,
     dataSaver: Boolean = false,
-    /** #19 tab strip: a tab opens that feed full-page — the TV nav host
-     *  pushes a TvFeed entry (issue #13). */
-    onSwitchFeed: (FeedSource) -> Unit = {},
-    /** #19 strip seams to the TV nav destinations (Niches/Collections/
-     *  CustomFeeds pushed over this feed); Explore/Following have no TV host
-     *  today — hidden. */
-    onOpenNiches: () -> Unit = {},
-    onOpenCollections: () -> Unit = {},
-    onOpenCustomFeeds: () -> Unit = {},
     /** Issue #13 §4.2: per-entry saveable state (the Root hoist is replaced
      *  by the destination's rememberLazyStaggeredGridState()). */
     gridState: LazyStaggeredGridState = rememberLazyStaggeredGridState(),
@@ -206,6 +197,7 @@ fun TvSourceFeedScreen(
                     val refreshInteraction = remember { MutableInteractionSource() }
                     IconButton(
                         onClick = { refreshAndReturnToTop() },
+                        scale = ButtonScale.None,
                         interactionSource = refreshInteraction,
                         colors =
                             IconButtonDefaults.colors(
@@ -223,6 +215,7 @@ fun TvSourceFeedScreen(
                     val sortInteraction = remember { MutableInteractionSource() }
                     IconButton(
                         onClick = { showFilter = true },
+                        scale = ButtonScale.None,
                         interactionSource = sortInteraction,
                         colors =
                             IconButtonDefaults.colors(
@@ -267,31 +260,13 @@ fun TvSourceFeedScreen(
                     NicheFeedHeader(detail)
                 }
             }
-            // #19: the shared tab strip — same fixed set as mobile (For You when
-            // signed in only · Trending · Favorites · More ▾), hosted on EVERY TV
-            // full feed exactly like mobile hosts its FeedScreen; a tab opens the
-            // new source full-page via onSwitchFeed (Root openFeed). State inputs
-            // are plain parameters — the strip keeps zero VM coupling.
-            val isLoggedIn by feedViewModel.isLoggedIn.collectAsStateWithLifecycle(false)
-            val pinnedNiches by feedViewModel.pinnedNiches.collectAsStateWithLifecycle(emptySet())
-            val favoritedFeeds by feedViewModel.favoritedFeeds.collectAsStateWithLifecycle(emptyList())
-            val pinnedCreators by feedViewModel.pinnedCreators.collectAsStateWithLifecycle(emptySet())
-            val customFeeds by feedViewModel.customFeeds.collectAsStateWithLifecycle(emptyList())
-            FeedTabStrip(
-                source = source,
-                isLoggedIn = isLoggedIn,
-                pinnedNiches = pinnedNiches,
-                favoritedFeeds = favoritedFeeds,
-                pinnedCreators = pinnedCreators,
-                customFeeds = customFeeds,
-                onOpen = onSwitchFeed,
-                // #25: the shared FeedViewModel outlives openFeed swaps (activity
-                // scope) — the group-chip memory lives with the feed source itself.
-                lastGroupSub = feedViewModel.lastGroupSub(),
-                onOpenNiches = onOpenNiches,
-                onOpenCollections = onOpenCollections,
-                onOpenCustomFeeds = onOpenCustomFeeds,
-            )
+            // #39 (TV e2e sweep 2026-10-16): the shared FeedTabStrip is NOT
+            // mounted here — it is the mobile FeedScreen's main-tab chrome
+            // (M3 FilterChips + DropdownMenu), reproduced as "TV was showing
+            // mobile ui" on search results. TV navigation lives in its own
+            // chrome: the home header pills (Settings/Niches/Search/More ▾),
+            // quick-actions "Open feed", and the niche/creator seams below.
+            // This screen keeps its own Refresh + Sort & filter affordances.
             // #15: staggered grid — true-aspect GifCard tiles (no square crop),
             // variable heights, same 4 columns / 16dp padding / 10dp spacing.
             // The state type changed with it (LazyStaggeredGridState) — hoisted
@@ -474,6 +449,7 @@ private fun RefreshFooterButton(onClick: () -> Unit) {
     val endInteraction = remember { MutableInteractionSource() }
     Button(
         onClick = onClick,
+        scale = ButtonScale.None,
         interactionSource = endInteraction,
         colors =
             ButtonDefaults.colors(

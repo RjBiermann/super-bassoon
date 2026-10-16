@@ -52,7 +52,9 @@ import androidx.media3.ui.PlayerView
 import androidx.tv.material3.Border
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
+import androidx.tv.material3.ButtonScale
 import androidx.tv.material3.ClickableSurfaceDefaults
+import androidx.tv.material3.ClickableSurfaceScale
 import coil3.compose.AsyncImage
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
@@ -480,6 +482,7 @@ fun TvPlayerScreen(
                                 val interaction = remember { MutableInteractionSource() }
                                 TvSurface(
                                     onClick = { onOpenNiche(FeedSource.Niche(niche.id, niche.name)) },
+                                    scale = ClickableSurfaceScale.None,
                                     interactionSource = interaction,
                                     colors =
                                         ClickableSurfaceDefaults.colors(
@@ -673,6 +676,7 @@ private fun TvFocusButton(
 ) {
     Button(
         onClick = onClick,
+        scale = ButtonScale.None,
         colors =
             ButtonDefaults.colors(
                 containerColor = Color.Transparent,

@@ -70,7 +70,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -101,6 +100,7 @@ import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.player.seedContentAspectRatio
 import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
 import com.rjbiermann.giffyviewer.core.ui.PlayerOverlay
+import com.rjbiermann.giffyviewer.core.ui.toTileContentScale
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flatMapLatest
@@ -669,8 +669,12 @@ private fun PlayerPage(
         // a placeholder, not pixel-perfect (Fit framing may differ slightly
         // from the seeded/rendered video box — acceptable). It zooms WITH the
         // video so pinch-zoom never contrasts a static poster against a
-        // zooming surface. Poster-null gifs: nothing renders and the black
-        // background stays the truthful state (no invented placeholder).
+        // zooming surface. Issue #41: the poster honors the same §5 video-fit
+        // pref as the video surface (shared toTileContentScale mapping —
+        // crop → Crop, everything else → Fit) so a crop user never watches the
+        // un-cropped poster under the cropped video. Poster-null gifs: nothing
+        // renders and the black background stays the truthful state (no
+        // invented placeholder).
         Box(
             modifier =
                 Modifier
@@ -684,7 +688,7 @@ private fun PlayerPage(
         ) {
             AsyncImage(
                 model = gif.posterUrl,
-                contentScale = ContentScale.Fit,
+                contentScale = videoFit.toTileContentScale(),
                 contentDescription = null,
                 modifier = Modifier.matchParentSize(),
             )
@@ -707,6 +711,17 @@ private fun PlayerPage(
                         // re-asserted per update below so the pref wins.
                         resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                     }
+                },
+                onRelease = { view ->
+                    // Leak H1/H2 (OOM sweep 2026-10-16): a page CAN leave
+                    // composition while the AndroidView still holds the shared
+                    // player (a generation reset swaps pages under an active
+                    // page) — PlayerView detaches its ComponentListener +
+                    // TextureView surface ONLY via setPlayer(null)/release(),
+                    // so every attached dispose leaks a player-anchored view
+                    // subtree. The update{} path's own if/else nulls stay
+                    // untouched; adopt/park semantics unchanged.
+                    view.player = null
                 },
                 update = { view ->
                     // Attach ONLY when the shared player is already (about to be)

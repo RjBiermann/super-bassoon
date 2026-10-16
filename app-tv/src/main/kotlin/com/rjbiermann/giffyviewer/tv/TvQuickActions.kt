@@ -41,7 +41,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.Border
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
+import androidx.tv.material3.ButtonScale
 import androidx.tv.material3.ClickableSurfaceDefaults
+import androidx.tv.material3.ClickableSurfaceScale
 import androidx.tv.material3.Surface
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
@@ -479,6 +481,7 @@ private fun TvButton(
     Button(
         onClick = onClick,
         enabled = enabled,
+        scale = ButtonScale.None,
         colors =
             ButtonDefaults.colors(
                 containerColor = MaterialTheme.colorScheme.primary,
@@ -543,6 +546,7 @@ private fun TvAddToFeedDialog(
                         val focused by src.collectIsFocusedAsState()
                         Surface(
                             onClick = { feedId = def.id },
+                            scale = ClickableSurfaceScale.None,
                             interactionSource = src,
                             colors =
                                 ClickableSurfaceDefaults.colors(
@@ -581,6 +585,7 @@ private fun TvAddToFeedDialog(
                             onClick = {
                                 if (ref in selected) selected.remove(ref) else selected.add(ref)
                             },
+                            scale = ClickableSurfaceScale.None,
                             interactionSource = src,
                             colors =
                                 ClickableSurfaceDefaults.colors(

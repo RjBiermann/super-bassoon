@@ -43,10 +43,10 @@ internal fun centeredBringIntoViewSpec(deadbandPx: Int): BringIntoViewSpec =
         override val scrollAnimationSpec: AnimationSpec<Float> = snap()
     }
 
-/** Provides [centeredBringIntoViewSpec] to the LazyRow it wraps. */
+/** Provides [centeredBringIntoViewSpec] to the scrollable it wraps. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun CenteredRow(
+private fun Centered(
     deadband: Dp,
     content: @Composable () -> Unit,
 ) {
@@ -54,3 +54,26 @@ internal fun CenteredRow(
     val spec = remember(deadbandPx) { centeredBringIntoViewSpec(deadbandPx) }
     CompositionLocalProvider(LocalBringIntoViewSpec provides spec) { content() }
 }
+
+/** Provides [centeredBringIntoViewSpec] to the LazyRow it wraps. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun CenteredRow(
+    deadband: Dp,
+    content: @Composable () -> Unit,
+) = Centered(deadband, content)
+
+/**
+ * #35: the same centered spec for a VERTICAL scrollable (the home body
+ * LazyColumn). A focused card's bring-into-view request bubbles past the
+ * row's own LazyRow to the outer LazyColumn, whose platform default spec is
+ * edge-aligned — at the XL row height (rowHeightFor "xl", the band fills
+ * most of the viewport) that read plainly as "the feed is not centered".
+ * The same size-agnostic math centers the focused row band vertically.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun CenteredColumn(
+    deadband: Dp,
+    content: @Composable () -> Unit,
+) = Centered(deadband, content)
