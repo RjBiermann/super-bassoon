@@ -505,10 +505,15 @@ private fun PlayerPage(
         // feature — #1 stream): keyed on gif.id so a swap re-fires it.
         LaunchedEffect(gif.id, dataSaver) {
             if (player.currentGifId.value == gif.id) {
-                // Adopted inline preview already playing THIS gif (tap-to-open on
+                // Adopted inline preview already on THIS gif (tap-to-open on
                 // the settled 1-col tile, issue #9): keep the live position and
-                // buffer — no re-prepare; the sampling below continues from the
-                // live position.
+                // buffer — no re-prepare. CONTINUE PLAYING: leaving the feed
+                // correctly parks the inline player (FeedScreen's onDispose
+                // parks = pause + re-armed preview profile), and the full-
+                // screen adopt must resume from the live position — otherwise
+                // every settled-tile open sits paused (device pass 2026-10-16;
+                // unsettled-tile opens built a FRESH player and auto-played).
+                player.playWhenReady = true
             } else {
                 player.playGif(gif, dataSaver, resumeMs = 0L, videoQuality = videoQuality)
             }
