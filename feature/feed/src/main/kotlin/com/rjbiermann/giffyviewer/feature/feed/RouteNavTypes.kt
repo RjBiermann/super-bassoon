@@ -6,6 +6,8 @@ import com.rjbiermann.giffyviewer.core.model.Gif
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * NavType implementations for the type-safe route args the shells pass
@@ -26,6 +28,24 @@ private val RouteJson =
         encodeDefaults = true
     }
 
+/**
+ * Route-string wire wrapper (issue #34 device crash): nav treats `/` as the
+ * path-arg delimiter in its encoded route strings, and a custom NavType's
+ * `serializeAsValue` is embedded verbatim — raw JSON (gifs carrying a
+ * description like "https://onlyfans.com/…") injected extra segments and
+ * crashed mid-navigation ("…/0 cannot be found in the navigation graph").
+ * Base64-urlsafe is route-segment-safe (alphabet has no `/`), stdlib-only,
+ * and the payload stays an opaque envelope — never a public format.
+ */
+@OptIn(ExperimentalEncodingApi::class)
+private val RouteWire = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
+
+@OptIn(ExperimentalEncodingApi::class)
+private fun routeEncode(json: String): String = RouteWire.encode(json.encodeToByteArray())
+
+@OptIn(ExperimentalEncodingApi::class)
+private fun routeDecode(wire: String): String = RouteWire.decode(wire).decodeToString()
+
 private const val ROUTE_NAME_FEED_SOURCE = "feed_source"
 
 /**
@@ -39,22 +59,22 @@ val feedSourceNavType: NavType<FeedSource> =
         override fun get(
             bundle: Bundle,
             key: String,
-        ): FeedSource? = bundle.getString(key)?.let { FeedSourceRoutes.decode(it) }
+        ): FeedSource? = bundle.getString(key)?.takeIf { it.isNotEmpty() }?.let { FeedSourceRoutes.decode(routeDecode(it)) }
 
         override fun parseValue(value: String): FeedSource {
             // Nullable-allowed NavType encodes null as the empty string
             // (start-destination RouteEncoder.encodeNull contract).
-            return if (value.isEmpty()) FeedSource.Trending else FeedSourceRoutes.decode(value)
+            return if (value.isEmpty()) FeedSource.Trending else FeedSourceRoutes.decode(routeDecode(value))
         }
 
-        override fun serializeAsValue(value: FeedSource): String = FeedSourceRoutes.encode(value)
+        override fun serializeAsValue(value: FeedSource): String = routeEncode(FeedSourceRoutes.encode(value))
 
         override fun put(
             bundle: Bundle,
             key: String,
             value: FeedSource,
         ) {
-            bundle.putString(key, FeedSourceRoutes.encode(value))
+            bundle.putString(key, serializeAsValue(value))
         }
     }
 
@@ -71,18 +91,18 @@ val gifListNavType: NavType<List<Gif>> =
         override fun get(
             bundle: Bundle,
             key: String,
-        ): List<Gif> = bundle.getString(key, "[]").let { RouteJson.decodeFromString(jsonSerializer, it) }
+        ): List<Gif> = bundle.getString(key, "[]").let { parseValue(it) }
 
-        override fun parseValue(value: String): List<Gif> = RouteJson.decodeFromString(jsonSerializer, value)
+        override fun parseValue(value: String): List<Gif> = RouteJson.decodeFromString(jsonSerializer, routeDecode(value))
 
-        override fun serializeAsValue(value: List<Gif>): String = RouteJson.encodeToString(jsonSerializer, value)
+        override fun serializeAsValue(value: List<Gif>): String = routeEncode(RouteJson.encodeToString(jsonSerializer, value))
 
         override fun put(
             bundle: Bundle,
             key: String,
             value: List<Gif>,
         ) {
-            bundle.putString(key, RouteJson.encodeToString(jsonSerializer, value))
+            bundle.putString(key, routeEncode(RouteJson.encodeToString(jsonSerializer, value)))
         }
 
         private val jsonSerializer: KSerializer<List<Gif>> = serializer()
@@ -112,17 +132,17 @@ val nicheNavType: NavType<FeedSource.Niche> =
         override fun get(
             bundle: Bundle,
             key: String,
-        ): FeedSource.Niche = FeedSourceRoutes.decodeNiche(bundle.getString(key, ""))
+        ): FeedSource.Niche = FeedSourceRoutes.decodeNiche(routeDecode(bundle.getString(key, "")))
 
-        override fun parseValue(value: String): FeedSource.Niche = FeedSourceRoutes.decodeNiche(value)
+        override fun parseValue(value: String): FeedSource.Niche = FeedSourceRoutes.decodeNiche(routeDecode(value))
 
-        override fun serializeAsValue(value: FeedSource.Niche): String = FeedSourceRoutes.encodeNiche(value)
+        override fun serializeAsValue(value: FeedSource.Niche): String = routeEncode(FeedSourceRoutes.encodeNiche(value))
 
         override fun put(
             bundle: Bundle,
             key: String,
             value: FeedSource.Niche,
         ) {
-            bundle.putString(key, FeedSourceRoutes.encodeNiche(value))
+            bundle.putString(key, routeEncode(FeedSourceRoutes.encodeNiche(value)))
         }
     }
