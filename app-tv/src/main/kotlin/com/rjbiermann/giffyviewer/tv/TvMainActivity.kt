@@ -49,12 +49,16 @@ import com.rjbiermann.giffyviewer.core.ui.Feature
 import com.rjbiermann.giffyviewer.core.ui.GiffyTheme
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
+import com.rjbiermann.giffyviewer.feature.feed.feedSourceNavType
+import com.rjbiermann.giffyviewer.feature.feed.gifListNavType
+import com.rjbiermann.giffyviewer.feature.feed.nicheNavType
 import com.rjbiermann.giffyviewer.feature.feed.parseNicheRef
 import com.rjbiermann.giffyviewer.feature.settings.SettingsScreen
 import com.rjbiermann.giffyviewer.search.SearchScreen
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.serialization.Serializable
 import javax.inject.Inject
+import kotlin.reflect.typeOf
 import androidx.tv.material3.Text as TvText
 
 /**
@@ -185,7 +189,9 @@ class TvMainActivity : ComponentActivity() {
             composable<TvHome> {
                 TvHomeDestination(navController)
             }
-            composable<TvFeed> { entry ->
+            composable<TvFeed>(
+                typeMap = mapOf(typeOf<FeedSource>() to feedSourceNavType),
+            ) { entry ->
                 val route = entry.toRoute<TvFeed>()
                 val dataSaver by settings.dataSaver.collectAsStateWithLifecycle(false)
                 // Per-feed pager model — entry-scoped now (§4.2): one fresh
@@ -225,7 +231,9 @@ class TvMainActivity : ComponentActivity() {
                     onFocusSaved = { focusItem = it },
                 )
             }
-            composable<TvPlayer> { entry ->
+            composable<TvPlayer>(
+                typeMap = mapOf(typeOf<List<Gif>>() to gifListNavType),
+            ) { entry ->
                 val route = entry.toRoute<TvPlayer>()
                 TvPlayerScreen(
                     gifs = route.gifs,
@@ -258,7 +266,9 @@ class TvMainActivity : ComponentActivity() {
                     },
                 )
             }
-            composable<TvNicheAbout> { entry ->
+            composable<TvNicheAbout>(
+                typeMap = mapOf(typeOf<FeedSource.Niche>() to nicheNavType),
+            ) { entry ->
                 val about = entry.toRoute<TvNicheAbout>().about
                 com.rjbiermann.giffyviewer.feature.feed.NicheAboutScreen(
                     nicheId = about.id,

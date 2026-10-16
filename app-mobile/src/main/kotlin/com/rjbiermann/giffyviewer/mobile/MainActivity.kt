@@ -41,11 +41,13 @@ import com.rjbiermann.giffyviewer.feature.feed.FollowingScreen
 import com.rjbiermann.giffyviewer.feature.feed.NicheAboutScreen
 import com.rjbiermann.giffyviewer.feature.feed.NichesScreen
 import com.rjbiermann.giffyviewer.feature.feed.PlayerScreen
+import com.rjbiermann.giffyviewer.feature.feed.feedSourceNavType
 import com.rjbiermann.giffyviewer.feature.settings.SettingsScreen
 import com.rjbiermann.giffyviewer.search.SearchScreen
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.serialization.Serializable
 import javax.inject.Inject
+import kotlin.reflect.typeOf
 
 /**
  * Issue #13 nav routes (mobile). Route args are @Serializable
@@ -55,10 +57,16 @@ import javax.inject.Inject
 @Serializable
 data object MainCollections
 
-/** The home feed as seeded (start destination) and every feed hop after it. */
+/** The home feed as seeded (start destination): the VM resolves `seedSource`
+ *  (For You when logged in per batch-21, else Trending) with no route arg. */
+@Serializable
+data object MainFeedDefault
+
+/** Every feed hop after the start (non-null by construction — no encodeNull
+ *  against the custom NavType's non-null serializeAsValue Contract). */
 @Serializable
 data class MainFeed(
-    val source: FeedSource? = null,
+    val source: FeedSource,
 )
 
 @Serializable
@@ -161,31 +169,24 @@ class MainActivity : ComponentActivity() {
             }
             onDispose { window.clearFlags(FLAG_KEEP_SCREEN_ON) }
         }
-        NavHost(navController, startDestination = MainFeed(source = null)) {
-            composable<MainFeed> { entry ->
-                val src = entry.toRoute<MainFeed>().source ?: feedViewModel.seedSource
-                // Issue #13 §3.3: every MainFeed entry re-asserts its source on
-                // (re)composition — the VM stays single-sourced (sort adoption,
-                // userNavigated, lastGroupSub semantics all inside open()) while
-                // each entry keeps its own scroll state. Back into a covered
-                // entry whose source already matches is a no-op (same-value
-                // StateFlow write → no pager restart, no grid flash).
-                LaunchedEffect(src) { if (feedViewModel.source.value != src) feedViewModel.open(src) }
-                FeedScreen(
-                    modifier = Modifier.fillMaxSize(),
-                    gridColumns = hint.gridColumns,
-                    onOpenPlayer = { index -> navController.navigate(MainPlayer(index)) },
-                    onOpenSettings = { navController.navigate(MainSettings) },
-                    onOpenSearch = { navController.navigate(MainSearch) },
-                    onOpenNiches = { navController.navigate(MainNiches) },
-                    onOpenFollowing = { navController.navigate(MainFollowing) },
-                    onOpenCollections = { navController.navigate(MainCollections) },
-                    onOpenCustomFeeds = { navController.navigate(MainCustomFeeds) },
-                    onFeedNav = { source -> navController.navigate(MainFeed(source)) },
-                    playerFactory = playerFactory,
-                    viewModel = feedViewModel,
+        NavHost(navController, startDestination = MainFeedDefault) {
+            // Start destination: NO route arg — the VM resolves seedSource
+            // (For You when logged-in, else Trending; batch-21 rule). Feed hops
+            // use MainFeed(source) with the non-null custom-NavType arg.
+            composable<MainFeedDefault> {
+                MainFeedDestination(src = null, hint, navController, feedViewModel)
+            }
+            composable<MainFeed>(
+                typeMap = mapOf(typeOf<FeedSource>() to feedSourceNavType),
+            ) { entry ->
+                MainFeedDestination(
+                    src = entry.toRoute<MainFeed>().source,
+                    hint,
+                    navController,
+                    feedViewModel,
                 )
             }
+
             composable<MainPlayer> { entry ->
                 val start = entry.toRoute<MainPlayer>().startIndex
                 PlayerScreen(
@@ -273,5 +274,38 @@ class MainActivity : ComponentActivity() {
                 SettingsScreen(onBack = { navController.popBackStack() })
             }
         }
+    }
+
+    @Composable
+    private fun MainFeedDestination(
+        src: FeedSource?,
+        hint: LayoutHint,
+        navController: androidx.navigation.NavHostController,
+        feedViewModel: FeedViewModel,
+    ) {
+        val srcResolved = src ?: feedViewModel.seedSource
+        // Issue #13 §3.3: every feed entry re-asserts its source on
+        // (re)composition — the VM stays single-sourced (sort adoption,
+        // userNavigated, lastGroupSub semantics all inside open()) while
+        // each entry keeps its own scroll state. Back into a covered
+        // entry whose source already matches is a no-op (same-value
+        // StateFlow write → no pager restart, no grid flash).
+        LaunchedEffect(srcResolved) {
+            if (feedViewModel.source.value != srcResolved) feedViewModel.open(srcResolved)
+        }
+        FeedScreen(
+            modifier = Modifier.fillMaxSize(),
+            gridColumns = hint.gridColumns,
+            onOpenPlayer = { index -> navController.navigate(MainPlayer(index)) },
+            onOpenSettings = { navController.navigate(MainSettings) },
+            onOpenSearch = { navController.navigate(MainSearch) },
+            onOpenNiches = { navController.navigate(MainNiches) },
+            onOpenFollowing = { navController.navigate(MainFollowing) },
+            onOpenCollections = { navController.navigate(MainCollections) },
+            onOpenCustomFeeds = { navController.navigate(MainCustomFeeds) },
+            onFeedNav = { source -> navController.navigate(MainFeed(source)) },
+            playerFactory = playerFactory,
+            viewModel = feedViewModel,
+        )
     }
 }
