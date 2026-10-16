@@ -24,6 +24,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import com.rjbiermann.giffyviewer.core.auth.TokenStore
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
@@ -32,6 +33,7 @@ import com.rjbiermann.giffyviewer.core.ui.GiffyTheme
 import com.rjbiermann.giffyviewer.core.ui.LayoutHint
 import com.rjbiermann.giffyviewer.core.ui.PinLockScreen
 import com.rjbiermann.giffyviewer.core.ui.layoutHint
+import com.rjbiermann.giffyviewer.feature.auth.DebugSignIn
 import com.rjbiermann.giffyviewer.feature.feed.CollectionsScreen
 import com.rjbiermann.giffyviewer.feature.feed.CustomFeedsScreen
 import com.rjbiermann.giffyviewer.feature.feed.FeedScreen
@@ -102,12 +104,19 @@ data object MainSettings
 class MainActivity : ComponentActivity() {
     @Inject lateinit var settings: SettingsRepository
 
+    @Inject lateinit var tokenStore: TokenStore
+
     @Inject lateinit var playerFactory: GiffyPlayerFactory
 
     @Inject lateinit var db: GiffyDatabase
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Debug-only sign-in injection (Stream-G device gates): the token
+        // rides the launch extra in debug builds; release never reaches it.
+        if (com.rjbiermann.giffyviewer.mobile.BuildConfig.DEBUG) {
+            DebugSignIn.apply(tokenStore, intent?.getStringExtra("giffy_debug_bundle"))
+        }
         enableEdgeToEdge()
         setContent { ThemeHost() }
     }

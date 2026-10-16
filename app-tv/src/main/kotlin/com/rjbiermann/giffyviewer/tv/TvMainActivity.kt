@@ -47,6 +47,7 @@ import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.ui.Feature
 import com.rjbiermann.giffyviewer.core.ui.GiffyTheme
+import com.rjbiermann.giffyviewer.feature.auth.DebugSignIn
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
 import com.rjbiermann.giffyviewer.feature.feed.feedSourceNavType
@@ -115,6 +116,11 @@ class TvMainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Debug-only sign-in injection (Stream-G device gates): the token
+        // rides the launch extra in debug builds; release never reaches it.
+        if (com.rjbiermann.giffyviewer.tv.BuildConfig.DEBUG) {
+            DebugSignIn.apply(tokenStore, intent?.getStringExtra("giffy_debug_bundle"))
+        }
         enableEdgeToEdge()
         setContent { ThemeHost() }
     }

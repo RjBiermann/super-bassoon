@@ -23,6 +23,9 @@ plugins {
 
 android {
     namespace = "com.rjbiermann.giffyviewer.mobile"
+    buildFeatures {
+        buildConfig = true
+    }
     compileSdk = 37
 
     defaultConfig {
