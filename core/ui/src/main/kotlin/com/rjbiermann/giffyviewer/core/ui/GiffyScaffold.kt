@@ -132,13 +132,25 @@ fun GiffyScaffold(
             // Re-claim the collapsed strip: shift the content draw up by the
             // collapse offset (layout-time place — no recomposition; the grid
             // measures once). The topBar column already paints over this area.
+            // 2026-10-16 jam fix: shifting alone left the content SHORT at
+            // full collapse — its bottom floated H-offsetPx off the screen,
+            // and drags landing in that uncovered strip hit no scrollable at
+            // all (FeedScreen froze after one swipe). Measure the content
+            // TALLER by the offset so it still reaches the screen bottom.
             val state = collapseState!!
             Box(
                 modifier =
                     Modifier.layout { measurable, constraints ->
-                        val placeable = measurable.measure(constraints)
+                        val extra = state.offsetPx
+                        val placeable =
+                            measurable.measure(
+                                constraints.copy(
+                                    minHeight = constraints.minHeight + extra,
+                                    maxHeight = constraints.maxHeight + extra,
+                                ),
+                            )
                         layout(placeable.width, placeable.height) {
-                            placeable.place(0, -state.offsetPx)
+                            placeable.place(0, -extra)
                         }
                     },
             ) {

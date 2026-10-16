@@ -657,8 +657,15 @@ class FeedViewModel
                                 settings.feedPrefs(feed.baseKey),
                             ) { o, v, p -> Triple(o, v, p) }
                         feedPrefs
-                            .drop(1)
+                            // distinct FIRST: a later DataStore re-subscription
+                            // wave re-emits the same INITIAL state; drop(1) only
+                            // swallows the first emission, so drop-then-dedupe
+                            // lets the unchanged replay pass as a "change" and
+                            // force-restarts the pager (For You scroll jam,
+                            // 2026-10-16). Dedupe remembers the dropped initial
+                            // value, so identical replays are blocked for real.
                             .distinctUntilChanged()
+                            .drop(1)
                             .debounce(PREFS_INVALIDATE_DEBOUNCE_MS)
                     }.collect { forceRefresh() }
             }
