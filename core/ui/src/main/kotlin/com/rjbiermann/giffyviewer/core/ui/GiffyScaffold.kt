@@ -97,7 +97,6 @@ fun GiffyScaffold(
                     topColumn
                         .onSizeChanged { if (useCollapse) collapseState!!.totalPx = it.height },
             ) {
-                collapsingHeaderExtra()
                 TopAppBar(
                     title = { Text(title) },
                     navigationIcon = {
@@ -116,6 +115,7 @@ fun GiffyScaffold(
                             containerColor = MaterialTheme.colorScheme.surface,
                         ),
                 )
+                collapsingHeaderExtra()
             }
         },
     ) { padding ->
