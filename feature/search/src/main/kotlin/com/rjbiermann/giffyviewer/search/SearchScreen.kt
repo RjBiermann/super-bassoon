@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -35,6 +36,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -102,318 +104,332 @@ fun SearchScreen(
 
     LaunchedEffect(Unit) { fieldFocus.requestFocus() }
 
-    Column(modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.navigationBars).imePadding()) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+    // Surface painted the background (issue #7): the platform window
+    // background otherwise leaks through on both shells.
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background,
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .imePadding(),
         ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "back")
-            }
-            OutlinedTextField(
-                value = query,
-                onValueChange = viewModel::setQuery,
-                singleLine = true,
-                placeholder = { Text("Search…") },
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                trailingIcon = {
-                    if (query.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.setQuery("") }) {
-                            Icon(Icons.Filled.Close, contentDescription = "clear query")
-                        }
-                    }
-                },
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions =
-                    KeyboardActions(onSearch = {
-                        submit(query)
-                    }),
-                shape = MaterialTheme.shapes.extraLarge,
-                modifier = Modifier.fillMaxWidth().focusRequester(fieldFocus),
-            )
-        }
-
-        // Hoisted reads (composable context): history-clear section + trending tags.
-        val trendingTags = viewModel.trendingTags.collectAsStateWithLifecycle().value
-        val images by viewModel.images.collectAsStateWithLifecycle()
-        val creatorPreviews by viewModel.creatorPreviews.collectAsStateWithLifecycle()
-        val nichePreviews by viewModel.nichePreviews.collectAsStateWithLifecycle()
-        // Explore empty state (issue #11): scope-map VM caches, seeded by the
-        // sections' own load-on-compose effects — body collects never fetch.
-        val topRanged by viewModel.topRanged.collectAsStateWithLifecycle()
-        val trendingPhotos by viewModel.trendingPhotos.collectAsStateWithLifecycle()
-        val trendingNiches by viewModel.trendingNiches.collectAsStateWithLifecycle()
-        val exploreCreators by viewModel.exploreCreators.collectAsStateWithLifecycle()
-        val creatorsEnd by viewModel.creatorsEnd.collectAsStateWithLifecycle()
-        val creatorsFailed by viewModel.creatorsFailed.collectAsStateWithLifecycle()
-        val matchedTags by viewModel.matchedTags.collectAsStateWithLifecycle()
-
-        // Selected top range (issue #11 slice A): Week first — verified pool
-        // order mirrors the site (top7 · top28 · top).
-        var topRange by remember { mutableStateOf(FeedSource.TopRanged.RANGES.first()) }
-
-        // Full-scope tabs (spec'd 2026-10-02): visible while a query is typed.
-        // GIFs = the existing submit path; other scopes render inline.
-        var scope by remember { mutableIntStateOf(SCOPE_GIFS) }
-        LaunchedEffect(scope, query) {
-            if (query.isNotBlank()) {
-                when (scope) {
-                    0 -> viewModel.loadScope(SearchViewModel.SCOPE_GIFS, query)
-                    1 -> viewModel.loadScope(SearchViewModel.SCOPE_IMAGES, query)
-                    2 -> viewModel.loadScope(SearchViewModel.SCOPE_CREATORS, query)
-                    3 -> viewModel.loadScope(SearchViewModel.SCOPE_NICHES, query)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "back")
                 }
-            }
-        }
-
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
-            // Empty field → history only (no suggestions, no extra network — §7).
-            if (query.isBlank()) {
-                item {
-                    TextButton(
-                        onClick = { viewModel.clearHistory() },
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                    ) { Text("Clear search history") }
-                }
-            }
-            items(history, key = { it.id }) { entry ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                submit(entry.query)
-                            }.padding(horizontal = 16.dp, vertical = 14.dp),
-                ) {
-                    Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Text(
-                        text = entry.query,
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
-                    )
-                    IconButton(onClick = { viewModel.removeHistory(entry) }) {
-                        Icon(Icons.Filled.Close, contentDescription = "remove ${entry.query}")
-                    }
-                }
-            }
-            items(suggestions, key = { "s:" + it.text }) { suggestion ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                submit(suggestion.text)
-                            }.padding(horizontal = 16.dp, vertical = 14.dp),
-                ) {
-                    Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Text(
-                        text = suggestion.text,
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
-                    )
-                    Text(
-                        text = "%,d gifs".format(suggestion.gifs),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            // Explore empty state (issue #11, site-parity top-down order:
-            // Top · photos · niches · creators · trending tags). Each section
-            // is VM-cached; loads fire when the section first composes — not
-            // all at once.
-            if (query.isBlank()) {
-                item(key = "top-header") {
-                    LaunchedEffect(topRange, query) { viewModel.loadTopRanged(topRange) }
-                    SectionHeader("Top gifs") {
-                        onOpenFeed(FeedSource.TopRanged(topRange))
-                    }
-                }
-                item(key = "top-chips") {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                    ) {
-                        // Chip labels = the site's own range wording; keys are
-                        // the search endpoint's BadOrder-verified orders.
-                        listOf("top7" to "Week", "top28" to "Month", "top" to "All time").forEach { (range, label) ->
-                            FilterChip(
-                                selected = topRange == range,
-                                onClick = { topRange = range },
-                                label = { Text(label) },
-                            )
-                        }
-                    }
-                }
-                items(topRanged[topRange].orEmpty().chunked(3), key = { "top:$topRange:" + it.first().id }) { rowGifs ->
-                    PosterRow(rowGifs)
-                }
-                item(key = "photos-header") {
-                    LaunchedEffect(query) { viewModel.loadTrendingPhotos() }
-                    SectionHeader("Trending photos")
-                }
-                items(trendingPhotos.chunked(3), key = { "ph:" + it.first().id }) { rowGifs ->
-                    PosterRow(rowGifs)
-                }
-                item(key = "niches-header") {
-                    LaunchedEffect(query) { viewModel.loadTrendingNiches() }
-                    SectionHeader("Trending niches")
-                }
-                item(key = "niches-row") {
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        items(trendingNiches, key = { it.id }) { niche ->
-                            FilterChip(
-                                selected = false,
-                                onClick = { onOpenNiche(niche.id, niche.name) },
-                                label = { Text(niche.name) },
-                            )
-                        }
-                    }
-                }
-                item(key = "creators-header") {
-                    SectionHeader("Creators")
-                }
-                item(key = "creators-row") {
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        items(exploreCreators, key = { it.username }) { creator ->
-                            CreatorCard(creator) { onOpenCreator(creator.username) }
-                        }
-                        // End sentinel: composes only as the row's end enters
-                        // the viewport — one next page per walk to the end
-                        // (the old ExploreScreen auto-fetch, now lazy).
-                        item(key = "creators-next") {
-                            if (creatorsFailed) {
-                                TextButton(onClick = viewModel::loadExploreCreators) { Text("Retry") }
-                            } else {
-                                LaunchedEffect(exploreCreators.size) { viewModel.loadExploreCreators() }
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = viewModel::setQuery,
+                    singleLine = true,
+                    placeholder = { Text("Search…") },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (query.isNotEmpty()) {
+                            IconButton(onClick = { viewModel.setQuery("") }) {
+                                Icon(Icons.Filled.Close, contentDescription = "clear query")
                             }
                         }
-                        if (creatorsEnd && exploreCreators.isNotEmpty()) {
-                            item(key = "creators-end") {
-                                Text(
-                                    "That's all ${exploreCreators.size} creators",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
+                    },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions =
+                        KeyboardActions(onSearch = {
+                            submit(query)
+                        }),
+                    shape = MaterialTheme.shapes.extraLarge,
+                    modifier = Modifier.fillMaxWidth().focusRequester(fieldFocus),
+                )
+            }
+
+            // Hoisted reads (composable context): history-clear section + trending tags.
+            val trendingTags = viewModel.trendingTags.collectAsStateWithLifecycle().value
+            val images by viewModel.images.collectAsStateWithLifecycle()
+            val creatorPreviews by viewModel.creatorPreviews.collectAsStateWithLifecycle()
+            val nichePreviews by viewModel.nichePreviews.collectAsStateWithLifecycle()
+            // Explore empty state (issue #11): scope-map VM caches, seeded by the
+            // sections' own load-on-compose effects — body collects never fetch.
+            val topRanged by viewModel.topRanged.collectAsStateWithLifecycle()
+            val trendingPhotos by viewModel.trendingPhotos.collectAsStateWithLifecycle()
+            val trendingNiches by viewModel.trendingNiches.collectAsStateWithLifecycle()
+            val exploreCreators by viewModel.exploreCreators.collectAsStateWithLifecycle()
+            val creatorsEnd by viewModel.creatorsEnd.collectAsStateWithLifecycle()
+            val creatorsFailed by viewModel.creatorsFailed.collectAsStateWithLifecycle()
+            val matchedTags by viewModel.matchedTags.collectAsStateWithLifecycle()
+
+            // Selected top range (issue #11 slice A): Week first — verified pool
+            // order mirrors the site (top7 · top28 · top).
+            var topRange by remember { mutableStateOf(FeedSource.TopRanged.RANGES.first()) }
+
+            // Full-scope tabs (spec'd 2026-10-02): visible while a query is typed.
+            // GIFs = the existing submit path; other scopes render inline.
+            var scope by remember { mutableIntStateOf(SCOPE_GIFS) }
+            LaunchedEffect(scope, query) {
+                if (query.isNotBlank()) {
+                    when (scope) {
+                        0 -> viewModel.loadScope(SearchViewModel.SCOPE_GIFS, query)
+                        1 -> viewModel.loadScope(SearchViewModel.SCOPE_IMAGES, query)
+                        2 -> viewModel.loadScope(SearchViewModel.SCOPE_CREATORS, query)
+                        3 -> viewModel.loadScope(SearchViewModel.SCOPE_NICHES, query)
                     }
                 }
             }
-            // Trending tags rows (hoisted read above; empty query only).
-            if (query.isBlank() && trendingTags.isNotEmpty()) {
-                item(key = "tags-header") {
-                    Text(
-                        "Trending tags",
-                        style = MaterialTheme.typography.titleSmall,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
+
+            LazyColumn(modifier = Modifier.fillMaxSize()) {
+                // Empty field → history only (no suggestions, no extra network — §7).
+                if (query.isBlank()) {
+                    item {
+                        TextButton(
+                            onClick = { viewModel.clearHistory() },
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        ) { Text("Clear search history") }
+                    }
                 }
-                items(trendingTags, key = { "t:" + it.name }) { tag ->
+                items(history, key = { it.id }) { entry ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier =
                             Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    submit(tag.name)
+                                    submit(entry.query)
                                 }.padding(horizontal = 16.dp, vertical = 14.dp),
                     ) {
+                        Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(20.dp))
                         Text(
-                            text = "#${tag.name}",
+                            text = entry.query,
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+                        )
+                        IconButton(onClick = { viewModel.removeHistory(entry) }) {
+                            Icon(Icons.Filled.Close, contentDescription = "remove ${entry.query}")
+                        }
+                    }
+                }
+                items(suggestions, key = { "s:" + it.text }) { suggestion ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    submit(suggestion.text)
+                                }.padding(horizontal = 16.dp, vertical = 14.dp),
+                    ) {
+                        Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Text(
+                            text = suggestion.text,
+                            style = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
                         )
                         Text(
-                            text = "%,d gifs".format(tag.count),
+                            text = "%,d gifs".format(suggestion.gifs),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
-            }
-            // Full-scope tab row (site results-page parity: GIFs · Images ·
-            // Creators · Niches) + the active scope's inline section.
-            if (query.isNotBlank()) {
-                item(key = "scope-tabs") {
-                    TabRow(selectedTabIndex = scope) {
-                        listOf("GIFs", "Images", "Creators", "Niches").forEachIndexed { i, label ->
-                            Tab(selected = scope == i, onClick = { scope = i }, text = { Text(label) })
+                // Explore empty state (issue #11, site-parity top-down order:
+                // Top · photos · niches · creators · trending tags). Each section
+                // is VM-cached; loads fire when the section first composes — not
+                // all at once.
+                if (query.isBlank()) {
+                    item(key = "top-header") {
+                        LaunchedEffect(topRange, query) { viewModel.loadTopRanged(topRange) }
+                        SectionHeader("Top gifs") {
+                            onOpenFeed(FeedSource.TopRanged(topRange))
+                        }
+                    }
+                    item(key = "top-chips") {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                        ) {
+                            // Chip labels = the site's own range wording; keys are
+                            // the search endpoint's BadOrder-verified orders.
+                            listOf("top7" to "Week", "top28" to "Month", "top" to "All time").forEach { (range, label) ->
+                                FilterChip(
+                                    selected = topRange == range,
+                                    onClick = { topRange = range },
+                                    label = { Text(label) },
+                                )
+                            }
+                        }
+                    }
+                    items(topRanged[topRange].orEmpty().chunked(3), key = { "top:$topRange:" + it.first().id }) { rowGifs ->
+                        PosterRow(rowGifs)
+                    }
+                    item(key = "photos-header") {
+                        LaunchedEffect(query) { viewModel.loadTrendingPhotos() }
+                        SectionHeader("Trending photos")
+                    }
+                    items(trendingPhotos.chunked(3), key = { "ph:" + it.first().id }) { rowGifs ->
+                        PosterRow(rowGifs)
+                    }
+                    item(key = "niches-header") {
+                        LaunchedEffect(query) { viewModel.loadTrendingNiches() }
+                        SectionHeader("Trending niches")
+                    }
+                    item(key = "niches-row") {
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            items(trendingNiches, key = { it.id }) { niche ->
+                                FilterChip(
+                                    selected = false,
+                                    onClick = { onOpenNiche(niche.id, niche.name) },
+                                    label = { Text(niche.name) },
+                                )
+                            }
+                        }
+                    }
+                    item(key = "creators-header") {
+                        SectionHeader("Creators")
+                    }
+                    item(key = "creators-row") {
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            items(exploreCreators, key = { it.username }) { creator ->
+                                CreatorCard(creator) { onOpenCreator(creator.username) }
+                            }
+                            // End sentinel: composes only as the row's end enters
+                            // the viewport — one next page per walk to the end
+                            // (the old ExploreScreen auto-fetch, now lazy).
+                            item(key = "creators-next") {
+                                if (creatorsFailed) {
+                                    TextButton(onClick = viewModel::loadExploreCreators) { Text("Retry") }
+                                } else {
+                                    LaunchedEffect(exploreCreators.size) { viewModel.loadExploreCreators() }
+                                }
+                            }
+                            if (creatorsEnd && exploreCreators.isNotEmpty()) {
+                                item(key = "creators-end") {
+                                    Text(
+                                        "That's all ${exploreCreators.size} creators",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
                         }
                     }
                 }
-                when (scope) {
-                    0 -> {
-                        // Issue #11 slice C: matched tag chips feed the existing
-                        // tags → tag-feed submit path (no tag-results tab).
-                        val tags = matchedTags[query.trim()].orEmpty()
-                        if (tags.isNotEmpty()) {
-                            item(key = "matched-tags") {
-                                Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                                    Text(
-                                        "Tags matching",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                                    )
-                                    LazyRow(
-                                        contentPadding = PaddingValues(horizontal = 12.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    ) {
-                                        items(tags, key = { "#" + it }) { tag ->
-                                            FilterChip(
-                                                selected = false,
-                                                onClick = { submit(tag) },
-                                                label = { Text("#$tag") },
-                                            )
+                // Trending tags rows (hoisted read above; empty query only).
+                if (query.isBlank() && trendingTags.isNotEmpty()) {
+                    item(key = "tags-header") {
+                        Text(
+                            "Trending tags",
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+                    items(trendingTags, key = { "t:" + it.name }) { tag ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        submit(tag.name)
+                                    }.padding(horizontal = 16.dp, vertical = 14.dp),
+                        ) {
+                            Text(
+                                text = "#${tag.name}",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+                            )
+                            Text(
+                                text = "%,d gifs".format(tag.count),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+                // Full-scope tab row (site results-page parity: GIFs · Images ·
+                // Creators · Niches) + the active scope's inline section.
+                if (query.isNotBlank()) {
+                    item(key = "scope-tabs") {
+                        TabRow(selectedTabIndex = scope) {
+                            listOf("GIFs", "Images", "Creators", "Niches").forEachIndexed { i, label ->
+                                Tab(selected = scope == i, onClick = { scope = i }, text = { Text(label) })
+                            }
+                        }
+                    }
+                    when (scope) {
+                        0 -> {
+                            // Issue #11 slice C: matched tag chips feed the existing
+                            // tags → tag-feed submit path (no tag-results tab).
+                            val tags = matchedTags[query.trim()].orEmpty()
+                            if (tags.isNotEmpty()) {
+                                item(key = "matched-tags") {
+                                    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                                        Text(
+                                            "Tags matching",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                                        )
+                                        LazyRow(
+                                            contentPadding = PaddingValues(horizontal = 12.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        ) {
+                                            items(tags, key = { "#" + it }) { tag ->
+                                                FilterChip(
+                                                    selected = false,
+                                                    onClick = { submit(tag) },
+                                                    label = { Text("#$tag") },
+                                                )
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
-                    }
-                    1 -> {
-                        val imgs = images[query.trim()].orEmpty()
-                        if (imgs.isEmpty()) {
-                            item(key = "images-hint") {
-                                SectionHint(if (images.containsKey(query.trim())) "No images found" else "")
+                        1 -> {
+                            val imgs = images[query.trim()].orEmpty()
+                            if (imgs.isEmpty()) {
+                                item(key = "images-hint") {
+                                    SectionHint(if (images.containsKey(query.trim())) "No images found" else "")
+                                }
+                            } else {
+                                items(imgs.chunked(3), key = { "img:" + it.first().id }) { PosterRow(it) }
                             }
-                        } else {
-                            items(imgs.chunked(3), key = { "img:" + it.first().id }) { PosterRow(it) }
                         }
-                    }
-                    2 -> {
-                        val rows = creatorPreviews[query.trim()].orEmpty()
-                        if (rows.isEmpty()) {
-                            item(key = "creators-hint") {
-                                SectionHint(if (creatorPreviews.containsKey(query.trim())) "No creators found" else "")
-                            }
-                        } else {
-                            items(rows, key = { "cr:" + it.id }) { gif ->
-                                PreviewRow(gif) {
-                                    onOpenCreator(gif.userName)
+                        2 -> {
+                            val rows = creatorPreviews[query.trim()].orEmpty()
+                            if (rows.isEmpty()) {
+                                item(key = "creators-hint") {
+                                    SectionHint(if (creatorPreviews.containsKey(query.trim())) "No creators found" else "")
+                                }
+                            } else {
+                                items(rows, key = { "cr:" + it.id }) { gif ->
+                                    PreviewRow(gif) {
+                                        onOpenCreator(gif.userName)
+                                    }
                                 }
                             }
                         }
-                    }
-                    3 -> {
-                        val rows = nichePreviews[query.trim()].orEmpty()
-                        if (rows.isEmpty()) {
-                            item(key = "niches-hint") {
-                                SectionHint(if (nichePreviews.containsKey(query.trim())) "No niches found" else "")
-                            }
-                        } else {
-                            items(rows, key = { "ni:" + it.first.id }) { (niche, gif) ->
-                                PreviewRow(gif, label = niche.name) {
-                                    onOpenNiche(niche.id, niche.name)
+                        3 -> {
+                            val rows = nichePreviews[query.trim()].orEmpty()
+                            if (rows.isEmpty()) {
+                                item(key = "niches-hint") {
+                                    SectionHint(if (nichePreviews.containsKey(query.trim())) "No niches found" else "")
+                                }
+                            } else {
+                                items(rows, key = { "ni:" + it.first.id }) { (niche, gif) ->
+                                    PreviewRow(gif, label = niche.name) {
+                                        onOpenNiche(niche.id, niche.name)
+                                    }
                                 }
                             }
                         }

@@ -42,6 +42,12 @@ class ForYouNetworkPagingSource(
         return try {
             // B1: same dead-end walk as LikedNetworkPagingSource (bounded
             // ≤ MAX_WALK_HOPS, sequential); B2: pool-cap 400 = graceful end.
+            // Issue #30: the context loader propagates its failures (the repo
+            // memoizes only on success), so a failed follow fetch arrives here
+            // as a throw inside this try → LoadResult.Error — the For You UI
+            // shows the error state, never a scope-filtered empty page (the
+            // scope filter below can only ever run on a successfully fetched
+            // ctx; there is no failed-but-empty ctx shape to skip).
             val ctx = forYouContext()
             var page = firstPage
             var gifs: List<Gif> = emptyList()

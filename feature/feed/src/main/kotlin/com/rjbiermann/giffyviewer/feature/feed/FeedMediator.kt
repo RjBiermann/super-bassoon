@@ -61,12 +61,19 @@ class FeedMediator(
 
             LoadType.REFRESH -> {
                 // TTL: skip the network when the first page is still fresh.
-                // Exception: a cached EMPTY Favorites page is only ever the
-                // "nothing favorited yet" marker — treat it as always stale so the
-                // first favorite appears immediately (regression: TV Favorites row
-                // stayed empty).
+                // Issue #30 (extended from the Favorites-only rule): a cached
+                // EMPTY first page is never fresh for ANY feed — it is either
+                // the "nothing favorited yet" marker or a row served while the
+                // upstream was genuinely empty (custom feed filled later via
+                // quick-add, a search/niche pool that grew). Honoring the TTL on
+                // a zero row pinned an empty grid for the whole TTL, so a TTL
+                // refresh re-hits the network for empty rows; a candidate feed
+                // that loads and a non-empty cached page still skip the network
+                // (stale-while-revalidate intact). An offline failure here
+                // surfaces MediatorResult.Error and the read path keeps serving
+                // the cached row — honest offline behavior unchanged.
                 val cached = pageDao.page(feedPageKey(feed, 1))
-                val staleEmpty = cached != null && feed is FeedSource.Favorites && cached.gifIds.isEmpty()
+                val staleEmpty = cached != null && cached.gifIds.isEmpty()
                 if (!force && cached != null && now() - cached.fetchedAt < feed.ttlMs && !staleEmpty) {
                     MediatorResult.Success(endOfPaginationReached = false)
                 } else {

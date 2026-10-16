@@ -71,9 +71,10 @@ class FeedMediatorFavoritesTest {
         pageDao: FeedPageDao,
         gifDao: GifDao,
         api: GifsApi,
-        favorites: suspend () -> List<String>,
+        feed: FeedSource = FeedSource.Favorites,
+        favorites: suspend () -> List<String> = { emptyList() },
     ) = FeedMediator(
-        feed = FeedSource.Favorites,
+        feed = feed,
         gifDao = gifDao,
         pageDao = pageDao,
         api = api,
@@ -106,6 +107,41 @@ class FeedMediatorFavoritesTest {
         assertTrue((result as MediatorResult.Success).endOfPaginationReached)
         assertEquals(0, api.userGifsCalls)
         assertTrue(pageDao.pages.isEmpty())
+    }
+
+    /** Issue #30 (stale-empty extended beyond Favorites): a cached EMPTY first
+     *  page is never fresh for ANY feed — a TTL refresh re-hits the network so
+     *  feed content that appears later is not pinned behind the whole TTL. */
+    @Test
+    fun `cached empty non-favorites page refreshes within the ttl`() {
+        val pageDao = FakeFeedPageDao()
+        pageDao.pages["trend:v2:pop:p1"] =
+            FeedPageEntity(pageKey = "trend:v2:pop:p1", gifIds = emptyList(), nextPageKey = null, fetchedAt = 1_000)
+        val api = FakeApi()
+        val result =
+            runBlocking {
+                mediator(pageDao, FakeGifDao(), api, favorites = { emptyList() }, feed = FeedSource.Trending)
+                    .load(LoadType.REFRESH, state())
+            }
+        assertTrue(result is MediatorResult.Success)
+        assertEquals(listOf(1), api.trendingCalls)
+    }
+
+    /** Stale-while-revalidate intact: a NON-empty cached page inside the TTL
+     *  still serves the cache — the empty-row exception is the only widening. */
+    @Test
+    fun `cached non-empty page inside the ttl serves the cache`() {
+        val pageDao = FakeFeedPageDao()
+        pageDao.pages["trend:v2:pop:p1"] =
+            FeedPageEntity(pageKey = "trend:v2:pop:p1", gifIds = listOf("g1"), nextPageKey = null, fetchedAt = 1_000)
+        val api = FakeApi()
+        val result =
+            runBlocking {
+                mediator(pageDao, FakeGifDao(), api, favorites = { emptyList() }, feed = FeedSource.Trending)
+                    .load(LoadType.REFRESH, state())
+            }
+        assertTrue(result is MediatorResult.Success)
+        assertTrue(api.trendingCalls.isEmpty())
     }
 
     @Test

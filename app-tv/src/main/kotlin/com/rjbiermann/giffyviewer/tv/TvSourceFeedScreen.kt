@@ -49,12 +49,15 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButton
 import androidx.tv.material3.IconButtonDefaults
 import com.rjbiermann.giffyviewer.core.model.Gif
+import com.rjbiermann.giffyviewer.feature.feed.CreatorFeedHeader
 import com.rjbiermann.giffyviewer.feature.feed.FeedFilterDialog
 import com.rjbiermann.giffyviewer.feature.feed.FeedRepository
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import com.rjbiermann.giffyviewer.feature.feed.FeedTabStrip
 import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
+import com.rjbiermann.giffyviewer.feature.feed.NicheFeedHeader
 import com.rjbiermann.giffyviewer.feature.feed.activeSort
+import com.rjbiermann.giffyviewer.feature.feed.nicheSourceId
 import com.rjbiermann.giffyviewer.feature.feed.packNicheRef
 import com.rjbiermann.giffyviewer.feature.feed.sortOptions
 import com.rjbiermann.giffyviewer.feature.feed.title
@@ -138,6 +141,10 @@ fun TvSourceFeedScreen(
                     .FeedPrefs(),
         )
     var showFilter by remember { mutableStateOf(false) }
+    // Issue #28: the §5 video-fit pref governs the grid tiles (ONE collect at
+    // the parent; "fit" is the default and leaves the cards unchanged — TV
+    // no-jump invariant).
+    val videoFit by feedViewModel.videoFit.collectAsStateWithLifecycle("fit")
     // Initial D-pad focus (AGENTS-APP pattern): the grid's first card takes
     // focus on open — no blind first press. Issue #13 §4.3: the "first" card
     // is the SAVED focus on a re-entry (BACK from a player restores D-pad
@@ -171,6 +178,9 @@ fun TvSourceFeedScreen(
             // #19 tab strip instead of clearing a fixed 44dp title band).
             LaunchedEffect(source) {
                 feedViewModel.refreshCreatorStats((source as? FeedSource.Creator)?.username)
+                // Issue #31: the header gate clears the niche stats for every
+                // non-niche source (same null-clear call as the creator's).
+                feedViewModel.refreshNicheStats(nicheSourceId(source))
             }
             Box {
                 Column {
@@ -183,6 +193,9 @@ fun TvSourceFeedScreen(
                     )
                     if (source is FeedSource.Creator) {
                         stats?.let { s ->
+                            // Issue #31: identity row (avatar + @user + bio)
+                            // above the existing counts row (kept verbatim).
+                            CreatorFeedHeader(s)
                             Text(
                                 text =
                                     "%,d posts · %,d followers · %,d views".format(
@@ -195,6 +208,13 @@ fun TvSourceFeedScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(start = 16.dp, bottom = 4.dp),
                             )
+                        }
+                    }
+                    if (source is FeedSource.Niche) {
+                        // Issue #31: the niche feed previously rendered NO
+                        // header at all — same shared mount, under the title.
+                        feedViewModel.nicheStats.collectAsStateWithLifecycle().value?.let { detail ->
+                            NicheFeedHeader(detail)
                         }
                     }
                 }
@@ -304,6 +324,7 @@ fun TvSourceFeedScreen(
                             dataSaver = dataSaver,
                             onClick = { onOpenGif(snapshot(gifs), gifs.indexOf(gif.id)) },
                             trueAspect = true,
+                            videoFit = videoFit,
                         )
                     }
                 }

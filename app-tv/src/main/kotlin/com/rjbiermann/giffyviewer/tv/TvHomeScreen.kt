@@ -1,3 +1,8 @@
+// AspectRatioFrameLayout RESIZE_MODE_* (issue #28 preview surface) is
+// @UnstableApi — same file-level opt-in PlayerScreen.kt carries (lint
+// UnsafeOptInUsageError).
+@file:androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.rjbiermann.giffyviewer.tv
 
 import androidx.compose.animation.core.animateFloatAsState
@@ -38,11 +43,11 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
@@ -59,6 +64,7 @@ import com.rjbiermann.giffyviewer.core.ui.AudioBadge
 import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
 import com.rjbiermann.giffyviewer.core.ui.avgColorOr
 import com.rjbiermann.giffyviewer.core.ui.giffyFocus
+import com.rjbiermann.giffyviewer.core.ui.toTileContentScale
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 
 /**
@@ -119,6 +125,9 @@ fun TvHomeScreen(
     val likedOrientation by homeViewModel.likedOrientation.collectAsStateWithLifecycle("any")
     val forYouOrientation by homeViewModel.forYouOrientation.collectAsStateWithLifecycle("any")
     val hasFavorites by homeViewModel.hasFavorites.collectAsStateWithLifecycle(initialValue = false)
+    // Issue #28: the §5 video-fit pref governs the row cards (ONE collect at
+    // the parent; "fit" is the default and leaves every card unchanged).
+    val videoFit by homeViewModel.videoFit.collectAsStateWithLifecycle("fit")
 
     // Remote MENU key on a focused card opens creator quick actions.
     var actionsFor by remember { mutableStateOf<Gif?>(null) }
@@ -177,6 +186,7 @@ fun TvHomeScreen(
                     onMenu = { gifEntry, feedSource, viaHold -> openActions(gifEntry, feedSource, viaHold) },
                     preview = preview,
                     dataSaver = dataSaver,
+                    videoFit = videoFit,
                     scopeChips = { ForYouScopeRow(homeViewModel) },
                     rowHeight = rowHeight,
                     source = FeedSource.ForYou,
@@ -195,6 +205,7 @@ fun TvHomeScreen(
                 onMenu = { gifEntry, feedSource, viaHold -> openActions(gifEntry, feedSource, viaHold) },
                 preview = preview,
                 dataSaver = dataSaver,
+                videoFit = videoFit,
                 rowHeight = rowHeight,
                 source = FeedSource.Trending,
                 orientation = trendingOrientation,
@@ -224,6 +235,7 @@ fun TvHomeScreen(
                 onMenu = { gifEntry, feedSource, viaHold -> openActions(gifEntry, feedSource, viaHold) },
                 preview = preview,
                 dataSaver = dataSaver,
+                videoFit = videoFit,
                 rowHeight = rowHeight,
                 source = FeedSource.TopThisWeek,
                 orientation = topThisWeekOrientation,
@@ -242,6 +254,7 @@ fun TvHomeScreen(
                     onMenu = { gifEntry, feedSource, viaHold -> openActions(gifEntry, feedSource, viaHold) },
                     preview = preview,
                     dataSaver = dataSaver,
+                    videoFit = videoFit,
                     rowHeight = rowHeight,
                     source = FeedSource.Favorites,
                     orientation = favoritesOrientation,
@@ -261,6 +274,7 @@ fun TvHomeScreen(
                     onMenu = { gifEntry, feedSource, viaHold -> openActions(gifEntry, feedSource, viaHold) },
                     preview = preview,
                     dataSaver = dataSaver,
+                    videoFit = videoFit,
                     rowHeight = rowHeight,
                     source = FeedSource.Liked,
                     orientation = likedOrientation,
@@ -414,6 +428,8 @@ private fun FeedRow(
     /** Preview-on-focus state (null = feature off). */
     preview: FocusPreview? = null,
     dataSaver: Boolean = false,
+    /** §5 video fit for the row's card posters (issue #28). */
+    videoFit: String = "fit",
     /** Optional content under the title, above the cards (For You scope chips). */
     scopeChips: (@Composable () -> Unit)? = null,
     /** Effective card height (slice 11 row-size setting). */
@@ -502,6 +518,7 @@ private fun FeedRow(
                         onClick = { onOpenGif(snapshot(gifs), gifs.indexOf(gif.id)) },
                         preview = preview,
                         dataSaver = dataSaver,
+                        videoFit = videoFit,
                         rowHeight = rowHeight,
                     )
                 }
@@ -640,6 +657,9 @@ internal fun GifCard(
      *  the fixed row band (staggered source-feed grids). Home rows keep the
      *  band (default false). */
     trueAspect: Boolean = false,
+    /** §5 video fit for this card's poster + its preview surface (issue #28);
+     *  "fit" (default) changes nothing — the TV no-jump invariant. */
+    videoFit: String = "fit",
 ) {
     // 10-foot UX: focused card grows so the D-pad user always sees where focus is.
     var focused by remember { mutableStateOf(false) }
@@ -710,9 +730,9 @@ internal fun GifCard(
             // avgColor placeholder: no black flash on slow cells.
             // Clip: the poster must round with the card (mobile GifTile parity).
             // Tile geometry (#14 §A/#15): fixed row band by default; trueAspect
-            // (source-feed grids) rides the gif's own aspect — no crop on ANY
-            // content (mobile GifTile parity), poster ContentScale.Fit
-            // letterboxes only extreme aspects in-color (both geometries).
+            // (source-feed grids) rides the gif's own aspect. The poster scale
+            // follows the §5 video-fit pref (issue #28): fit (default) leaves
+            // the letterbox behavior untouched, crop matches the player framing.
             Box(
                 modifier =
                     Modifier
@@ -747,9 +767,11 @@ internal fun GifCard(
                     // Decorative: the visible "@user" Text announces the creator —
                     // saying both duplicates the name per card (mobile-parity fix).
                     contentDescription = null,
-                    // Fit (#14 §A): matched boxes render identically; clamped/extreme
-                    // tiles letterbox in avgColor instead of center-cropping.
-                    contentScale = ContentScale.Fit,
+                    // #14 §A / issue #28: fit renders identically to matched
+                    // boxes (the default, nothing changes); the user's §5
+                    // video-fit crop matches the poster to the player framing.
+                    // Clamped/extreme tiles letterbox in avgColor either way.
+                    contentScale = videoFit.toTileContentScale(),
                     modifier = Modifier.matchParentSize(),
                 )
                 if (preview != null && preview.settledId == gif.id && preview.player != null) {
@@ -774,7 +796,19 @@ internal fun GifCard(
                                     isFocusable = false
                                 }
                         },
-                        update = { view -> (view as androidx.media3.ui.PlayerView).player = preview.player },
+                        update = { view ->
+                            (view as androidx.media3.ui.PlayerView).apply {
+                                player = preview.player
+                                // Issue #28 (crop only): the preview surface's
+                                // resize mode follows the fit pref so the first
+                                // video frames land exactly on the poster. Fit
+                                // keeps the focus_preview_player.xml default —
+                                // nothing changes on TV when videoFit == fit.
+                                if (videoFit == "crop") {
+                                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                                }
+                            }
+                        },
                         modifier = Modifier.matchParentSize(),
                     )
                 }

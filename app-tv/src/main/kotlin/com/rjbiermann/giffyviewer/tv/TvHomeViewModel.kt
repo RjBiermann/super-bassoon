@@ -85,6 +85,13 @@ class TvHomeViewModel
             viewModelScope.launch { settings.setForYouScope(scope) }
         }
 
+        /** §5 video fit (issue #28): grid tiles honor it on TV too — "fit"
+         *  leaves the cards byte-identical (the no-jump invariant), crop matches
+         *  the poster→preview→player chain. */
+        val videoFit: StateFlow<String> =
+            settings.videoFit
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "fit")
+
         /** TV home row size (slice 11): default | large | xl — DataStore pref,
          *  mapped to the card height in TvHomeScreen.rowHeightFor(). TV-visible
          *  Settings row (showTvRowHeight) — the mobile grid-columns block is

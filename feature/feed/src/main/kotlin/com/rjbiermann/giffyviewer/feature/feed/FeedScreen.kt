@@ -55,13 +55,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
@@ -81,6 +81,7 @@ import com.rjbiermann.giffyviewer.core.ui.avgColorOr
 import com.rjbiermann.giffyviewer.core.ui.rememberReducedMotion
 import com.rjbiermann.giffyviewer.core.ui.rememberScrollingUp
 import com.rjbiermann.giffyviewer.core.ui.scrollToTop
+import com.rjbiermann.giffyviewer.core.ui.toTileContentScale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -131,6 +132,9 @@ fun FeedScreen(
     val gridNestedScroll = scrollBehavior.nestedScrollConnection
     val feedAutoplay by viewModel.feedAutoplay.collectAsStateWithLifecycle(true)
     val dataSaver by viewModel.dataSaver.collectAsStateWithLifecycle(false)
+    // Issue #28: the §5 video-fit pref governs tiles too — a tile's poster and
+    // its inline preview surface match what the player shows on tap-through.
+    val videoFit by viewModel.videoFit.collectAsStateWithLifecycle("fit")
     val showBlockHint by viewModel.showBlockHint.collectAsStateWithLifecycle()
     // B3: global §6 orientation filter — fallback for the per-feed pref in the
     // filtered-empty predicate (same merge as FeedPagingSource's read chain).
@@ -147,6 +151,13 @@ fun FeedScreen(
             viewModel.dismissBlockHint()
         }
     }
+    // Screen-scope per-feed prefs (#31 chip badge + #28/§8 predicates read it
+    // in BOTH the collapsing header row and the empty-state checks).
+    val feedPrefs by remember(source.baseKey) { viewModel.feedPrefs(source.baseKey) }
+        .collectAsStateWithLifecycle(
+            com.rjbiermann.giffyviewer.core.datastore
+                .FeedPrefs(),
+        )
 
     GiffyScaffold(
         title = source.title(),
@@ -162,8 +173,12 @@ fun FeedScreen(
                 Icon(Icons.Outlined.Settings, contentDescription = "settings")
             }
         },
-    ) { padding ->
-        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+        // Issue #32 (mobile): the feed-local header cluster collapses WITH the
+        // top bar — scroll-down slides it under the bar (GiffyScaffold clips +
+        // translates the topBar column); scroll-up re-reveals it and the
+        // scroll-to-top Fab resets the offset. Reduced motion: the pinned
+        // behavior never moves the offset, so the block is static.
+        collapsingHeaderExtra = {
             // #19: the tab strip moved VERBATIM into the shared FeedTabStrip —
             // one call, same chips/More menu/selected logic; onOpen stays the
             // in-place viewModel.open; ALL screen seams non-null = mobile
@@ -188,37 +203,18 @@ fun FeedScreen(
                 onOpenCustomFeeds = onOpenCustomFeeds,
             )
 
-            // Matching creators above search results (§7) — tap opens their feed.
-            val creators by viewModel.creatorResults.collectAsStateWithLifecycle(emptyList())
-            if (creators.isNotEmpty()) {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 12.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    creators.forEach { creator ->
-                        SuggestionChip(
-                            onClick = { onFeedNav(FeedSource.Creator(username = creator.username)) },
-                            label = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    CreatorLabel(creator.username, creator.verified)
-                                    Text(" · ${creator.followers}⇡")
-                                }
-                            },
-                        )
-                    }
-                }
-            }
-
-            // Creator stats header (§7/§9): v1/users counts above a creator's tiles.
+            // Feed identity headers (§7/§9 + issue #31): creator avatar/bio +
+            // niche description/counts; refreshed per source, cleared for any
+            // other source. The creator COUNTS row below stays as-is.
             LaunchedEffect(source) {
                 viewModel.refreshCreatorStats((source as? FeedSource.Creator)?.username)
+                viewModel.refreshNicheStats(nicheSourceId(source))
             }
             if (source is FeedSource.Creator) {
                 viewModel.creatorStats.collectAsStateWithLifecycle().value?.let { stats ->
+                    CreatorFeedHeader(stats)
+                    // Existing counts row (§7/§9): v1/users counts above a
+                    // creator's tiles — unchanged, not duplicated.
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -237,10 +233,15 @@ fun FeedScreen(
                     }
                 }
             }
+            if (source is FeedSource.Niche) {
+                viewModel.nicheStats.collectAsStateWithLifecycle().value?.let { detail ->
+                    NicheFeedHeader(detail)
+                }
+            }
 
             // For You scope selector (§7 Creators·Niches·All — logged-in only).
             if (source is FeedSource.ForYou && isLoggedIn) {
-                val scope by viewModel.forYouScope.collectAsStateWithLifecycle("all")
+                val activeScope by viewModel.forYouScope.collectAsStateWithLifecycle("all")
                 Row(
                     modifier =
                         Modifier
@@ -251,7 +252,7 @@ fun FeedScreen(
                 ) {
                     listOf("All" to "all", "Creators" to "creators", "Niches" to "niches").forEach { (label, value) ->
                         FilterChip(
-                            selected = scope == value,
+                            selected = activeScope == value,
                             onClick = { viewModel.setForYouScope(value) },
                             label = { Text(label) },
                         )
@@ -264,11 +265,6 @@ fun FeedScreen(
             // semantics ride the tint (chips' selected state): a saved non-default
             // sort or an active filter lights the icon.
             var showFilter by remember { mutableStateOf(false) }
-            val feedPrefs by remember(source.baseKey) { viewModel.feedPrefs(source.baseKey) }
-                .collectAsStateWithLifecycle(
-                    com.rjbiermann.giffyviewer.core.datastore
-                        .FeedPrefs(),
-                )
             val filtersActive =
                 listOf(feedPrefs.duration, feedPrefs.resolution, feedPrefs.orientation).any { it.isNotEmpty() }
             val savedSort by remember(source.baseKey) { viewModel.sortFor(source.baseKey) }
@@ -322,6 +318,35 @@ fun FeedScreen(
                     },
                     onDismiss = { showFilter = false },
                 )
+            }
+        },
+    ) { padding ->
+        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+            // Matching creators above search results (§7) — tap opens their
+            // feed. NOT part of the collapsing header (issue #32 scope): the
+            // suggestions stay pinned the way the old layout stacked them.
+            val creators by viewModel.creatorResults.collectAsStateWithLifecycle(emptyList())
+            if (creators.isNotEmpty()) {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 12.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    creators.forEach { creator ->
+                        SuggestionChip(
+                            onClick = { onFeedNav(FeedSource.Creator(username = creator.username)) },
+                            label = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    CreatorLabel(creator.username, creator.verified)
+                                    Text(" · ${creator.followers}⇡")
+                                }
+                            },
+                        )
+                    }
+                }
             }
 
             // M3 linear indicator for refresh / append activity. FIXED 4dp slot —
@@ -424,8 +449,22 @@ fun FeedScreen(
                             "long-press a tile or use ⋯ in the player → “Add to custom feed…”"
                         else -> "open any video and use ⋯ → “Favorite @creator”"
                     }
-                com.rjbiermann.giffyviewer.core.ui
-                    .EmptyState(modifier = Modifier.fillMaxSize(), message = msg, hint = hint)
+                // Issue #30: the genuinely-empty copy stays; one manual-refresh
+                // hint rides under it (the grid owns the pull-to-refresh area
+                // itself — empty and reachable).
+                Box(modifier = Modifier.fillMaxSize()) {
+                    com.rjbiermann.giffyviewer.core.ui.EmptyState(
+                        message = msg,
+                        hint = hint,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                    Text(
+                        "Pull down to refresh",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp),
+                    )
+                }
             } else {
                 // Pull-to-refresh owns revalidate (same path as the TTL
                 // revalidate); the scroll-up icon is NAVIGATION only (#23 — no
@@ -559,6 +598,7 @@ fun FeedScreen(
                                         },
                                         inlinePlayer = inlinePlayer,
                                         inlineAttached = inlineIndex == index,
+                                        videoFit = videoFit,
                                     )
                                     if (sheetFor != null) {
                                         QuickBlockSheet(
@@ -577,7 +617,15 @@ fun FeedScreen(
                         ScrollToTopFab(
                             visible = showPill,
                             onClick = {
-                                scope.launch { gridState.scrollToTop(reducedMotion) }
+                                scope.launch {
+                                    gridState.scrollToTop(reducedMotion)
+                                    // Issue #32: "top" includes the collapsed
+                                    // header — the bar slides back out, so a
+                                    // scroll-0 feed never keeps hidden tab strip
+                                    // rows. Reduced motion: the pinned behavior
+                                    // holds the offset at 0 (set is a no-op).
+                                    scrollBehavior.state.heightOffset = 0f
+                                }
                             },
                             modifier = Modifier.align(Alignment.BottomCenter),
                         )
@@ -616,6 +664,8 @@ private fun GifTile(
     inlinePlayer: GiffyPlayer? = null,
     /** This tile is the settled one — hosts the shared player's surface. */
     inlineAttached: Boolean = false,
+    /** §5 video fit for this tile's poster + inline surface (issue #28). */
+    videoFit: String = "fit",
 ) {
     Column(
         modifier =
@@ -646,7 +696,8 @@ private fun GifTile(
                 // Decorative: the visible "@user" Text announces the creator;
                 // a duplicated contentDescription read both (audit 2026-10).
                 contentDescription = null,
-                contentScale = ContentScale.Crop,
+                // Issue #28: the poster follows the player's §5 video-fit pref.
+                contentScale = videoFit.toTileContentScale(),
                 modifier = Modifier.fillMaxSize(),
             )
             if (inlinePlayer != null && inlineAttached) {
@@ -669,7 +720,20 @@ private fun GifTile(
                                 isFocusable = false
                             }
                     },
-                    update = { view -> (view as PlayerView).player = inlinePlayer },
+                    update = { view ->
+                        (view as PlayerView).apply {
+                            player = inlinePlayer
+                            // Issue #28 (same mapping as PlayerScreen's
+                            // videoFitMode): the inline surface matches the
+                            // tile's poster scale under the same §5 pref.
+                            resizeMode =
+                                if (videoFit == "crop") {
+                                    AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                                } else {
+                                    AspectRatioFrameLayout.RESIZE_MODE_FIT
+                                }
+                        }
+                    },
                     modifier = Modifier.matchParentSize(),
                 )
             }

@@ -45,19 +45,26 @@ class FeedRepository
         private suspend fun forYouContext(): ForYouContext {
             val scope = settings.forYouScope.firstOrNull() ?: "all"
             scopeCtx?.takeIf { it.scope == scope && now() - it.at < CTX_TTL_MS }?.let { return it }
+            // Issue #30: a failed follows/niches fetch must NOT degrade to an
+            // EMPTY scope filter — that dropped every row and rendered "Your
+            // For You feed is empty" for the wrong reason (an auth hiccup read
+            // exactly like a genuinely empty feed). The failure now propagates:
+            // the paging sources surface it as a load error → the UI's error
+            // state (offline retry stays available). The memo is written ONLY
+            // on success — no cache-on-failure entry, so the next page load
+            // retries the context immediately instead of honoring a 5-min
+            // empty-shaped memo.
             val followed =
                 if (scope == "creators") {
-                    runCatching { api.followedCreators() }.getOrDefault(emptyList()).mapTo(HashSet()) { it.lowercase() }
+                    api.followedCreators().mapTo(HashSet()) { it.lowercase() }
                 } else {
                     emptySet()
                 }
             val joinedTags =
                 if (scope == "niches") {
-                    runCatching { api.followedNiches() }
-                        .getOrDefault(
-                            com.rjbiermann.giffyviewer.core.network
-                                .FollowedNichesDto(),
-                        ).niches
+                    api
+                        .followedNiches()
+                        .niches
                         .flatMapTo(HashSet()) { n -> n.tags.map(String::lowercase) }
                 } else {
                     emptySet()

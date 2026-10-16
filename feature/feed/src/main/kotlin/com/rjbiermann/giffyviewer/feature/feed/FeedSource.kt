@@ -144,6 +144,12 @@ fun feedPageKey(
 /** Page number back out of a "base:p<n>" key. */
 fun pageNumber(pageKey: String?): Int? = pageKey?.substringAfterLast(":p", "")?.toIntOrNull()
 
+/** Issue #31 niche-header gate (pure, unit-tested): only a niche feed owns the
+ *  niche stats header; every other source maps to null = the clear call
+ *  (refreshNicheStats(null) clears the StateFlow exactly like the creator
+ *  header's null gate does). */
+fun nicheSourceId(source: FeedSource): String? = (source as? FeedSource.Niche)?.id
+
 /** A feed's UI-facing identity for titles. */
 fun FeedSource.title(): String =
     when (this) {

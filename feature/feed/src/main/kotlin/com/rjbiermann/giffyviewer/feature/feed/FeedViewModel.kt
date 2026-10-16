@@ -442,6 +442,32 @@ class FeedViewModel
             }
         }
 
+        /** Niche stats header (v2/niches/{id}, verified — issue #31: the niche
+         *  feed previously rendered no header at all). Same contract as the
+         *  creator stats: a non-niche source (or a failed fetch) clears the
+         *  flow → no header. The nicheHeaderSourceId gate maps any other feed
+         *  to the null clear-call (unit-tested). */
+        private val _nicheStats = MutableStateFlow<com.rjbiermann.giffyviewer.core.network.NicheDetail?>(null)
+        val nicheStats: StateFlow<com.rjbiermann.giffyviewer.core.network.NicheDetail?> = _nicheStats
+
+        fun refreshNicheStats(nicheId: String?) {
+            viewModelScope.launch {
+                if (nicheId == null) {
+                    _nicheStats.value = null
+                    return@launch
+                }
+                runCatching { withContext(Dispatchers.IO) { api.nicheDetail(nicheId) } }
+                    .onSuccess { _nicheStats.value = it.niche }
+                    .onFailure { _nicheStats.value = null }
+            }
+        }
+
+        /** §5 video fit (fit | crop) — the mobile grid's posters and the
+         *  inline preview surface follow the player's setting (issue #28). */
+        val videoFit: StateFlow<String> =
+            settings.videoFit
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "fit")
+
         /** For You scope (§7 Creators·Niches·All, logged-in; default All). */
         val forYouScope: StateFlow<String> =
             settings.forYouScope
