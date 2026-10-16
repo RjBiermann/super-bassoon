@@ -20,6 +20,7 @@ on:
 
 permissions:
   contents: write
+  actions: write # dispatch release.yml (the GITHUB_TOKEN tag push doesn't fire push triggers)
 
 # One cut at a time — two dispatches must not race toward the same tag.
 concurrency:
@@ -124,6 +125,22 @@ jobs:
           # git itself rejects the push.
           git tag "$NEXT" "$GITHUB_SHA"
           git push origin "refs/tags/$NEXT"
+
+      # A push made with GITHUB_TOKEN does NOT fire release.yml's push trigger
+      # (the 2026-10-16 v0.5.0 cut had to be dispatched manually). The API
+      # workflow_dispatch DOES start the target workflow, so chain it here —
+      # contents+actions:write in the job scope below.
+      - name: Dispatch release.yml on the new tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEXT: ${{ steps.calc.outputs.next }}
+        run: |
+          set -euo pipefail
+          if ! gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/$NEXT" >/dev/null 2>&1; then
+            echo "::error::tag $NEXT missing on remote — refusing to dispatch release"; exit 1
+          fi
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$NEXT"
+          echo "dispatched release.yml @ $NEXT"
 
       - name: Summary
         run: |
