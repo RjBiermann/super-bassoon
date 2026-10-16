@@ -40,7 +40,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -54,7 +53,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -78,6 +76,7 @@ import com.rjbiermann.giffyviewer.core.ui.GiffyScaffold
 import com.rjbiermann.giffyviewer.core.ui.SCROLL_TO_TOP_THRESHOLD
 import com.rjbiermann.giffyviewer.core.ui.ScrollToTopFab
 import com.rjbiermann.giffyviewer.core.ui.avgColorOr
+import com.rjbiermann.giffyviewer.core.ui.rememberGiffyCollapseState
 import com.rjbiermann.giffyviewer.core.ui.rememberReducedMotion
 import com.rjbiermann.giffyviewer.core.ui.rememberScrollingUp
 import com.rjbiermann.giffyviewer.core.ui.scrollToTop
@@ -117,19 +116,13 @@ fun FeedScreen(
     val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle(false)
     val items = viewModel.gifs.collectAsLazyPagingItems()
     val context = LocalContext.current
-    // Content-first top bar (user report: the title/actions stayed static while
-    // scrolling): M3 enterAlways — the bar collapses on scroll-down, re-reveals
-    // on scroll-up, wired to the staggered grid via nestedScroll. The behavior
-    // flattens to a static bar when motion is scaled to 0 (reduced-motion rule,
-    // same pattern as the ScrollToTopFab scroll-to-top).
     val reducedMotion = rememberReducedMotion()
-    val scrollBehavior =
-        if (reducedMotion) {
-            TopAppBarDefaults.pinnedScrollBehavior()
-        } else {
-            TopAppBarDefaults.enterAlwaysScrollBehavior()
-        }
-    val gridNestedScroll = scrollBehavior.nestedScrollConnection
+    // Issue #32: the WHOLE top section (title bar + tab strip + headers + chips
+    // + filter row) folds on scroll-down and re-expands on scroll-up — owned by
+    // GiffyCollapseState (M3's own behavior collapses only the bar; device-pass
+    // 2026-10-16). Reduced motion → no state → static block.
+    val collapsePx = rememberGiffyCollapseState()
+    LaunchedEffect(source) { collapsePx.reset() }
     val feedAutoplay by viewModel.feedAutoplay.collectAsStateWithLifecycle(true)
     val dataSaver by viewModel.dataSaver.collectAsStateWithLifecycle(false)
     // Issue #28: the §5 video-fit pref governs tiles too — a tile's poster and
@@ -163,7 +156,8 @@ fun FeedScreen(
         title = source.title(),
         onBack = null,
         modifier = modifier.fillMaxSize(),
-        scrollBehavior = scrollBehavior,
+        scrollBehavior = null,
+        collapseState = if (reducedMotion) null else collapsePx,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         actions = {
             IconButton(onClick = onOpenSearch) {
@@ -573,7 +567,7 @@ fun FeedScreen(
                         LazyVerticalStaggeredGrid(
                             state = gridState,
                             columns = StaggeredGridCells.Fixed(gridColumns),
-                            modifier = Modifier.fillMaxSize().nestedScroll(gridNestedScroll),
+                            modifier = Modifier.fillMaxSize(),
                             // Tiles scroll under the system nav (edge-to-edge);
                             // the inset is a contentPadding, not dead space.
                             contentPadding =
@@ -620,11 +614,9 @@ fun FeedScreen(
                                 scope.launch {
                                     gridState.scrollToTop(reducedMotion)
                                     // Issue #32: "top" includes the collapsed
-                                    // header — the bar slides back out, so a
-                                    // scroll-0 feed never keeps hidden tab strip
-                                    // rows. Reduced motion: the pinned behavior
-                                    // holds the offset at 0 (set is a no-op).
-                                    scrollBehavior.state.heightOffset = 0f
+                                    // header — re-expand the block so a
+                                    // scroll-0 feed never keeps hidden rows.
+                                    collapsePx.reset()
                                 }
                             },
                             modifier = Modifier.align(Alignment.BottomCenter),
