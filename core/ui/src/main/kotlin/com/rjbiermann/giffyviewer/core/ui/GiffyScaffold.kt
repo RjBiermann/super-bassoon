@@ -99,7 +99,12 @@ fun GiffyScaffold(
                     topColumn
                         .onSizeChanged { if (useCollapse) collapseState!!.totalPx = it.height },
             ) {
-                OfflineBanner()
+                // Issue #33: gated by the LocalIsOnline carrier (TV's Root
+                // overlay owns its own read; TV shared screens keep the
+                // default-true = no double banner).
+                if (offlineBannerVisible(LocalIsOnline.current)) {
+                    OfflineBanner()
+                }
                 TopAppBar(
                     title = { Text(title) },
                     navigationIcon = {

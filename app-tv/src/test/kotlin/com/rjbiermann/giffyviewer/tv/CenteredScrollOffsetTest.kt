@@ -1,38 +1,48 @@
 package com.rjbiermann.giffyviewer.tv
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * #14 §B: the pure centering math behind the focused-row scrollToItem offset —
- * the offset leans an item of itemWidthPx toward the middle of the content
- * area (viewport minus the 16dp leading padding on both sides).
+ * #14 §B (device pass 2026-10-16): the focused-row centering moved from a
+ * programmatic scrollToItem (breaks the focused item's a11y state — see
+ * RowCentering.kt) to a BringIntoViewSpec. The pure math contract: an item
+ * left of center scrolls RIGHT (positive), right of center scrolls LEFT
+ * (negative), a centered item never scrolls; the deadband absorbs small
+ * offsets so focus steps that land near center don't jitter.
  */
 class CenteredScrollOffsetTest {
+    private val spec = centeredBringIntoViewSpec(deadbandPx = 48)
+
     @Test
-    fun `centers a card in the padded viewport`() {
-        // (800 - 2×50 - 300) / 2 = 200 px past the padded start.
-        assertEquals(200, centeredScrollOffset(800, 300, 50, 48))
+    fun `item left of center scrolls right to the middle`() {
+        // Viewport 800, card 300 at offset 100: center slot = (800-300)/2 = 250
+        // → distance = 100 - 250 = -150 → NEGATIVE scrolls the content LEFT
+        // (brings the right-side card toward center).
+        assertEquals(-150f, spec.calculateScrollDistance(100f, 300f, 800f), 0.01f)
     }
 
     @Test
-    fun `inside the deadband returns null so small focus steps don't jitter`() {
-        // (800 - 100 - 636) / 2 = 32 ≤ 48 → no scroll.
-        assertNull(centeredScrollOffset(800, 636, 50, 48))
-        // EXACT-deadband boundary also counts as "already centered".
-        assertNull(centeredScrollOffset(800, 604, 50, 48))
+    fun `item right of center scrolls left to the middle`() {
+        // Card at offset 600 in an 800 viewport: 600 - 250 = +350.
+        assertEquals(350f, spec.calculateScrollDistance(600f, 300f, 800f), 0.01f)
     }
 
     @Test
-    fun `negative offset pulls an early card right - scrollToItem accepts it`() {
-        // Item wider than the content area → leans as far right as it can.
-        assertEquals(-100, centeredScrollOffset(800, 900, 50, 48))
+    fun `centered item never scrolls`() {
+        assertEquals(0f, spec.calculateScrollDistance(250f, 300f, 800f), 0.01f)
     }
 
     @Test
-    fun `degenerate inputs never scroll`() {
-        assertNull(centeredScrollOffset(0, 300, 50, 48))
-        assertNull(centeredScrollOffset(800, 0, 50, 48))
+    fun `inside the deadband returns zero so small offsets don't jitter`() {
+        // Distance 32 ≤ 48 → no scroll.
+        assertEquals(0f, spec.calculateScrollDistance(282f, 300f, 800f), 0.01f)
+    }
+
+    @Test
+    fun `zero deadband centers exactly every step`() {
+        val exact = centeredBringIntoViewSpec(deadbandPx = 0)
+        // Same offset that the deadband spec absorbed now scrolls exactly.
+        assertEquals(32f, exact.calculateScrollDistance(282f, 300f, 800f), 0.01f)
     }
 }

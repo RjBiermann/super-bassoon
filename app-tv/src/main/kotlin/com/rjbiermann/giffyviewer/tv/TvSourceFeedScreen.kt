@@ -49,6 +49,7 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButton
 import androidx.tv.material3.IconButtonDefaults
 import com.rjbiermann.giffyviewer.core.model.Gif
+import com.rjbiermann.giffyviewer.core.ui.EmptyState
 import com.rjbiermann.giffyviewer.feature.feed.CreatorFeedHeader
 import com.rjbiermann.giffyviewer.feature.feed.FeedFilterDialog
 import com.rjbiermann.giffyviewer.feature.feed.FeedRepository
@@ -141,6 +142,10 @@ fun TvSourceFeedScreen(
                     .FeedPrefs(),
         )
     var showFilter by remember { mutableStateOf(false) }
+    // F4 (TV e2e sweep): the honest-empty predicate needs the GLOBAL §6
+    // orientation under the per-feed override, same merge as mobile FeedScreen.
+    val globalOrientation by feedViewModel.orientationFilter.collectAsStateWithLifecycle("any")
+    val verifiedOnlyPref by feedViewModel.verifiedOnly.collectAsStateWithLifecycle(false)
     // Issue #28: the §5 video-fit pref governs the grid tiles (ONE collect at
     // the parent; "fit" is the default and leaves the cards unchanged — TV
     // no-jump invariant).
@@ -172,62 +177,30 @@ fun TvSourceFeedScreen(
     }
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Title + creator stats (v1/users — site-profile counts, tiles-only
-            // feeds) with the Refresh / Sort&filter icons aligned TopEnd above
-            // them (same top region as before — the grid now flows BELOW the
-            // #19 tab strip instead of clearing a fixed 44dp title band).
+            // Title row + creator/niche headers (#31) with the Refresh /
+            // Sort&filter icons BESIDE the title — the old Box-overlay put
+            // them on top of the title text (device pass: "Se [icon][icon]:
+            // yoga"); the icons' right side hosts them now (title weight(1f)).
             LaunchedEffect(source) {
                 feedViewModel.refreshCreatorStats((source as? FeedSource.Creator)?.username)
                 // Issue #31: the header gate clears the niche stats for every
                 // non-niche source (same null-clear call as the creator's).
                 feedViewModel.refreshNicheStats(nicheSourceId(source))
             }
-            Box {
-                Column {
-                    val stats by feedViewModel.creatorStats.collectAsStateWithLifecycle()
-                    Text(
-                        text = source.title(),
-                        // F8 (batch 15): same slot as mobile's GiffyScaffold title.
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 0.dp),
-                    )
-                    if (source is FeedSource.Creator) {
-                        stats?.let { s ->
-                            // Issue #31: identity row (avatar + @user + bio)
-                            // above the existing counts row (kept verbatim).
-                            CreatorFeedHeader(s)
-                            Text(
-                                text =
-                                    "%,d posts · %,d followers · %,d views".format(
-                                        java.util.Locale.US,
-                                        s.gifs,
-                                        s.followers,
-                                        s.views,
-                                    ),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(start = 16.dp, bottom = 4.dp),
-                            )
-                        }
-                    }
-                    if (source is FeedSource.Niche) {
-                        // Issue #31: the niche feed previously rendered NO
-                        // header at all — same shared mount, under the title.
-                        feedViewModel.nicheStats.collectAsStateWithLifecycle().value?.let { detail ->
-                            NicheFeedHeader(detail)
-                        }
-                    }
-                }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = source.title(),
+                    // F8 (batch 15): same slot as mobile's GiffyScaffold title.
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.weight(1f).padding(start = 16.dp),
+                )
                 // Top-end icon row (§6 #22 + #18): Refresh (forced generation) and the
                 // ONE Sort & filter entry (sort + filters + clear inside the shared
                 // FeedFilterDialog). Focus = issue-#7 tokens on tv-material
                 // IconButton (§3.1, tinted via the scheme); the old giffyFocus
                 // ring is retired.
                 Row(
-                    modifier =
-                        Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(end = 16.dp, top = 8.dp),
+                    modifier = Modifier.padding(end = 16.dp, top = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     val refreshInteraction = remember { MutableInteractionSource() }
@@ -264,6 +237,34 @@ fun TvSourceFeedScreen(
                     ) {
                         Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort & filter")
                     }
+                }
+            }
+            // Creator/niche identity headers (#31) — full width, BELOW the
+            // title/icon row.
+            if (source is FeedSource.Creator) {
+                feedViewModel.creatorStats.collectAsStateWithLifecycle().value?.let { s ->
+                    // Issue #31: identity row (avatar + @user + bio)
+                    // above the existing counts row (kept verbatim).
+                    CreatorFeedHeader(s)
+                    Text(
+                        text =
+                            "%,d posts · %,d followers · %,d views".format(
+                                java.util.Locale.US,
+                                s.gifs,
+                                s.followers,
+                                s.views,
+                            ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 16.dp, bottom = 4.dp),
+                    )
+                }
+            }
+            if (source is FeedSource.Niche) {
+                // Issue #31: the niche feed previously rendered NO header at
+                // all — same shared mount, under the title.
+                feedViewModel.nicheStats.collectAsStateWithLifecycle().value?.let { detail ->
+                    NicheFeedHeader(detail)
                 }
             }
             // #19: the shared tab strip — same fixed set as mobile (For You when
@@ -331,9 +332,43 @@ fun TvSourceFeedScreen(
                 // End-of-feed footer (#22): composed AFTER the item slots, keyed off
                 // load states — never a pager item, never inside snapshot(). The
                 // button reuses the §6 refresh plumbing.
-                val refreshSettled = gifs.loadState.refresh is LoadState.NotLoading
+                // F4 (TV e2e sweep 2026-10-16): a FAILED refresh with zero cached
+                // rows composed NOTHING — blank body, no error copy (the old
+                // settled-only footer never rendered) — and a settled-empty feed
+                // said "End of feed" over zero tiles. Same honest contract as
+                // mobile FeedScreen; Refresh stays D-pad reachable in every state.
+                val refreshState = gifs.loadState.refresh
                 val append = gifs.loadState.append as? LoadState.NotLoading
-                if (refreshSettled && append != null && (append.endOfPaginationReached || gifs.itemCount == 0)) {
+                val filteredEmpty =
+                    feedPrefs.duration.isNotEmpty() ||
+                        feedPrefs.resolution.isNotEmpty() ||
+                        feedPrefs.orientation.ifEmpty { globalOrientation } != "any" ||
+                        feedPrefs.untaggedOnly ||
+                        verifiedOnlyPref
+                if (gifs.itemCount == 0 && refreshState is LoadState.Error) {
+                    item(span = StaggeredGridItemSpan.FullLine) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            EmptyState(message = "Something went wrong", hint = "Retry the feed")
+                            RefreshFooterButton(onClick = ::refreshAndReturnToTop)
+                        }
+                    }
+                } else if (gifs.itemCount == 0 && refreshState is LoadState.NotLoading && append?.endOfPaginationReached == true) {
+                    item(span = StaggeredGridItemSpan.FullLine) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            EmptyState(
+                                message = if (filteredEmpty) "No videos match this filter" else "No videos here yet",
+                                hint = if (filteredEmpty) "Clear or loosen the filters (Sort & filter above)" else null,
+                            )
+                            RefreshFooterButton(onClick = ::refreshAndReturnToTop)
+                        }
+                    }
+                } else if (refreshState is LoadState.NotLoading && append != null && append.endOfPaginationReached) {
                     item(span = StaggeredGridItemSpan.FullLine) {
                         Column(
                             modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
@@ -344,24 +379,7 @@ fun TvSourceFeedScreen(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            val endInteraction = remember { MutableInteractionSource() }
-                            Button(
-                                onClick = { refreshAndReturnToTop() },
-                                interactionSource = endInteraction,
-                                colors =
-                                    ButtonDefaults.colors(
-                                        containerColor = Color.Transparent,
-                                        contentColor = MaterialTheme.colorScheme.onSurface,
-                                        focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                        focusedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    ),
-                                border =
-                                    ButtonDefaults.border(
-                                        focusedBorder =
-                                            Border(BorderStroke(3.dp, MaterialTheme.colorScheme.primary)),
-                                    ),
-                                modifier = Modifier.padding(top = 4.dp),
-                            ) { TvText("Refresh") }
+                            RefreshFooterButton(onClick = ::refreshAndReturnToTop)
                         }
                     }
                 }
@@ -448,3 +466,27 @@ class TvNicheFeedViewModel
                     repository.paging(src, forceRefresh = forced).cachedIn(viewModelScope)
                 }
     }
+
+/** F4: the footer Refresh button (error / empty / end-of-feed states share it) —
+ *  issue-#7 tv-material focus tokens, same look the old inline footer had. */
+@Composable
+private fun RefreshFooterButton(onClick: () -> Unit) {
+    val endInteraction = remember { MutableInteractionSource() }
+    Button(
+        onClick = onClick,
+        interactionSource = endInteraction,
+        colors =
+            ButtonDefaults.colors(
+                containerColor = Color.Transparent,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                focusedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            ),
+        border =
+            ButtonDefaults.border(
+                focusedBorder =
+                    Border(BorderStroke(3.dp, MaterialTheme.colorScheme.primary)),
+            ),
+        modifier = Modifier.padding(top = 4.dp),
+    ) { TvText("Refresh") }
+}

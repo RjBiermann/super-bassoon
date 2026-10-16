@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -335,10 +336,10 @@ private fun CreatorRow(
     restoredItem: Int = -1,
     onFocusSaved: (Int) -> Unit = {},
 ) {
-    // Focused-row centering (#14 §B) — declared first so the §4.3 restore
-    // effect can anchor on the same row state (its saveable LazyListState
-    // also restores the horizontal offset on re-entry for free).
-    val (centeringState, onCardFocus) = rememberCenteringRow(loading = false)
+    // Focused-row centering (#14 §B): the row scrolls via the bring-into-view
+    // pipeline (CenteredRow) — see RowCentering.kt for why programmatic
+    // scrollToItem must not run while an item is focused.
+    val rowState = rememberLazyListState()
     // Issue #13 §4.3: re-arm the saved card once per entry appearance (the
     // latch is deliberately NOT saveable — it must reset per re-entry while
     // the saved index rides the host's saveables).
@@ -351,7 +352,7 @@ private fun CreatorRow(
         if (focusRearmed || restoredItem !in creators.indices) return@LaunchedEffect
         focusRearmed = true
         // Scroll is suspend: the saved card is composed when this returns.
-        centeringState.scrollToItem(restoredItem.coerceAtLeast(0))
+        rowState.scrollToItem(restoredItem.coerceAtLeast(0))
         runCatching { rowFocus.requestFocus() }
     }
 
@@ -372,7 +373,7 @@ private fun CreatorRow(
             }
         }
         androidx.compose.foundation.lazy.LazyRow(
-            state = centeringState,
+            state = rowState,
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -384,7 +385,6 @@ private fun CreatorRow(
                         Modifier
                             .then(if (i == restoredItem) Modifier.focusRequester(rowFocus) else Modifier)
                             .onFocusChanged { focus ->
-                                onCardFocus(i, focus.isFocused)
                                 if (focus.isFocused && rowKey.isNotEmpty()) onFocusSaved(i)
                             },
                 ) {
@@ -447,8 +447,7 @@ private fun FeedRow(
     // Focused-row centering (#14 §B) — declared first so the §4.3 restore
     // effect can anchor on the same row state (its saveable LazyListState
     // also restores the horizontal offset on re-entry for free).
-    val (centeringState, onCardFocus) =
-        rememberCenteringRow(loading = gifs.loadState.refresh is LoadState.Loading)
+    val rowState = rememberLazyListState()
     // Issue #13 §4.3: re-arm the saved card once per entry appearance. The
     // latch is deliberately NOT saveable — it resets per re-entry, while the
     // saved index itself rides the host's saveables (savedItem -1 = fresh
@@ -459,7 +458,7 @@ private fun FeedRow(
         if (restoredItem < 0 || focusRearmed || gifs.itemCount <= restoredItem) return@LaunchedEffect
         focusRearmed = true
         // Scroll is suspend: the saved card is composed when this returns.
-        centeringState.scrollToItem(restoredItem.coerceAtLeast(0))
+        rowState.scrollToItem(restoredItem.coerceAtLeast(0))
         runCatching { rowFocus.requestFocus() }
     }
     // Reserve the row's space while paging loads — a zero-height row that pops
@@ -496,31 +495,30 @@ private fun FeedRow(
                 modifier = Modifier.padding(start = 8.dp),
             ) { Text("Retry") }
         }
-        // (#14 §B centering declaration moved to the top: the §4.3 restore
-        // effect anchors on the same row state.)
-        LazyRow(
-            state = centeringState,
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            items(count = gifs.itemCount, key = { i -> gifs[i]?.id ?: "pending$i" }) { i ->
-                gifs[i]?.let { gif ->
-                    GifCard(
-                        gif,
-                        Modifier
-                            .width(cardWidth(gif, rowHeight))
-                            .then(if (i == restoredItem) Modifier.focusRequester(rowFocus) else Modifier),
-                        onMenu = { viaHold -> onMenu(gif, source, viaHold) },
-                        onFocusChange = { focused ->
-                            onCardFocus(i, focused)
-                            if (focused && rowKey.isNotEmpty()) onFocusSaved(i)
-                        },
-                        onClick = { onOpenGif(snapshot(gifs), gifs.indexOf(gif.id)) },
-                        preview = preview,
-                        dataSaver = dataSaver,
-                        videoFit = videoFit,
-                        rowHeight = rowHeight,
-                    )
+        CenteredRow(deadband = 0.dp) {
+            LazyRow(
+                state = rowState,
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                items(count = gifs.itemCount, key = { i -> gifs[i]?.id ?: "pending$i" }) { i ->
+                    gifs[i]?.let { gif ->
+                        GifCard(
+                            gif,
+                            Modifier
+                                .width(cardWidth(gif, rowHeight))
+                                .then(if (i == restoredItem) Modifier.focusRequester(rowFocus) else Modifier),
+                            onMenu = { viaHold -> onMenu(gif, source, viaHold) },
+                            onFocusChange = { focused ->
+                                if (focused && rowKey.isNotEmpty()) onFocusSaved(i)
+                            },
+                            onClick = { onOpenGif(snapshot(gifs), gifs.indexOf(gif.id)) },
+                            preview = preview,
+                            dataSaver = dataSaver,
+                            videoFit = videoFit,
+                            rowHeight = rowHeight,
+                        )
+                    }
                 }
             }
         }

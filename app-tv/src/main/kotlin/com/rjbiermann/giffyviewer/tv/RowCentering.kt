@@ -1,71 +1,56 @@
 package com.rjbiermann.giffyviewer.tv
 
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.snap
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.BringIntoViewSpec
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import kotlin.math.abs
 
 /**
- * #14 §B — pure helper: the scrollToItem offset (px) that centers an item of
- * [itemWidthPx] in a viewport of [viewportPx] whose content area starts
- * [leadingPaddingPx] in; null = already centered (the [deadbandPx] deadband,
- * ~±48dp at call sites, so small focus steps don't jitter). Pixel-based —
- * callers resolve dp against their own density.
+ * #14 §B — the CENTERED bring-into-view spec for LazyRows hosting focusable
+ * cards: when a card gains focus its own focusable emits a bring-into-view
+ * request and the row scrolls it to center — through the FOCUS pipeline,
+ * never a programmatic scrollToItem.
+ *
+ * Device pass 2026-10-16 (TV home, F1 repro ×6): ANY programmatic
+ * scrollToItem while an item is focused — a valid snap or an
+ * impossible-then-clamped one — strips the item's a11y focus state and
+ * focus indication (RIGHT/DOWN read focus-lost every step; only LEFT's
+ * in-deadband steps re-armed; Compose logical focus itself survives —
+ * Center still opened the card). The bring-into-view pipeline is the
+ * platform path for focus-driven scrolls and does not disturb focus.
+ * [snap] keeps the #14 "no per-step animation lag" rule; the deadband
+ * (±[deadbandPx]) keeps small focus steps from jittering.
  */
-internal fun centeredScrollOffset(
-    viewportPx: Int,
-    itemWidthPx: Int,
-    leadingPaddingPx: Int,
-    deadbandPx: Int,
-): Int? {
-    if (viewportPx <= 0 || itemWidthPx <= 0) return null
-    val offset = (viewportPx - 2 * leadingPaddingPx - itemWidthPx) / 2
-    return if (abs(offset) <= deadbandPx) null else offset
-}
+@OptIn(ExperimentalFoundationApi::class)
+internal fun centeredBringIntoViewSpec(deadbandPx: Int): BringIntoViewSpec =
+    object : BringIntoViewSpec {
+        override fun calculateScrollDistance(
+            offset: Float,
+            size: Float,
+            containerSize: Float,
+        ): Float {
+            val distance = offset - (containerSize - size) / 2f
+            return if (abs(distance) <= deadbandPx) 0f else distance
+        }
 
-/** Focused index + instant-recenter wiring shared by FeedRow/CreatorRow. */
-internal data class RowCenterer(
-    val state: LazyListState,
-    /** (item index, gained|lost focus) — tracks the row's focused card; a
-     *  focus MOVE between cards fires loss/gain in either order, so the
-     *  loss branch only clears its own index. */
-    val onFocus: (index: Int, focused: Boolean) -> Unit,
-)
+        override val scrollAnimationSpec: AnimationSpec<Float> = snap()
+    }
 
-/**
- * #14 §B wiring: one remembered list state + the focused-card index; on every
- * focus change (and again when a loading row settles) the focused card is
- * INSTANTLY re-centered (scrollToItem — no per-step animation lag on the
- * D-pad). Only the row the focus moved in reacts; vertical traversal never
- * recenters (leaving a row clears its own index via the loss branch).
- */
+/** Provides [centeredBringIntoViewSpec] to the LazyRow it wraps. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun rememberCenteringRow(loading: Boolean): RowCenterer {
-    val state = rememberLazyListState()
-    var focusedIndex by remember { mutableStateOf<Int?>(null) }
-    val density = LocalDensity.current
-    // Same 16dp as the rows' LazyRow contentPadding; deadband ~±48dp (doc).
-    val leadingPaddingPx = remember(density) { with(density) { 16.dp.roundToPx() } }
-    val deadbandPx = remember(density) { with(density) { 48.dp.roundToPx() } }
-    LaunchedEffect(focusedIndex, loading) {
-        val index = focusedIndex
-        if (index == null || loading) return@LaunchedEffect
-        val info = state.layoutInfo
-        val target = info.visibleItemsInfo.firstOrNull { it.index == index } ?: return@LaunchedEffect
-        centeredScrollOffset(info.viewportSize.width, target.size, leadingPaddingPx, deadbandPx)?.let {
-            state.scrollToItem(index, it)
-        }
-    }
-    return remember {
-        RowCenterer(state) { index, focused ->
-            if (focused || focusedIndex == index) focusedIndex = if (focused) index else null
-        }
-    }
+internal fun CenteredRow(
+    deadband: Dp,
+    content: @Composable () -> Unit,
+) {
+    val deadbandPx = with(LocalDensity.current) { deadband.roundToPx() }
+    val spec = remember(deadbandPx) { centeredBringIntoViewSpec(deadbandPx) }
+    CompositionLocalProvider(LocalBringIntoViewSpec provides spec) { content() }
 }
