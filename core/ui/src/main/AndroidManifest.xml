@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Issue #33: the module CALLS ConnectivityManager (NetworkMonitor) — the
+     permission must be visible to the lint call site; merges into both apps
+     (they also declare it for their own banner wiring). -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+</manifest>

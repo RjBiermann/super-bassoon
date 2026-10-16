@@ -17,7 +17,6 @@ android {
 }
 
 dependencies {
-    testImplementation(libs.junit)
     api(platform(libs.compose.bom))
     api(libs.compose.ui)
     api(libs.compose.foundation)
@@ -25,6 +24,8 @@ dependencies {
     api(libs.compose.material3.window.size)
     implementation(libs.material.icons)
     implementation(libs.material.icons.extended)
+
+    testImplementation(libs.junit)
 }
 
 kotlin {

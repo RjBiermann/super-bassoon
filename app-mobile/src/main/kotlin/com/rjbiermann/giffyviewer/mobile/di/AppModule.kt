@@ -17,6 +17,7 @@ import com.rjbiermann.giffyviewer.core.network.GifsApi
 import com.rjbiermann.giffyviewer.core.network.NetworkComponents
 import com.rjbiermann.giffyviewer.core.network.buildNetwork
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
+import com.rjbiermann.giffyviewer.core.ui.NetworkMonitor
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -65,6 +66,13 @@ object AppModule {
 
     @Provides
     fun api(network: NetworkComponents): GifsApi = network.api
+
+    /** Issue #33: OS connectivity behind the offline banner (TokenStore shape). */
+    @Provides
+    @Singleton
+    fun networkMonitor(
+        @ApplicationContext context: Context,
+    ): NetworkMonitor = NetworkMonitor(context)
 
     @Provides
     @Singleton

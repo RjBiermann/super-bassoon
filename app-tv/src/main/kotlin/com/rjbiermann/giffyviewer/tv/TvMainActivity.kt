@@ -26,6 +26,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -47,6 +48,9 @@ import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.ui.Feature
 import com.rjbiermann.giffyviewer.core.ui.GiffyTheme
+import com.rjbiermann.giffyviewer.core.ui.NetworkMonitor
+import com.rjbiermann.giffyviewer.core.ui.OfflineBanner
+import com.rjbiermann.giffyviewer.core.ui.offlineBannerVisible
 import com.rjbiermann.giffyviewer.feature.auth.DebugSignIn
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
@@ -114,6 +118,9 @@ class TvMainActivity : ComponentActivity() {
 
     @Inject lateinit var tokenStore: TokenStore
 
+    /** Issue #33: OS connectivity behind the offline banner. */
+    @Inject lateinit var networkMonitor: NetworkMonitor
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Debug-only sign-in injection (Stream-G device gates): the token
@@ -158,6 +165,10 @@ class TvMainActivity : ComponentActivity() {
 
     @Composable
     private fun Root() {
+        // Issue #33: banner is an OVERLAY here (TV never provides LocalIsOnline,
+        // so TV-hosted shared screens can't double-banner), inside the overscan
+        // margins, non-focusable by construction (no click/D-pad target).
+        val online by networkMonitor.isOnline.collectAsStateWithLifecycle(initialValue = true)
         val confirmed by settings.ageConfirmed.collectAsStateWithLifecycle(initialValue = false)
         // Issue #13 §4.2: age gate + PIN stay OUTSIDE the NavHost (gating, not
         // navigation). unlocked is deliberately NOT saveable — same as today,
@@ -165,20 +176,32 @@ class TvMainActivity : ComponentActivity() {
         val pinHash by settings.pinHash.collectAsStateWithLifecycle(initialValue = null)
         var unlocked by remember { mutableStateOf(false) }
         // PLAN §1: 5% overscan margins on TV — content never touches the bezel.
-        Column(modifier = Modifier.fillMaxSize().padding(horizontal = 48.dp, vertical = 27.dp)) {
-            when {
-                pinHash != null && !unlocked ->
-                    com.rjbiermann.giffyviewer.core.ui.PinLockScreen(
-                        onUnlock = { unlocked = true },
-                        verifyPin = { settings.verifyPin(it) },
-                    )
-                !confirmed ->
-                    com.rjbiermann.giffyviewer.core.ui.AgeGate(
-                        onConfirmed = { settings.confirmAge() },
-                        onExit = ::finishAffinity,
-                        requestInitialFocus = true,
-                    )
-                else -> TvNav()
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 48.dp, vertical = 27.dp),
+            ) {
+                when {
+                    pinHash != null && !unlocked ->
+                        com.rjbiermann.giffyviewer.core.ui.PinLockScreen(
+                            onUnlock = { unlocked = true },
+                            verifyPin = { settings.verifyPin(it) },
+                        )
+                    !confirmed ->
+                        com.rjbiermann.giffyviewer.core.ui.AgeGate(
+                            onConfirmed = { settings.confirmAge() },
+                            onExit = ::finishAffinity,
+                            requestInitialFocus = true,
+                        )
+                    else -> TvNav()
+                }
+            }
+            if (offlineBannerVisible(online)) {
+                OfflineBanner(
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(horizontal = 48.dp, vertical = 27.dp),
+                )
             }
         }
     }

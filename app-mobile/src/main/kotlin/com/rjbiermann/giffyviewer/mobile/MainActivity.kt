@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,6 +32,8 @@ import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.ui.AgeGate
 import com.rjbiermann.giffyviewer.core.ui.GiffyTheme
 import com.rjbiermann.giffyviewer.core.ui.LayoutHint
+import com.rjbiermann.giffyviewer.core.ui.LocalIsOnline
+import com.rjbiermann.giffyviewer.core.ui.NetworkMonitor
 import com.rjbiermann.giffyviewer.core.ui.PinLockScreen
 import com.rjbiermann.giffyviewer.core.ui.layoutHint
 import com.rjbiermann.giffyviewer.feature.auth.DebugSignIn
@@ -110,6 +113,9 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var db: GiffyDatabase
 
+    /** Issue #33: OS connectivity behind the offline banner. */
+    @Inject lateinit var networkMonitor: NetworkMonitor
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Debug-only sign-in injection (Stream-G device gates): the token
@@ -130,7 +136,11 @@ class MainActivity : ComponentActivity() {
         val windowSize = calculateWindowSizeClass(this)
         val columnsOverride by settings.gridColumns.collectAsStateWithLifecycle(initialValue = 0)
         val hint = layoutHint(windowSize.widthSizeClass, columnsOverride)
-        GiffyTheme(amoled = amoled) { Host(hint) }
+        // Issue #33: the offline banner reads OS connectivity app-wide.
+        val online by networkMonitor.isOnline.collectAsStateWithLifecycle(initialValue = true)
+        GiffyTheme(amoled = amoled) {
+            CompositionLocalProvider(LocalIsOnline provides online) { Host(hint) }
+        }
     }
 
     @Composable

@@ -42,6 +42,8 @@ import androidx.compose.ui.layout.onSizeChanged
  * up with the collapse so the viewport re-claims the strip; scrolling up
  * re-expands continuously ("until scrolled up"). Reduced-motion callers pass
  * no state → static block, exactly like every other surface.
+ *
+ * Issue #33: the offline banner rides the same topBar column (above the bar).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,7 +58,7 @@ fun GiffyScaffold(
      *  Modifier.nestedScroll(behavior.nestedScrollConnection) on the scrolling
      *  content themselves if they build a behavior. */
     scrollBehavior: TopAppBarScrollBehavior? = null,
-    /** Issue #31/#32: rows rendered under the bar that collapse with it via
+    /** Issue #31/#32: rows rendered UNDER the bar that collapse with it via
      *  [collapseState]. Zero extra when the caller passes nothing. */
     collapsingHeaderExtra: @Composable ColumnScope.() -> Unit = {},
     /** The owned collapse driver for the extra block. null → static rows. */
@@ -97,6 +99,7 @@ fun GiffyScaffold(
                     topColumn
                         .onSizeChanged { if (useCollapse) collapseState!!.totalPx = it.height },
             ) {
+                OfflineBanner()
                 TopAppBar(
                     title = { Text(title) },
                     navigationIcon = {
@@ -125,7 +128,7 @@ fun GiffyScaffold(
             // collapse offset (layout-time place — no recomposition; the grid
             // measures once). The topBar column already paints over this area.
             val state = collapseState!!
-            androidx.compose.foundation.layout.Box(
+            Box(
                 modifier =
                     Modifier.layout { measurable, constraints ->
                         val placeable = measurable.measure(constraints)

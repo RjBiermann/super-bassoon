@@ -153,42 +153,49 @@ fun TvNichesScreen(
                                     }
                                 }.padding(vertical = 8.dp),
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = niche.name,
-                                style = MaterialTheme.typography.titleMedium,
-                                color =
-                                    if (rowFocused) {
-                                        MaterialTheme.colorScheme.onPrimaryContainer
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurface
-                                    },
-                            )
-                            if (isPinned) {
-                                // Vector pin (emoji-prefix anti-pattern; announced oddly).
-                                androidx.compose.material3.Icon(
-                                    imageVector = androidx.compose.material.icons.Icons.Filled.PushPin,
-                                    contentDescription = "pinned",
-                                    tint =
+                        // Surface's content scope is NOT a layout container —
+                        // two children place at the same position (device pass
+                        // 2026-10-16: name drawn over the stats line). Own the
+                        // stacking with a Column.
+                        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = niche.name,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color =
                                         if (rowFocused) {
                                             MaterialTheme.colorScheme.onPrimaryContainer
                                         } else {
                                             MaterialTheme.colorScheme.onSurface
                                         },
-                                    modifier = Modifier.padding(start = 6.dp).size(14.dp),
                                 )
+                                if (isPinned) {
+                                    // Vector pin (emoji-prefix anti-pattern; announced oddly).
+                                    androidx.compose.material3.Icon(
+                                        imageVector = androidx.compose.material.icons.Icons.Filled.PushPin,
+                                        contentDescription = "pinned",
+                                        tint =
+                                            if (rowFocused) {
+                                                MaterialTheme.colorScheme.onPrimaryContainer
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurface
+                                            },
+                                        modifier = Modifier.padding(start = 6.dp).size(14.dp),
+                                    )
+                                }
                             }
+                            Text(
+                                text = "${niche.gifs} gifs · ${niche.subscribers} subscribers",
+                                style = MaterialTheme.typography.bodySmall,
+                                color =
+                                    if (rowFocused) {
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                modifier = Modifier.padding(top = 2.dp),
+                            )
                         }
-                        Text(
-                            text = "${niche.gifs} gifs · ${niche.subscribers} subscribers",
-                            style = MaterialTheme.typography.bodySmall,
-                            color =
-                                if (rowFocused) {
-                                    MaterialTheme.colorScheme.onPrimaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                        )
                     }
                     // Parity: mobile opens niche About from the player cluster;
                     // TV gets an explicit About focusable (D-pad has no tap).
