@@ -30,13 +30,26 @@ class ContentFilter
         private var feedTags: Set<String> = emptySet()
 
         suspend fun refreshFrom(dao: ContentPrefsDao) {
+            refreshFrom(
+                dao.blockedCreators(),
+                dao.blockedTags(),
+                dao.blockedKeywords(),
+            )
+        }
+
+        /** List-based core of [refreshFrom] (issue #42): the same merge the DAO
+         *  path performs, callable without a Room handle — the repository
+         *  passes a refresh closure built on the DAO variant, tests prime the
+         *  sets directly. */
+        suspend fun refreshFrom(
+            blockedCreators: Collection<String>,
+            blockedTags: Collection<String>,
+            blockedKeywords: Collection<String>,
+        ) {
             mutex.withLock {
-                creators =
-                    dao.blockedCreators().mapTo(HashSet()) { it.lowercase() }
-                tags =
-                    dao.blockedTags().mapTo(HashSet()) { it.lowercase() }
-                keywords =
-                    dao.blockedKeywords().map { it.lowercase() }
+                creators = blockedCreators.mapTo(HashSet()) { it.lowercase() }
+                tags = blockedTags.mapTo(HashSet()) { it.lowercase() }
+                keywords = blockedKeywords.map { it.lowercase() }
             }
         }
 

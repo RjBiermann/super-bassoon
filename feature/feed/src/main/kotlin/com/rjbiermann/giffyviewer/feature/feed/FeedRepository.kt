@@ -122,12 +122,33 @@ class FeedRepository
                     // (structural equality) so only a REAL filter move restarts.
                     .distinctUntilChanged()
                     .flatMapLatest { (o, v) ->
-                        Pager(
-                            config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = 10, enablePlaceholders = false),
-                            pagingSourceFactory = {
-                                LikedNetworkPagingSource(api, contentFilter, PAGE_SIZE, o, v)
-                            },
-                        ).flow
+                        // Issue #42: the lease re-invalidates the source on
+                        // pref-table writes (creator/tag/keyword blocks, BLOCKED
+                        // feeds) so already-composed pages re-filter immediately;
+                        // same lifecycle shape as cachedPager (dispose on
+                        // collection end so no observer outlives its generation).
+                        val lease = networkPrefsLease()
+                        val pager =
+                            Pager(
+                                config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = 10, enablePlaceholders = false),
+                                pagingSourceFactory = {
+                                    LikedNetworkPagingSource(
+                                        api,
+                                        contentFilter,
+                                        PAGE_SIZE,
+                                        refreshBlocks = { refreshFilterSets() },
+                                        orientation = o,
+                                        verifiedOnly = v,
+                                    ).also(lease::observe)
+                                },
+                            ).flow
+                        kotlinx.coroutines.flow.flow {
+                            try {
+                                emitAll(pager)
+                            } finally {
+                                lease.dispose()
+                            }
+                        }
                     }
             } else if (feed is FeedSource.ForYou) {
                 // Network-live, never cached (PLAN §7, same rule as Liked):
@@ -146,19 +167,30 @@ class FeedRepository
                     settings.verifiedOnly,
                     settings.forYouScope,
                 ).flatMapLatest { (o, v, s) ->
-                    Pager(
-                        config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = 10, enablePlaceholders = false),
-                        pagingSourceFactory = {
-                            ForYouNetworkPagingSource(
-                                api,
-                                contentFilter,
-                                PAGE_SIZE,
-                                forYouContext = { forYouContext(s) },
-                                orientation = o,
-                                verifiedOnly = v,
-                            )
-                        },
-                    ).flow
+                    // Issue #42 lease — same shape as the Liked path above.
+                    val lease = networkPrefsLease()
+                    val pager =
+                        Pager(
+                            config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = 10, enablePlaceholders = false),
+                            pagingSourceFactory = {
+                                ForYouNetworkPagingSource(
+                                    api,
+                                    contentFilter,
+                                    PAGE_SIZE,
+                                    refreshBlocks = { refreshFilterSets() },
+                                    forYouContext = { forYouContext(s) },
+                                    orientation = o,
+                                    verifiedOnly = v,
+                                ).also(lease::observe)
+                            },
+                        ).flow
+                    kotlinx.coroutines.flow.flow {
+                        try {
+                            emitAll(pager)
+                        } finally {
+                            lease.dispose()
+                        }
+                    }
                 }
             } else {
                 // Orientation (global) + §8 per-feed prefs BOTH restart the pager:
@@ -204,6 +236,33 @@ class FeedRepository
          *  freshest rotation the moment a forced generation re-seeds it. */
         @Volatile
         private var favoritesShuffleSeed = 0L
+
+        /** Issue #42: the block-set refresh the network-live sources call at
+         *  load (the singleton had no refresher on this path); local DB only
+         *  — no network requests, rate-limit invariant untouched. */
+        private suspend fun refreshFilterSets() {
+            contentFilter.refreshFrom(db.contentPrefsDao())
+            contentFilter.refreshBlockedFeeds(db.customFeedDao())
+        }
+
+        /** Issue #42: the cached pager's PrefObservationLease shape, reused for
+         *  the NETWORK-LIVE pagers (Liked/ForYou) — one lease per pager
+         *  generation, observing the same pref tables (creator/tag/keyword
+         *  blocks + BLOCKED custom feeds); a block write invalidates the live
+         *  source so the composed pages re-filter immediately. Lifecycle
+         *  identical to cachedPager: the wrapper flow's finally disposes. */
+        private fun networkPrefsLease(): PrefObservationLease =
+            PrefObservationLease(
+                tables =
+                    listOf(
+                        "creator_prefs",
+                        "tag_prefs",
+                        "keyword_blocks",
+                        "custom_feeds",
+                    ),
+                addObserver = { observer -> db.invalidationTracker.addObserver(observer) },
+                removeObserver = { observer -> db.invalidationTracker.removeObserver(observer) },
+            )
 
         private fun cachedPager(
             feed: FeedSource,

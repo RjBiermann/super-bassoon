@@ -18,11 +18,19 @@ import com.rjbiermann.giffyviewer.core.network.dto.toModel
  * same "fetch once, three filters" shape as the cached FeedPagingSource path
  * (the server endpoint has no scope param); [forYouContext] is the repo's
  * 5-min-memoized loader (followed creators + joined niche tags).
+ *
+ * Issue #42: [refreshBlocks] (the repository's DAO-backed refresher) runs
+ * at load — the singleton's sets used to be refreshed only by the cached
+ * path and Search, so a block written while the home page sat on this
+ * network-live feed never filtered. The repository's PrefObservationLease
+ * re-invalidates this source on pref-table writes so already-composed
+ * pages re-filter too.
  */
 class ForYouNetworkPagingSource(
     private val api: GifsApi,
     private val contentFilter: ContentFilter,
     private val pageSize: Int,
+    private val refreshBlocks: suspend () -> Unit,
     private val forYouContext: suspend () -> FeedRepository.ForYouContext,
     private val orientation: String = "any",
     private val verifiedOnly: Boolean = false,
@@ -49,6 +57,9 @@ class ForYouNetworkPagingSource(
             // scope filter below can only ever run on a successfully fetched
             // ctx; there is no failed-but-empty ctx shape to skip).
             val ctx = forYouContext()
+            // Issue #42: refresh the singleton's block sets at load (mirrors
+            // FeedPagingSource) — the network path has no other refresher.
+            refreshBlocks()
             var page = firstPage
             var gifs: List<Gif> = emptyList()
             var nextKey: Int? = null

@@ -23,6 +23,7 @@ class ForYouContextFailureTest {
                     FakeApi(),
                     ContentFilter(),
                     20,
+                    refreshBlocks = {},
                     forYouContext = { error("followed creators fetch failed (issue #30 contract)") },
                     orientation = "any",
                 )

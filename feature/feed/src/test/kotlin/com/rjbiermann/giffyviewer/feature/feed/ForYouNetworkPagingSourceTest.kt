@@ -15,6 +15,7 @@ class ForYouNetworkPagingSourceTest {
             api,
             ContentFilter(),
             20,
+            refreshBlocks = {},
             forYouContext = { FeedRepository.ForYouContext("all", emptySet(), emptySet()) },
             orientation = "horizontal",
         )
@@ -87,5 +88,43 @@ class ForYouNetworkPagingSourceTest {
             assertEquals(listOf("g4"), page.data.map { it.id })
             assertEquals(5, page.nextKey)
             assertEquals(listOf(3, 4), api.forYouCalls.subList(2, api.forYouCalls.size))
+        }
+
+    @Test
+    fun `load refreshes the block sets and drops a newly blocked creator (#42)`() =
+        runTest {
+            // Issue #42 contract: the source runs the repository's refresh
+            // closure BEFORE filtering, so a creator blocked while the home
+            // page sat on this network-live feed is dropped from the very
+            // first page (previously the singleton's stale sets let it
+            // through). The closure simulates the repo's DAO-backed refresher
+            // via ContentFilter's list-based overload.
+            val api = FakeApi()
+            api.forYouPages[1] =
+                GifsPageDto(
+                    gifs =
+                        listOf(
+                            gifDtoShell("p1", "creatorofp1"),
+                            gifDtoShell("p2", "creatorofp2"),
+                        ),
+                )
+            var refreshes = 0
+            val filter = ContentFilter()
+            val src =
+                ForYouNetworkPagingSource(
+                    api,
+                    filter,
+                    20,
+                    refreshBlocks = {
+                        refreshes++
+                        filter.refreshFrom(listOf("creatorofp1"), emptyList(), emptyList())
+                    },
+                    forYouContext = { FeedRepository.ForYouContext("all", emptySet(), emptySet()) },
+                )
+            val result = src.load(PagingSource.LoadParams.Refresh(key = 1, loadSize = 20, placeholdersEnabled = false))
+            assertTrue(result is PagingSource.LoadResult.Page)
+            val page = result as PagingSource.LoadResult.Page
+            assertEquals(1, refreshes)
+            assertEquals(listOf("p2"), page.data.map { it.id })
         }
 }

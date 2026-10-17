@@ -18,7 +18,7 @@ class LikedNetworkPagingSourceTest {
             api.likedPages[1] =
                 com.rjbiermann.giffyviewer.core.network.dto
                     .GifsPageDto(gifs = listOf(gifDtoShell("g1", "solarhelen")))
-            val source = LikedNetworkPagingSource(api, ContentFilter(), 20)
+            val source = LikedNetworkPagingSource(api, ContentFilter(), 20, refreshBlocks = {})
 
             val p1 =
                 source.load(PagingSource.LoadParams.Refresh(key = 1, loadSize = 20, placeholdersEnabled = false))
@@ -43,7 +43,7 @@ class LikedNetworkPagingSourceTest {
             val api = FakeApi()
             api.likedPages[1] = GifsPageDto(gifs = listOf(portraitGif("p1")))
             api.likedPages[2] = GifsPageDto(gifs = listOf(landscapeGif("p2")))
-            val source = LikedNetworkPagingSource(api, ContentFilter(), 20, orientation = "horizontal")
+            val source = LikedNetworkPagingSource(api, ContentFilter(), 20, refreshBlocks = {}, orientation = "horizontal")
 
             val result =
                 source.load(PagingSource.LoadParams.Refresh(key = 1, loadSize = 20, placeholdersEnabled = false))
@@ -64,7 +64,7 @@ class LikedNetworkPagingSourceTest {
             val api = FakeApi()
             api.likedPages[1] = GifsPageDto(gifs = listOf(portraitGif("p1")))
             api.likedHttpErrors[2] = 400
-            val source = LikedNetworkPagingSource(api, ContentFilter(), 20, orientation = "horizontal")
+            val source = LikedNetworkPagingSource(api, ContentFilter(), 20, refreshBlocks = {}, orientation = "horizontal")
 
             val result =
                 source.load(PagingSource.LoadParams.Refresh(key = 1, loadSize = 20, placeholdersEnabled = false))
@@ -81,7 +81,7 @@ class LikedNetworkPagingSourceTest {
             val api = FakeApi()
             api.likedPages[1] = GifsPageDto(gifs = listOf(portraitGif("p1")))
             api.likedHttpErrors[2] = 500
-            val source = LikedNetworkPagingSource(api, ContentFilter(), 20, orientation = "horizontal")
+            val source = LikedNetworkPagingSource(api, ContentFilter(), 20, refreshBlocks = {}, orientation = "horizontal")
 
             val result =
                 source.load(PagingSource.LoadParams.Refresh(key = 1, loadSize = 20, placeholdersEnabled = false))
@@ -96,7 +96,7 @@ class LikedNetworkPagingSourceTest {
             // dangling nextKey (cached-path parity) instead of walking forever.
             val api = FakeApi()
             repeat(9) { p -> api.likedPages[p + 1] = GifsPageDto(gifs = listOf(portraitGif("p${p + 1}"))) }
-            val source = LikedNetworkPagingSource(api, ContentFilter(), 20, orientation = "horizontal")
+            val source = LikedNetworkPagingSource(api, ContentFilter(), 20, refreshBlocks = {}, orientation = "horizontal")
 
             val result =
                 source.load(PagingSource.LoadParams.Refresh(key = 1, loadSize = 20, placeholdersEnabled = false))
@@ -116,7 +116,7 @@ class LikedNetworkPagingSourceTest {
             val api = FakeApi()
             api.likedPages[1] = GifsPageDto(gifs = listOf(landscapeGif("g1")))
             api.likedPages[2] = GifsPageDto(gifs = listOf(landscapeGif("g1"), landscapeGif("g2")))
-            val source = LikedNetworkPagingSource(api, ContentFilter(), 20)
+            val source = LikedNetworkPagingSource(api, ContentFilter(), 20, refreshBlocks = {})
 
             val p1 =
                 source.load(PagingSource.LoadParams.Refresh(key = 1, loadSize = 20, placeholdersEnabled = false))
@@ -141,7 +141,7 @@ class LikedNetworkPagingSourceTest {
             val api = FakeApi()
             api.likedPages[1] = GifsPageDto(gifs = listOf(landscapeGif("g1")))
             repeat(9) { p -> api.likedPages[p + 2] = GifsPageDto(gifs = listOf(landscapeGif("g1"))) }
-            val source = LikedNetworkPagingSource(api, ContentFilter(), 20)
+            val source = LikedNetworkPagingSource(api, ContentFilter(), 20, refreshBlocks = {})
 
             source.load(PagingSource.LoadParams.Refresh(key = 1, loadSize = 20, placeholdersEnabled = false))
             val result =

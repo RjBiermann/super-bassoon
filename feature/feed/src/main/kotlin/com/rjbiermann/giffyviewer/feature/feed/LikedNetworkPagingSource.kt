@@ -12,11 +12,20 @@ import com.rjbiermann.giffyviewer.core.network.dto.toModel
  * Liked feed (PLAN §7): reads the NETWORK live — never cached (§5 no-cache rule;
  * no Room reads, no feed_pages rows, no mediator). ContentFilter still applies
  * (leak-zero: a blocked creator stays blocked even in your own likes).
+ *
+ * Issue #42: this source's filter path used to call `allow()` against a
+ * STALE singleton — the in-memory block sets were refreshed only by the
+ * cached path (FeedPagingSource) and Search, so a creator blocked while the
+ * home page sat on a network-live feed never got filtered. [refreshBlocks]
+ * (the repository's DAO-backed refresher) runs at load, and the repository's
+ * PrefObservationLease re-invalidates this source on pref-table writes so
+ * already-composed pages re-filter immediately.
  */
 class LikedNetworkPagingSource(
     private val api: GifsApi,
     private val contentFilter: ContentFilter,
     private val pageSize: Int,
+    private val refreshBlocks: suspend () -> Unit,
     private val orientation: String = "any",
     private val verifiedOnly: Boolean = false,
 ) : PagingSource<Int, Gif>() {
@@ -38,6 +47,9 @@ class LikedNetworkPagingSource(
             var gifs: List<Gif> = emptyList()
             var nextKey: Int? = null
             var hops = 0
+            // Issue #42: refresh the singleton's block sets at load (mirrors
+            // FeedPagingSource) — the network path has no other refresher.
+            refreshBlocks()
             do {
                 val dto =
                     try {
