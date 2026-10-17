@@ -4,6 +4,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,22 +14,29 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -37,11 +46,18 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.Border
+import androidx.tv.material3.Button
+import androidx.tv.material3.ButtonDefaults
+import androidx.tv.material3.ButtonScale
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.ClickableSurfaceScale
 import androidx.tv.material3.Surface
+import com.rjbiermann.giffyviewer.core.ui.giffyFocus
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import com.rjbiermann.giffyviewer.feature.feed.NichesViewModel
+
+/** Mobile NichesScreen's sort-label rendering ("alphabetical_asc" → "Alphabetical"). */
+private fun sortLabel(sort: String): String = sort.removeSuffix("_asc").removeSuffix("_desc").replaceFirstChar { it.uppercase() }
 
 /**
  * Niches browser for TV (PLAN §7 groundwork, mobile NichesScreen parity):
@@ -59,6 +75,13 @@ fun TvNichesScreen(
     val endReached by viewModel.endReached.collectAsStateWithLifecycle()
     val loadFailed by viewModel.loadFailed.collectAsStateWithLifecycle()
     val pinned by viewModel.settings.pinnedNiches.collectAsStateWithLifecycle(initialValue = emptySet())
+    // Site-parity category chips + sort (#47 slice 2): state lives in the
+    // shared NichesViewModel — selectCategory/resort restart() the list and
+    // the existing loadMore/LaunchedEffect paging continues unchanged.
+    val category by viewModel.category.collectAsStateWithLifecycle()
+    val categories by viewModel.categories.collectAsStateWithLifecycle()
+    val sort by viewModel.sort.collectAsStateWithLifecycle()
+    var sortMenuOpen by remember { mutableStateOf(false) }
 
     // D-pad browsing has no tap-to-load-more: fetch as focus nears the end.
     LaunchedEffect(niches.size, endReached) {
@@ -80,6 +103,83 @@ fun TvNichesScreen(
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp),
         )
+        // #47 slice 2: category chips + sort, mobile NichesScreen parity. The
+        // sort list mirrors mobile's menu (mobile keeps it inline in
+        // NichesScreen, which is outside this slice's fence); values are the
+        // verified taxonomy orders.
+        // Chips = M3 FilterChip + giffyFocus ring (the shared-module chip
+        // exception) so the D-pad focus treatment matches the other M3-hosted
+        // rows; Sort = tv Button + M3 DropdownMenu (a changed sort restarts
+        // the list in NichesViewModel).
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 16.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            LazyRow(
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                item {
+                    val allInteraction = remember { MutableInteractionSource() }
+                    FilterChip(
+                        selected = category == null,
+                        onClick = { viewModel.selectCategory(null) },
+                        label = { Text("All") },
+                        interactionSource = allInteraction,
+                        modifier = Modifier.giffyFocus(allInteraction, shape = RoundedCornerShape(8.dp)),
+                    )
+                }
+                items(categories) { cat ->
+                    val interaction = remember { MutableInteractionSource() }
+                    FilterChip(
+                        selected = category == cat,
+                        onClick = { viewModel.selectCategory(if (category == cat) null else cat) },
+                        label = { Text(cat) },
+                        interactionSource = interaction,
+                        modifier = Modifier.giffyFocus(interaction, shape = RoundedCornerShape(8.dp)),
+                    )
+                }
+            }
+            Box {
+                Button(
+                    onClick = { sortMenuOpen = true },
+                    scale = ButtonScale.None,
+                    colors =
+                        ButtonDefaults.colors(
+                            containerColor = Color.Transparent,
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                            focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            focusedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        ),
+                    border =
+                        ButtonDefaults.border(
+                            focusedBorder =
+                                Border(BorderStroke(3.dp, MaterialTheme.colorScheme.primary)),
+                        ),
+                ) { Text("Sort: ${sortLabel(sort)}") }
+                DropdownMenu(
+                    expanded = sortMenuOpen,
+                    onDismissRequest = { sortMenuOpen = false },
+                ) {
+                    listOf(
+                        "subscribers" to "Subscribers",
+                        "posts" to "Gifs",
+                        "alphabetical_asc" to "A–Z",
+                        "alphabetical_desc" to "Z–A",
+                        "random" to "Random",
+                    ).forEach { (value, label) ->
+                        DropdownMenuItem(
+                            text = { Text(label) },
+                            onClick = {
+                                viewModel.resort(value)
+                                sortMenuOpen = false
+                            },
+                        )
+                    }
+                }
+            }
+        }
         LazyColumn(
             modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
             contentPadding = PaddingValues(bottom = 16.dp),

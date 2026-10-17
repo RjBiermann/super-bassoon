@@ -68,7 +68,9 @@ import com.rjbiermann.giffyviewer.feature.feed.FeedRepository
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
 import com.rjbiermann.giffyviewer.feature.feed.NicheFeedHeader
+import com.rjbiermann.giffyviewer.feature.feed.NicheJoinViewModel
 import com.rjbiermann.giffyviewer.feature.feed.activeSort
+import com.rjbiermann.giffyviewer.feature.feed.joinNicheLabel
 import com.rjbiermann.giffyviewer.feature.feed.nicheSourceId
 import com.rjbiermann.giffyviewer.feature.feed.packNicheRef
 import com.rjbiermann.giffyviewer.feature.feed.sortOptions
@@ -113,6 +115,9 @@ fun TvSourceFeedScreen(
     viewModel: TvNicheFeedViewModel,
     /** Shared quick-action model (favorite/block/custom-feed adds). */
     feedViewModel: FeedViewModel,
+    /** Issue #47 slice 1: niche-feed Join/Leave state; null (default) keeps
+     *  the header info-only — non-niche hosts and anonymous users included. */
+    joinViewModel: NicheJoinViewModel? = null,
     /** Show-more pane niche rows — the feed swaps (same semantics as onOpenCreator). */
     onOpenNiche: (FeedSource.Niche) -> Unit = {},
     /** #18 sort apply: the host re-identifies the feed with the sorted source
@@ -188,6 +193,9 @@ fun TvSourceFeedScreen(
                 // Issue #31: the header gate clears the niche stats for every
                 // non-niche source (same null-clear call as the creator's).
                 feedViewModel.refreshNicheStats(nicheSourceId(source))
+                // Join/Leave (issue #47 slice 1): refresh membership on a
+                // niche entry — GET /v2/niches/following, 1 request per open.
+                if (joinViewModel != null && source is FeedSource.Niche) joinViewModel.refresh()
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -267,7 +275,23 @@ fun TvSourceFeedScreen(
                 // Issue #31: the niche feed previously rendered NO header at
                 // all — same shared mount, under the title.
                 feedViewModel.nicheStats.collectAsStateWithLifecycle().value?.let { detail ->
-                    NicheFeedHeader(detail)
+                    val joinedIds = joinViewModel?.joined?.collectAsStateWithLifecycle()?.value
+                    val joinError = joinViewModel?.error?.collectAsStateWithLifecycle()?.value
+                    NicheFeedHeader(
+                        niche = detail,
+                        joinButton =
+                            if (joinViewModel != null && joinViewModel.loggedIn) {
+                                {
+                                    NicheJoinButton(
+                                        joined = detail.id in joinedIds!!,
+                                        error = joinError,
+                                        onToggle = { joinViewModel.toggle(detail.id) },
+                                    )
+                                }
+                            } else {
+                                null
+                            },
+                    )
                 }
                 // Issue #45: For You-style §8 chips where the feed supports
                 // them — orientation (per-feed pref, same values the shared
@@ -568,6 +592,45 @@ class TvNicheFeedViewModel
                     repository.paging(src, forceRefresh = forced).cachedIn(viewModelScope)
                 }
     }
+
+/** Issue #47 slice 1: Join/Leave beside the niche-feed counts (logged-in only
+ *  — the host gates on [NicheJoinViewModel].loggedIn). Same issue-#7
+ *  tv-material focus tokens as the footer Refresh button; a failed write
+ *  NEVER flips the label — the honest error lines under the button. */
+@Composable
+private fun NicheJoinButton(
+    joined: Boolean,
+    error: String?,
+    onToggle: () -> Unit,
+) {
+    Column {
+        val interaction = remember { MutableInteractionSource() }
+        Button(
+            onClick = onToggle,
+            scale = ButtonScale.None,
+            interactionSource = interaction,
+            colors =
+                ButtonDefaults.colors(
+                    containerColor = Color.Transparent,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    focusedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ),
+            border =
+                ButtonDefaults.border(
+                    focusedBorder =
+                        Border(BorderStroke(3.dp, MaterialTheme.colorScheme.primary)),
+                ),
+        ) { TvText(joinNicheLabel(joined)) }
+        if (error != null) {
+            TvText(
+                error,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+    }
+}
 
 /** F4: the footer Refresh button (error / empty / end-of-feed states share it) —
  *  issue-#7 tv-material focus tokens, same look the old inline footer had. */

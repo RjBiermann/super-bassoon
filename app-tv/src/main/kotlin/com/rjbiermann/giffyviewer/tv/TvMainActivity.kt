@@ -54,6 +54,7 @@ import com.rjbiermann.giffyviewer.core.ui.offlineBannerVisible
 import com.rjbiermann.giffyviewer.feature.auth.DebugSignIn
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
+import com.rjbiermann.giffyviewer.feature.feed.NicheJoinViewModel
 import com.rjbiermann.giffyviewer.feature.feed.feedSourceNavType
 import com.rjbiermann.giffyviewer.feature.feed.gifListNavType
 import com.rjbiermann.giffyviewer.feature.feed.nicheNavType
@@ -227,6 +228,9 @@ class TvMainActivity : ComponentActivity() {
                 // TvNicheFeedViewModel per pushed feed (the flow pins the
                 // source via remember(source.keyBase) inside the screen).
                 val feedVm: TvNicheFeedViewModel = hiltViewModel()
+                // Issue #47 slice 1: niche Join/Leave state (feature.feed) —
+                // per-entry; the screen refreshes membership on niche entry.
+                val joinVm: NicheJoinViewModel = hiltViewModel()
                 // Issue #13 §4.3: saveable focus position — BACK from a
                 // player re-arms D-pad focus on the same card (TvSourceFeedScreen
                 // owns the restore; scroll is saveable per entry in-screen).
@@ -236,6 +240,7 @@ class TvMainActivity : ComponentActivity() {
                     onOpenGif = { gifs, index -> navController.navigate(TvPlayer(gifs, index)) },
                     viewModel = feedVm,
                     feedViewModel = quickVm,
+                    joinViewModel = joinVm,
                     onOpenNiche = { niche -> navController.navigate(TvFeed(niche)) },
                     // #18: the dialog's sort half re-identifies the feed — a
                     // CHANGED sort REPLACES this entry (no stacking per tap).

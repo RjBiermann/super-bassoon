@@ -71,10 +71,14 @@ fun CreatorFeedHeader(
 fun NicheFeedHeader(
     niche: NicheDetail,
     modifier: Modifier = Modifier,
+    /** Issue #47 slice 1: the site's niche page shows a Join control beside
+     *  the counts. Host-rendered slot so the shared header stays shell-agnostic
+     *  (M3 Button on mobile, tv-material Button on TV); null = info-only
+     *  header (anonymous users — a write would 401). */
+    joinButton: (@Composable () -> Unit)? = null,
 ) {
     Column(
         modifier = modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(text = niche.name, style = MaterialTheme.typography.titleMedium)
         niche.description?.takeIf { it.isNotBlank() }?.let { description ->
@@ -86,16 +90,19 @@ fun NicheFeedHeader(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Text(
-            // Same Locale.US count formatting as the creator stats row.
-            text =
-                "%,d members · %,d posts".format(
-                    java.util.Locale.US,
-                    niche.subscribers,
-                    niche.gifs,
-                ),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                // Same Locale.US count formatting as the creator stats row.
+                text =
+                    "%,d members · %,d posts".format(
+                        java.util.Locale.US,
+                        niche.subscribers,
+                        niche.gifs,
+                    ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            joinButton?.invoke()
+        }
     }
 }

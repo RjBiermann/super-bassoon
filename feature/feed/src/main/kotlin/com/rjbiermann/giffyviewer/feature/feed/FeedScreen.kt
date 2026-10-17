@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -109,6 +110,9 @@ fun FeedScreen(
      *  tile plays a muted+looped preview. Null factory = no inline preview. */
     playerFactory: GiffyPlayerFactory? = null,
     viewModel: FeedViewModel = hiltViewModel(),
+    /** Issue #47 slice 1: niche-feed Join/Leave (the shared NicheFeedHeader's
+     *  joinButton slot); Niche-scoped refresh + anonymous gate inside. */
+    joinViewModel: NicheJoinViewModel = hiltViewModel(),
 ) {
     val source by viewModel.source.collectAsStateWithLifecycle()
     val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle(false)
@@ -140,6 +144,15 @@ fun FeedScreen(
         if (showBlockHint) {
             snackbarHostState.showSnackbar("Tip: long-press a tile to block creators, tags or keywords")
             viewModel.dismissBlockHint()
+        }
+    }
+    // Issue #47 slice 1: honest join/leave failure (the header state never
+    // fakes success) — surfaced on the existing snackbar.
+    val joinError by joinViewModel.error.collectAsStateWithLifecycle()
+    LaunchedEffect(joinError) {
+        joinError?.let {
+            snackbarHostState.showSnackbar(it)
+            joinViewModel.dismissError()
         }
     }
     // Screen-scope per-feed prefs (#31 chip badge + #28/§8 predicates read it
@@ -201,6 +214,9 @@ fun FeedScreen(
             LaunchedEffect(source) {
                 viewModel.refreshCreatorStats((source as? FeedSource.Creator)?.username)
                 viewModel.refreshNicheStats(nicheSourceId(source))
+                // Join/Leave (issue #47 slice 1): refresh membership on a
+                // niche entry — GET /v2/niches/following, 1 request per open.
+                if (source is FeedSource.Niche) joinViewModel.refresh()
             }
             if (source is FeedSource.Creator) {
                 viewModel.creatorStats.collectAsStateWithLifecycle().value?.let { stats ->
@@ -227,7 +243,23 @@ fun FeedScreen(
             }
             if (source is FeedSource.Niche) {
                 viewModel.nicheStats.collectAsStateWithLifecycle().value?.let { detail ->
-                    NicheFeedHeader(detail)
+                    val joined by joinViewModel.joined.collectAsStateWithLifecycle(initialValue = emptySet())
+                    NicheFeedHeader(
+                        niche = detail,
+                        // Site-parity Join/Leave beside the counts (logged-in
+                        // only — anonymous writes would 401; NicheJoinViewModel
+                        // flips state only on a verified 202 write).
+                        joinButton =
+                            if (joinViewModel.loggedIn) {
+                                {
+                                    Button(onClick = { joinViewModel.toggle(detail.id) }) {
+                                        Text(joinNicheLabel(joined = detail.id in joined))
+                                    }
+                                }
+                            } else {
+                                null
+                            },
+                    )
                 }
             }
 
