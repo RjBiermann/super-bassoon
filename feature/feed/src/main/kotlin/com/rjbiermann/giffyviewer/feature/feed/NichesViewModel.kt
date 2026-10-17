@@ -16,6 +16,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/** Full sort menu for the niches LISTING (`v2/niches/search/previews`): all
+ *  five orders live-verified 2026-10-17 (DESIGN-47SORTS §1) — menu order +
+ *  labels mirror the site's own /niches sort UI. Mobile + TV share it. */
+val nicheListingSorts: List<Pair<String, String>> =
+    listOf(
+        "subscribers" to "Subscribers",
+        "posts" to "Posts",
+        "alphabetical_asc" to "Name: A-Z",
+        "alphabetical_desc" to "Name: Z-A",
+        "random" to "Randomize",
+    )
+
 /**
  * One preview-tile row (issue #47 slice 3, DESIGN-47s3): niche identity +
  * the counts the site tiles omit (app-superior) + the tile image (preview-gif
@@ -66,8 +78,7 @@ class NichesViewModel
         private val _category = MutableStateFlow<String?>(null)
         val category: StateFlow<String?> = _category
 
-        // Previews-verified orders only (DESIGN-47s3 §1: posts/alphabetical_*
-        // are taxonomy-endpoint truth, never live-checked on this endpoint).
+        // Values restricted to [nicheListingSorts] (all probe-verified).
         private val _sort = MutableStateFlow("subscribers")
         val sort: StateFlow<String> = _sort
 

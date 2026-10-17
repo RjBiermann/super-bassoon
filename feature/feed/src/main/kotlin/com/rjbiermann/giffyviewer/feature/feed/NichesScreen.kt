@@ -56,7 +56,7 @@ import kotlinx.coroutines.launch
  * `v2/niches/search/previews` (the site's own /niches source, live-verified:
  * DESIGN-47s3 §1); tap opens the niche as a feed tab.
  * Site-parity 2026-10: scrollable category filter chips (`v2/niches/categories`)
- * and the Sort menu (previews-verified orders only — subscribers/random).
+ * and the Sort menu (all five live-verified orders — DESIGN-47SORTS).
  * Paging state lives in the shared NichesViewModel (mobile + TV one path).
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -106,20 +106,14 @@ fun NichesScreen(
         onBack = onBack,
         actions = {
             androidx.compose.material3.TextButton(onClick = { sortMenuOpen = true }) {
-                Text(
-                    "Sort: ${sort.removeSuffix("_asc").removeSuffix("_desc").replaceFirstChar { it.uppercase() }}",
-                )
+                Text("Sort: ${nicheListingSorts.first { it.first == sort }.second}")
             }
             androidx.compose.material3.DropdownMenu(
                 expanded = sortMenuOpen,
                 onDismissRequest = { sortMenuOpen = false },
             ) {
-                // Previews-verified orders only (DESIGN-47s3 §1): the other
-                // taxonomy sorts were never live-checked on this endpoint.
-                listOf(
-                    "subscribers" to "Subscribers",
-                    "random" to "Randomize",
-                ).forEach { (value, label) ->
+                // All five orders live-verified on this endpoint (DESIGN-47SORTS §1).
+                nicheListingSorts.forEach { (value, label) ->
                     androidx.compose.material3.DropdownMenuItem(
                         text = { Text(label) },
                         onClick = {

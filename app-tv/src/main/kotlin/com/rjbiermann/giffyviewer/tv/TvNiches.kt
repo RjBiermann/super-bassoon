@@ -61,9 +61,10 @@ import com.rjbiermann.giffyviewer.core.ui.giffyFocus
 import com.rjbiermann.giffyviewer.feature.feed.AutoRetryEffect
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import com.rjbiermann.giffyviewer.feature.feed.NichesViewModel
+import com.rjbiermann.giffyviewer.feature.feed.nicheListingSorts
 
-/** Mobile NichesScreen's sort-label rendering ("alphabetical_asc" → "Alphabetical"). */
-private fun sortLabel(sort: String): String = sort.removeSuffix("_asc").removeSuffix("_desc").replaceFirstChar { it.uppercase() }
+/** Mobile NichesScreen's sort-label rendering — the shared menu's label. */
+private fun sortLabel(sort: String): String = nicheListingSorts.first { it.first == sort }.second
 
 /**
  * Niches browser for TV (mobile NichesScreen parity): issue #47 slice 3 —
@@ -182,13 +183,9 @@ fun TvNichesScreen(
                     expanded = sortMenuOpen,
                     onDismissRequest = { sortMenuOpen = false },
                 ) {
-                    // Previews-verified orders only — mobile parity (issue #47
-                    // slice 3; DESIGN-47s3 §1: the taxonomy-only sorts were
-                    // never live-checked on this endpoint).
-                    listOf(
-                        "subscribers" to "Subscribers",
-                        "random" to "Randomize",
-                    ).forEach { (value, label) ->
+                    // All five orders live-verified on this endpoint (DESIGN-47SORTS
+                    // §1) — same shared menu as mobile NichesScreen.
+                    nicheListingSorts.forEach { (value, label) ->
                         DropdownMenuItem(
                             text = { Text(label) },
                             onClick = {
