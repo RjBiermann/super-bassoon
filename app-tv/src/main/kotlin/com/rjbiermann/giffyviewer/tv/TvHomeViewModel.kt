@@ -35,9 +35,15 @@ class TvHomeViewModel
         tokenStore: com.rjbiermann.giffyviewer.core.auth.TokenStore,
         private val api: com.rjbiermann.giffyviewer.core.network.GifsApi,
         private val settings: com.rjbiermann.giffyviewer.core.datastore.SettingsRepository,
+        networkMonitor: com.rjbiermann.giffyviewer.core.ui.NetworkMonitor,
     ) : ViewModel() {
         val trending = repository.paging(FeedSource.Trending).cachedIn(viewModelScope)
         val topThisWeek = repository.paging(FeedSource.TopThisWeek).cachedIn(viewModelScope)
+
+        /** Issue #46 part 2: OS connectivity for the rows' silent auto-retry —
+         *  the SAME singleton NetworkMonitor the offline banner reads (the
+         *  banner lives in TvMainActivity; the rows reach it through here). */
+        val isOnline: StateFlow<Boolean> = networkMonitor.isOnline
 
         /** Favorites row with a forced-refresh generation (#36c, TV-side panel
          *  "Refresh feed": the quick-actions plumbing exists; the row pager

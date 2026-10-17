@@ -66,6 +66,7 @@ import com.rjbiermann.giffyviewer.core.ui.avgColorOr
 import com.rjbiermann.giffyviewer.core.ui.giffyFocus
 import com.rjbiermann.giffyviewer.core.ui.toTileContentScale
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
+import kotlinx.coroutines.delay
 
 /**
  * 10-foot UI (PLAN §8 TV): vertical stack of rows, D-pad navigates rows and
@@ -117,6 +118,9 @@ fun TvHomeScreen(
     LaunchedEffect(isLoggedIn) { if (isLoggedIn) followingVm.refresh() }
     val exploreCreators by homeViewModel.exploreCreators.collectAsStateWithLifecycle(initialValue = emptyList())
     val exploreFailed by homeViewModel.exploreFailed.collectAsStateWithLifecycle(false)
+    // Issue #46 part 2: OS connectivity for silent auto-retry (rows re-fetch
+    // when the network returns; same NetworkMonitor the offline banner uses).
+    val isOnline by homeViewModel.isOnline.collectAsStateWithLifecycle(true)
     // SLICE-12: effective §6/§8 orientation per row (per-feed pref merged over
     // the global pref) — the filtered-empty hint names the ACTUAL filter.
     val trendingOrientation by homeViewModel.trendingOrientation.collectAsStateWithLifecycle("any")
@@ -195,6 +199,7 @@ fun TvHomeScreen(
                         rowHeight = rowHeight,
                         source = FeedSource.ForYou,
                         orientation = forYouOrientation,
+                        isOnline = isOnline,
                         rowKey = "For You",
                         restoredItem = if (focusRow == "For You") focusItem else -1,
                         onFocusSaved = { i -> onFocusSaved("For You", i) },
@@ -213,6 +218,7 @@ fun TvHomeScreen(
                     rowHeight = rowHeight,
                     source = FeedSource.Trending,
                     orientation = trendingOrientation,
+                    isOnline = isOnline,
                     rowKey = "Trending",
                     restoredItem = if (focusRow == "Trending") focusItem else -1,
                     onFocusSaved = { i -> onFocusSaved("Trending", i) },
@@ -226,6 +232,7 @@ fun TvHomeScreen(
                     onOpenCreator,
                     failed = exploreFailed,
                     onRetry = { homeViewModel.refreshExplore() },
+                    isOnline = isOnline,
                     rowKey = "Explore",
                     restoredItem = if (focusRow == "Explore") focusItem else -1,
                     onFocusSaved = { i -> onFocusSaved("Explore", i) },
@@ -243,6 +250,7 @@ fun TvHomeScreen(
                     rowHeight = rowHeight,
                     source = FeedSource.TopThisWeek,
                     orientation = topThisWeekOrientation,
+                    isOnline = isOnline,
                     rowKey = "Top This Week",
                     restoredItem = if (focusRow == "Top This Week") focusItem else -1,
                     onFocusSaved = { i -> onFocusSaved("Top This Week", i) },
@@ -262,6 +270,7 @@ fun TvHomeScreen(
                         rowHeight = rowHeight,
                         source = FeedSource.Favorites,
                         orientation = favoritesOrientation,
+                        isOnline = isOnline,
                         rowKey = "Favorites",
                         restoredItem = if (focusRow == "Favorites") focusItem else -1,
                         onFocusSaved = { i -> onFocusSaved("Favorites", i) },
@@ -282,6 +291,7 @@ fun TvHomeScreen(
                         rowHeight = rowHeight,
                         source = FeedSource.Liked,
                         orientation = likedOrientation,
+                        isOnline = isOnline,
                         rowKey = "Liked GIFs & Images",
                         restoredItem = if (focusRow == "Liked GIFs & Images") focusItem else -1,
                         onFocusSaved = { i -> onFocusSaved("Liked GIFs & Images", i) },
@@ -295,6 +305,7 @@ fun TvHomeScreen(
                         rowKey = "Following",
                         restoredItem = if (focusRow == "Following") focusItem else -1,
                         onFocusSaved = { i -> onFocusSaved("Following", i) },
+                        isOnline = isOnline,
                     )
                 }
             }
@@ -344,6 +355,8 @@ private fun CreatorRow(
     onOpenCreator: (String) -> Unit,
     failed: Boolean = false,
     onRetry: (() -> Unit)? = null,
+    /** Issue #46 part 2: OS connectivity — auto-retry waits for it. */
+    isOnline: Boolean = true,
     /** Issue #13 §4.3 focus seam: stable row id + the saved item this row must
      *  re-arm on re-entry (-1 = not this row) + the host save callback. */
     rowKey: String = "",
@@ -359,6 +372,13 @@ private fun CreatorRow(
     // the saved index rides the host's saveables).
     var focusRearmed by remember { mutableStateOf(false) }
     val rowFocus = remember { FocusRequester() }
+    AutoRetryEffect(
+        error = failed,
+        success = !failed,
+        key = failed,
+        isOnline = isOnline,
+        retry = { onRetry?.invoke() },
+    )
     LaunchedEffect(restoredItem, creators.size) {
         // Index guard covers the unsaved state too (no saved index = -1 →
         // nothing to re-arm); scrollToItem's Range constraint is then trivially
@@ -455,6 +475,8 @@ private fun FeedRow(
      *  honest filtered-empty copy ("any" → generic hint, strict value → names
      *  the actual filter, per-feed pref vs global Settings distinguished). */
     orientation: String = "any",
+    /** Issue #46 part 2: OS connectivity — auto-retry waits for it. */
+    isOnline: Boolean = true,
     /** Issue #13 §4.3 focus seam: stable row id + the saved item this row must
      *  re-arm on re-entry (-1 = not this row) + the host save callback. */
     rowKey: String = "",
@@ -482,6 +504,15 @@ private fun FeedRow(
     // to full height shoves every row below (homepage UI drift, user report).
     // A strict global pref (orientation "horizontal" over an all-portrait pool,
     // live-proven) can empty a row entirely — never a silent blank strip.
+    // Issue #46 part 2: silent auto-retry while the error hint is visible —
+    // one debounced fetch per appearance (≤2 per success, no polling loop).
+    AutoRetryEffect(
+        error = gifs.loadState.refresh is LoadState.Error,
+        success = gifs.loadState.refresh is LoadState.NotLoading,
+        key = gifs.loadState.refresh,
+        isOnline = isOnline,
+        retry = { gifs.retry() },
+    )
     Column(modifier = Modifier.padding(vertical = 8.dp).heightIn(min = reservedHeight(rowHeight))) {
         RowTitle(title)
         scopeChips?.invoke()
@@ -628,6 +659,50 @@ internal fun rowHeightFor(pref: String): Dp =
 
 /** Loading-reserved height scales with the row-size setting (card + caption). */
 internal fun reservedHeight(rowHeight: Dp): Dp = rowHeight + (ROW_RESERVED_HEIGHT - CARD_ROW_HEIGHT_DP)
+
+/** Issue #46 part 2: consecutive silent auto-retries allowed per row appearance. */
+internal const val AUTO_RETRY_MAX = 2
+
+/** Issue #46 part 2: debounce before an auto-retry fires (fast scroll-throughs
+ *  cancel before this; the rate limiter/breaker still guard the network). */
+internal const val AUTO_RETRY_DEBOUNCE_MS = 2_000L
+
+/** Issue #46 part 2 retry gate: the row may auto-retry while under the cap;
+ *  the caller's counter resets on success (and per appearance, via remember). */
+internal fun shouldAutoRetry(consecutiveRetries: Int): Boolean = consecutiveRetries < AUTO_RETRY_MAX
+
+/**
+ * Issue #46 part 2: silent recovery for home rows stuck in the "Couldn't load"
+ * hint (paging refresh error or the Explore creators fetch). When [error] is
+ * visible — meaning the row composed/scrolls into view — fire ONE debounced
+ * [retry] through the existing refresh path ([LazyPagingItems.retry] /
+ * refreshExplore), and up to [AUTO_RETRY_MAX] per success streak; a success
+ * resets the counter, a reload-in-progress ([success] = false, [error] = false)
+ * preserves it so retry→loading→error can't loop. Re-fires on a NEW failure
+ * (keyed by [key]) or when connectivity returns ([isOnline] flips true).
+ * No WorkManager, no polling — stale-while-revalidate on open, network truth
+ * from the shared NetworkMonitor.
+ */
+@Composable
+private fun AutoRetryEffect(
+    error: Boolean,
+    success: Boolean,
+    key: Any?,
+    isOnline: Boolean,
+    retry: () -> Unit,
+) {
+    var consecutiveRetries by remember { mutableStateOf(0) }
+    LaunchedEffect(key, isOnline) {
+        when {
+            success -> consecutiveRetries = 0
+            error && shouldAutoRetry(consecutiveRetries) -> {
+                consecutiveRetries++
+                delay(AUTO_RETRY_DEBOUNCE_MS)
+                retry()
+            }
+        }
+    }
+}
 
 /**
  * Mixed-orientation rows (PLAN §9 TV): card width = row height × the gif's own
