@@ -36,7 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -71,9 +71,12 @@ import androidx.tv.material3.Surface as TvSurface
 import androidx.tv.material3.Text as TvText
 
 /**
- * 10-foot player: one gif at a time, D-pad up/down (left/right too) walks the
- * list, back exits. Every play starts at 0 (watch-history/resume removed with
- * the feature); the end-of-feed popup (#22) covers the snapshot end.
+ * 10-foot player (issue #48 keymap): one gif at a time. Controls start HIDDEN
+ * and stay hidden across switches; OK/Center reveals, BACK hides (then exits),
+ * UP/DOWN switch videos only while hidden (focus traversal once revealed),
+ * left/right seek ±10s, CENTER tap = play/pause, hold-Center/MENU = quick
+ * actions. Every play starts at 0 (watch-history/resume removed with the
+ * feature); the end-of-feed popup (#22) covers the snapshot end.
  */
 @Composable
 fun TvPlayerScreen(
@@ -142,8 +145,14 @@ fun TvPlayerScreen(
     // mobile QuickSheet parity — 0.5–2× in 0.25 steps; was a 4-step cycle).
     var speed by remember { mutableStateOf(1f) }
 
-    // Player text auto-hide state — declared before the key-event Column.
-    var textVisible by remember { mutableStateOf(true) }
+    // Player controls visibility (issue #48 keymap): HIDDEN on entry and on
+    // every video switch; OK/Center reveals; BACK hides (progress line stays
+    // always-on); BACK again exits (unconsumed BACK = system back = nav pop).
+    // While hidden UP/DOWN switch videos; while visible they are focus
+    // traversal (this handler only sees them when the player body itself is
+    // focused — revealed pills consume their own activation keys and bubble
+    // the rest here, where visible-state UP/DOWN must stay unconsumed).
+    var controlsVisible by remember { mutableStateOf(false) }
 
     // Playback failure overlay (mobile PlayerScreen parity): Retry re-resolves
     // the current gif, Skip advances. Keyed to the gif so moving past a failed
@@ -165,12 +174,18 @@ fun TvPlayerScreen(
             }
         }
 
-    // D-pad events only reach onPreviewKeyEvent via a FOCUSED node inside the
-    // hierarchy — the PlayerView never takes focus, so grab it on entry.
+    // D-pad events only reach onKeyEvent via a FOCUSED node inside the
+    // hierarchy — the PlayerView never takes focus, so grab it on entry and
+    // again whenever the controls hide (a focused pill leaving composition
+    // with the auto-hide must not strand focus).
     val playerFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { playerFocus.requestFocus() }
-    // Issue #24 retry/skip focusability: the root Column pins focus and its
-    // onPreviewKeyEvent pre-consumes Up/Down/Center, so the overlay's
+    LaunchedEffect(controlsVisible) {
+        if (!controlsVisible) playerFocus.requestFocus()
+    }
+    // Issue #48 (a): every switch happens under hidden UI — no text flash.
+    LaunchedEffect(gif.id) { controlsVisible = false }
+    // Issue #24 retry/skip focusability: the root Column holds focus and its
+    // onKeyEvent consumes Up/Down/Center (while hidden), so the overlay's
     // buttons can never win focus by traversal alone. On error the Retry
     // button takes focus; when the overlay leaves (Skip settles / a new gif
     // commits) root focus is restored. Same pattern as the batch-18
@@ -190,15 +205,24 @@ fun TvPlayerScreen(
                 .background(Color.Black)
                 .focusable()
                 .focusRequester(playerFocus)
-                .onPreviewKeyEvent { e ->
-                    // Player text auto-hide: any key re-reveals the cluster.
-                    if (e.type == KeyEventType.KeyUp) textVisible = true
+                .onKeyEvent { e ->
+                    // Issue #48 (b): BACK hides the controls (the progress
+                    // line stays); BACK again is unconsumed → system back →
+                    // nav pop exits the player. Consuming BOTH phases of the
+                    // hide press keeps Activity back-tracking from firing.
+                    if (e.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_BACK) {
+                        if (controlsVisible) {
+                            controlsVisible = false
+                            return@onKeyEvent true
+                        }
+                        return@onKeyEvent false
+                    }
                     // Issue #24: while the Retry/Skip overlay is up, every key
                     // falls through to the focused overlay buttons (Up/Down walk
                     // Retry↔Skip, CENTER/ENTER activates, BACK stays the Root
                     // BackHandler = exit player). The gif does NOT advance with
                     // Up/Down while a video is failing — the honest behavior.
-                    if (playError) return@onPreviewKeyEvent false
+                    if (playError) return@onKeyEvent false
                     // Keymap rule 4: hold repeats its own key's action. Seek keys
                     // act on KeyDown so the OS key-repeat (held key) yields
                     // progressive ±10s steps; everything else stays KeyUp-only
@@ -234,11 +258,11 @@ fun TvPlayerScreen(
                                     }
                                     else -> false
                                 }
-                        }.let { consumed -> if (consumed) return@onPreviewKeyEvent true }
+                        }.let { consumed -> if (consumed) return@onKeyEvent true }
                         // Unconsumed Down falls through to the KeyUp table below
                         // (CENTER etc. must not double-fire there).
                     }
-                    if (e.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
+                    if (e.type != KeyEventType.KeyUp) return@onKeyEvent false
                     // AGENTS-UX-PATTERNS TV keymap: horizontal = time (±10s,
                     // hold-repeat = progressive seek), vertical = items,
                     // CENTER = play/pause, MENU = quick actions, media keys
@@ -260,36 +284,57 @@ fun TvPlayerScreen(
                         -> Unit
                         // Media-key remotes: next/prev walk the list (up/down parity).
                         // #22: manual next at the LAST gif opens the end-of-feed
-                        // popup instead of silently doing nothing.
+                        // popup instead of silently doing nothing. Switches hide
+                        // synchronously (issue #48 a: no flash) — the gif.id
+                        // effect below is the backstop for other paths.
                         android.view.KeyEvent.KEYCODE_MEDIA_NEXT -> {
+                            controlsVisible = false
                             if (index < gifs.size - 1) index++ else endDialog = true
                         }
                         android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
+                            controlsVisible = false
                             if (index > 0) index--
                         }
                     }
                     when (e.key) {
+                        // Issue #48 (d): UP/DOWN switch videos ONLY while the
+                        // controls are hidden; once visible they are focus
+                        // traversal — leave them unconsumed so the focus system
+                        // walks between the player body and the pill row.
                         Key.DirectionDown -> {
-                            if (index < gifs.size - 1) index++ else endDialog = true
-                            true
+                            if (!controlsVisible) {
+                                if (index < gifs.size - 1) index++ else endDialog = true
+                                true
+                            } else {
+                                false
+                            }
                         }
                         Key.DirectionUp -> {
-                            if (index > 0) index--
-                            true
+                            if (!controlsVisible) {
+                                if (index > 0) index--
+                                true
+                            } else {
+                                false
+                            }
                         }
                         // Fired on KeyDown (hold-repeat progressive seek);
                         // KeyUp just consumes so the press doesn't double-step.
                         Key.DirectionRight,
                         Key.DirectionLeft,
                         -> true
-                        // CENTER = play/pause (audit: "can't pause on TV");
-                        // at the ended frame restarts (playOrRestart).
-                        // Menu-less-remote keymap: a fired hold already opened
-                        // the quick-actions panel — the KeyUp must not ALSO
-                        // run play/pause (spec KeyUp-suppression rule).
+                        // CENTER = play/pause while visible (audit: "can't
+                        // pause on TV"); at the ended frame restarts
+                        // (playOrRestart). Menu-less-remote keymap: a fired
+                        // hold already opened the quick-actions panel — the
+                        // KeyUp must not ALSO run play/pause (spec
+                        // KeyUp-suppression rule). Issue #48 (c): short CENTER
+                        // while HIDDEN is the reveal press — it only shows the
+                        // controls; the NEXT short CENTER plays/pauses.
                         Key.DirectionCenter -> {
                             if (!centerHold.up()) {
-                                if (player.playbackState == Player.STATE_ENDED) {
+                                if (!controlsVisible) {
+                                    controlsVisible = true
+                                } else if (player.playbackState == Player.STATE_ENDED) {
                                     player.playOrRestart()
                                 } else {
                                     player.playWhenReady = !(player.playWhenReady)
@@ -400,7 +445,6 @@ fun TvPlayerScreen(
                             focusRequester = overlayRetryFocus,
                             onClick = {
                                 playError = false
-                                textVisible = true
                                 scope.launch { player.playGif(gif, dataSaver, videoQuality = videoQuality) }
                             },
                         )
@@ -412,7 +456,6 @@ fun TvPlayerScreen(
                             interaction = skipInteraction,
                             onClick = {
                                 playError = false
-                                textVisible = true
                                 if (index < gifs.size - 1) index++
                             },
                         )
@@ -430,16 +473,19 @@ fun TvPlayerScreen(
             }
             // Mobile-player parity (2026-10): creator + description cluster,
             // bottom-left, above the progress line. Verified tick rides along.
-            // Player text auto-hide (AGENTS-APP TV spec): playing && not seeking
-            // → 3s fade; any key re-reveals; hidden cluster (incl. pills) leaves
-            // composition so no invisible focus targets; progress line always-on.
-            LaunchedEffect(gif.id, textVisible) {
-                if (textVisible && player.playbackState != Player.STATE_ENDED) {
+            // Issue #48 keymap: hidden on entry/switch; OK/Center reveals;
+            // BACK hides (progress line always-on); auto-hide (AGENTS-APP TV
+            // spec) then governs the REVEALED state: playing && not seeking
+            // → 3s fade; hidden cluster (incl. pills) leaves composition so
+            // no invisible focus targets (player body focus is restored by
+            // the LaunchedEffect(controlsVisible) above).
+            LaunchedEffect(gif.id, controlsVisible) {
+                if (controlsVisible && player.playbackState != Player.STATE_ENDED) {
                     kotlinx.coroutines.delay(3_000)
-                    textVisible = false
+                    controlsVisible = false
                 }
             }
-            androidx.compose.animation.AnimatedVisibility(visible = textVisible) {
+            androidx.compose.animation.AnimatedVisibility(visible = controlsVisible) {
                 Column(
                     modifier =
                         Modifier
@@ -466,10 +512,10 @@ fun TvPlayerScreen(
                         )
                     }
                     // Niche pills (mobile-player parity, links audit #5): ≤3 payload
-                    // names; a pill opens the niche feed. D-pad: pills use the
-                    // issue-#7 focus trio (tv-material Surface, §3.1); DOWN from
-                    // the player body walks into the row, CENTER presses, UP
-                    // returns to the player body (vertical = keymap items).
+                    // names; a pill opens the niche feed. D-pad (issue #48):
+                    // pills exist only in the REVEALED state; DOWN from the
+                    // player body traverses into the row, CENTER presses the
+                    // pill, UP returns to the player body.
                     if (gif.niches.isNotEmpty()) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             gif.niches.take(3).forEach { niche ->
@@ -542,6 +588,9 @@ fun TvPlayerScreen(
                         player.play()
                         return
                     }
+                    // Issue #48 (a): the auto-swipe switch also happens under
+                    // hidden UI.
+                    controlsVisible = false
                     index++
                 }
             }
@@ -619,7 +668,6 @@ fun TvPlayerScreen(
                         focusRequester = endFocus,
                         onClick = {
                             endDialog = false
-                            textVisible = true
                             index = 0
                             playerFocus.requestFocus()
                         },
