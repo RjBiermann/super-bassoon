@@ -23,4 +23,11 @@ object PlayerOverlay {
      *  ≈2–3.7:1 over bright artwork inside the gradient ramp — near-opaque
      *  onSurface (≥0.95) is the report's floor for text in that zone. */
     val secondaryOnVideo = GiffyColors.OnSurface.copy(alpha = 0.95f)
+
+    /** Dark pill backdrop (~80% black, WCAG-tested via OverlayContrast) set
+     *  BEHIND secondary text rows over video — finding-5 residual: scheme
+     *  secondary #E3BDC4 is only ≈3.4:1 under the 0.60 scrim on white frames;
+     *  with this backdrop under it the composite clears AA by a wide margin.
+     *  The text color stays as-is; the backdrop carries the contrast. */
+    val secondaryOnVideoBackdrop = Color.Black.copy(alpha = 0.80f)
 }

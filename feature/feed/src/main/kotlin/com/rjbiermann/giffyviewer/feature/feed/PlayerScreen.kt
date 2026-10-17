@@ -806,12 +806,20 @@ private fun PlayerPage(
                         .padding(start = 16.dp, bottom = 64.dp, end = 96.dp),
             ) {
                 gif.description?.takeIf { it.isNotBlank() }?.let { desc ->
+                    // Finding-5 residual: dark pill behind secondary overlay text
+                    // (contrast carried by PlayerOverlay.secondaryOnVideoBackdrop).
                     Text(
                         text = desc,
                         color = PlayerOverlay.secondaryOnVideo,
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
+                        modifier =
+                            Modifier
+                                .background(
+                                    PlayerOverlay.secondaryOnVideoBackdrop,
+                                    MaterialTheme.shapes.extraSmall,
+                                ).padding(horizontal = 6.dp, vertical = 2.dp),
                     )
                     Spacer(Modifier.height(6.dp))
                 }
@@ -835,7 +843,7 @@ private fun PlayerPage(
                                         .minimumInteractiveComponentSize()
                                         .clickable {
                                             onOpenNiche(niche.id, niche.name)
-                                        }.background(Color.Transparent, CircleShape)
+                                        }.background(PlayerOverlay.secondaryOnVideoBackdrop, CircleShape)
                                         .border(1.dp, PlayerOverlay.track, CircleShape)
                                         .padding(horizontal = 10.dp, vertical = 4.dp),
                             )
@@ -850,6 +858,10 @@ private fun PlayerPage(
                                 modifier =
                                     Modifier
                                         .minimumInteractiveComponentSize()
+                                        .background(
+                                            PlayerOverlay.secondaryOnVideoBackdrop,
+                                            MaterialTheme.shapes.extraSmall,
+                                        ).padding(horizontal = 6.dp, vertical = 2.dp)
                                         .clickable {
                                             onOpenTag(tag)
                                         },

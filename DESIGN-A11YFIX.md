@@ -95,3 +95,9 @@ allows skipping tests where no trivial hook exists; noted per finding above.
   focusable rows) — cosmetic class, not in issue #51's six findings.
 - Secondary-colored tag text over bright artwork (residual above) — needs a
   design decision (token or color change), not an alpha fix.
+- RESOLVED: finding-5 residual closed via design decision — subtle dark pill
+  backdrop `PlayerOverlay.secondaryOnVideoBackdrop` (80% black, theme
+  shapes.extraSmall) behind the overlay secondary text rows (description,
+  tags, niche chips/pills) on PlayerScreen + TvPlayerScreen; text colors
+  unchanged, contrast carried by the backdrop and WCAG-verified by
+  OverlayContrastTest (:core:ui).

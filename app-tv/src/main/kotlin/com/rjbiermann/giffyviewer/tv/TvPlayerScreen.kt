@@ -503,12 +503,20 @@ fun TvPlayerScreen(
                         )
                     }
                     gif.description?.takeIf { it.isNotBlank() }?.let { desc ->
+                        // Finding-5 residual: dark pill behind secondary overlay text
+                        // (contrast carried by PlayerOverlay.secondaryOnVideoBackdrop).
                         Text(
                             text = desc,
                             color = PlayerOverlay.secondaryOnVideo,
                             style = MaterialTheme.typography.bodyMedium,
                             maxLines = 2,
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            modifier =
+                                Modifier
+                                    .background(
+                                        PlayerOverlay.secondaryOnVideoBackdrop,
+                                        MaterialTheme.shapes.extraSmall,
+                                    ).padding(horizontal = 6.dp, vertical = 2.dp),
                         )
                     }
                     // Niche pills (mobile-player parity, links audit #5): ≤3 payload
@@ -532,7 +540,7 @@ fun TvPlayerScreen(
                                     interactionSource = interaction,
                                     colors =
                                         ClickableSurfaceDefaults.colors(
-                                            containerColor = Color.Transparent,
+                                            containerColor = PlayerOverlay.secondaryOnVideoBackdrop,
                                             contentColor = MaterialTheme.colorScheme.secondary,
                                             focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                                             focusedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
