@@ -40,6 +40,10 @@ android {
         val (maj, min, pat) = tag.split('.').map { it.toInt() }
         versionCode = maj * 10_000 + min * 100 + pat
         versionName = tag
+
+        // Issue #50 stage 3: instrumented (androidTest) suites run through the
+        // standard runner (createComposeRule / AndroidJUnit4).
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -99,6 +103,20 @@ dependencies {
     implementation(libs.hilt.navigation.compose)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+
+    // Issue #50 stage 3: instrumented Compose tests. Tests hand-wire the app
+    // graph (buildNetwork pointed at a local MockWebServer + in-memory Room) —
+    // no Hilt test infra and no production-DI changes.
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.rules)
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    androidTestImplementation(libs.okhttp.mockwebserver)
+    // FeedMediator offline tests touch paging's MediatorResult/PagingState directly.
+    androidTestImplementation(libs.paging.runtime)
+    // Registers the test ComponentActivity for createComposeRule().
+    debugImplementation(libs.compose.ui.test.manifest)
 }
 
 detekt {
