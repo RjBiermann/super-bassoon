@@ -37,4 +37,18 @@ class NicheJoinStateTest {
         assertEquals(setOf("n1"), pendingAfterStart(emptySet(), "n1"))
         assertEquals(emptySet<String>(), pendingResolved(setOf("n1"), "n1"))
     }
+
+    @Test
+    fun `optimistic rollback restores the pre-toggle membership both directions`() {
+        // Optimistic flip + failure rollback, reproducing the VM's exact math:
+        // a failed JOIN removes the optimistically added id; a failed LEAVE
+        // puts the removed id back.
+        val joinedAfterOptimisticJoin = joinedAfter(setOf<String>(), "n1", joined = true)
+        assertEquals(setOf("n1"), joinedAfterOptimisticJoin)
+        assertEquals(setOf<String>(), joinedAfter(joinedAfterOptimisticJoin, "n1", joined = false))
+
+        val joinedAfterOptimisticLeave = joinedAfter(setOf("n1", "n2"), "n1", joined = false)
+        assertEquals(setOf("n2"), joinedAfterOptimisticLeave)
+        assertEquals(setOf("n1", "n2"), joinedAfter(joinedAfterOptimisticLeave, "n1", joined = true))
+    }
 }

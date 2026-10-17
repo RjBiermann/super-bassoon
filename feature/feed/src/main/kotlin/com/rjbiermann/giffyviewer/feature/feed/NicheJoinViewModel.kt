@@ -80,15 +80,24 @@ class NicheJoinViewModel
         fun toggle(id: String) {
             if (!loggedIn) return
             _error.value = null
+            // Optimistic flip welded to the pending-guard: the button is
+            // disabled for the write's lifetime anyway, so showing the target
+            // state immediately cannot be re-pressed into a double-write, and
+            // the device-verified race class (write completes during heavy
+            // feed paging → header slot sometimes recomposes stale) never
+            // shows a wrong direction — failure rolls the flip back with the
+            // honest error instead of an invisible success.
+            val targetJoined = id !in _joined.value
+            _joined.value = joinedAfter(_joined.value, id, joined = targetJoined)
             _pending.value = pendingAfterStart(_pending.value, id)
             viewModelScope.launch {
                 runCatching {
-                    if (id in _joined.value) api.unsubscribeNiche(nicheId = id) else api.subscribeNiche(nicheId = id)
-                }.onSuccess {
-                    _joined.value = joinedAfter(_joined.value, id, joined = id in _joined.value)
+                    if (targetJoined) api.subscribeNiche(nicheId = id) else api.unsubscribeNiche(nicheId = id)
                 }.onFailure {
-                    // No optimistic flip on failure — the honest error surfaces
-                    // instead (the write did not happen).
+                    // The write did not happen — roll the optimistic flip back
+                    // (remove if we added, restore if we removed) AND surface
+                    // the honest error.
+                    _joined.value = if (targetJoined) _joined.value - id else _joined.value + id
                     _error.value = JOIN_UPDATE_FAILED
                 }.also {
                     _pending.value = pendingResolved(_pending.value, id)
