@@ -65,6 +65,7 @@ import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
 import com.rjbiermann.giffyviewer.core.ui.avgColorOr
 import com.rjbiermann.giffyviewer.core.ui.giffyFocus
 import com.rjbiermann.giffyviewer.core.ui.toTileContentScale
+import com.rjbiermann.giffyviewer.feature.feed.AutoRetryEffect
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import kotlinx.coroutines.delay
 
@@ -659,50 +660,6 @@ internal fun rowHeightFor(pref: String): Dp =
 
 /** Loading-reserved height scales with the row-size setting (card + caption). */
 internal fun reservedHeight(rowHeight: Dp): Dp = rowHeight + (ROW_RESERVED_HEIGHT - CARD_ROW_HEIGHT_DP)
-
-/** Issue #46 part 2: consecutive silent auto-retries allowed per row appearance. */
-internal const val AUTO_RETRY_MAX = 2
-
-/** Issue #46 part 2: debounce before an auto-retry fires (fast scroll-throughs
- *  cancel before this; the rate limiter/breaker still guard the network). */
-internal const val AUTO_RETRY_DEBOUNCE_MS = 2_000L
-
-/** Issue #46 part 2 retry gate: the row may auto-retry while under the cap;
- *  the caller's counter resets on success (and per appearance, via remember). */
-internal fun shouldAutoRetry(consecutiveRetries: Int): Boolean = consecutiveRetries < AUTO_RETRY_MAX
-
-/**
- * Issue #46 part 2: silent recovery for home rows stuck in the "Couldn't load"
- * hint (paging refresh error or the Explore creators fetch). When [error] is
- * visible — meaning the row composed/scrolls into view — fire ONE debounced
- * [retry] through the existing refresh path ([LazyPagingItems.retry] /
- * refreshExplore), and up to [AUTO_RETRY_MAX] per success streak; a success
- * resets the counter, a reload-in-progress ([success] = false, [error] = false)
- * preserves it so retry→loading→error can't loop. Re-fires on a NEW failure
- * (keyed by [key]) or when connectivity returns ([isOnline] flips true).
- * No WorkManager, no polling — stale-while-revalidate on open, network truth
- * from the shared NetworkMonitor.
- */
-@Composable
-private fun AutoRetryEffect(
-    error: Boolean,
-    success: Boolean,
-    key: Any?,
-    isOnline: Boolean,
-    retry: () -> Unit,
-) {
-    var consecutiveRetries by remember { mutableStateOf(0) }
-    LaunchedEffect(key, isOnline) {
-        when {
-            success -> consecutiveRetries = 0
-            error && shouldAutoRetry(consecutiveRetries) -> {
-                consecutiveRetries++
-                delay(AUTO_RETRY_DEBOUNCE_MS)
-                retry()
-            }
-        }
-    }
-}
 
 /**
  * Mixed-orientation rows (PLAN §9 TV): card width = row height × the gif's own

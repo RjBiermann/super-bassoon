@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
 import com.rjbiermann.giffyviewer.core.network.GifsApi
 import com.rjbiermann.giffyviewer.core.network.NicheDto
+import com.rjbiermann.giffyviewer.core.ui.NetworkMonitor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,6 +23,7 @@ class NichesViewModel
     constructor(
         private val api: GifsApi,
         val settings: SettingsRepository,
+        val networkMonitor: NetworkMonitor,
     ) : ViewModel() {
         private val _niches = MutableStateFlow<List<NicheDto>>(emptyList())
         val niches: StateFlow<List<NicheDto>> = _niches
@@ -42,7 +44,15 @@ class NichesViewModel
         val sort: StateFlow<String> = _sort
 
         private var nextPage = 1
-        private var loading = false
+
+        /** A taxonomy page is in flight; hosts show a pending indicator while
+         *  the list is empty instead of the silent-blind state. */
+        private val _loading = MutableStateFlow(false)
+        val loading: StateFlow<Boolean> = _loading
+
+        /** Live connectivity (the auto-retry re-fires when it returns). */
+        val isOnline: StateFlow<Boolean>
+            get() = networkMonitor.isOnline
 
         init {
             loadMore()
@@ -53,8 +63,8 @@ class NichesViewModel
 
         /** Fetches the next taxonomy page; safe to call repeatedly (tap/D-pad walk). */
         fun loadMore() {
-            if (loading || nextPage <= 0) return
-            loading = true
+            if (_loading.value || nextPage <= 0) return
+            _loading.value = true
             viewModelScope.launch {
                 runCatching { api.niches(page = nextPage, category = _category.value, order = _sort.value) }
                     .onSuccess { pageDto ->
@@ -63,7 +73,7 @@ class NichesViewModel
                         nextPage = if (pageDto.page < pageDto.pages) pageDto.page + 1 else 0
                         _endReached.value = nextPage == 0
                     }.onFailure { _loadFailed.value = true }
-                loading = false
+                _loading.value = false
             }
         }
 

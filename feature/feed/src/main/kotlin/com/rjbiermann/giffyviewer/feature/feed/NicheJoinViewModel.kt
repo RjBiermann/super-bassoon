@@ -24,6 +24,19 @@ internal fun joinedAfter(
 /** Honest write-failure copy: state stays put, the host surfaces this. */
 internal const val JOIN_UPDATE_FAILED = "Couldn't update join — check your connection and retry"
 
+/** Pending-write bookkeeping (issue #47 device finding): the id is pending
+ *  from toggle start until its write completes either way — repeat presses
+ *  while the write is in flight must not stack duplicate subscriptions. */
+internal fun pendingAfterStart(
+    current: Set<String>,
+    id: String,
+): Set<String> = current + id
+
+internal fun pendingResolved(
+    current: Set<String>,
+    id: String,
+): Set<String> = current - id
+
 /**
  * Niche join/leave state (PLAN §7/§9 — API word: subscription, UI word:
  * Join/Leave Niche). Server state is the source of truth: joined ids come
@@ -45,6 +58,10 @@ class NicheJoinViewModel
         private val _error = MutableStateFlow<String?>(null)
         val error: StateFlow<String?> = _error
 
+        /** Writes currently in flight; hosts disable their buttons while set. */
+        private val _pending = MutableStateFlow<Set<String>>(emptySet())
+        val pending: StateFlow<Set<String>> = _pending
+
         fun dismissError() {
             _error.value = null
         }
@@ -63,6 +80,7 @@ class NicheJoinViewModel
         fun toggle(id: String) {
             if (!loggedIn) return
             _error.value = null
+            _pending.value = pendingAfterStart(_pending.value, id)
             viewModelScope.launch {
                 runCatching {
                     if (id in _joined.value) api.unsubscribeNiche(nicheId = id) else api.subscribeNiche(nicheId = id)
@@ -72,6 +90,8 @@ class NicheJoinViewModel
                     // No optimistic flip on failure — the honest error surfaces
                     // instead (the write did not happen).
                     _error.value = JOIN_UPDATE_FAILED
+                }.also {
+                    _pending.value = pendingResolved(_pending.value, id)
                 }
             }
         }

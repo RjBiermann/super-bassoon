@@ -1,6 +1,7 @@
 package com.rjbiermann.giffyviewer.feature.feed
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -67,13 +69,29 @@ fun NichesScreen(
     val sort by viewModel.sort.collectAsStateWithLifecycle()
     val endReached by viewModel.endReached.collectAsStateWithLifecycle()
     val loadFailed by viewModel.loadFailed.collectAsStateWithLifecycle()
+    val loading by viewModel.loading.collectAsStateWithLifecycle()
+    val isOnline by viewModel.isOnline.collectAsStateWithLifecycle()
     var sortMenuOpen by remember { mutableStateOf(false) }
+
+    // Issue #49: the page's load used to fail/hang silently — the list sat
+    // empty with no indication and nothing retried. Auto-retry (same budget
+    // as home rows) after each visible failure; the pending spinner below
+    // makes an in-flight load visible, and callTimeout bounds any hang so
+    // it degrades into the honest failure copy instead of a blind void.
     // Scroll-to-top fab (#23): the taxonomy pages can run deep; same thresholds
     // as the main feed, navigation-only.
     val listState = rememberLazyListState()
     val showFab by rememberScrollingUp(listState, SCROLL_TO_TOP_THRESHOLD)
     val reducedMotion = rememberReducedMotion()
     val scope = rememberCoroutineScope()
+
+    AutoRetryEffect(
+        error = loadFailed,
+        success = niches.isNotEmpty() && !loadFailed,
+        key = loadFailed,
+        isOnline = isOnline,
+        retry = { viewModel.loadMore() },
+    )
 
     GiffyScaffold(
         title = "Niches",
@@ -168,6 +186,25 @@ fun NichesScreen(
                         },
                         modifier = Modifier.clickable { onOpenNiche(FeedSource.Niche(niche.id, niche.name)) },
                     )
+                }
+                if (niches.isEmpty() && !loadFailed && loading) {
+                    item(key = "pending") {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(24.dp),
+                            horizontalArrangement = Arrangement.Center,
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    }
+                }
+                if (niches.isEmpty() && !loadFailed && !loading && endReached) {
+                    item(key = "empty") {
+                        com.rjbiermann.giffyviewer.core.ui.EmptyState(
+                            message = "No niches",
+                            hint = "Check back later",
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        )
+                    }
                 }
                 if (loadFailed) {
                     item(key = "error") {

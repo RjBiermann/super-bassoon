@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
@@ -53,6 +54,7 @@ import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.ClickableSurfaceScale
 import androidx.tv.material3.Surface
 import com.rjbiermann.giffyviewer.core.ui.giffyFocus
+import com.rjbiermann.giffyviewer.feature.feed.AutoRetryEffect
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import com.rjbiermann.giffyviewer.feature.feed.NichesViewModel
 
@@ -74,6 +76,8 @@ fun TvNichesScreen(
     val niches by viewModel.niches.collectAsStateWithLifecycle()
     val endReached by viewModel.endReached.collectAsStateWithLifecycle()
     val loadFailed by viewModel.loadFailed.collectAsStateWithLifecycle()
+    val loading by viewModel.loading.collectAsStateWithLifecycle()
+    val isOnline by viewModel.isOnline.collectAsStateWithLifecycle()
     val pinned by viewModel.settings.pinnedNiches.collectAsStateWithLifecycle(initialValue = emptySet())
     // Site-parity category chips + sort (#47 slice 2): state lives in the
     // shared NichesViewModel — selectCategory/resort restart() the list and
@@ -88,6 +92,18 @@ fun TvNichesScreen(
         if (niches.isNotEmpty() && !endReached) viewModel.loadMore()
     }
     LaunchedEffect(Unit) { viewModel.loadMore() }
+
+    // Issue #49 (the silent-empty page): visible pending state while a load
+    // is in flight, and the shared auto-retry budget after a visible
+    // failure. callTimeout bounds any hang so it degrades into the
+    // honest error copy instead of a blind void.
+    AutoRetryEffect(
+        error = loadFailed,
+        success = niches.isNotEmpty() && !loadFailed,
+        key = loadFailed,
+        isOnline = isOnline,
+        retry = { viewModel.loadMore() },
+    )
 
     // Initial D-pad focus (AGENTS-APP pattern): without it the list sits
     // unfocused — the first CENTER press did nothing and no focus ring showed.
@@ -304,6 +320,23 @@ fun TvNichesScreen(
                     TextButton(onClick = { onOpenNicheAbout(niche.id, niche.name) }) {
                         Text("About")
                     }
+                }
+            }
+            if (niches.isEmpty() && !loadFailed && loading) {
+                item(key = "pending") {
+                    CircularProgressIndicator(
+                        modifier = Modifier.padding(24.dp),
+                    )
+                }
+            }
+            if (niches.isEmpty() && !loadFailed && !loading && endReached) {
+                item(key = "empty") {
+                    Text(
+                        "No niches — check back later",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(16.dp),
+                    )
                 }
             }
             if (loadFailed) {

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -244,6 +246,7 @@ fun FeedScreen(
             if (source is FeedSource.Niche) {
                 viewModel.nicheStats.collectAsStateWithLifecycle().value?.let { detail ->
                     val joined by joinViewModel.joined.collectAsStateWithLifecycle(initialValue = emptySet())
+                    val pending by joinViewModel.pending.collectAsStateWithLifecycle(initialValue = emptySet())
                     NicheFeedHeader(
                         niche = detail,
                         // Site-parity Join/Leave beside the counts (logged-in
@@ -252,7 +255,16 @@ fun FeedScreen(
                         joinButton =
                             if (joinViewModel.loggedIn) {
                                 {
-                                    Button(onClick = { joinViewModel.toggle(detail.id) }) {
+                                    Button(
+                                        onClick = { joinViewModel.toggle(detail.id) },
+                                        enabled = detail.id !in pending,
+                                    ) {
+                                        if (detail.id in pending) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.padding(end = 8.dp).size(14.dp),
+                                                strokeWidth = 2.dp,
+                                            )
+                                        }
                                         Text(joinNicheLabel(joined = detail.id in joined))
                                     }
                                 }

@@ -277,6 +277,7 @@ fun TvSourceFeedScreen(
                 feedViewModel.nicheStats.collectAsStateWithLifecycle().value?.let { detail ->
                     val joinedIds = joinViewModel?.joined?.collectAsStateWithLifecycle()?.value
                     val joinError = joinViewModel?.error?.collectAsStateWithLifecycle()?.value
+                    val pendingIds = joinViewModel?.pending?.collectAsStateWithLifecycle()?.value
                     NicheFeedHeader(
                         niche = detail,
                         joinButton =
@@ -285,6 +286,7 @@ fun TvSourceFeedScreen(
                                     NicheJoinButton(
                                         joined = detail.id in joinedIds!!,
                                         error = joinError,
+                                        pending = detail.id in pendingIds!!,
                                         onToggle = { joinViewModel.toggle(detail.id) },
                                     )
                                 }
@@ -601,12 +603,14 @@ class TvNicheFeedViewModel
 private fun NicheJoinButton(
     joined: Boolean,
     error: String?,
+    pending: Boolean,
     onToggle: () -> Unit,
 ) {
     Column {
         val interaction = remember { MutableInteractionSource() }
         Button(
             onClick = onToggle,
+            enabled = !pending,
             scale = ButtonScale.None,
             interactionSource = interaction,
             colors =

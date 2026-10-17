@@ -1,5 +1,7 @@
 package com.rjbiermann.giffyviewer.tv
 
+import com.rjbiermann.giffyviewer.feature.feed.AUTO_RETRY_MAX
+import com.rjbiermann.giffyviewer.feature.feed.shouldAutoRetry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -9,7 +11,7 @@ import org.junit.Test
  * Issue #46 part 2: home rows in the "Couldn't load" state auto-retry when
  * they (re)compose or the network returns — silently, capped so a breaker
  * outage can't turn the row into a retry loop. The gate rule:
- * up to [TvHomeScreenKt.AUTO_RETRY_MAX] consecutive auto-retries per row
+ * up to [com.rjbiermann.giffyviewer.feature.feed.AUTO_RETRY_MAX] consecutive auto-retries per row
  * appearance; the counter resets only when a load succeeds (offline/re-entry
  * resets naturally with the row's own remember state).
  */

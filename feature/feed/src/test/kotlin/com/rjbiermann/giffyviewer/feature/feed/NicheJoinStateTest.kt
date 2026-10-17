@@ -28,4 +28,13 @@ class NicheJoinStateTest {
     fun `failure surfaces an honest non-blank message`() {
         assertTrue(JOIN_UPDATE_FAILED.isNotBlank())
     }
+
+    @Test
+    fun `pending opens on start and resolves on completion both ways`() {
+        // The button must guard double-taps while the write is in flight
+        // (an unflipped button invites re-presses; repeat writes raced the
+        // joined-state non-determinism seen in the #47 device pass).
+        assertEquals(setOf("n1"), pendingAfterStart(emptySet(), "n1"))
+        assertEquals(emptySet<String>(), pendingResolved(setOf("n1"), "n1"))
+    }
 }

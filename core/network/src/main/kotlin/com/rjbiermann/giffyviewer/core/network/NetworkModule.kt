@@ -99,6 +99,10 @@ fun buildNetwork(
             .Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
+            // Hard bound per call: a request parked in the limiter's cooldown
+            // path or a stuck connection must never hang a screen silently
+            // forever — it degrades into the honest failure states.
+            .callTimeout(60, TimeUnit.SECONDS)
             .addInterceptor(BrowserIdentityInterceptor())
             .addInterceptor(authInterceptor)
             .addInterceptor(RateLimitInterceptor(limiter))
