@@ -159,7 +159,15 @@ fun GiffyScaffold(
                                     maxHeight = spec.measureMaxHeight,
                                 ),
                             )
-                        layout(placeable.width, placeable.height) {
+                        layout(placeable.width, spec.reportedHeight) {
+                            // Issue #40: report the INCOMING height, not the grown
+                            // child — Scaffold centers its content placeable, so a
+                            // taller child split the growth half out the top and
+                            // half off the bottom, leaving a band of offsetPx/2 at
+                            // the screen bottom whenever the header was collapsed.
+                            // With the true height the placement is identity and
+                            // the grown child (placed at -offset) reaches the
+                            // bottom inset exactly.
                             placeable.place(0, spec.contentOffsetY)
                         }
                     },
@@ -192,6 +200,10 @@ internal data class CollapseLayoutSpec(
     val measureMaxHeight: Int,
     /** Draw offset: the collapsed strip the topBar column paints over. */
     val contentOffsetY: Int,
+    /** Height the layout reports to the parent. Must be the INCOMING max —
+     *  Scaffold centers its content placeable, so reporting the grown child
+     *  height split the growth half off the bottom (issue #40's band). */
+    val reportedHeight: Int,
 )
 
 internal fun collapseLayout(
@@ -204,5 +216,6 @@ internal fun collapseLayout(
         measureMinHeight = incomingMinHeight + extra,
         measureMaxHeight = incomingMaxHeight + extra,
         contentOffsetY = -extra,
+        reportedHeight = incomingMaxHeight,
     )
 }

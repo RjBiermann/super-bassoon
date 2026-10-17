@@ -10,8 +10,19 @@ import org.junit.Test
  *  and (b) no phantom gap opens below the grid at rest or while scrolled. */
 class GiffyCollapseLayoutTest {
     private fun bottomWhenFilling(spec: CollapseLayoutSpec): Int {
-        // A content that fills the grown max heights; drawn at contentOffsetY.
-        return spec.measureMaxHeight + spec.contentOffsetY
+        // A content that fills the grown max heights, drawn at contentOffsetY
+        // inside a layout reporting reportedHeight (the un-grown parent height
+        // — the parent centers its placeable, so the reported height must not
+        // be the grown one or the overflow splits off the bottom, issue #40).
+        return spec.contentOffsetY + spec.measureMaxHeight
+    }
+
+    @Test
+    fun `reported height is the un-grown parent height`() {
+        // Issue #40: the parent centers the content placeable — reporting the
+        // grown child height halved the overflow off the screen bottom.
+        val spec = collapseLayout(incomingMinHeight = 0, incomingMaxHeight = 900, collapseOffsetPx = 300)
+        assertEquals(900, spec.reportedHeight)
     }
 
     @Test
@@ -20,6 +31,7 @@ class GiffyCollapseLayoutTest {
         assertEquals(0, spec.measureMinHeight)
         assertEquals(900, spec.measureMaxHeight)
         assertEquals(0, spec.contentOffsetY)
+        assertEquals(900, spec.reportedHeight)
     }
 
     @Test
@@ -28,6 +40,7 @@ class GiffyCollapseLayoutTest {
         assertEquals(300, spec.measureMinHeight)
         assertEquals(1200, spec.measureMaxHeight)
         assertEquals(-300, spec.contentOffsetY)
+        assertEquals(900, spec.reportedHeight)
         // (b) no phantom gap: bottom edge sits exactly at the un-grown bottom.
         assertEquals(900, bottomWhenFilling(spec))
     }
