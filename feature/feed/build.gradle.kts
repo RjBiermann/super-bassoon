@@ -54,9 +54,24 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    // Issue #50 stage 2: Compose UI tests on the JVM rung (Robolectric).
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.ext.junit)
+    testImplementation(libs.compose.ui.test.junit4)
+    // Registers ComponentActivity in the manifest for createComposeRule().
+    debugImplementation(libs.compose.ui.test.manifest)
     // httpError(): retrofit2.HttpException + okhttp3.ResponseBody construction.
     testImplementation(libs.okhttp)
     testImplementation(libs.retrofit)
+}
+
+android {
+    testOptions {
+        unitTests {
+            // Robolectric reads the merged (debug) manifest + resources.
+            isIncludeAndroidResources = true
+        }
+    }
 }
 
 detekt {

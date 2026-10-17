@@ -129,6 +129,23 @@ private const val IDLE_HIDE_MS = 3_000L
 /** Hold-to-2× (UX-PATTERNS candidate): long-press on the player body = 2× while held. */
 private const val HOLD_SPEED = 2f
 
+/**
+ * Issue #51 (a11y-breaking): the reveal tap is a raw pointerInput gesture
+ * TalkBack can't dispatch, and the auto-hidden overlay leaves composition
+ * entirely — without this action the controls are unreachable for
+ * screen-reader users until the video is re-fetched.
+ */
+internal fun Modifier.playerControlsSemantics(onReveal: () -> Unit): Modifier =
+    semantics {
+        customActions =
+            listOf(
+                CustomAccessibilityAction("Show playback controls") {
+                    onReveal()
+                    true
+                },
+            )
+    }
+
 @OptIn(ExperimentalCoroutinesApi::class)
 @Composable
 fun PlayerScreen(
@@ -531,20 +548,7 @@ private fun PlayerPage(
             Modifier
                 .fillMaxSize()
                 .background(Color.Black)
-                // Issue #51 (a11y-breaking): the reveal tap is a raw
-                // pointerInput gesture TalkBack can't dispatch, and the
-                // auto-hidden overlay leaves composition entirely — without
-                // this action the controls are unreachable for screen-reader
-                // users until the video is re-fetched.
-                .semantics {
-                    customActions =
-                        listOf(
-                            CustomAccessibilityAction("Show playback controls") {
-                                onShowControls()
-                                true
-                            },
-                        )
-                }
+                .playerControlsSemantics(onReveal = onShowControls)
                 // two-finger pinch zoom + pan (PLAN §9); zoom resets per page.
                 // Two-pointer-only: single-finger drags stay unconsumed so the
                 // VerticalPager keeps working.

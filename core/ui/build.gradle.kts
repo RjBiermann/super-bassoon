@@ -26,6 +26,22 @@ dependencies {
     implementation(libs.material.icons.extended)
 
     testImplementation(libs.junit)
+    // Issue #50 stage 2: Compose UI tests on the JVM rung (Robolectric) so
+    // `check` runs them on the 2-core CI — no emulator needed.
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.ext.junit)
+    testImplementation(libs.compose.ui.test.junit4)
+    // Registers ComponentActivity in the manifest for createComposeRule().
+    debugImplementation(libs.compose.ui.test.manifest)
+}
+
+android {
+    testOptions {
+        unitTests {
+            // Robolectric reads the merged (debug) manifest + resources.
+            isIncludeAndroidResources = true
+        }
+    }
 }
 
 kotlin {

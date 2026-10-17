@@ -950,7 +950,7 @@ private fun AboutPanel(modifier: Modifier = Modifier) {
     }
 }
 
-private fun LazyListScope.section(
+internal fun LazyListScope.section(
     title: String,
     values: List<String>,
     firstFocus: Modifier = Modifier,

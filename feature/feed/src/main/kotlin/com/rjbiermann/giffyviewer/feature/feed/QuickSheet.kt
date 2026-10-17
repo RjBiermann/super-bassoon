@@ -125,8 +125,7 @@ internal fun QuickBlockSheet(
                                     // "NN%".
                                     .semantics {
                                         contentDescription = "Playback speed"
-                                        stateDescription =
-                                            String.format(java.util.Locale.US, "%.2f×", dragSpeed)
+                                        stateDescription = speedStateDescription(dragSpeed)
                                     },
                         )
                         Text("2×", style = MaterialTheme.typography.bodySmall)
@@ -427,3 +426,7 @@ internal fun AddToNicheDialog(
         dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
+
+/** Issue #51: the visible "Speed N.NN×" label is not attached to the slider —
+ *  this state description is what TalkBack announces instead of "NN%". */
+internal fun speedStateDescription(speed: Float): String = String.format(java.util.Locale.US, "%.2f×", speed)
