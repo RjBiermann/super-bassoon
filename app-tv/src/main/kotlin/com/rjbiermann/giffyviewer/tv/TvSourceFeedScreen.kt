@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -272,12 +273,24 @@ fun TvSourceFeedScreen(
                 }
             }
             if (source is FeedSource.Niche) {
+                // D-pad reachability (2026-10-17 device finding): directional
+                // beams skip the header Join (it sits outside the chips row's
+                // beam; UP landed on the far top-end icons). The chips row's
+                // UP is redirected onto the Join (attached when logged in —
+                // detached requesters are simply never addressed).
+                val joinFocus = remember { FocusRequester() }
                 // Issue #31: the niche feed previously rendered NO header at
                 // all — same shared mount, under the title.
                 feedViewModel.nicheStats.collectAsStateWithLifecycle().value?.let { detail ->
                     val joinedIds = joinViewModel?.joined?.collectAsStateWithLifecycle()?.value
                     val joinError = joinViewModel?.error?.collectAsStateWithLifecycle()?.value
                     val pendingIds = joinViewModel?.pending?.collectAsStateWithLifecycle()?.value
+                    // D-pad reachability (2026-10-17 device finding): the plain
+                    // traversal from the cards skipped the header Join button —
+                    // the framework's directional beam jumps past it to the
+                    // top-end icons (the Join sits rightward of the chips'
+                    // beam). UP from the filter chips goes to the Join
+                    // instead; UP again continues to the global header.
                     NicheFeedHeader(
                         niche = detail,
                         joinButton =
@@ -287,6 +300,7 @@ fun TvSourceFeedScreen(
                                         joined = detail.id in joinedIds!!,
                                         error = joinError,
                                         pending = detail.id in pendingIds!!,
+                                        focusRequester = joinFocus,
                                         onToggle = { joinViewModel.toggle(detail.id) },
                                     )
                                 }
@@ -302,6 +316,7 @@ fun TvSourceFeedScreen(
                 NicheFilterChipsRow(
                     prefs = feedPrefs,
                     verifiedOnly = verifiedOnlyPref,
+                    focusUp = joinFocus,
                     onOrientation = { value ->
                         feedViewModel.setFeedPrefs(source.baseKey, feedPrefs.copy(orientation = value))
                     },
@@ -521,11 +536,19 @@ private fun SourceFeedRow(
 private fun NicheFilterChipsRow(
     prefs: FeedPrefs,
     verifiedOnly: Boolean,
+    focusUp: FocusRequester? = null,
     onOrientation: (String) -> Unit,
     onVerifiedOnly: (Boolean) -> Unit,
 ) {
     Row(
-        modifier = Modifier.padding(start = 16.dp, top = 2.dp, bottom = 2.dp),
+        modifier =
+            if (focusUp != null) {
+                Modifier
+                    .focusProperties { up = focusUp }
+                    .padding(start = 16.dp, top = 2.dp, bottom = 2.dp)
+            } else {
+                Modifier.padding(start = 16.dp, top = 2.dp, bottom = 2.dp)
+            },
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         listOf(
@@ -604,6 +627,7 @@ private fun NicheJoinButton(
     joined: Boolean,
     error: String?,
     pending: Boolean,
+    focusRequester: FocusRequester? = null,
     onToggle: () -> Unit,
 ) {
     Column {
@@ -625,6 +649,7 @@ private fun NicheJoinButton(
                     focusedBorder =
                         Border(BorderStroke(3.dp, MaterialTheme.colorScheme.primary)),
                 ),
+            modifier = if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier,
         ) { TvText(joinNicheLabel(joined)) }
         if (error != null) {
             TvText(
