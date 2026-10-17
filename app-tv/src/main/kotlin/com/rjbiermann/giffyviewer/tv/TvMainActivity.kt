@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -228,12 +227,9 @@ class TvMainActivity : ComponentActivity() {
                 // TvNicheFeedViewModel per pushed feed (the flow pins the
                 // source via remember(source.keyBase) inside the screen).
                 val feedVm: TvNicheFeedViewModel = hiltViewModel()
-                // Batch-22 hoisted grid state is REPLACED: per-entry saveable
-                // state (BACK from player keeps exactly this entry's position).
-                val gridState = rememberLazyStaggeredGridState()
-                // Issue #13 §4.3: saveable grid focus position — BACK from a
+                // Issue #13 §4.3: saveable focus position — BACK from a
                 // player re-arms D-pad focus on the same card (TvSourceFeedScreen
-                // owns the restore; the header initial focus must yield to it).
+                // owns the restore; scroll is saveable per entry in-screen).
                 var focusItem by rememberSaveable { mutableIntStateOf(-1) }
                 TvSourceFeedScreen(
                     source = route.source,
@@ -254,7 +250,6 @@ class TvMainActivity : ComponentActivity() {
                     // on the home header pills + quick-actions "Open feed".
                     playerFactory = playerFactory,
                     dataSaver = dataSaver,
-                    gridState = gridState,
                     savedFocusItem = focusItem,
                     onFocusSaved = { focusItem = it },
                 )
