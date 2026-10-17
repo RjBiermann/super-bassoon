@@ -322,6 +322,16 @@ fun TvHomeScreen(
                 onOpenFeed(source)
             },
             feedSource = actionsFeed,
+            // Home-row refresh affordance (#36c):FavoritesRow cards carry the
+            // panel's "Refresh feed" row → a forced generation re-keys the
+            // row pager with a NEW rotation seed. Other home rows stay
+            // one-shot (null = the panel row is hidden).
+            onRefresh =
+                if (actionsFeed == FeedSource.Favorites) {
+                    { homeViewModel.refreshFavorites() }
+                } else {
+                    null
+                },
         )
     }
 }

@@ -2,14 +2,23 @@ package com.rjbiermann.giffyviewer.tv
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.paging.LoadState
+import androidx.paging.LoadStates
+import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.feature.feed.FeedRepository
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -29,7 +38,47 @@ class TvHomeViewModel
     ) : ViewModel() {
         val trending = repository.paging(FeedSource.Trending).cachedIn(viewModelScope)
         val topThisWeek = repository.paging(FeedSource.TopThisWeek).cachedIn(viewModelScope)
-        val favorites = repository.paging(FeedSource.Favorites).cachedIn(viewModelScope)
+
+        /** Favorites row with a forced-refresh generation (#36c, TV-side panel
+         *  "Refresh feed": the quick-actions plumbing exists; the row pager
+         *  just lacked a generation). Same shape as FeedViewModel's
+         *  combine+flatMapLatest: gen 0 = today's one-shot pager; a bumped gen
+         *  emits the S3 reset (Loading state kills the old grid flash + latched
+         *  error, see FeedViewModel §S3) and re-keys with forceRefresh=true so
+         *  the repository re-rotates the round-robin and evicts stale pages.
+         *  PendLeader: only the Favorites row wires a refresh — other home rows
+         *  stay one-shot (no speculative config). */
+        private val favoritesGen = MutableStateFlow(0)
+        val favorites: Flow<PagingData<Gif>> =
+            favoritesGen
+                .flatMapLatest { gen -> favoritesPagingFlow(gen) }
+                .cachedIn(viewModelScope)
+
+        private fun favoritesPagingFlow(gen: Int): Flow<PagingData<Gif>> =
+            if (gen > 0) {
+                flow {
+                    emit(resetGenerationPagingData())
+                    emitAll(repository.paging(FeedSource.Favorites, forceRefresh = true))
+                }
+            } else {
+                repository.paging(FeedSource.Favorites)
+            }
+
+        private fun resetGenerationPagingData(): PagingData<Gif> =
+            PagingData.empty(
+                LoadStates(
+                    refresh = LoadState.Loading,
+                    append = LoadState.NotLoading(false),
+                    prepend = LoadState.NotLoading(false),
+                ),
+            )
+
+        /** Panel "Refresh feed" for Favorites-row cards (#36c): bumps the gen →
+         *  fresh REFRESH + new rotation seed (rate-limit-safe: one page-1
+         *  fetch per bump, same as the mobile pull-to-refresh path). */
+        fun refreshFavorites() {
+            favoritesGen.value = favoritesGen.value + 1
+        }
 
         /** Liked (PLAN §7): network-live, never cached — same source as mobile. */
         val liked = repository.paging(FeedSource.Liked).cachedIn(viewModelScope)
