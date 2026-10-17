@@ -66,7 +66,28 @@ minSdk 24 (mobile) / 26 (TV) · targetSdk 35 · DB name `giffy.db`.
   shape unchanged). Bonus fix in the same sweep: TokenStore's PKCE challenge used
   `java.util.Base64` (API 26+) — a real crash on minSdk 24/25 — swapped to
   `Base64.UrlSafe.withPadding(ABSENT)`.
-- Non-trivial logic ships with one minimal self-check (small `test_*.py`-style unit test or `@Test`), not a framework suite.
+- **Testing policy (2026-10, supersedes the old one-minimal-test rule — every kind of
+  test, small to big, is in scope; no suite implemented yet, policy first):**
+  1. **Unit (JVM)** — pure logic, ViewModels/state (StateFlow/UiState with fakes),
+     rate limiter/breaker/filter invariants. JUnit 4; MockWebServer for API/DTO paths;
+     Robolectric only where Android deps are unavoidable.
+  2. **Compose UI component tests** — `createComposeRule()` for shared widgets with
+     interaction/visual behavior worth pinning (GiffyScaffold, focus/fill states, chips).
+  3. **Instrumented tests** (`src/androidTest`) — Espresso + Compose test per shell
+     (mobile + TV): launch, navigation smoke, player open/play/pause.
+  4. **Integration/e2e** — full flows end to end on emulators; the manual device-gate
+     recipes (giffy-device-gate skill) become automated where economical.
+  5. **Manual device gates stay** for what automation can't judge: focus rings,
+     10-foot feel, visual regressions.
+  New non-trivial logic ships with a test at the lowest rung that covers it — no
+  logic lands untested. Instrumented/e2e run locally on the emulator (RAM rule:
+  one heavy operation at a time); CI runs the JVM rungs via `check` until a
+  CI emulator lane exists.
+- **TDD (test-driven development) is the default development loop:** for any new
+  logic or bug fix, write the failing test first, watch it fail, implement the
+  minimum to make it pass, then refactor. UI/device work follows the same shape:
+  capture the expected state (XML dump / probe) first where possible. `check`
+  green is the merge gate; device gates come after green.
 - rate-limit invariant: ≤15 requests in any rolling 5s window (retuned 2026-10-03 to the browser-like budget after the live-probe session; browser identity policy in AGENTS-NETWORK.md) — own change must not break it.
 
 ## Module map
@@ -100,6 +121,7 @@ minSdk 24 (mobile) / 26 (TV) · targetSdk 35 · DB name `giffy.db`.
 5. Login survives process death; logout revokes.
 6. Filter leak-zero on every surface.
 7. Export → import round-trip on fresh install.
+8. Testing-policy suite green (JVM rungs via `check`; instrumented/e2e on device).
 
 When unsure: check the matching AGENTS doc first, then ask. Don't invent endpoints or features.
 
@@ -328,7 +350,9 @@ Compiled + ktlint + detekt + unit tests + lint green on all touched modules.
     responsive-first mobile shell.
   - `navigation-3` / `navigation-event` — only if navigation is ever migrated; navigation
     went to STABLE navigation-compose 2.10.2 instead (issue #13, 2026-10) — N3 stays declined.
-  - `testing-setup` — if unit-coverage is ever expanded beyond the one-test rule.
+  - `testing-setup` — the 2026-10 testing policy supersedes the old one-test
+    rule; this is the reference skill for building the suite out (unit → UI →
+    instrumented → e2e).
 - **Not relevant / skip:** ml-kit-genai-prompt-api (LLM on-device — app rule: no such
   feature), appfunctions (exposes app to agents; privacy surface — skip), engage-sdk,
   play-billing, media3-cast (no cast; upstream has none verified), camerax, wear,

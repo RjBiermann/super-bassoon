@@ -40,7 +40,8 @@ single issue — the gates and evidence rules always apply.
 - **Device passes earn their keep**: batch 24's static-green code hid 3 crash-class bugs
   (NavType crashes) that only device verification caught. UI/behavior claims get a device
   gate per giffy-device-gate.
-- Regression tests for each fixed bug (the one-minimal-test rule).
+- Regression tests for each fixed bug (TDD per the 2026-10 testing policy in
+  AGENTS.md — failing test first, then the fix).
 
 ## 5. Close
 
