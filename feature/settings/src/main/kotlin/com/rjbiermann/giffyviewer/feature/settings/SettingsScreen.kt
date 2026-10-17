@@ -50,6 +50,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -825,7 +827,7 @@ private fun BlockedPanel(
                     "Blocked feeds",
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
+                    modifier = Modifier.padding(top = 12.dp, bottom = 4.dp).semantics { heading() },
                 )
             }
             // Keys are the row ids — custom-feed names may repeat (save
@@ -960,7 +962,8 @@ private fun LazyListScope.section(
             title,
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
+            // Issue #51: mark section headers for TalkBack heading navigation.
+            modifier = Modifier.padding(top = 12.dp, bottom = 4.dp).semantics { heading() },
         )
     }
     itemsIndexed(values, key = { _, value -> "$title:$value" }) { index, value ->

@@ -296,7 +296,9 @@ private fun NicheTileCard(
             IconButton(onClick = onPin) {
                 Icon(
                     imageVector = if (isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
-                    contentDescription = if (isPinned) "unpin" else "pin",
+                    // Issue #51: name the object — "pin" alone is ambiguous in
+                    // a scrolling list (sibling buttons name theirs).
+                    contentDescription = if (isPinned) "unpin ${tile.name}" else "pin ${tile.name}",
                 )
             }
         }

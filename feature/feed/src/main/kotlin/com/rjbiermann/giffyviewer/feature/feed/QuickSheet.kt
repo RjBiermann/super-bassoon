@@ -24,6 +24,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
@@ -112,7 +115,19 @@ internal fun QuickBlockSheet(
                             onValueChange = { dragSpeed = it },
                             valueRange = 0.25f..2f,
                             onValueChangeFinished = { onSpeedChange(dragSpeed) },
-                            modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+                            modifier =
+                                Modifier
+                                    .weight(1f)
+                                    .padding(horizontal = 12.dp)
+                                    // Issue #51: the visible "Speed 1.25×" label is
+                                    // not attached to the slider — name it + carry
+                                    // the state so TalkBack doesn't announce only
+                                    // "NN%".
+                                    .semantics {
+                                        contentDescription = "Playback speed"
+                                        stateDescription =
+                                            String.format(java.util.Locale.US, "%.2f×", dragSpeed)
+                                    },
                         )
                         Text("2×", style = MaterialTheme.typography.bodySmall)
                     }

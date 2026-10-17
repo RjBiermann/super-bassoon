@@ -52,6 +52,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -72,9 +73,13 @@ import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -526,6 +531,20 @@ private fun PlayerPage(
             Modifier
                 .fillMaxSize()
                 .background(Color.Black)
+                // Issue #51 (a11y-breaking): the reveal tap is a raw
+                // pointerInput gesture TalkBack can't dispatch, and the
+                // auto-hidden overlay leaves composition entirely — without
+                // this action the controls are unreachable for screen-reader
+                // users until the video is re-fetched.
+                .semantics {
+                    customActions =
+                        listOf(
+                            CustomAccessibilityAction("Show playback controls") {
+                                onShowControls()
+                                true
+                            },
+                        )
+                }
                 // two-finger pinch zoom + pan (PLAN §9); zoom resets per page.
                 // Two-pointer-only: single-finger drags stay unconsumed so the
                 // VerticalPager keeps working.
@@ -754,9 +773,14 @@ private fun PlayerPage(
                         .background(
                             androidx.compose.ui.graphics.Brush.verticalGradient(
                                 0f to androidx.compose.ui.graphics.Color.Transparent,
-                                0.65f to androidx.compose.ui.graphics.Color.Transparent,
-                                1f to
-                                    PlayerOverlay.scrim,
+                                0.45f to androidx.compose.ui.graphics.Color.Transparent,
+                                // Issue #51 finding 5: the bottom text cluster sits
+                                // ~64–214dp above the bottom edge — inside the old
+                                // 0.65→1 ramp, so its text landed at ≈2–3.7:1 over
+                                // bright artwork. Full scrim from the cluster's top
+                                // down restores ≥4.5:1 for the onSurface text.
+                                0.75f to PlayerOverlay.scrim,
+                                1f to PlayerOverlay.scrim,
                             ),
                         ),
             )
@@ -804,6 +828,7 @@ private fun PlayerPage(
                                 style = MaterialTheme.typography.labelMedium,
                                 modifier =
                                     Modifier
+                                        .minimumInteractiveComponentSize()
                                         .clickable {
                                             onOpenNiche(niche.id, niche.name)
                                         }.background(Color.Transparent, CircleShape)
@@ -820,6 +845,7 @@ private fun PlayerPage(
                                 style = MaterialTheme.typography.labelMedium,
                                 modifier =
                                     Modifier
+                                        .minimumInteractiveComponentSize()
                                         .clickable {
                                             onOpenTag(tag)
                                         },
@@ -987,7 +1013,15 @@ private fun PlayerControls(
                             activeTrackColor = fill,
                             inactiveTrackColor = trackColor,
                         ),
-                    modifier = Modifier.weight(1f),
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .semantics {
+                                // Issue #51: bare "NN%" gave no context —
+                                // name the control and announce the position.
+                                contentDescription = "Playback position"
+                                stateDescription = formatRemaining(positionMs, durationMs)
+                            },
                 )
                 Text(
                     text = formatRemaining(positionMs, durationMs),

@@ -41,6 +41,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -797,7 +798,11 @@ private fun GifTile(
             gif.verified,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(start = 4.dp, top = 2.dp, bottom = 4.dp),
+            // Issue #51: labelSmall caption was ≈20dp tall — a nested clickable
+            // inside the tile's combinedClickable. minimumInteractiveComponentSize
+            // (before CreatorLabel's own clickable) grows the hit area to 48dp,
+            // keeping the visual caption size.
+            modifier = Modifier.padding(start = 4.dp).minimumInteractiveComponentSize(),
             onClick = onOpenCreator,
         )
     }

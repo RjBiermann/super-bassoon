@@ -56,6 +56,8 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -377,7 +379,10 @@ fun SearchScreen(
                                         Text(
                                             "Tags matching",
                                             style = MaterialTheme.typography.titleSmall,
-                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                                            modifier =
+                                                Modifier
+                                                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                                                    .semantics { heading() },
                                         )
                                         LazyRow(
                                             contentPadding = PaddingValues(horizontal = 12.dp),
@@ -464,7 +469,12 @@ private fun SectionHeader(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
-        Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+        // Issue #51: TalkBack heading navigation needs headers markable.
+        Text(
+            title,
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.weight(1f).semantics { heading() },
+        )
         if (onOpenAll != null) {
             TextButton(onClick = onOpenAll) { Text("Browse all →") }
         }
@@ -498,9 +508,11 @@ private fun CreatorCard(
                 .clickable(onClick = onClick)
                 .padding(4.dp),
     ) {
+        // Issue #51: the row's Text already names the creator — a duplicated
+        // description on the avatar made TalkBack announce the name twice.
         AsyncImage(
             model = creator.profileImageUrl,
-            contentDescription = "@${creator.username}",
+            contentDescription = null,
             modifier = Modifier.size(56.dp).clip(CircleShape),
         )
         Text(

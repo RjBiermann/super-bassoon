@@ -20,6 +20,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
@@ -87,7 +89,7 @@ fun FollowingScreen(
                     Text(
                         "Creators",
                         style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier.padding(16.dp).semantics { heading() },
                     )
                 }
                 items(creators, key = { "c" + it.username }) { creator ->
@@ -110,7 +112,7 @@ fun FollowingScreen(
                     Text(
                         "Niches",
                         style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier.padding(16.dp).semantics { heading() },
                     )
                 }
                 items(niches, key = { "n" + it.id }) { niche ->

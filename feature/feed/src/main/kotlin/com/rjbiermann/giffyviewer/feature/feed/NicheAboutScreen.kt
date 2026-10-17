@@ -24,6 +24,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
@@ -110,7 +112,11 @@ fun NicheAboutScreen(
                         }
                     }
                     d.rules?.takeIf { it.isNotEmpty() }?.let { rules ->
-                        Text("Niche Rules", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp))
+                        Text(
+                            "Niche Rules",
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.padding(top = 16.dp).semantics { heading() },
+                        )
                         rules.forEachIndexed { i, rule ->
                             Text(
                                 "${i + 1}. $rule",
@@ -130,7 +136,11 @@ fun NicheAboutScreen(
                 }
             }
             if (topCreators.isNotEmpty()) {
-                Text("Top Creators", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(16.dp))
+                Text(
+                    "Top Creators",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(16.dp).semantics { heading() },
+                )
                 topCreators.forEach { creator ->
                     ListItem(
                         leadingContent = {
@@ -149,7 +159,11 @@ fun NicheAboutScreen(
                 }
             }
             if (related.isNotEmpty()) {
-                Text("Niches you might also like", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(16.dp))
+                Text(
+                    "Niches you might also like",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(16.dp).semantics { heading() },
+                )
                 related.forEach { niche ->
                     ListItem(
                         headlineContent = { Text(niche.name ?: niche.id) },
