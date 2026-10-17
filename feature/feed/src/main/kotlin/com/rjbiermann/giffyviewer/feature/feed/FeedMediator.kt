@@ -96,6 +96,18 @@ class FeedMediator(
         } catch (e: IOException) {
             android.util.Log.w("FeedMediator", "${feed.keyBase} append p$page network error", e)
             MediatorResult.Error(e)
+        } catch (e: retrofit2.HttpException) {
+            // Pool-cap wall (issue #46 follow-up): pools hard-400 past their far
+            // end (live-proven, ~5-6 pages) — the pager's walk treats that as
+            // end-of-pool (FeedWalkTest contract), so the mediator's APPEND must
+            // too: Success(end), not an Error that surfaces "Couldn't load" for
+            // an honest empty wall. Page-1 400s (BadOrder discovery) stay errors.
+            if (e.code() == 400 && page > 1) {
+                MediatorResult.Success(endOfPaginationReached = true)
+            } else {
+                android.util.Log.w("FeedMediator", "${feed.keyBase} append p$page failed", e)
+                MediatorResult.Error(e)
+            }
         } catch (e: Exception) {
             android.util.Log.w("FeedMediator", "${feed.keyBase} append p$page failed", e)
             MediatorResult.Error(e)
