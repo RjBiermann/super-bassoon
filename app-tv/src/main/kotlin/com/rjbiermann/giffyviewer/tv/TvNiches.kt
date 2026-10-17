@@ -38,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -136,8 +137,17 @@ fun TvNichesScreen(
             modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 16.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            val sortFocus = remember { FocusRequester() }
             LazyRow(
-                modifier = Modifier.weight(1f),
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        // D-pad reachability (2026-10-17 device finding): RIGHT
+                        // from the last category chip fell DOWN to the row's
+                        // About focusable — the Sort button (this row's right
+                        // end) was unreachable. Exit-right of the chips row
+                        // lands on Sort; mid-row rights stay inside the row.
+                        .focusProperties { right = sortFocus },
                 contentPadding = PaddingValues(horizontal = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -166,6 +176,7 @@ fun TvNichesScreen(
                 Button(
                     onClick = { sortMenuOpen = true },
                     scale = ButtonScale.None,
+                    modifier = Modifier.focusRequester(sortFocus),
                     colors =
                         ButtonDefaults.colors(
                             containerColor = Color.Transparent,
