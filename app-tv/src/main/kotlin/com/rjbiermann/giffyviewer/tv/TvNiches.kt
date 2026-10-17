@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -35,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -43,6 +45,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -53,6 +56,7 @@ import androidx.tv.material3.ButtonScale
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.ClickableSurfaceScale
 import androidx.tv.material3.Surface
+import coil3.compose.AsyncImage
 import com.rjbiermann.giffyviewer.core.ui.giffyFocus
 import com.rjbiermann.giffyviewer.feature.feed.AutoRetryEffect
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
@@ -62,10 +66,10 @@ import com.rjbiermann.giffyviewer.feature.feed.NichesViewModel
 private fun sortLabel(sort: String): String = sort.removeSuffix("_asc").removeSuffix("_desc").replaceFirstChar { it.uppercase() }
 
 /**
- * Niches browser for TV (PLAN §7 groundwork, mobile NichesScreen parity):
- * paginated taxonomy from `v2/niches` (anonymous OK). D-pad: Enter opens the
- * niche feed; MENU toggles the home-tab pin (shows in the top pill row).
- * State lives in the shared NichesViewModel (feature:feed).
+ * Niches browser for TV (mobile NichesScreen parity): issue #47 slice 3 —
+ * preview tiles from `v2/niches/search/previews` (DESIGN-47s3). D-pad: Enter
+ * opens the niche feed; MENU/hold-Center toggles the home-tab pin (shows in
+ * the top pill row). State lives in the shared NichesViewModel (feature:feed).
  */
 @Composable
 fun TvNichesScreen(
@@ -178,12 +182,12 @@ fun TvNichesScreen(
                     expanded = sortMenuOpen,
                     onDismissRequest = { sortMenuOpen = false },
                 ) {
+                    // Previews-verified orders only — mobile parity (issue #47
+                    // slice 3; DESIGN-47s3 §1: the taxonomy-only sorts were
+                    // never live-checked on this endpoint).
                     listOf(
                         "subscribers" to "Subscribers",
-                        "posts" to "Gifs",
-                        "alphabetical_asc" to "A–Z",
-                        "alphabetical_desc" to "Z–A",
-                        "random" to "Random",
+                        "random" to "Randomize",
                     ).forEach { (value, label) ->
                         DropdownMenuItem(
                             text = { Text(label) },
@@ -276,6 +280,21 @@ fun TvNichesScreen(
                         // 2026-10-16: name drawn over the stats line). Own the
                         // stacking with a Column.
                         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                            // #47 slice 3: preview-tile image above the name
+                            // (site /niches tile = poster + title; static
+                            // poster here — no inline video on TV niche rows).
+                            if (niche.imageUrl != null) {
+                                AsyncImage(
+                                    model = niche.imageUrl,
+                                    contentDescription = "niche ${niche.name}",
+                                    contentScale = ContentScale.Crop,
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .aspectRatio(16f / 9f)
+                                            .clip(RoundedCornerShape(12.dp)),
+                                )
+                            }
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     text = niche.name,

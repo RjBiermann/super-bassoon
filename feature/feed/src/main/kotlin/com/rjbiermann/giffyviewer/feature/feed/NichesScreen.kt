@@ -3,14 +3,19 @@ package com.rjbiermann.giffyviewer.feature.feed
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.outlined.Info
@@ -20,7 +25,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -33,9 +37,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.compose.AsyncImage
 import com.rjbiermann.giffyviewer.core.ui.GiffyScaffold
 import com.rjbiermann.giffyviewer.core.ui.SCROLL_TO_TOP_THRESHOLD
 import com.rjbiermann.giffyviewer.core.ui.ScrollToTopFab
@@ -45,10 +52,11 @@ import com.rjbiermann.giffyviewer.core.ui.scrollToTop
 import kotlinx.coroutines.launch
 
 /**
- * Niches browser (PLAN §7 groups groundwork): paginated taxonomy from
- * `v2/niches` (anonymous OK); tap opens the niche as a feed tab.
+ * Niches browser: issue #47 slice 3 — preview-tile listing from
+ * `v2/niches/search/previews` (the site's own /niches source, live-verified:
+ * DESIGN-47s3 §1); tap opens the niche as a feed tab.
  * Site-parity 2026-10: scrollable category filter chips (`v2/niches/categories`)
- * and a Sort by menu (orders verified against the server's BadOrder message).
+ * and the Sort menu (previews-verified orders only — subscribers/random).
  * Paging state lives in the shared NichesViewModel (mobile + TV one path).
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -106,12 +114,11 @@ fun NichesScreen(
                 expanded = sortMenuOpen,
                 onDismissRequest = { sortMenuOpen = false },
             ) {
+                // Previews-verified orders only (DESIGN-47s3 §1): the other
+                // taxonomy sorts were never live-checked on this endpoint.
                 listOf(
                     "subscribers" to "Subscribers",
-                    "posts" to "Gifs",
-                    "alphabetical_asc" to "A–Z",
-                    "alphabetical_desc" to "Z–A",
-                    "random" to "Random",
+                    "random" to "Randomize",
                 ).forEach { (value, label) ->
                     androidx.compose.material3.DropdownMenuItem(
                         text = { Text(label) },
@@ -155,37 +162,30 @@ fun NichesScreen(
                         }
                     }
                 }
-                items(niches.size, key = { niches[it].id }) { index ->
-                    val niche = niches[index]
-                    ListItem(
-                        headlineContent = { Text(niche.name) },
-                        supportingContent = { Text("${niche.gifs} gifs · ${niche.subscribers} subscribers") },
-                        trailingContent = {
-                            Row {
-                                // §9 lingo: Join Niche / Leave Niche (logged-in only).
-                                if (joinViewModel.loggedIn) {
-                                    TextButton(onClick = { joinViewModel.toggle(niche.id) }) {
-                                        Text(if (niche.id in joined) "Leave" else "Join")
-                                    }
-                                }
-                                IconButton(onClick = { onOpenAbout(niche.id, niche.name) }) {
-                                    Icon(Icons.Outlined.Info, contentDescription = "about ${niche.name}")
-                                }
-                                IconButton(onClick = { viewModel.togglePin(niche) }) {
-                                    Icon(
-                                        imageVector =
-                                            if (pinned.any { it.startsWith("${niche.id}|") }) {
-                                                Icons.Filled.PushPin
-                                            } else {
-                                                Icons.Outlined.PushPin
-                                            },
-                                        contentDescription = if (pinned.any { it.startsWith("${niche.id}|") }) "unpin" else "pin",
-                                    )
-                                }
+                // Preview tiles (issue #47 slice 3): two tiles per row — the
+                // shared scroll helpers/fab are LazyListState-typed, so the
+                // grid is chunked rows inside the existing LazyColumn.
+                items(niches.chunked(2)) { rowTiles ->
+                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                        rowTiles.forEach { tile ->
+                            NicheTileCard(
+                                tile = tile,
+                                isPinned = pinned.any { it.startsWith("${tile.id}|") },
+                                canJoin = joinViewModel.loggedIn,
+                                joined = tile.id in joined,
+                                onOpen = { onOpenNiche(FeedSource.Niche(tile.id, tile.name)) },
+                                onJoin = { joinViewModel.toggle(tile.id) },
+                                onAbout = { onOpenAbout(tile.id, tile.name) },
+                                onPin = { viewModel.togglePin(tile) },
+                                modifier = Modifier.weight(1f),
+                            )
+                            if (rowTiles.size > 1 && tile != rowTiles.last()) {
+                                Spacer(modifier = Modifier.width(8.dp))
                             }
-                        },
-                        modifier = Modifier.clickable { onOpenNiche(FeedSource.Niche(niche.id, niche.name)) },
-                    )
+                        }
+                        // Keep pairs aligned: an empty spacer fills the odd row.
+                        if (rowTiles.size == 1) Spacer(modifier = Modifier.weight(1f))
+                    }
                 }
                 if (niches.isEmpty() && !loadFailed && loading) {
                     item(key = "pending") {
@@ -244,6 +244,61 @@ fun NichesScreen(
                 },
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
+        }
+    }
+}
+
+/**
+ * One preview tile (issue #47 slice 3): site ellipsis — poster image + title
+ * (A1), with the app-superior counts kept and every pre-listing action intact.
+ * Image = preview-gif poster / niche thumbnail / niche cover (DESIGN-47s3 §2);
+ * Coil handles loading, failure leaves the name-only tile.
+ */
+@Composable
+private fun NicheTileCard(
+    tile: NicheTile,
+    isPinned: Boolean,
+    canJoin: Boolean,
+    joined: Boolean,
+    onOpen: () -> Unit,
+    onJoin: () -> Unit,
+    onAbout: () -> Unit,
+    onPin: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.clickable(onClick = onOpen).padding(vertical = 8.dp),
+    ) {
+        AsyncImage(
+            model = tile.imageUrl,
+            contentDescription = "niche ${tile.name}",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp)),
+        )
+        Text(
+            tile.name,
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+        Text(
+            "${tile.gifs} gifs · ${tile.subscribers} members",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // §9 lingo: Join Niche / Leave Niche (logged-in only).
+            if (canJoin) {
+                TextButton(onClick = onJoin) { Text(if (joined) "Leave" else "Join") }
+            }
+            IconButton(onClick = onAbout) {
+                Icon(Icons.Outlined.Info, contentDescription = "about ${tile.name}")
+            }
+            IconButton(onClick = onPin) {
+                Icon(
+                    imageVector = if (isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
+                    contentDescription = if (isPinned) "unpin" else "pin",
+                )
+            }
         }
     }
 }

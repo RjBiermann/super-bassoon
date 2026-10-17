@@ -18,6 +18,7 @@ import retrofit2.http.Query
  * the site's undocumented API (PLAN §2, live-verified 2026). Endpoint paths only may
  * drift — architecture doesn't.
  */
+@Suppress("TooManyFunctions") // one wide data-access surface per file is by design (the detekt threshold comment)
 interface GifsApi {
     @GET("v2/auth/temporary")
     suspend fun temporaryToken(): TemporaryTokenDto
@@ -128,6 +129,20 @@ interface GifsApi {
     suspend fun nichesTrendingSearch(
         @Query("count") count: Int = 12,
     ): NichesPageDto
+
+    /** Niche preview-tile LISTING (issue #47 slice 3, live-verified 2026-10-17,
+     *  anonymous OK): the site's own /niches page source — NO query param there.
+     *  Verified params: order=subscribers|random (posts/alphabetical_* NOT
+     *  verified on this endpoint — taxonomy-only), category=<taxonomy name>,
+     *  page, count (30 site default, 100 accepted). Top-level
+     *  {previews, page, pages, total}; row shape in DESIGN-47s3.md §1. */
+    @GET("v2/niches/search/previews")
+    suspend fun nichePreviewListing(
+        @Query("order") order: String = "subscribers",
+        @Query("category") category: String? = null,
+        @Query("page") page: Int = 1,
+        @Query("count") count: Int = 30,
+    ): NicheSearchPreviewsDto
 
     /** Niche preview tiles (same spec): {niche, gif} rows — owner unused. */
     @GET("v2/niches/search/previews")
@@ -488,6 +503,11 @@ data class CreatorPreviewsDto(
 @Serializable
 data class NicheSearchPreviewsDto(
     val previews: List<NichePreviewRowDto> = emptyList(),
+    // Paginated (live-verified 2026-10-17 on the /niches listing shape):
+    // {previews, page, pages, total}; page math mirrors GifsPageDto.
+    val page: Int = 1,
+    val pages: Int = 1,
+    val total: Int = 0,
 )
 
 @Serializable
@@ -496,12 +516,17 @@ data class NichePreviewRowDto(
     val gif: GifDtoShell? = null,
 )
 
-/** Lenient niche object inside a preview row (only id/name consumed; the full
- *  niche payload carries far more). */
+/** Lenient niche object inside a preview row. Live-verified 2026-10-17: rows
+ *  carry the full niche object; the app consumes id/name + tile image
+ *  (cover/thumbnail) + the counts the search scope never needed. */
 @Serializable
 data class NichePreviewNicheDto(
     val id: String = "",
     val name: String? = null,
+    val cover: String? = null,
+    val thumbnail: String? = null,
+    val gifs: Long = 0,
+    val subscribers: Long = 0,
 )
 
 /** /v2/creators/search item — username is the identity; counts for the row. */

@@ -12,6 +12,7 @@ import com.rjbiermann.giffyviewer.core.network.dto.TemporaryTokenDto
 
 /** In-memory GifsApi for unit tests; shared by the mediator + liked-feed
  *  tests. Open so feed-specific tests can override one endpoint. */
+@Suppress("TooManyFunctions") // the interface keeps growing — a test double mirrors it, not logic
 internal open class FakeApi : GifsApi {
     var userGifsCalls = 0
     var searchCalls = 0
@@ -83,6 +84,13 @@ internal open class FakeApi : GifsApi {
         order: String,
         count: Int,
         page: Int,
+    ) = throw NotImplementedError()
+
+    override suspend fun nichePreviewListing(
+        order: String,
+        category: String?,
+        page: Int,
+        count: Int,
     ) = throw NotImplementedError()
 
     override suspend fun nicheSearchPreviews(
