@@ -204,8 +204,10 @@ TvPlayerScreen now has one Player.Listener: STATE_ENDED → auto-swipe on (and n
  data-saver) → advance to the next gif, looping the last; off → loop (seekTo(0)+play).
 CENTER/PLAY and media keys route through `playOrRestart()` at the ended frame (a
 bare playWhenReady toggle re-ends instantly, staying parked — root cause of
-"press play does nothing at end"). Not yet live-soaked through end-of-media on
-TV36 (needs a video actually ending; emulator session pending).
+"press play does nothing at end"). LIVE-SOAKED: batch-18 (2026-10-02) TV36
+end-of-media loop soak passed — six real end→restart cycles via watch_history
+position samples; see that record (the decoder wedge after ~35 min was the
+documented emulator fragility, not the loop).
 
 Former deferred notes (all closed by the listener above):
 - **Dead toggle:** MENU "Auto-swipe next" pref was write-only on TV — now consumed.

@@ -941,3 +941,63 @@ User slice: "work on all the open github issues; triage, plan, design, implement
   1. **Phantom force-refresh at ~+4s** (FeedViewModel pref-invalidation watcher): a DataStore re-subscription wave re-emits the INITIAL pref state; `drop(1)` swallowed only the first combine emission, so the identical replay passed `distinctUntilChanged` (which never saw the dropped one) and force-restarted the pager under the user. FIX: `.distinctUntilChanged().drop(1)` (dedupe BEFORE drop — dedupe remembers the dropped initial value, identical replays blocked). Verified: 0 forceRefresh calls in the boot window post-fix (FYProbe logs, stripped after).
   2. **Dead bottom strip at full collapse (the actual scroll jam — app-wide, any feed):** GiffyScaffold's collapse shifted content up with `place(0, -offsetPx)` but never grew its measured height; at offsetPx=totalPx (732px here) the content's bottom floated H-732px off the screen and that strip hit NO scrollable — every drag starting there was silently eaten (FeedScreen froze after exactly ONE swipe on BOTH Trending and For You; Niches/player/chrome unaffected — they don't use the collapse). Probe-recorded on the NS connection: consumed deltas then total silence on later drags. FIX: the layout modifier measures the content `minHeight/maxHeight + offsetPx` and places at `-offsetPx` — full-collapsed content still reaches the screen bottom. Device-verified: 10+ deep stops, 4 distinct checkpoint hashes where before was 1-advance-then-frozen. (Lesson: mid-walk a11y labels are unreliable while the settled interop surface is foregrounded — pixel hashes are the evidence; and the earlier "12 distinct stops" reading was decode frames of one settled tile — measurement invalidated, corrected here.)
   3. Same session closes **signed-in double-tap like observed end-to-end**: fresh-bundle sign-in → For You walk (post-fix) → tap-open player → double-tap → app DB gained exactly ONE liked_ids row (`jaggedhighlevelram`, ~43s old) AND the liked re-sync ranks it FIRST in the server's liked page (most-recent-like ordering) — UI+DB+server agree. Note: the manual-curl id_token expired mid-test (TokenExpired 401; id_token-only convention applies to MANUAL curl checks) — the app's silent refresh handled it and stayed signed in. The refresh grant was NOT probed (rotation rule holds).
+
+### Session 2026-10-17 batch 28 (v0.6.0 released + device-gate sweep: #36c Favorites gate, theme-rebrand owed gates, emulator-wedge false alarm discriminated)
+- **v0.6.0 RELEASED** (user cut request): `cut-release.yml` minor bump chained
+  `release.yml` automatically (batch-25 fix now the norm) → v0.6.0 @ `79f88a18`
+  (= main HEAD, the #36c Favorites-row slice), guards passed, assets
+  GiffyViewer-mobile-0.6.0.apk (3.6 MB) + GiffyViewer-tv-0.6.0.apk (3.4 MB),
+  R8-shrunk, signature-verified SAME release cert (SHA-256 84048555… 9eea5,
+  reuse-forever intact).
+- **#36c Favorites-row device gate CLOSED (TV36, fresh profile, real token
+  bundle via DebugSignIn @phcoxju):** signed out → no Favorites row
+  (honest-empty rule hides it — hasFavorites = favorited CREATORS, not liked
+  gifs); favorited a creator live (Trending card → hold-Center panel →
+  Favorite row, label flips to "Unfavorite") → Favorites row APPEARED on home
+  populated with the creator's gifs → **card panel on a Favorites-row card
+  shows the "Refresh feed" row** (the #36c change) → pressed it → row
+  reshuffled live (first cards changed pose; repository round-robin reshuffle
+  + stale-page eviction working). Panel stayed open through the toggle (no
+  close on in-place actions).
+- **Theme-rebrand owed gates (issue #7 landing) PASSED on both shells:** focus
+  fill = #7D0030-family + border = #FF668F (pixel-sampled, no purple/blue
+  defaults) on header pills, Settings chips (TV + mobile), quick-action panel
+  rows, player error-overlay rows, player niche pills; AMOLED true-black
+  sampled (0,0,0) on BOTH shells (restored after); CenterHold panels opened on
+  home cards ×2 + MENU player panel with full row set (Like/Mute/Speed/Auto-
+  swipe/Favorite/Open feed/Follow/Pin/Add to…/Tags) + D-pad row walk + BACK
+  closes panel without popping the player; MENU/tap re-reveals text; mobile
+  General sub-page (PIN/Grid columns/Autoplay/AMOLED) renders; error overlay
+  Retry recovered a real mid-playback failure live (overlay → Retry focused →
+  resume). TV row height Large→cards ~1.4× (508px vs 377px) then restored.
+- **Emulator-wedge FALSE ALARM discriminated (do not file as player bug):**
+  mid-session ALL video surfaces (inline tile AND fullscreen player) rendered
+  black while playback kept advancing (progress bar + countdown moving,
+  MediaCodec active). Screencaps showed the home/controls fine → not the app
+  renderer. `screenrecord` 4s = 20KB (all-black recording — screencap-variant
+  ruled out) + `MediaCodec: rendring output error -32` (EPIPE) in logcat → the
+  documented AVD decoder wedge (renderer pipe broke mid-session, unrecoverable
+  until process death). force-stop + relaunch → frames render again instantly.
+  **Lesson: black-video + advancing progress = wedge until proven otherwise —
+  discriminate via screenrecord size (MBs=content, KBs=black) + one process
+  restart; never open a player regression from this signature alone.**
+- **§8 partial pass:** player pop → home grid restored EXACTLY (same scroll
+  position + saved card focus, screencap-verified); sign-in survived
+  force-stop/relaunch on both shells. Full 15-step walk + R8-build D-pad walk
+  still owed (AGENTS-APP.md nav section updated with the partial-pass state).
+- **§3.4 finding flagged (decision owed):** TV quick-action panel rows measure
+  ≈37.5dp visual height — under the 48dp M3 target guideline. D-pad-first
+  surface (no touch); visually large on 10-foot. Recorded in AGENTS-APP.md
+  batch-24 device-gates block; bump to 48dp if a touch-on-TV or strict-a11y
+  ask ever lands.
+- **Session mechanics lessons:** mobile applicationId is `com.rjbiermann
+  .giffyviewer` (pm clear / am start use it; activity path `.mobile
+  .MainActivity` — re-affirmed); screencap is 1080x2340 while rendered readers
+  scale it — `adb shell input tap` needs ORIGINAL coords (a displayed-coords
+  tap missed, hit the Autoplay toggle instead — restored); uiautomator dumps
+  lag actual state after navigation (stale dumps showed old screens) —
+  screencap is the state evidence (batch-26 lesson re-affirmed).
+- **Hygiene:** 0 FATAL exceptions across the whole session (both emulators);
+  teardown emul-stop + pkill + `gradlew --stop`; token bundle written to /tmp
+  only (0600) and deleted after the session; no app code changes — doc-only
+  landing.

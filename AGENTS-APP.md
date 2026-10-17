@@ -376,10 +376,13 @@ per-appear latch; header-pill initial focus runs only while no saved row focus e
 Niches/Following/About/CustomFeeds opens also stay on the stack (no manual clears).
 
 **Owed device gates (implementation can't run them):** design §8's 15-step list on both
-emulators — full pass before closing the issue. Known device-sensitive bits: MainFeed source
-re-assert + S3 reset-emit must not flash the grid on pop; player pop keeps the feed's grid
- position; TV D-pad focus walk after restore (R8); the >1MB-serialized-route risk (R3) stays
- theoretical.
+emulators — full pass before closing the issue. PARTIAL PASS 2026-10-17 (batch 28):
+devices covered the pop-sensitive bits live — player pop restores the feed's grid
+position + saved card focus (TV36 screencap-exact), sign-in survives process death on
+both shells, D-pad walk into rows + card open + BACK restores. STILL OWED: the full
+15-step walk (MainFeed source re-assert + S3 reset-emit must not flash the grid on pop
+— not re-driven this session) and the R8-build D-pad focus walk; >1MB-serialized-route
+risk (R3) stays theoretical.
 
 
 **Feature audit (2026-10-02) — parity writes unchanged; corrections**
@@ -1218,8 +1221,11 @@ changed where:
   #F7E9EC@70% (desc text on both players, bookkeeping for the issue's
   onSurface wording). Bare-white glyphs (seek flash, action rail) stay white
   (media icons, not themed text) per the audit.
-- Device gates still owed (this landing is code+host checks only): TV36 focus
-  pixel check on every migrated row (fill = #7D0030-family, never a purple/blue
-  default), CenterHold/MENU/quick-actions re-walk, overscan 48dp + ≥48dp target
-  sweep, Medium_Phone AMOLED/Settings/player-accent pass + onSurfaceVariant
-  only-at-large-sizes walkthrough (§3.4).
+- Device gates: PASSED 2026-10-17 (batch 28, TV36 + Medium_Phone) — see AGENTS.md
+  batch-28 record. Focus pixels verified live (fill #7D0030-family, border
+  #FF668F, no purple/blue) on header pills, Settings chips, quick-action panel
+  rows, error-overlay rows and player niche pills; AMOLED sampled (0,0,0) on
+  BOTH shells; CenterHold/MENU/quick-actions re-walked; overscan margins
+  ≈62dp. ONE OPEN §3.4 finding: TV quick-action panel rows measure ≈37.5dp
+  visual height — under the 48dp target guideline (D-pad-first surface;
+  decision doc'd below, not a theme defect).
