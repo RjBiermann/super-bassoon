@@ -54,7 +54,11 @@ object BrowserIdentity {
      * ~19 digits, client-side, no secret material.
      */
     fun newSessionId(): String {
-        val value = 1_000_000_000_000_000_000L + (SecureRandom().nextLong() and Long.MAX_VALUE) % 9_000_000_000_000_000_000L
+        // Range [1e18, 9e18): every id a 19-digit positive long. The old
+        // `% 9e18 + 1e18` topped out above Long.MAX_VALUE (9.223e18) and
+        // overflowed negative ~8.4% of the time (issue #50 test-expansion
+        // finding; the existing 19-digit test catches it).
+        val value = 1_000_000_000_000_000_000L + (SecureRandom().nextLong() and Long.MAX_VALUE) % 8_000_000_000_000_000_000L
         return value.toString()
     }
 
