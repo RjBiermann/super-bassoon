@@ -513,7 +513,7 @@ private fun GeneralPanel(
                                 .fillMaxWidth()
                                 .padding(top = 8.dp),
                     ) {
-                        listOf("Default" to "default", "Large" to "large", "XL" to "xl").forEach { (label, value) ->
+                        listOf("Default" to "default", "Large" to "large", "XL" to "xl", "XXL" to "xxl").forEach { (label, value) ->
                             val src = remember { MutableInteractionSource() }
                             FilterChip(
                                 selected = rowHeight == value,

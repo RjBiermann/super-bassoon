@@ -615,13 +615,14 @@ internal fun filteredEmptyHint(orientation: String): String =
 
 /**
  * Row-size setting (slice 11, DataStore `tv_row_height`): DEFAULT keeps the
- * current 170dp 10-foot card; Large/XL scale it for farther viewports. Pure
+ * current 170dp 10-foot card; Large/XL/XXL scale it for farther viewports. Pure
  * mapping so the Settings choice is unit-testable.
  */
 internal fun rowHeightFor(pref: String): Dp =
     when (pref) {
         "large" -> CARD_ROW_HEIGHT_DP * 1.4f
         "xl" -> CARD_ROW_HEIGHT_DP * 1.8f
+        "xxl" -> CARD_ROW_HEIGHT_DP * 2.2f
         else -> CARD_ROW_HEIGHT_DP
     }
 

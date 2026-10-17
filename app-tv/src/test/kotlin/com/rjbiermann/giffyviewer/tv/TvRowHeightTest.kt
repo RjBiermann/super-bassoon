@@ -18,8 +18,10 @@ class TvRowHeightTest {
     fun `large and xl scale the default upward`() {
         assertEquals(238f, rowHeightFor("large").value, 0.01f) // 170 × 1.4f
         assertEquals(306f, rowHeightFor("xl").value, 0.01f) // 170 × 1.8f
+        assertEquals(374f, rowHeightFor("xxl").value, 0.01f) // 170 × 2.2f (#44)
         assertTrue(rowHeightFor("default") < rowHeightFor("large"))
         assertTrue(rowHeightFor("large") < rowHeightFor("xl"))
+        assertTrue(rowHeightFor("xl") < rowHeightFor("xxl"))
     }
 
     @Test
