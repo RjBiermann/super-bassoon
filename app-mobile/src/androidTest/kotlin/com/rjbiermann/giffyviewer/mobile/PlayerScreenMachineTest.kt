@@ -62,14 +62,19 @@ class PlayerScreenMachineTest {
     fun setUp() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         graph = TestFeedGraph(context)
-        val wav = context.assets.open(MEDIA_ASSET).use { it.readBytes() }
+        // The asset ships in the TEST apk's source set — read it from the
+        // instrumentation context, not the target app's.
+        val wav = InstrumentationRegistry.getInstrumentation().context.assets.open(MEDIA_ASSET).use { it.readBytes() }
         graph.startHappy(mediaPath = "/media.wav", wav = wav)
         // Synthetic sign-in: isLoggedIn drives the double-tap like write path.
         assertTrue(graph.tokenStore.save("test.jwt.token"))
         // Park OUR player in the VM so the test holds the instance PlayerScreen
         // adopts (issue-#9 adoption path) and can read its real state.
         player = sharedFactory.create(context)
-        graph.viewModel.returnInlinePlayer(player)
+        // Media3 requires main-thread access; the park path pauses the player.
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            graph.viewModel.returnInlinePlayer(player)
+        }
     }
 
     @After
@@ -159,7 +164,7 @@ class PlayerScreenMachineTest {
     }
 
     @Test
-    fun `tap toggles controls and NEVER pauses playback (issue-2 semantics)`() {
+    fun tapTogglesControls_and_neverPauses_issue2() {
         setContent()
         awaitFeedItem()
         rule.onRoot().performClick()
@@ -179,7 +184,7 @@ class PlayerScreenMachineTest {
     }
 
     @Test
-    fun `controls auto-hide after 3s idle and the a11y reveal action brings them back`() {
+    fun controlsAutoHide3s_andA11yRevealAction() {
         setContent()
         awaitFeedItem()
         // Ticker isPlaying=true → the 3s idle timer hides the text cluster;
@@ -193,7 +198,7 @@ class PlayerScreenMachineTest {
     }
 
     @Test
-    fun `hold engages 2x speed and release restores`() {
+    fun holdEngages2xSpeed_releaseRestores() {
         setContent()
         awaitFeedItem()
         holdByTouch(holdMs = 1_200)
@@ -205,7 +210,7 @@ class PlayerScreenMachineTest {
     }
 
     @Test
-    fun `double tap likes through the optimistic write path`() {
+    fun doubleTap_likes_viaOptimisticWritePath() {
         setContent()
         awaitFeedItem()
         // Give the on-open syncLikes() its turn so it cannot race the flip.

@@ -14,7 +14,7 @@ import com.rjbiermann.giffyviewer.feature.feed.FeedScreen
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import kotlinx.coroutines.runBlocking
 import org.junit.After
-import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -64,7 +64,7 @@ class FeedMediatorOfflineTest {
     )
 
     @Test
-    fun `offline REFRESH surfaces MediatorResult_Error with the IOException`() {
+    fun offlineRefresh_surfaces_MediatorResultError_with_IOException() {
         val mediator =
             FeedMediator(
                 feed = FeedSource.Trending,
@@ -77,11 +77,12 @@ class FeedMediatorOfflineTest {
         runBlocking { result.set(mediator.load(LoadType.REFRESH, state())) }
         val error = result.get() as? RemoteMediator.MediatorResult.Error
         assertTrue("expected MediatorResult.Error, got ${result.get()}", error != null)
-        assertEquals(IOException::class.java, error!!.throwable::class.java)
+        // Connection-refused surfaces as ConnectException, an IOException subclass.
+        assertTrue("expected IOException, got ${error!!.throwable::class.java}", error.throwable is IOException)
     }
 
     @Test
-    fun `offline refresh renders the honest offline empty state`() {
+    fun offlineRefresh_rendersHonestOfflineEmptyState() {
         rule.setContent {
             GiffyTheme {
                 FeedScreen(

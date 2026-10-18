@@ -96,7 +96,14 @@ internal class TestFeedGraph(
                                 .body(Buffer().write(wav))
                                 .build()
 
-                        path.contains("v2/feeds/trending/popular") -> respond(200, trendingPageJson())
+                        path.contains("v2/feeds/trending/popular") || path.contains("v2/feeds/for-you") ->
+                            respond(200, trendingPageJson())
+
+                        // AnonymousSession fetches a temp token before the first feed
+                        // call; the "{}" fallback fails TemporaryTokenDto parsing and
+                        // every feed request then goes out unauthenticated (401) —
+                        // the fixture never renders. Serve a parseable token.
+                        path.contains("v2/auth/temporary") -> respond(200, """{"token":"test.jwt.token"}""")
 
                         path.contains("v2/likes") -> respond(200, "[]")
 
