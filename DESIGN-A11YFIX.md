@@ -1,7 +1,7 @@
 # DESIGN-A11YFIX.md — issue #51 implementation log (lane-a11yfix)
 
-Base: main `fa77b5cf`. Six findings from `gh issue view 51`, evidence in
-`REPORT-a11y-mobile.md`. Fence: PlayerScreen/QuickSheet/FeedScreen (host of the
+Base: main `fa77b5cf`. Six findings from `gh issue view 51`, evidence in the (since
+removed) `REPORT-a11y-mobile.md` audit — see jj/git history. Fence: PlayerScreen/QuickSheet/FeedScreen (host of the
 tile caption fix)/SearchScreen/SettingsScreen/FollowingScreen/NicheAboutScreen/
 NichesScreen + `:core:ui` PlayerOverlay.kt. TV files, ContentFilter,
 FeedMediator, FeedRepository, NicheJoinViewModel untouched. No emulator/adb.

@@ -67,8 +67,7 @@ on a fresh install (acceptance criterion). No server, no backup API — local fi
 - Read-time filter in FeedPagingSource: rows whose creator is no longer FAVORITED never
   render (instant un-favorite; round-robin cache refreshes on TTL).
 - Ceiling (ponytail): feed stops when any creator's round comes back empty; a changed
-  favorite set shifts the round-robin mapping until TTL refresh. For You blend (70%) is
-  a later slice.
+  favorite set shifts the round-robin mapping until TTL refresh. For You blend shipped later (issue ledger, For You scope chips).
 - Mobile round-trip verified: favorite @sweetiefox → Favorites chip shows their gifs →
   `creator_prefs` row `sweetiefox|FAVORITED` → Settings unfavorite → empty state text.
 
@@ -76,29 +75,9 @@ Closed since: favorite tag (quick sheet + tag_prefs FAVORITED), collections
 (CollectionsScreen, both apps), hide-count Settings display ("Hidden this week").
 Import/Export landed — see ContentPrefsBackup below; niche groups landed in DB v5.
 
-## Live status (2026-09)
-- Niche groups: DB v5 (`niche_groups`), GroupsScreen live on both apps, BLOCKED groups feed stage 2.
+## Live status
+- ~~Niche groups: DB v5 (`niche_groups`), GroupsScreen live on both apps~~ — SUPERSEDED: groups merged into custom feeds (DB v10, GroupsScreen deleted — see the DONE section below).
 - Hide counts: single rolling 7-day counter (`hide_counts`), no per-reason split — matches the spec.
-
-## Merging groups into custom feeds (SHIPPED 2026-10-02 — see the DONE section at the bottom)
-
-Conceptually `niche_groups` is a special case of `custom_feeds` (an all-tag-refs feed), and the
-merge would generalize blocking to per-ref granularity (blockable `creator:` refs — not possible
-today; blocking a custom feed's `tag:` refs would map onto existing paths). NOT implemented:
-no bug, no user ask — cosmetic consolidation against real churn. Re-evaluate only if blockable
-creators become a want.
-
-If picked up later, the inventory:
-- Room migration: `niche_groups` rows → `custom_feeds` rows, `tagList` → refs (`tag:<t>` each); drop the table.
-- `custom_feeds` gains a `state` column (BLOCKED | FAVORITED | NEUTRAL, as `niche_groups` has today).
-- ContentFilter blocked-set derivation rewritten: a BLOCKED custom feed's refs become global block
-  sets (`tag:` → tag path, `creator:` → creator path, `niche:` blocked after fetcher expansion via its
-  tag list). Preserve pipeline order and the regression tests (`ContentFilterTest.kt`).
-- GroupsScreen folds into CustomFeedsScreen on mobile + TV (the `FeedScreen` "add to custom feed"
-  quick path is ref-based already, keeps working).
-- `ContentPrefsBackup` export format changes → versioned importer for old exports (round-trip gate 7).
-- `nicheGifs` page-mapping quirk stays (live API behavior, not ours to fix).
-- AGENTS-APP.md groups references updated.
 
 ## Orientation filter (planned, decided 2026-10-01)
 NOT part of the ContentFilter pipeline — a global DataStore pref `orientation_filter`
@@ -136,12 +115,7 @@ Pinned section now pins FAVORITED feeds; TV already surfaces all custom feeds).
 `ContentPrefsBackup` v3: `CustomFeedDef.state` (absent in v2 exports → NEUTRAL;
 versioned-importer rule holds — groups were never exported pre-v3).
 
-Device-verified (TV36): migration live, feed created via typed input (and the
-screen's initial focus landed on the name field — requestInitialFocus wired for
-TV), state cycled Neutral→Tab→Blocked→Neutral, BLOCKED feed opens no feed,
-NEUTRAL feed opens. Verification lesson: `adb shell input -t` isn't a thing and
-a shared TextField traps D-pad focus on TV (CAST via `input text` into the
-focused field; coordinate taps escape the trap) — TV-hosted shared list screens
-MUST take `requestInitialFocus = true` and put it on the FIRST focusable.
-
-Re-evaluation trigger for this merge: satisfied by the user ask ("do these").
+Device-verified (TV36): migration live, state cycle 3-way, BLOCKED feed opens
+no feed, NEUTRAL opens. TV-hosted shared list screens MUST take
+`requestInitialFocus = true` on the FIRST focusable (a shared TextField traps
+D-pad focus on TV).

@@ -9,11 +9,11 @@ Room as **single source of truth** with stale-while-revalidate. DB name: `giffy.
 - `feed_pages` — key format `"trend:v2:pop:p3"` incl. extended variants; sort/range changes → **distinct keys**
 - `search_history` · `tags` · `liked_ids` (tiny mirror of server likes — write-through like/unlike, refreshed from `/v2/likes`; renders liked badges + Liked feed skeleton offline) · `watch_history` — REMOVED with the feature (2026-10 stream): "Continue Watching"/"Surprise me"/resume writers+readers deleted → the table dropped in `MIGRATION_10_11` (DB v11; positions were exactly the data the user deleted — a future resume feature would re-add the entity as a new version). The old ≥3s write-policy note no longer applies. · `hide_counts` (single rolling 7-day counter) · `custom_feeds` (§7, built 2026-10 — v7 migration, MIGRATION_6_7)
 - `creator_prefs(username PK, state, favorited_at)` · `tag_prefs(tag PK, state, blocked_at, favorited_at)`
-- `keyword_blocks(pattern PK, blocked_at)` · `niche_groups(id auto, name, tag_list, state)` (state ∈ BLOCKED | FAVORITED)
+- `keyword_blocks(pattern PK, blocked_at)` · ~~`niche_groups`~~ — DROPPED in DB v10 (`MIGRATION_9_10`): groups merged into custom feeds (see AGENTS-CONTENT-FILTER.md); each group became a tag-bundle `custom_feeds` row and old `group:%` cache rows were evicted.
 - `gifs` v9: `nicheNames` map column (id→name from the gif payload — niche chips need
   labels; ids column format unchanged, `MIGRATION_8_9`, JSON via MapStringStringConverter)
 - `pinned_ids` (server-pin mirror, `v2/pins` — Phase 7)
-- Local `collections` + `collection_items` tables: only if the §2 server-collections verification fails (creator-groupings shape per §6/§7 — decide in Phase 2, not Phase 7)
+- No local `collections` tables: server collections are fully verified and source-of-truth (`GET /v2/me/collections` + writes — see AGENTS-NETWORK.md); only collection-content BROWSING lacks a verified endpoint (no-guess rule).
 - `feed_prefs` handled in `:core:datastore`, **not** Room.
 
 ## Rules
@@ -22,7 +22,7 @@ Room as **single source of truth** with stale-while-revalidate. DB name: `giffy.
 - UI reads Room; a background refresh hits the API and upserts. Never fetch-to-render first.
 - **Favorites are never cached** — network-backed only.
 - TTLs: tags 7d · trending/top 10 min · search 1h · gif metadata 24h.
-- Group feed keys `group:<id>:p<n>`; revalidate when the group's tag list changes.
+- Custom-feed cache keys are `custom:<id>:p<n>` (`FeedSource.keyBase` = `custom:$id`; the v10 migration evicted the old `group:%` rows); revalidate/evict when the feed's tag refs change (CustomFeedsScreen evicts on edit).
 - Airplane-mode cold start must work off Room alone — design queries so the first frame needs no network.
 
 ## Preferences backup (`ContentPrefsBackup.kt`)
@@ -51,5 +51,8 @@ Export/import of content prefs as JSON via SAF document pickers (Settings screen
   fallback advances past the highest CACHED page (`pagesForBase` max + 1), never page 1.
 - **Server reshuffles page contents between fetches** → an id already live in the pager's
   list can re-enter a later page; DB-row dedup can't see the live list → duplicate
-  LazyGrid keys crash the measure pass ("Key was already used"). Fix: session-wide
-  seen-set per feed keyBase in FeedRepository; the source registers ids it returns.
+  LazyGrid keys crash the measure pass ("Key was already used"). Fix: **per-pager** (per-generation) session dedup in
+  `FeedPagingSource`/`ForYouNetworkPagingSource` — the source registers ids it returns.
+  The old static session-wide seen-set was removed (batch 24 #26/#19): it survived pager
+  restarts and deduped Favorites round-robin re-lists to empty ("No favorites yet" for a
+  non-empty feed), and its leak kept invalidation dispatches alive across generations.

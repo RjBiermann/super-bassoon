@@ -37,8 +37,7 @@ Media3/ExoPlayer + SimpleCache (cache-first rules formerly PLAN.md §5).
   panel) shows more screen but crops ~9:16 content heavily; it works as a user
   choice via this pref, not as a TV-forced default. Keep it available to pick on TV
   (the shared SettingsScreen already covers both apps).
-- **Preferred video quality (issue #4, built with the plugin+clamp guard; LIVE
-  probe still open):** DataStore `video_quality` = `auto | highest | 720 | 480`
+- **Preferred video quality (issue #4, built with the plugin+clamp guard; live manifest probe CLOSED 2026-10):** DataStore `video_quality` = `auto | highest | 720 | 480`
   (value list owned by `core/model VideoQuality` — THE one place for the menu
   list; Settings row sits under the video-fit block on the shared screen).
   Data-saver keeps its first rule (forces SD); Auto/Highest equal today's URL
@@ -47,19 +46,21 @@ Media3/ExoPlayer + SimpleCache (cache-first rules formerly PLAN.md §5).
   mid-stream on pref change, no re-prepare) with the no-selected-track clamp
   guard: `onTracksChanged` tracks the smallest known rendition height and lifts
   a cap below every rendition to that height (a single-rendition MP4 is an
-  honest no-op). OPEN: what `urls.hd` actually is (direct MP4 vs HLS ladder)
-  decides whether the discrete caps are meaningful; until probed the plumbing
-  is safe-by-construction.
+  honest no-op). Probe result: `urls.hd`/`urls.sd` are single-rendition faststart
+  MP4s (no HLS ladder) — the discrete caps are mostly honest no-ops in practice,
+  the plumbing is safe-by-construction.
 
-## Verified end-to-end (emulator, 2026-09)
-- Feed tile → PlayerScreen → ExoPlayer playback → 5s position sample → `watch_history` row
-  (positionMs 5750 observed). All confirmed via run-as sqlite3.
-- Emulator screencap shows a solid green video surface — that's a screencap/codec artifact,
-  not a bug; verify playback via position values in `watch_history`, not pixels.
+## Verified end-to-end (emulator, 2026-09; pre-watch_history-removal)
+- Feed tile → PlayerScreen → ExoPlayer playback verified via run-as sqlite3
+  (position samples into `watch_history` — that table has since been DROPPED,
+  `MIGRATION_10_11`; both players now start every gif at 0). Emulator screencap
+  shows a solid green video surface — a screencap/codec artifact, not a bug;
+  verify playback via logcat/codec state, not pixels.
 - Data-saver is wired end-to-end: `Gif.streamUrl(dataSaver)` → `GiffyPlayer.playGif`;
   covered by `StreamUrlTest` (:core:model). Toggle UI intentionally deferred to the
   Phase 7 settings screen.
-- "Continue Watching" is a TV row (AGENTS.md shell-agnostic rule); mobile has no such row.
+- ~~"Continue Watching" is a TV row~~ — REMOVED entirely (2026-10 stream, issue #1):
+  watch_history dropped, no Continue Watching surface on either shell.
 
 ## Inline feed autoplay (BUILT 2026-10-02 — live-parity check passed first)
 When the feed grid is **1-column** (`gridColumns == 1`, compact phone),
@@ -107,9 +108,9 @@ Implementation (FeedScreen + GifTile):
   hand-rolled UI. On content switch the collect `stop()`s the player BEFORE
   the surface moves (no stale previous-gif frame on the incoming tile) and
   the surface stays on the outgoing tile (frozen frame) while scrolling —
-  no mid-fling surface jumps. NOTE: attach-on-first-frame was attempted and
-  REVERTED — ExoPlayer without an attached surface doesn't decode, so
-  onRenderedFirstFrame never fires (chicken-and-egg deadlock; poster froze).
+  no mid-fling surface jumps. (attach-on-first-frame was attempted and
+  REVERTED: ExoPlayer without an attached surface doesn't decode, so
+  onRenderedFirstFrame never fires — chicken-and-egg deadlock).
   TikTok/Reels precedent (2026-10-03 research): per-tile surface +
   TextureView + settle-driven switch — we mirror the surface rules; their
   2–3-player pool stays unbuilt (rate-limit invariant; fallback per the
@@ -150,54 +151,37 @@ Implementation (FeedScreen + GifTile):
   a decoder that claims BOTH SDR and HDR profiles still serves SDR (residual
   HDR-variant window awaits the live probe — whether any gif stream even
   presents HDR variants is unprobed).
-- `TvPlayerScreen` mirrors mobile resume + 5s `watch_history` sampling — verified live
-  (gif 22.3s played → `watched=1`).
+- ~~`TvPlayerScreen` mirrors mobile resume + 5s `watch_history` sampling~~ —
+  watch_history was DROPPED (`MIGRATION_10_11`); TV playback starts every gif at 0.
 - TV image has no `sqlite3` in run-as — pull `giffy.db` + `-wal` + `-shm` and read on host.
 - TV home uses androidx.tv `Card` for tiles: plain `Modifier.clickable` does NOT take
   D-pad focus inside tv-foundation rows.
 
-## Auto-advance across a page boundary (2026-10-01, logic-verified)
+## Auto-advance across a page boundary (2026-10-01, logic-verified + SOAK PASSED)
 PlayerScreen `pendingAdvance`: pool end → `retry()` + pendingAdvance; the
 LaunchedEffect re-drives on (pendingAdvance, itemCount, append) changes —
 next < itemCount → advance; append endOfPaginationReached → loop the last
 video; else → retry again. Manual swipe cancels via the currentPage
-LaunchedEffect. Compile-verified + code-reviewed; live soak through an
-actual boundary still pending (needs minutes of playback — cheap unit
-coverage isn't possible against Compose pager state).
-
-**Update (2026-10-01, soak):** the boundary soak DID exercise this path and
-caught a real crash — during a paging refresh the presenter list emptied
-while the pager still composed page 0 → `items[page]` IndexOutOfBounds.
-Fixed with a bounds guard before `items[page]` (the null check only catches
-placeholders). Full clean pass still pending — the Phone34 emulator dies
-every few minutes on this host, so a 10-min soak keeps getting interrupted.
+LaunchedEffect. The boundary soak (2026-10-01) caught a real crash — during a
+paging refresh the presenter list emptied while the pager still composed page 0 →
+`items[page]` IndexOutOfBounds — fixed with a bounds guard before `items[page]`
+(the null check only catches placeholders).
 
 **SOAK PASSED (2026-10-02 batch 18, Medium_Phone):** 21-minute continuous
-auto-swipe run at 1× over a fresh profile — 62 DISTINCT gifs advanced
-(`COUNT(DISTINCT gifId)` on watch_history as the observable), the
-page-1→page-2 boundary crossed live (count jumped 40→42 with
-appended-page ids), zero FATAL exceptions. The "keeps getting interrupted"
-streak is closed.
+auto-swipe run at 1× over a fresh profile — 62 DISTINCT gifs advanced, the
+page-1→page-2 boundary crossed live, zero FATAL exceptions.
 
 **TV end-of-media loop soak (batch 18, TV36):** the STATE_ENDED →
-seekTo(0)+play loop was exercised with the media ACTUALLY ending —
-watch_history position samples cycled 10396 → 6263 → 16283 → 13155 →
-6332 → 16342 across six real cycle-end restarts (19.2s gif, 5s sampler).
-After ~35 min of continuous decoder activity playback wedged mid-frame
-(position frozen, Codec2 "Invalid WorkBundle" chatter) — the DOCUMENTED
-emulator decode fragility, not app behavior (the loop had functioned over
-all cycles before the wedge).
+seekTo(0)+play loop was exercised with the media ACTUALLY ending — six real
+cycle-end restarts observed. After ~35 min of continuous decoder activity
+playback wedged mid-frame — the DOCUMENTED emulator decode fragility, not app
+behavior (the loop had functioned over all cycles before the wedge).
 
 ## Auto-swipe advance (2026-10-01)
 - **Bare-lambda trap:** a `{ ... }` block placed as a statement inside
   `onPlaybackStateChanged` compiles clean but never runs (it's a discarded
-  lambda expression) — the whole auto-advance was a silent no-op while the
-  toggle looked functional. Symptom: video parked at STATE_ENDED, watch_history
-  frozen, no crash. Now a direct block; live-proven (61 advances, boundary
-  crossed, 0 fatals).
-- Boundary pass recipe: duration chip 10–30s + auto-swipe ON + speed 2× in the
-  overflow sheet → distinct `watch_history.gifId` growth is the advance
-  observable (grid tile dumps are unreliable this session).
+  lambda expression) — an entire feature can be a silent no-op while the
+  toggle looks functional. Always a direct block; live-proven.
 
 ## TV end-of-media (IMPLEMENTED 2026-10-01, session 3 — mirror of mobile's ended-block)
 TvPlayerScreen now has one Player.Listener: STATE_ENDED → auto-swipe on (and not

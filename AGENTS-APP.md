@@ -7,11 +7,13 @@ prefs + the normative UI-lingo table below (formerly PLAN.md §3, §7–9).
 - Start destination until `age_confirmed_at` set in DataStore.
 - "I am 18 or older — Enter" / "Exit (leaves app)". Cannot be bypassed by back gesture.
 - **No content loads before confirmation.**
-- Optional lock: PIN + biometric — mobile `BiometricPrompt`, TV D-pad PIN pad. No recovery (clear app data resets).
+- Optional lock: PIN + biometric — mobile `BiometricPrompt`, TV D-pad PIN pad. No recovery (clear app data resets; deliberate user decision — forgotten PIN = clear app data, keeps the lock opaque).
 - Settings option to re-run/reset gate status.
 
 ## Mobile app
-- minSdk 24, targetSdk 35, edge-to-edge, Material 3 dynamic color, AMOLED true-black option.
+- minSdk 24, targetSdk 35, edge-to-edge, Material 3 with the issue-#7 seed-derived
+  dark scheme (dynamic color REMOVED — see "Issue-#7 theme rebrand" below),
+  AMOLED true-black option.
 - **Phone + tablet = one adaptive UI** (AGENTS.md shell-agnostic rule): same screens, touch-first everywhere;
   width is the only variable. `WindowWidthSizeClass` computed once at the app shell,
   derived layout hint passed down (column counts, margins) — no scattered width checks.
@@ -21,11 +23,10 @@ prefs + the normative UI-lingo table below (formerly PLAN.md §3, §7–9).
   mode the settled tile plays inline, muted + looped; tap opens the swipe
   player as today. Full policy lives in AGENTS-PLAYER.md ("Inline feed
   autoplay") — shared-player, no-history-write, data-saver-off rules are
-  normative there. Settings surface: app-only pref **"Autoplay in feed"**
-  (whole-row switch, under the Grid columns block; TV keeps none — the pref
-  only affects the 1-col grid). Live-site check that gated the build
-  PASSED: the site's own 1-col feed runs ONE shared `<video>` (muted:true,
-  loop:true) on the settled tile — observed via Playwright at 390×844.
+  normative there (the live-site check passed: the site's own 1-col feed
+  runs ONE shared muted+looped `<video>` on the settled tile). Settings
+  surface: app-only pref **"Autoplay in feed"** (whole-row switch, under
+  the Grid columns block; TV keeps none — the pref only affects the 1-col grid).
 - TikTok-style swipe player.
 - Long-press (tile or player) quick sheet: four panes per the restructure spec
   (BUILT 2026-10-01, live-verified both apps): main = Favorite · Pin · Add to… ·
@@ -33,7 +34,7 @@ prefs + the normative UI-lingo table below (formerly PLAN.md §3, §7–9).
 - Creator profile: Follow/Unfollow (server-backed, `v1/me/follows`; button states Follow ↔ Following per site); niche cards show Join/Leave state (site wording "Join Niche / Leave Niche", API `v2/niches/{id}/subscription`).
 - Tap username → profile-like view (follow/block/manage lists).
 - Feeds: Trending / Explore / Top(day…all), group feeds, custom feeds, For You, Search, Favorites, Groups, Settings — plus **"Continue Watching"** in More ▾ (mobile, 2026-10; app-only label): Room-only partial-watches surface — shared `FeedSource.Continue` reads `WatchHistoryDao.continueWatching(20)` through the SAME read-time chain TV's ContinueWatchingViewModel applies (ContentFilter + verified-only + orientation) plus §8 per-feed prefs; invalidation via the source's invalidation-tracker observer (watch_history/gifs/pref tables → per-load re-derivation), no hide-count increment (watch-time counted); helpful empty state when nothing partial; resume rides the swipe player's existing watch_history position.
-- **UI lingo = site words (verified live via logged-in Playwright sweep, 2026-10-01 — normative for every user-visible label):**
+- **UI lingo = site words (verified live via logged-in sweep, 2026-10-01 — normative for every user-visible label):**
   - For You / Trending (home tabs; For You scope dropdown **Creators · Niches · All**).
   - **Explore** (NOT "Discover" — site nav renders Home · Explore · Niches · Profile); Explore = "Top Creators" surface (`/explore/creators`).
   - Follow states **Follow ↔ Following**; following page heading "Following", per-creator **unfollow button**.
@@ -45,7 +46,6 @@ prefs + the normative UI-lingo table below (formerly PLAN.md §3, §7–9).
   - Sorts (niche/creator/profile): **Hot · Latest · Top**; tag/search pages: **Trending · Top This Week · Top This Month · Latest**.
   - **"Pinned" stays "Pinned"** — the API's own word (`v2/pins`); no site UI surface exists.
   - **App-only surfaces keep app labels** (no site equivalent — do not retrofit site wording): Continue Watching · Surprise me · Groups (niche groups) · Favorite creator · Data saver · autoplay toggle · Grid columns · Preferences backup.
-- Surface `RateLimitBus` state as a subtle "cooling down" indicator.
 
 ## TV app
 - androidx.tv, minSdk 26, full D-pad navigation incl. Groups + settings + PIN pad; 5% overscan margins.
@@ -67,252 +67,112 @@ prefs + the normative UI-lingo table below (formerly PLAN.md §3, §7–9).
   never encounters a hidden item; surfacing one to explain it would punch through
   the leak-zero choke point. "Hidden this week" count in Settings covers the need.
 
-## Favorite creator (Phase 7 slice 4, verified live on Phone34)
+## Favorite creator (verified live)
 - Mobile: "Favorites" FilterChip in the feed tab row; helpful empty state when nothing
-  favorited (no blank screen). Quick sheet: Favorite/Unfavorite follows current state.
-- TV: "Favorites" TvLazyRow appears ONLY when favorites exist (`hasFavorites` flow);
-  TV favorite/block landed via MENU quick actions on focused cards (2026-09) — row verified live.
-- TV initial focus fix: no focusable grabs D-pad focus on app open — AccountButton gets
-  a FocusRequester + LaunchedEffect request, else header buttons are unreachable.
+  favorited (no blank screen). Quick sheet: Favorite/Unfavorite follows current state.- TV: "Favorites" TvLazyRow appears ONLY when favorites exist (`hasFavorites` flow);
+  favorite/block via MENU quick actions on focused cards — row verified live.
+- **TV initial focus rule:** no focusable grabs D-pad focus on app open — the first
+  focusable gets a FocusRequester + LaunchedEffect request, else header buttons are
+  unreachable (AccountButton; same fix on TvNichesScreen first row + first grid card).
 
-## Preferences backup (Phase 7, verified live on Phone34)
+## Preferences backup (verified live on Phone34)
 - Settings screen: "Preferences backup" section with Export/Import buttons (SAF
   `CreateDocument("application/json")` / `OpenDocument`) + snackbar feedback
   ("Preferences exported" / "Imported N entries" / "Import failed — not a Giffy
-  preferences file"). Closes verification gate 7 (round-trip on fresh install).
-- Live round-trip: block @cherrymoon__ + favorite @candyai → Export to
-  `Download/giffy-prefs.json` → uninstall → fresh install → age gate → Import →
-  both prefs restored, blocked creator leak-zero in feed, snackbar "Imported 2 entries".
-- BACK from Settings exits the app (no back stack) — relaunch after navigation tests.
-- Touch-coordinate scale: Phone34 thumbnails 540×1170 for a 1080×2400 screen = ×2.051,
-  NOT ×2 — SAF dialog buttons at (958, 2215), Import button at (423, 810).
+  preferences file"). Closes verification gate 7 (round-trip on fresh install,
+  including blocked-creator leak-zero after import). BACK from Settings exits the app
+  (no back stack) — relaunch after navigation tests.
 
-## Verified tick + verified-only filter (built 2026-10, live-verified Phone34 + TV36)
+## Verified tick + verified-only filter (built 2026-10, live-verified)
 - Every gif payload carries top-level `verified` (creator's badge) — no verified-set
-  download needed; live-probed 2026-10 (`v2/gifs/search`, `v2/feeds/trending/popular`,
-  `v2/users/{u}/search` all include it; `users` array rows carry it too for following).
+  download needed (all feed/search/user endpoints include it; `users` array rows
+  carry it too for following).
 - **VerifiedTick (core:ui)** renders next to every user-visible @username: mobile tiles,
-  player cluster, creator rows (Explore/Following/NicheAbout), feed creator chips,
-  quick sheets; TV cards, creator cards, quick-actions header, player cluster. Tint:
-  shared Info cyan on mobile dark, white on video overlays, onSurfaceVariant on TV cards.
-- **"Verified creators only"** — one global toggle in Settings (shared mobile/TV screen).
+  player cluster, creator rows (Following/NicheAbout), feed creator chips, quick
+  sheets; TV cards, creator cards, quick-actions header, player cluster. Tint: shared
+  Info cyan on mobile dark, white on video overlays, onSurfaceVariant on TV cards.- **"Verified creators only"** — one global toggle in Settings (shared mobile/TV screen).
   Read-time pref like orientation: `SettingsRepository.verifiedOnly` → pager restart via
   `FeedRepository.paging` combine → `FeedPagingSource`/`LikedNetworkPagingSource`
   filter + `refreshSurprise` + `ContinueWatchingViewModel`. Room: `gifs.verified`
   (v8, MIGRATION_7_8). MUST stay OUTSIDE the hide-count increment (prefs are not blocks).
 
-## UI/UX audit findings (2026-10, research-only — fixes unscheduled)
-Static review against mobile-accessibility / M3 / ui-ux-pro-max rules. Not a work order;
-a user slice picks from this list. Priority order within each tier.
+## A11y & UX requirements
+- Player Retry/Skip are ≥48dp TextButtons; SearchScreen rows ≥48dp. Player bottom text
+  cluster + action rail sit on a bottom gradient scrim; pill buttons keep container-fill
+  rest state with ≥4.5:1 contrast.
+- Settings Switch rows are whole-row `Modifier.toggleable(role = Role.Switch)` —
+  target size + TalkBack state announcement (data-saver, verified-only, AMOLED; all done).
+- PIN pad keys carry real contentDescriptions ("Delete last digit"/"Submit PIN"), dot
+  row announces "N of 4 digits entered", like button is a polite live region announcing
+  the optimistic flip; keypress haptics (KeyboardTap per key, LongPress on wrong PIN).
+- Brute-force slowdown (3+ wrong → 15s wait) shipped. Double-tap like —
+  double-tap = LIKE (never unlike), rail heart toggles.
+- TvPlayerScreen pause/seek: horizontal = ±10s seek with flash, hold-repeat progressive
+  (seek keys act on KeyDown so OS key-repeat yields progressive steps; KeyUp just
+  consumes); item-walk Down/Up stays KeyUp-only on purpose (a held Down would churn
+  the decoder across gifs). TvSourceFeedScreen onMenu opens quick actions.
+- Tile a11y: GifCard image decorative; the visible "@user" Text announces the creator.
+- Search suggestion rows show `"%,d gifs"` (grouped + unit), not a bare count.
+- Speed labels `Locale.US` with %.2f (steps are 0.25, so 2 decimals is real precision).
+  OfflineNotice deleted; core:ui EmptyState is the only empty surface.
+- AuthScreen: paste-token removed (user decision); PKCE "Sign in with browser" is the
+  only path. Signed-in state shows "Signed in as @<username>" via
+  `TokenStore.usernameFromJwt` (id_token `preferred_username`).
+- **Every list surface has a retry/error state** (loadFailed + error EmptyState + Retry;
+  section fetches degrade to empty sections) — the remember-vars drift class that
+  silently lost error branches is closed by the Hilt-VM convergence (below).
+- One-time long-press coach mark: SnackbarHost on FeedScreen, DataStore flag
+  `block_hint_shown` (written only after showSnackbar returns).
+- RateLimitBus "cooling down" indicator — decided spec'd-not-built (no UI consumer;
+  build only when a user-visible failure trace demands it).
+- Skipped by design: live D-pad traversal audit cadence (needs an emulator session);
+  contrast math under the theme (Material guarantees it).
 
-**Fixed in the 2026-10-01 session (verified live):** dead duplicate data-saver row
-removed (Settings); Collections NameDialog cancel/dismiss no longer submits "";
-NichesScreen initial fetch moved to LaunchedEffect; empty-Favorites hint now points at
-the player's ⋯ sheet (no tiles exist on an empty feed); TV speed label Locale.US;
-TvPlayerScreen progress fraction starts at 0 (stale BISECT probe removed).
-
-**Critical**
-- ~~Dead control: CollectionsScreen share `IconButton(onClick = {})`~~ — CLOSED: the share
-  icon was removed (top-bar actions now = create; per-item edit/delete). No dead control remains
-  there.
-- Explore error path — UPDATED round 3: a `loadFailed` flag + error EmptyState + Retry button
-  were added, but the wiring is still broken: `.onFailure` only does `loading = false` and
-  **never sets `loadFailed = true`** → the error branch is unreachable and the
-  `LaunchedEffect(creators.size)` refetch still never re-fires on failure. Retry UI exists,
-  cannot ever render. Sharpest open item. Same silent-failure pattern confirmed in
-  NicheAboutScreen (three `runCatching{}.onSuccess{}` fetches, no failure state) and
-  FollowingScreen (no error/empty/loading handling at all) — see round 3 below.
-- PIN lock (PinLockScreen): `✓` key fixed (submits at <4 digits too); brute-force
-  slowdown (3+ wrong → 15s wait) shipped. NO recovery affordance — deliberate
-  (user decision 2026-10: forgotten PIN = clear app data, keeps the lock opaque).
-
-**High (a11y / destructive actions) — all closed 2026-10**
-- Player Retry/Skip are ≥48dp TextButtons (audit H6 closed).
-- Player bottom text cluster + action rail sit on a bottom gradient scrim
-  (audit H5 closed); GiffyPillButton rest state is container-fill + TextHigh
-  (contrast closed).
-- Delete confirm inconsistency: closed — Groups delete now confirms first
-  (same destructive class as Collections).
-- TV age gate initial-focus FocusRequester:
-  [FIXED same day: TvMainActivity.AgeGate has `gateFocus`; **2026-10 session also
-  wired initial focus on TvNichesScreen (first row) and TvSourceFeedScreen (first
-  grid card) — those lists sat unfocused on open: no ring, first CENTER did nothing.**
-  Focus-ring unification: M3 Buttons/FilterChips on TV draw nothing on D-pad focus —
-  every TV Button/chip takes an explicit `MutableInteractionSource` passed BOTH to the
-  component and to `Modifier.giffyFocus(is)`, giving the one BrandRed ring everywhere
-  (Niches rows, quick-action dialogs, source-feed Filter chip).]
-
-**Medium**
-- AuthScreen hierarchy — closed: paste-token removed (2026-10 user decision);
-  PKCE "Sign in with browser" is the only path.
-- Settings Switch rows: whole row should be `Modifier.toggleable(role = Role.Switch)`
-  (target size + TalkBack state announcement), not Switch-only hit area — CLOSED for data-saver,
-  verified-only and AMOLED (all whole-row toggleable now); the last open instance is the
-  dynamic-color row (round 3 Medium below).
-- FeedScreen empty-Favorites hint — closed (points at the player's ⋯ sheet now).
-- Double-tap like — closed: double-tap = LIKE (never unlike), rail heart toggles.
-- TvPlayerScreen pause/seek — closed: horizontal = ±10s seek with flash,
-  hold-repeat progressive, CENTER = play/pause; TvSourceFeedScreen onMenu opens
-  quick actions. [CORRECTED 2026-10-02 batch 13: the handler was KeyUp-only —
-  a held Right gave ONE step, not the documented hold-repeat. Fixed: seek keys
-  (Left/Right + MEDIA_FF/REW) act on KeyDown so OS key-repeat yields progressive
-  steps; KeyUp just consumes (no double-step). Item-walk Down/Up stays KeyUp-only
-  on purpose — a held Down would churn the decoder across gifs. Device-verified
-  TV36: single press steps + flash + clamp at duration, no crash.]
-- ~~Tile a11y noise~~ — CLOSED on mobile AND TV (GifCard image decorative;
-  the visible "@user" Text announces the creator).
-- ~~Search suggestions render a bare count~~ — CLOSED: rows now show `"%,d gifs"`
-  (grouped + unit).
-
-**Low**
-- ~~OfflineNotice duplicates core:ui EmptyState — reuse it~~ — CLOSED: OfflineNotice deleted;
-  EmptyState is the only empty surface.
-- Speed label precision — CLOSED with correction: both labels are `Locale.US` now, and the
-  original "%.1f" claim was wrong — speed steps are 0.25, so 2 decimals is real precision
-  (0.25×, 1.25×). Kept %.2f on both platforms.
-- PinLockScreen: keypress haptic DONE (KeyboardTap per key, LongPress on wrong PIN —
-  2026-10-02); wrong-PIN shake skipped (haptic covers the feedback; brief screen).
-- NichesScreen initial fetch inside `remember { scope.launch {} }` — should be
-  LaunchedEffect(Unit) (same length, correct idiom).
-- contentDescription capitalization varies ("search" vs "Sound On") — copy consistency.
-
-Skipped by design: live D-pad traversal audit (needs emulator session via debroid/mobile
-MCP); contrast math under dynamic-color theme (Material guarantees it).
-
-## UI/UX + a11y + feature audit round 3 (2026-10-02, docs-only)
-Full sweep of every composable in feature:*/app-*/core:ui (grep-driven a11y patterns +
-file-by-file reads of the smaller screens; FeedScreen/PlayerScreen/Settings covered region-by-
-region). Stale round-1 items above are already marked. New findings, code-verified, fixes
-unscheduled — a user slice picks.
-
-**Critical (broken UI, must fix first)**
-- ~~ExploreScreen `loadFailed` is a dead flag~~ — CLOSED 2026-10-01: onFailure writes it,
-  Retry clears it, and the size/loadFailed LaunchedEffect re-fires on failure.
-
-**High (silent failures — same class as the Explore item)**
-- ~~FollowingScreen: zero error/empty/loading handling~~ — CLOSED 2026-10-01:
-  FollowingViewModel gained loadFailed (creators+niches result), the screen shows
-  error+Retry and a "Nothing followed yet" empty state.
-- ~~NicheAboutScreen swallow failures~~ — CLOSED 2026-10-01: detail failure shows
-  error EmptyState + Retry (loadAbout() local fun shared by initial + retry); section
-  fetches degrade to empty sections.
-- ~~System back from an opened feed exits the app~~ — **OBSOLETED 2026-10 (issue #13 nav wave):**
-  the one-level source-history stopgap (open() remembers the prior source; canGoBack +
-  FeedScreen BackHandler pops one level) was the nav-library trigger firing; the whole hand-rolled
-  stack is gone. See "NAVIGATION migration (issue #13)" below.
-
-**Medium**
-- ~~CustomFeedsScreen delete has NO confirm dialog~~ — CLOSED 2026-10-01: confirm-first
-  AlertDialog (mirrors Groups), same destructive-class wording.
-- ~~CustomFeedsScreen ref chips dead tap + <48dp Remove~~ — CLOSED 2026-10-01:
-  AssistChip (click = remove, the X states it; refs re-add trivially), 48dp IconButton
-  with "remove @user"-style descriptions.
-- ~~TV home login drift~~ — CLOSED 2026-10-01: isLoggedIn is now a token-flow StateFlow;
-  Following row refresh keyed on it (Liked row rides its own token flow).
-- ~~FeedRow LoadState.Error~~ — CLOSED 2026-10-01: error rows show "Couldn't load <title>"
-  + Retry (gifs.retry()); the filter-empty hint landed earlier. Explore/Following creator-row
-  guards still open (failed fetch = blank strip).
-- ~~Settings dynamic-color Switch-only row~~ — CLOSED 2026-10-01: whole-row toggleable
-  (last switch row; data-saver/verified-only/AMOLED already done).
-
-**Low**
-- ~~"upstream" wording ×2~~ — CLOSED 2026-10-01: AgeGate reworded ("the sites it browses"),
-  AuthSection "sync to your account".
-- ~~WebViewLoginScreen println~~ — CLOSED 2026-10-01: removed.
-- ~~Inverted close/back labels~~ — CLOSED 2026-10-01: Settings X = "close",
-  WebViewLogin ArrowBack = "back".
-- ~~PlayerScreen dead onTogglePlay param~~ — CLOSED 2026-10-01: param + wiring removed
-  (PlayerControls builds its own player lambda).
-- ~~TvNiches 📌 emoji prefix~~ — CLOSED 2026-10-01: PushPin vector icon with
-  contentDescription "pinned".
-- ~~TV media NEXT/PREV keys~~ — CLOSED 2026-10-01: handled (walk the list, up/down parity).
-- ~~SearchScreen rows <48dp~~ — CLOSED 2026-10-01: vertical padding 10→14dp.
-- contentDescription capitalization — CLOSED 2026-10-02: the "Back"×1 drift went with
-  GiffyScaffold; "remove"-prefixed descriptions verified lowercase everywhere.
-- AuthSection signed-in state shows only "Signed in" — no @username. ~~BLOCKED~~ —
-  **CLOSED 2026-10-02 batch 3:** the user supplied a fresh token bundle; the id_token's
-  `preferred_username` (standard OIDC claim) was live-verified as the account username
-  (`v1/users/{claim}` → 200, response username == claim). `TokenStore.usernameFromJwt`
-  (stdlib Base64Url payload decode, no guessing) + `AuthViewModel.username` → AuthSection
-  now shows "Signed in as @<username>" ("Signed in" fallback if the claim is absent).
-  Unit-tested in `TokenStoreTest`.
-- RateLimitBus "cooling down" indicator — decided 2026-10-01: **spec'd-not-built**
-  (marker only; no UI consumer — build when a user-visible failure trace demands it).
-- TV home "More ▾" DropdownMenuItems have no giffyFocus ring (M3 popup rows) — whether
-  they show visible D-pad focus at all needs the skipped device check.
-  ~~Still open~~ — **CLOSED 2026-10-02 (later session, TV36):** M3 popup rows DO show
-  visible D-pad focus (a lighter fill on the focused row — zoomed screenshot on the
-  fresh-profile single-row menu). No giffyFocus needed for dropdown items.
-
-## In-app links audit + navigation-library decision (2026-10-02, docs-only)
-Trigger: "creator/niche/tag etc. should be links so users can navigate". Audit of every
-user-visible entity reference × the surface that renders it. Destination plumbing already
-exists for ALL of them — `FeedSource` (Creator/Niche/Search/Group/Custom) + `FeedViewModel.open()`
-are the in-place link targets, and every screen that needs a hop already takes an
-`onOpenCreator`/`onOpenNiche` callback. No new screens required; this is wiring, not
-architecture.
+## In-app links audit + navigation-library decision (2026-10-02)
+Every user-visible entity reference is a link. Destination plumbing already exists for ALL
+of them — `FeedSource` (Creator/Niche/Search/Custom) + `FeedViewModel.open()` are the
+in-place link targets, and every screen that needs a hop takes an
+`onOpenCreator`/`onOpenNiche` callback. No new screens required; this is wiring.
 
 **Already linked (working today):**
 | Entity | Surface | Destination |
 |---|---|---|
-| Creator | FollowingScreen rows, search-page creator strip (explore strip, issue #11 — ExploreScreen deleted 2026-10), NicheAbout top-creators | creator feed |
+| Creator | FollowingScreen rows, search-page creator strip, NicheAbout top-creators | creator feed |
 | Niche | FollowingScreen rows, NichesScreen rows, NicheAbout related | niche feed |
 | Creator (search results) | FeedScreen creator-chips row (above search results) | creator feed |
 | Group / Custom feed / Pinned | chips, More ▾, TV pills + dropdown | their feeds |
 | Gif (tiles/cards) | mobile tiles + TV cards | player |
 
-**Missing links — status 2026-10-02:**
-1. **@username → creator feed — BUILT (mobile):** CreatorLabel gained an optional
-   `onClick`; wired on the mobile tile caption (in-place `viewModel.open`), the player
-   bottom cluster (open + close the player — the feed behind has swapped, like TikTok
-   leaving the player on a hashtag) and the quick-sheet row (#3). TV captions
-   deliberately stay non-tappable: a clickable inside a focusable Card steals D-pad
-   focus; the TV link equivalent is the "Open @user's feed" row in TvQuickActions
-   (built same day).
-2. **Player tag chips → tag feed — BUILT (mobile):** chips call
-   `FeedSource.Search(query = tag)` + close the player. TV keeps its quick-actions
-   tags pane as the equivalent.
-3. **Quick sheet "Open @user's feed" row — BUILT 2026-10-02:** QuickSheet main pane
-   (after Favorite) + TvQuickActions main pane; both `viewModel.open(FeedSource.Creator(...))`
-   + dismiss.
-4. **FollowingScreen niche rows** carry no About entry and TV has no NicheAbout at all
-   (existing "Minor" gap) — link exists, depth missing; unchanged here.
-5. **Gif niches → niche feed — MOBILE BUILT 2026-10-02 (slice a–c; the live-check
-   caveat did not block it):** the model keeps the payload's name (`Gif.niches:
-   List<NicheRef>` — NicheRef(id, name); Room `gifs` gained a `nicheNames` map via
-   MIGRATION_8_9, ids column untouched, round-trips through cache). The mobile player
-   cluster renders up to 3 niche pills BEFORE the tags (labels = payload name, id
-   fallback for pre-v9 cache rows), tap → `FeedSource.Niche(id, name)` + player close;
-   tags went plain lime text (style decision (b)) — no section heading is rendered, so
-   no new wording was invented (the (d) watch-page label check still applies IF a
-   labelled section is ever added). TV equivalent — **BUILT 2026-10-02:** TvPlayerScreen
-   gained the same ≤3-pill row (labels = payload name) + `onOpenNiche(FeedSource.Niche)`
-   callback wired in TvMainActivity (`openFeed = niche`, same swap semantics as
-   onOpenCreator). Pills use the TvQuickActions row pattern (M3 TextButton + shared
-   giffyFocus ring + interactionSource); pill row only composes when `gif.niches`
-   is non-empty. Compose-cluster pill render + the niche-gif composition path were
-   breakpoint-verified on TV36 (pill-row line hit with a 5-niche gif); the visible
-   D-pad focus ring cannot be verified on this image — the shared-dialog ring check
-   ran the same day and FAILED (see round-3 #4), so the pills inherit the same
-   limitation as every other in-dialog focusable on TV (MENU quick actions remain
-   the reliable link path). Parked residue: none for the wiring itself.
-6. **Possible gap to verify live:** the site watch page's "Suggested Niches / Suggested
-   Creators" + related "you might like" strip have no in-app counterpart (the swipe player
-   itself serves adjacent discovery; TV player has nothing). Verify against the live watch
-   page before spec'ing anything — add to the parity audit only if the strip is real.
+- **@username → creator feed — BUILT (mobile):** CreatorLabel `onClick` wired on the
+  tile caption (in-place `viewModel.open`), the player bottom cluster (open + close the
+  player — the feed behind has swapped) and the quick-sheet row. TV captions
+  deliberately stay non-tappable: a clickable inside a focusable Card steals D-pad
+  focus; the TV equivalent is the "Open @user's feed" row in TvQuickActions.
+- **Player tag chips → tag feed — BUILT (mobile):** chips call
+  `FeedSource.Search(query = tag)` + close the player. TV keeps its quick-actions
+  tags pane as the equivalent.
+- **Quick sheet "Open @user's feed" row — BUILT:** QuickSheet main pane (after
+  Favorite) + TvQuickActions main pane; both `viewModel.open(FeedSource.Creator(...))` + dismiss.
+- **Niche About + follow entries — CLOSED:** TvNiches rows carry a side-by-side About
+  focusable → shared NicheAboutScreen (batch 12, D-pad-verified); follow/unfollow is
+  wired BOTH apps via FeedViewModel (`refreshFollowedCreators` + `toggleFollowCreator`
+  over the verified PUT/DELETE v1/me/follows, optimistic flip on success): mobile
+  quick-sheet row + TV TvQuickActions row, same main-pane position after "Open @user's
+  feed". Anonymous (no token) shows no row on either app.
+- **Gif niches → niche feed — BUILT (both apps):** the model keeps the payload's name
+  (`Gif.niches: List<NicheRef>`; Room `gifs.nicheNames` map via MIGRATION_8_9, ids
+  column untouched, round-trips through cache). The player cluster (mobile + TV)
+  renders up to 3 niche pills before the tags (labels = payload name, id fallback for
+  pre-v9 cache rows), tap → `FeedSource.Niche(id, name)` + player close; tags are
+  plain text (no section heading rendered, so no new wording was invented). Pill row
+  only composes when `gif.niches` is non-empty. Device-verified on TV36.
+- **Open live-check:** the site watch page's "Suggested Niches / Suggested Creators" +
+  related "you might like" strip have no in-app counterpart (the swipe player itself
+  serves adjacent discovery; TV player has nothing). Verify against the live watch page
+  before spec'ing — add to the parity audit only if the strip is real.
 
-**Back-stack prerequisite (ties into round 3 High):** wiring @user links on mobile exposes the
-back problem immediately — open a creator feed from a tile and system back exits the app.
-~~Minimal standard fix BEFORE/with the link wiring: a small source history in FeedViewModel
-(`List<FeedSource>`; `open()` appends, a `BackHandler` inside FeedScreen pops it, disabled on
-home) — platform-native Compose mechanism, ~20 lines, no dependency.~~ (Built 2026-10-01, then
-SUPERSEDED by the nav migration below — the nav stack owns feed-hop history.)
-
-**Navigation library decision: ~~NOT now (revisit on trigger).~~ ADOPTED (issue #13).**
-The NOT-now block is kept as the decision trail; its own revisit triggers (a) nested multi-hop
-navigation losing position and (c) the shells' flag lists growing BOTH fired, and the user
-decided `androidx.navigation:navigation-compose` (STABLE, not navigation-3). Full migration
-record: "NAVIGATION migration (issue #13)" section below (DESIGN-nav-stream.md).
+Back-stack note: the old hand-rolled source-history stopgap is SUPERSEDED — the nav
+migration owns feed-hop history (below).
 
 ## NAVIGATION migration (issue #13) — BUILT 2026-10 nav stream
 Both shells run `androidx.navigation:navigation-compose` (catalog pin `navigationCompose =
@@ -375,40 +235,31 @@ per-appear latch; header-pill initial focus runs only while no saved row focus e
 **Search-submit semantics under nav:** stay-on-stack (BACK returns to the draft/history, §8.4);
 Niches/Following/About/CustomFeeds opens also stay on the stack (no manual clears).
 
-**Owed device gates (implementation can't run them):** design §8's 15-step list on both
-emulators — full pass before closing the issue. PARTIAL PASS 2026-10-17 (batch 28):
-devices covered the pop-sensitive bits live — player pop restores the feed's grid
-position + saved card focus (TV36 screencap-exact), sign-in survives process death on
-both shells, D-pad walk into rows + card open + BACK restores. STILL OWED: the full
-15-step walk (MainFeed source re-assert + S3 reset-emit must not flash the grid on pop
-— not re-driven this session) and the R8-build D-pad focus walk; >1MB-serialized-route
+**Owed device gates:** design §8's 15-step list on both emulators. PARTIAL PASS 2026-10-17
+(batch 28): player pop restores the feed's grid position + saved card focus, sign-in
+survives process death on both shells, D-pad walk into rows + card open + BACK restores.
+STILL OWED: the full 15-step walk (MainFeed source re-assert + S3 reset-emit must not
+flash the grid on pop) and the R8-build D-pad focus walk; >1MB-serialized-route
 risk (R3) stays theoretical.
 
+## Feature audit (2026-10-02) — parity writes
+GifsApi has `POST v2/me/collections` (create) + `DELETE v2/me/collections/{id}` but NO
+add-content write; no report endpoint; no `GET /v2/me/followers`; no tags-trending search
+tab; no niches/suggest. Remaining round-1 parity gaps (Report · Add to a Collection ·
+Add to a Niche · Followers page · Tags browse tab · Niches suggest · server search history ·
+creator stats header) — per-item status in the parity-audit section. Collections
+empty-state copy points at the real path ("Create New Collection, then long-press a
+tile → ⋯ → Add to a Collection"). Remaining TV parity gap: the Followers page only
+(Search/Groups mgmt/custom-feed mgmt/Collections are built — see "TV parity gaps").
 
-**Feature audit (2026-10-02) — parity writes unchanged; corrections**
-- GifsApi has `POST v2/me/collections` (create) + `DELETE v2/me/collections/{id}` but NO
-  add-content write; no report endpoint; no `GET /v2/me/followers`; no tags-trending search
-  tab; no niches/suggest. All eight round-1 parity gaps stand (Report · Add to a Collection ·
-  Add to a Niche · Followers page · Tags browse tab · Niches suggest · server search history ·
-  creator stats header).
-- Collections empty-state copy — FIXED 2026-10-02 (the add-write shipped
-  2026-10-01): now points at the real path ("Create New Collection, then
-  long-press a tile → ⋯ → Add to a Collection").
-- TV parity list correction: **§8 shuffle on TV is CLOSED** — TvSourceFeedScreen renders the
-  shared FeedFilterDialog (Shuffle/Off/Reshuffle chips) over the same feedprefs blob +
-  shared FeedRepository.paging path. The "TV has the Filter chip only" line above was stale;
-  remaining TV gaps (Search, Groups mgmt, custom-feed mgmt, Collections, followers) stand.
-
-## UX polish (Phase 7 slice 3, verified live on Phone34 + TV36)
+## UX polish (verified live)
 - Mobile tiles: avgColor placeholder + reserved aspect ratio (no layout jump / black
   flash), 12dp rounded corners, Coil crossfade, contentDescription "Gif by @user".
 - TV cards: same placeholder/crossfade + focus scale 1.0→1.08 via `animateFloatAsState`
   + `Modifier.onFocusChanged` (NOT onFocusStateChanged — doesn't exist in compose-ui 1.10).
-- One-time long-press coach mark: SnackbarHost on FeedScreen, DataStore flag
-  `block_hint_shown` in SettingsRepository (written only after showSnackbar returns).
 - Mobile app bar: Settings (gear) icon opens feature:settings SettingsScreen (blocked
   lists + unblock, reactive via ContentPrefsDao Flows); unblock → invalidation →
-  hidden tiles reappear instantly (verified round-trip on emily.reed).
+  hidden tiles reappear instantly (verified round-trip).
 
 ## Per-feed prefs (DataStore, via `:core:datastore`)
 Sort · date range · duration min/max · resolution · orientation · shuffle seed — persisted
@@ -418,23 +269,33 @@ per feed (`feed_prefs` key), survive restart, applied strictly AFTER ContentFilt
 - **TV intent (2026-10-02, user decision): the horizontal filter is a must-work-well
   use case on TV** — the TV grid is a shared 10-foot screen, vertical/portrait tiles
   waste it, so filtering to horizontal is the primary TV orientation behavior and any
-  future filter-path change must not regress TV (TV bypass notes above apply:
+  future filter-path change must not regress TV (TV bypass notes below:
   `LikedNetworkPagingSource` + the TV Continue Watching row). Vertical-only on TV is
   accepted as a dead end, not a target: portrait tiles letterbox against the row
   height and waste the screen.
-- **Vertical video on TV (option, not built): fullscreen-fill the width**
-  (`RESIZE_MODE_ZOOM`) so the image spans the 16:9 panel — acceptable live picture,
-  but ~9:16 content crops heavily top/bottom; only viable when the user explicitly
-  wants filled-screen over whole-frame. Keep TV default FIT; Fill is a shared-plug
-  user choice via the existing Fit/Crop/Stretch pref, not a TV-forced default.
+- **Vertical video on TV: BUILT** — TvPlayerScreen maps the shared video-fit pref
+  (Crop → `RESIZE_MODE_ZOOM`), so the image can span the 16:9 panel; ~9:16 content
+  crops heavily top/bottom, so TV default stays FIT and Fill/Crop remain shared-plug
+  user choices, not a TV-forced default.
+- The orientation filter is **data-bound, not fetch-bound (probed live)**: the API has no
+  orientation parameter, so the filter is client-side over whatever pool the feed
+  returns. Live trending pool = 99/99 portrait (0 landscape); with the global filter
+  "horizontal" the home rows legitimately show nothing (the empty-homepage incident: a
+  stale "horizontal" pref over an all-portrait cache hid every tile — live-reproduced,
+  fixed by restoring Any). User decision (2026-10-02): this is accepted as the pool's
+  shape, not a defect to pave over — on TV horizontal is the wanted filter, and when a
+  pool is all-portrait the empty-state hint is the honest answer, not a silent
+  Any-fallback.
 
-## §8 range chips + shuffle (built 2026-10, live-verified on Trending: chips, shuffle on/off, reshuffle)
+## §8 range chips + shuffle (built 2026-10, live-verified on Trending)
 Client-side per-feed filters: duration (<10s/10–30s/30–60s/1–5m/>5m) · resolution (HD only) ·
 orientation (Global default = the §6 global pref). Persisted per feed in DataStore
 (`feedprefs:<baseKey>` JSON via `FeedPrefs`); Filter ▾ + Clear chips above the grid
-(mobile; TV deferred — its global orientation filter covers the primary use case).
-Read-time AFTER ContentFilter, not in hide counts. Date range + untagged-only chips
-stay unbuilt (server param unverified / group-feeds-only).
+(mobile; TV renders the shared FeedFilterDialog over the same blob — §8 shuffle on TV
+is CLOSED). Read-time AFTER ContentFilter, not in hide counts. Date range + untagged-only
+chips: date range is documented impossible (the API ignores createdAfter/created_after/
+date/dateFrom — a future bound still returns 2019 gifs); untagged-only exists on group feeds
+(strict tags, below).
 Global DataStore pref `orientation_filter` (`any` default / `horizontal` / `vertical`) in the
 shared SettingsScreen — one toggle covers both apps (TV: horizontal-only use case, mobile:
 vertical-only). Per-feed §6 orientation chips, when they land, default to this value.
@@ -445,735 +306,345 @@ NOT counted in hide counts, no "why hidden" toast — a pref, not a block. Shuff
 (`Gif.width/height` already on the model); 0×0 unknown → pass-through (same fallback as
 TV card-width rule). Pager restarts on pref change via `flatMapLatest` in `FeedRepository.paging`.
 
-## Feeds (order in cache keys)
-Server-backed sorts → distinct cache keys (`...:sort=top_week:p<n>`). Client-side-only ops
-(duration sort, shuffle, creator A→Z on group/custom) share the base key. Shuffle is
-per-session Fisher-Yates, stable across recomposition, reshuffle action available.
+## Filtering behavior (durable rules)
+- hasAudio 🔊 badge on grid tiles (know-before-tap).
+- **Strict tags (untagged-only) on group feeds:** read-time filter — non-empty tag set
+  AND all tags within the group bundle (vacuous-all would pass every untagged gif —
+  live-proven). Mobile + TV share FeedFilterDialog.
+- **Paging invariant:** all client-side filters ride
+  `combine(orientationFilter, feedPrefs) → flatMapLatest` into the paging source params.
+  If a param stops being handed through, the filter becomes a silent no-op while the
+  blob persists — never add a filter that bypasses this combine.
+- **Filter dead-end:** a strict client filter can empty EVERY cached page; with 0 visible
+  items nothing scrolls → no APPEND → eternal spinner. `FeedPagingSource.load` walks
+  consecutive unfetched pages through the empties (bounded ≤8 — rate-limit safe) and
+  terminates on a missing/invalid next key.
+- **Trending server pool cap:** ~100 items — page 3×40 → 20 gifs, page 4 → HTTP 400
+  (probe kept in LiveSmokeTest). Cache rows from older pool rotations coexist, so deep
+  cached pages are historical; the mediator treats the page>1 pool-cap 400 as a
+  Success(end), not an error.
+- **Filtered-empty hint:** strict filters can legitimately match zero tiles → FeedScreen /
+  FeedRow show "No videos match this filter / Clear or loosen the filter chips" (plus the
+  orientation hint: "Settings → Orientation") instead of a blank grid. "Clear" refills.
+  Device-verified both ways (filtered-empty and refill).
 
-## Pending-items completion (2026-10-01)
-- hasAudio 🔊 badge on grid tiles (know-before-tap); keep-screen-on while
-  the swipe player is up (window flag, disposed).
-- A11y closed: PIN pad keys carry real contentDescriptions ("Delete last
-  digit"/"Submit PIN"), dot row announces "N of 4 digits entered", like
-  button is a polite live region announcing the optimistic flip,
-  data-saver row is a whole-row toggleable switch.
-- Strict tags (§8 untagged-only) on group feeds: read-time filter —
-  non-empty tag set AND all tags within the group bundle (vacuous-all
-  would pass every untagged gif — live-proven). Mobile + TV share
-  FeedFilterDialog (now public, own file); TV source feeds get a Filter
-  chip writing the same feedprefs blob (pager restarts via the combined
-  orientation+prefs flow).
-- Date-range chips: the API ignores createdAfter/created_after/date/
-  dateFrom (future bound still returns 2019 gifs) — documented impossible.
-- **Paging lesson:** cachedPager had been dropping the orientation+prefs
-  params → FeedPagingSource ran on constructor defaults → ALL client-side
-  filters (duration/resolution/orientation/shuffle/untagged) were silent
-  no-ops while the blobs persisted — the earlier verifications only
-  proved storage, not filtering. Fixed by combine(orientationFilter,
-  feedPrefs) → flatMapLatest → params handed to the source.
-- Filter dead-end (live-proven + fixed): a strict client filter can empty
-  EVERY cached page; with 0 visible items nothing scrolls → no APPEND →
-  the feed starves on an eternal spinner. FeedPagingSource.load now walks
-  consecutive unfetched pages through the empties (bounded ≤8 — rate-limit
-  safe) and terminates on a missing/invalid next key.
-- Trending server pool is ~100 items: page 3×40 → 20 gifs, page 4 → HTTP
-  400 (probe kept in LiveSmokeTest `trending page cap probe`). Cache rows
-  from older pool rotations coexist, so deep cached pages are historical.
-  Strict filters can therefore legitimately match zero tiles → FeedScreen
-  shows "No videos match this filter / Clear or loosen the filter chips"
-  instead of a blank grid. "Clear" refills (live-verified both ways).
-
-## Empty custom feeds + quick-add (IMPLEMENTED 2026-10-01, session 2)
+## Empty custom feeds + quick-add (IMPLEMENTED 2026-10-01)
 Quick-add is DONE (mobile: tile long-press → ⋯ → "Add to custom feed…" → picker
 dialog; TV parity in TvQuickActions; add is deduped + evicts `custom:<id>` pages).
-Empty creation now wired (was half-wired — intent documented, code contradicted):
-- `CustomFeedsScreen.kt` `save()` no longer guards `refs.isEmpty()` — a name-only
+- `CustomFeedsScreen.kt` `save()` does not guard `refs.isEmpty()` — a name-only
   definition saves with empty `sourcesJson` (matches `canSave = name.isNotBlank()`).
-- FeedScreen `EmptyState` now also fires for `FeedSource.Custom` — an empty custom
+- FeedScreen `EmptyState` also fires for `FeedSource.Custom` — an empty custom
   feed shows "This feed is empty / long-press a tile or use ⋯ in the player →
-  “Add to custom feed…”" instead of a blank grid.
-- Stale `FeedPageFetcher.kt` ponytail comment replaced (empty feeds valid; the
-  fetcher returns an empty page safely — mediator test already covered it).
+  "Add to custom feed…"" instead of a blank grid.
 - Test: `GifFeedRefsTest` covers the shared `gifFeedRefs` helper (creator first,
   3-tag cap, niche-ref prepend).
-- Groups→custom-feeds merge (AGENTS-CONTENT-FILTER.md) stays parked.
+- Groups→custom-feeds merge SHIPPED (DB v10): the merged niche-group management
+  lives in the shared CustomFeedsScreen (state cycle + TV focus-ring treatment on the
+  row buttons) — full record in AGENTS-CONTENT-FILTER.md.
 
-## Ponytail audit — merge/simplify/split candidates (EXECUTED 2026-10-01, session 2)
-Findings now applied:
-- **deleted:** `core/model/UiState.kt` (zero usages) and the unused
-  `typealias GifItem = Gif` (FeedSource.kt).
-- **merged:** TvNichesViewModel deleted; shared `NichesViewModel` lives in
-  `feature:feed` (paging + category/sort/pin); mobile NichesScreen and TV
-  TvNichesScreen both consume it — one paging path instead of two.
-- **deduped:** `gifFeedRefs` + `customRefSummary` (with the niche branch) in
-  `feature:feed`; mobile AddToCustomFeedDialog and TV TvAddToFeedDialog share them.
-- **split:** TvSourceFeedScreen + TvNicheFeedViewModel moved out of TvNiches.kt
-  into `TvSourceFeedScreen.kt` (zero logic change).
-- Judgment call stands: AppModule/TvAppModule stay device-shaped mirrors.
+## Structure decisions (settled 2026-10-01/02 — do not re-derive)
+Applied consolidations: deleted `core/model/UiState.kt` + `typealias GifItem = Gif`;
+shared `NichesViewModel` in feature:feed consumed by both Niches screens;
+`QuickSheet.kt` extracted (mobile AddToCustomFeedDialog + TV TvAddToFeedDialog share
+`gifFeedRefs`/`customRefSummary`; `packNicheRef`/`parseNicheRef` in CustomFeedsScreen.kt,
+`NicheRefTest` covers round-trip); shared `AgeGate` in core:ui (both shells, centered TV
+layout); `CreatorLabel(username, verified, tint, style, tickTint, tickSize, onClick)`
+replaced all 10 hand-rolled copies (tick size follows the label); `GiffyScaffold(title,
+onBack, …)` replaced boilerplate in 9 screens (PlayerScreen keeps a bare TopAppBar in
+AnimatedVisibility — not a Scaffold site); list-fetch state machine converged — all four
+list screens speak one Hilt-VM dialect (loadFailed/Retry shape; a further shared skeleton
+extraction stays parked); `avgColorOr` + `AudioBadge` in core:ui; FeedScreen chip row:
+sort chips + Filter ▾ + Clear merged into ONE row (sorts scroll left under a fixed
+right-aligned Filter/Clear pair; both stay per-feed controls); AppModule/TvAppModule stay
+device-shaped mirrors (judgment call).
 
-## UI/UX structure round 2 — merge/split/simplify candidates (2026-10-02, scan-only, docs-only)
-Bounded scan of feature:*/app-*/core:ui composables only. Adds to the executed
-2026-10-01 ponytail audit; overlaps deliberately avoided. Ranked, smallest first:
+**n=4 consolidation threshold:** flat copies beat one abstraction nobody has tuned — converge at the 4th instance.
 
-1. **SPLIT — DONE (2026-10-01):** QuickBlockSheet + AddToCustomFeedDialog +
-   listStyle moved to `QuickSheet.kt` (feature:feed), zero logic change.
-2. **SMALL MERGE — DONE (2026-10-01):** shared `AgeGate` in core:ui
-   (onConfirmed suspend, onExit, requestInitialFocus flag replaces TV's
-   gateFocus); both shells consume it; TV layout now shares the centered one
-   (visual change on TV: centered instead of top-160, pill button instead of
-   plain M3 Button).
-3. **PONYSAIL-ONLY — list-screen skeleta converge at the 4th instance.**
-   NichesScreen / FollowingScreen are hand-rolled "paged rows" skeleta
-   (VM + `remember`-ish fetch state machine + error/empty branch);
-   ExploreScreen's third copy died with it (deleted 2026-10, issue #11 — the
-   paging machine moved to SearchViewModel's explore creator strip). Two
-   audits already caught the cost (NichesScreen
-   `remember{}`-fetch bug, each surface's missing error branch per the critical
-   audit item). `ponytail:` consolidation threshold n=4: until another list
-   screen lands, flat copies beat one abstraction nobody has tuned.
+**D-pad ring-test rule:** M3 Buttons/FilterChips/dialog rows on TV draw NOTHING visible
+on D-pad focus by default — every TV focusable carries an explicit
+`MutableInteractionSource` wired to its focus treatment (tv-material components carry
+their own focused states; in shared M3 dialogs use `giffyFocus`). Ring-test any shared
+dialog on device BEFORE merging it: the picker-dialog family merge (Add-to-Custom-Feed /
+Add-to-a-Collection / Add-to-a-Niche × mobile/TV) STOPPED per its own stop rule when the
+focused "HD only" chip rendered with no visible focus treatment — only the shared
+`orderNichesByTagMatch` ordering rule landed. TV TvAddToFeedDialog has an unconditional
+"Add to…" row + Collection-style empty state.
 
 Scanned-and-rejected (documented so the next audit doesn't re-derive them):
-- **FeedScreen.kt 42K / PlayerScreen.kt 44K** — large but cohesive (one surface;
-   private `PlayerPage`/`PlayerControls`/`ActionRail` are that player's units).
-   Flat-structure rule wins; only candidate here is #1's extraction, not a
-   general split.
-- **FeedFilterDialog vs Settings content prefs** — different jobs (per-feed
-   duration/resolution/shuffle/strict/orientation vs global blocks/likes);
-   not a merge.
-- **Age-gate copy shared, gate screens not** — TV keeps its own shell per the
-   input-modality split decision; #2 shares only the widget, never the nav.
-- **TvMainActivity 16K** = activity + nav host + AgeGate + ThemeHost in one
-   file, only 4 top-level funs — thin-shell shape; no split without eating the
-   file apart for zero reuse.
-- **WebViewLoginScreen** — the live PKCE path (intercepts the redirect code,
-   verified 2026-09-30); NOT dead after the paste-token removal.
-- **SettingsScreen (shared, 22K)** — one screen both platforms consume; that is
-   the goal state for Settings, not bloat.
-
-The wait-in-line items from audit round 1 (a11y Low tier, OfflineNotice→EmptyState
-reuse, per-surface error branches) stay on top of #1–#3 — pick by user exposure,
-not file size.
-
-## UI/UX structure round 3 — simplification audit (2026-10-02, docs-only)
-Post-fix-batch rescan (after the round-3 batch + the Add-to-Collection/Niche commit).
-Simplification only — every feature stays; findings collapse implementation, not scope.
-Ranked by lines removed per risk, smallest diffs first. Threshold rule from round 2
-(consolidate at the 4th instance) applied where it now fires.
-
-1. **CreatorLabel convergence — DONE (2026-10-02):** core:ui `CreatorLabel(username,
-   verified, tint, style, tickTint, tickSize, onClick)` replaced all 10 hand-rolled
-   copies (FeedScreen tile caption + creator chip, Explore/Following/NicheAbout rows,
-   PlayerScreen cluster, QuickSheet header, TvHomeScreen ×2, TvPlayerScreen cluster,
-   TvQuickActions header). Tick size follows the label (14dp default, 12dp TV cards,
-   16–18dp player clusters); tint colors text, tickTint the tick (Info cyan fallback).
-   Optional `onClick` powers the links-audit @user wiring.
-
-2. **GiffyScaffold — DONE (2026-10-02):** core:ui `GiffyScaffold(title, onBack, modifier,
-   backIcon, backDescription, actions, snackbarHost, content)` replaces the boilerplate in
-   Explore, Following, Collections, Groups, CustomFeeds, Niches, NicheAbout, Settings
-   (Close icon variant) and FeedScreen (onBack = null, home surface). PlayerScreen's top
-   bar is a bare TopAppBar inside AnimatedVisibility — not a Scaffold site, left alone.
-   "Back"→"back" copy drift (CustomFeeds) fixed as the side effect.
-
-3. **List-fetch state machine: the round-2 n=4 threshold is now CROSSED — CONVERGED 2026-10-02.**
-   ExploreScreen + NicheAboutScreen converted to Hilt VMs (`ExploreViewModel`,
-   `NicheAboutViewModel`) with the same StateFlow machine as Niches/Following; MainActivity's
-   standalone `api` injection died with the `api=` composable params. All four list screens
-   now speak one dialect — the loadFailed/Retry shape is consistent, the drift class (a
-   remember-vars machine silently losing its error branch) is closed. A further shared
-   skeleton extraction stays parked (four flat VMs beat one abstraction until real reuse
-   shows).
-
-4. **Picker-dialog family: six implementations of one dialog shape — CLOSED (2026-10-02, device check ran, ring test FAILED).**
-   Add-to-Custom-Feed, Add-to-a-Collection, Add-to-a-Niche — each × mobile + TV = 6 near-
-   identical "list of options → tap → Cancel" dialogs (~820 lines across the two files).
-   The niche tag-matching ordering rule (`gifTags → matching → ordered`) is copy-pasted
-   VERBATIM in both niche dialogs. Consolidation: one shared M3 picker dialog in
-   feature:feed (platform-neutral — the shared FeedFilterDialog already runs on TV) + one
-   shared `orderNichesByTagMatch(gifTags, niches)` rule beside gifFeedRefs. TV caveat:
-   TvQuickActions rows carry the giffyFocus ring — a shared dialog either accepts default
-   M3 focus visuals (what the shared FeedFilterDialog's contents already do on TV) or
-   takes a per-row decoration parameter. Decide on device, don't guess; if the ring test
-   fails, keep only the ordering rule + custom-feed dialog shared and stop.
-   **RAN THE DEVICE CHECK (TV36, 2026-10-02):** drove D-pad into the shared FeedFilterDialog's
-   chip rows on the niche source feed — the focused "HD only" chip (`focused="true"` in the
-   uiautomator dump) renders with NO visible focus treatment (default M3 outline only,
-   zoomed screenshot). Ring test FAILED ⇒ per this item's own stop rule the merge stops:
-   the shared ordering rule landed (batch 2), the dialog merge does NOT proceed. A TV
-   picker screen either needs giffyFocus per row (per-row decoration parameter) or
-   tv-material components — same conclusion the TvQuickActions rows already prove.
-   **TV equivalent DONE (2026-10-02, later session — no mobile-side changes):**
-   TvQuickActions' "Add to…" row is now unconditional (divider + row always render —
-   the no-custom-feeds state reaches the picker instead of the row disappearing), and
-   TvAddToFeedDialog gained the Collection-style empty state ("No custom feeds yet —
-   create one on the phone (“Custom feeds)."). Device-verified on TV36: main pane
-   shows "Add to…" with zero custom feeds; pane swap → picker renders title + empty
-   hint + disabled Add + Cancel.
-
-5. **avgColorOr + AudioBadge — DONE (2026-10-02):** both moved to core:ui
-   (`AudioBadge.kt`); the two call sites consume them (tile/card badge padding drift
-   collapsed to 4dp inner). Full shared GifThumb stays skipped on purpose.
-
-6. **packNicheRef/parseNicheRef — DONE (2026-10-02):** both helpers live in
-   CustomFeedsScreen.kt beside `customRefSummary`; all four parse sites (TV pills, TV
-   dropdown, FeedScreen pinnedNiches, FeedPageFetcher, CustomFeedsScreen summary) and the
-   two prefixed pack sites (FeedScreen, TvSourceFeedScreen) call them.
-   `NicheRefTest` covers both variants + round-trip. Pin packing in core:datastore
-   (`togglePinnedNiche`) stays inline — core can't reach feature:feed.
-
-7. **UX simplification (visual, not code): the FeedScreen chip pile-up — BUILT (2026-10-02).**
-   On a For-You niche/creator feed with options, the grid sat under up to five stacked
-   chrome rows — feed tabs · matching creators · For-You scope · sorts · Filter/Clear —
-   before the first tile (bad on a 360dp-wide phone in portrait). Landed: sort chips +
-   Filter ▾ + Clear merged into ONE row — sorts scroll left under a fixed right-aligned
-   Filter/Clear pair (weight(1f) scrollable inner row); both remain per-feed controls,
-   scope selector untouched. Compile + ktlint + detekt + unit tests green on :feature:feed.
-
-Scanned-and-rejected (documented so the next audit doesn't re-derive them):
-- **QuickSheet vs TvQuickActions row idioms** (TextButton+ripple vs Button+giffyFocus) —
-  the touch/D-pad split is the module-map's stated reason to exist; not a merge.
-- **FeedScreen 32K / PlayerScreen 44K** — re-affirmed cohesive post-batch; private
+- **QuickSheet vs TvQuickActions row idioms** — the touch/D-pad split is the
+  module-map's stated reason to exist; not a merge.
+- **FeedScreen / PlayerScreen file size** — re-affirmed cohesive; private
   PlayerPage/PlayerControls/ActionRail remain that player's own units.
-- **PlayerControls 24dp slot vs TvPlayerScreen always-on 3dp line** — different behavior
-  contracts (auto-hide vs 10-foot always-visible), not duplication. Scope narrowed
-  2026-10: "always-visible" is the PROGRESS LINE only — the text layer (creator /
-  description / niche pills) follows the mobile idle-hide rule (player text auto-hide,
-  TV parity gaps below).
-- **FeedViewModel vs TvHomeViewModel block/favorite creator functions** — RESOLVED
-  2026-10-02 (re-check ran; the Add-to writes had settled in FeedViewModel): the TV
-  quick actions already route through a fresh shared FeedViewModel, so TvHomeViewModel's
-  toggleFavoriteCreator/blockCreator/creatorState/togglePinnedCreator/pinnedCreators
-  were dead — deleted (~35 lines), not merged.
-- **Two time formatters** (formatRemaining vs seekBy's fmt) — 6 lines each, different
-  shapes (remaining vs position); sharing saves nothing real.
+- **PlayerControls vs TvPlayerScreen progress line** — different behavior contracts;
+  the TEXT layer follows the mobile idle-hide rule (player text auto-hide, below).
+- **FeedFilterDialog vs Settings content prefs** — different jobs; not a merge.
+- **Age-gate copy shared, gate screens not** — only the widget is shared, never the nav.
+- **TvMainActivity shape** — thin shell, one file; no split for zero reuse.
+- **WebViewLoginScreen** — the live PKCE path; NOT dead after the paste-token removal.
+- **SettingsScreen (shared)** — one screen both platforms consume; goal state, not bloat.
+- **Two time formatters** — different shapes; sharing saves nothing real.
 
-## Site feature-parity audit (2026-10-02, live-verified — doc-only, no code)
-Consumption surfaces are a full mirror: home tabs, Explore, Niches (index + Feed/About + join),
+## Site feature-parity audit (2026-10-02, live-verified)
+Consumption surfaces are a full mirror: home tabs, Niches (index + Feed/About + join),
 creator feed (tag chips, Follow), watch page, Saved Collections, Following, search
-(GIFs/Images/Creators/Niches tabs + Tags scope — see "Full-scope search" below), settings. Deliberately excluded per §0: upload/creator tools,
-Data Dashboard, boost/live-cam/only-fans/ads modules, premium (see AGENTS-NETWORK.md —
+(GIFs/Images/Creators/Niches tabs), settings. Deliberately excluded per §0: upload/creator
+tools, Data Dashboard, boost/live-cam/only-fans/ads modules, premium (see AGENTS-NETWORK.md —
 galleries verified dead, `v2/feeds/modules` checklist fully covered).
 
 Real gaps (site has them, app doesn't) — **spec'd-not-scheduled, a user slice picks**:
-- **Report** — UNPROBEABLE (2026-10): every plausible endpoint 404'd with the test
-  token (see AGENTS-NETWORK.md). Stays spec'd-not-scheduled; do not guess.
-- ~~Add to a Collection~~ — BUILT 2026-10-01: write probed live (POST
-  v2/me/collections/{id}/gifs {gifId} → 204, reverted), picker dialog in the Add-to…
-  pane on both apps (mobile AddToCollectionDialog, TV TvAddToCollectionDialog; empty
-  state points at Collections). In-app e2e not possible (emulator Keystore token
-  blocker); contract verified at API level.
-- ~~Add to a Niche~~ — BUILT 2026-10-01: write probed live (PUT v2/gifs/{gifId}/niches
-  {nicheId} → 202, reverted); AddToNicheDialog / TvAddToNicheDialog in the Add-to… pane —
-  joined niches, tag-matching first (site popup parity), 8-row cap, empty hint.
-- **Followers page** — BLOCKED on data shape (2026-10): both `GET /v2/me/followers`
-  and `GET /v1/me/followers/populated` return 200 but the test account has zero
-  followers — the row DTO is unverifiable, and building against a guessed shape
-  risks silent decode breakage (repo no-guess rule). Re-probe with an account
-  that has followers before wiring.
-- ~~Tags browse tab~~ — BUILT 2026-10-02 (section form): `GET /v2/tags/trending` wired
-  (GifsApi.trendingTags + TrendingTagsDto/TrendingTagDto); SearchScreen's empty-query
-  state gains a "Trending tags" section (#name + "N gifs", tap = the tag search feed via
-  the existing submit path — records history like any search). Fails silently to an
-  absent section. Note correction (2026-10-02, live): the site's search results-page tabs
-  are GIFs/Images/Creators/Niches — there is no Tags results tab (`/search/tags` 404s home);
-  trending tags live in the header search dropdown ("Trending Searches", links → tag feeds).
-  The app's empty-state section remains the equivalent surface.
+- **Report** — UNPROBEABLE: every plausible endpoint 404'd with the test token
+  (see AGENTS-NETWORK.md). Do not guess.
+- **Add to a Collection / Add to a Niche — BUILT 2026-10-01:** writes probed live
+  (POST v2/me/collections/{id}/gifs → 204; PUT v2/gifs/{gifId}/niches → 202, both
+  reverted); picker dialogs in the Add-to… pane on both apps (joined niches,
+  tag-matching first, 8-row cap, empty hints).
+- **Followers page** — BLOCKED on data shape: both follower endpoints return 200 but the
+  test account has zero followers — the row DTO is unverifiable, and building against a
+  guessed shape risks silent decode breakage (repo no-guess rule). Re-probe with an
+  account that has followers before wiring.
+- **Tags trending** — BUILT 2026-10-02: `GET /v2/tags/trending` wired as a "Trending
+  tags" section in SearchScreen's empty-query state (fails silently to an absent
+  section). The site's search results-page tabs are GIFs/Images/Creators/Niches — there
+  is no Tags results tab (`/search/tags` 404s home); trending tags live in the header
+  search dropdown; the app's empty-state section is the equivalent surface.
 - **Niches suggest** — `GET /v2/niches/suggest` (tag-context niche suggestions, verified)
-  un-wired; independent of the full-scope search spec (the Niches search tab uses
-  `niches/search/previews`, not suggest) — stays a fallback.
+  un-wired; independent of the full-scope search (the Niches search tab uses
+  `niches/search/previews`) — stays a fallback.
 - **Server search history** — `GET /v2/search/user-history` verified; site syncs history
-  server-side, app keeps local Room history. Existing spec'd-not-scheduled fallback now has
-  a verified endpoint to hang on.
-- ~~Creator stats header~~ — BUILT 2026-10-01: FeedViewModel.refreshCreatorStats +
-  creatorStats; mobile FeedScreen shows the counts row on Creator sources; TV
-  TvSourceFeedScreen shows it under the title (same shared VM state). Live-verified
-  on mobile (@lilymatrix → "154 posts · 121 followers · 200,599 views").
+  server-side, app keeps local Room history. Existing spec'd-not-scheduled fallback now
+  has a verified endpoint to hang on.
+- ~~Creator stats header~~ — BUILT: FeedViewModel.refreshCreatorStats + creatorStats;
+  counts row on Creator sources on both shells.
+- Parked (not gaps): For You server blend is `v2/feeds/for-you` as-is (70%
+  favorite-creator weighting was a local-blend idea, superseded by the server feed);
+  server collections are CLOSED as ALREADY BUILT (CollectionsViewModel is the
+  server-backed source of truth; only collection-content BROWSING lacks a verified
+  endpoint).
 
-Parked (not gaps): For You server blend is `v2/feeds/for-you` as-is (70% favorite-creator
-weighting was a local-blend idea, superseded by the server feed); search-history sync is a
-spec'd-not-scheduled fallback per AGENTS-NETWORK.md; **server collections CLOSED
-2026-10-02 batch 18 as ALREADY BUILT** (CollectionsViewModel is server-backed source of
-truth; only collection-content BROWING lacks a verified endpoint).
+## Full-scope search (BUILT 2026-10-02, mobile; device-verified batch 14)
+The site's search results page (live-verified): `/search/<scope>?query=&order=score` with
+result tabs **GIFs · Images · Creators · Niches**. `/search/tags` 404s home — tags have no
+results page; the header search box's Tags scope routes tag matches to the tag feed
+(`/gifs/<slug>`). App: SearchScreen shows the same 4-tab TabRow whenever a query is typed;
+the GIFs tab keeps the existing `FeedSource.Search` feed path unchanged.
 
-## Full-scope search (spec'd 2026-10-02 — BUILT same day, mobile; device-verified batch 14)
-The site's search results page (Playwright-verified live, desktop, `query=feet`):
-`/search/<scope>?query=&order=score` with result tabs **GIFs · Images · Creators · Niches**.
-`/search/tags` 404s home — tags have no results page; the header search box's Tags scope
-routes tag matches to the tag feed (`/gifs/<slug>`). App spec: SearchScreen gains the same
-tab row; the GIFs tab keeps the existing `FeedSource.Search` feed path unchanged.
-
-Scope → endpoint (all 200-verified 2026-10-02 with the anonymous temp token; row shapes in
-AGENTS-NETWORK.md):
+Scope → endpoint (all 200-verified 2026-10-02; row shapes in AGENTS-NETWORK.md):
 - **GIFs** — existing `GET /v2/gifs/search`; the site sends `type=g` explicitly (default `g`).
-- **Images** — same endpoint, `type=i`. Same response envelope + GifDto rows, but rows are
-  stills (`type=2`, `duration=null`, `hls=false`, `urls.sd/hd` are jpgs). Render as a
-  static-poster grid — **no player path** (nothing to play, no watch-history write).
+- **Images** — same endpoint, `type=i`. Same envelope + GifDto rows, but rows are
+  stills (`type=2`, `duration=null`, `urls.sd/hd` are jpgs). Rendered as a 3-up
+  static-poster strip — **no player path** (nothing to play, no watch-history write).
 - **Creators** — `GET /v2/creators/search/previews?order=best_match&page=1&count=30&query=`
-  → `{gifs:[…]}`, one preview gif per matched creator (dedupe by `gif.userName`);
-  tap → `FeedSource.Creator` (existing destination plumbing).
-- **Niches** — `GET /v2/niches/search/previews?order=best_match&page=1&count=30&query=`
-  → `{previews:[{niche, gif, user}]}` (niche object + preview gif + owner);
-  tap → `FeedSource.Niche` (existing destination plumbing).
-- **Tags** — `GET /v1/tags/match?query=` → tag-name array (`["Feet"]`); renders as
-  suggestion rows in the search empty/suggestion state, tap = the tag feed via the existing
-  submit path (alongside the existing Trending-tags section — one list, no new screen).
+  → `{gifs:[…]}`, one preview gif per matched creator (dedupe by `gif.userName`); tap →
+  `FeedSource.Creator`.
+- **Niches** — `GET /v2/niches/search/previews?…&query=` → `{previews:[{niche, gif,
+  user}]}`; tap → `FeedSource.Niche`.
+- **Tags** — `GET /v1/tags/match?query=` → tag-name array; the existing Trending-tags
+  section covers the suggestion state (a typed-query tags row was NOT built — the
+  empty/suggestion state already covers it).
 
-**BUILT (2026-10-02, later session):** SearchScreen shows the 4-tab TabRow whenever a query
-is typed (GIFs default — keeps the existing submit path untouched; switching tabs fires the
-scope's single request). SearchViewModel injects ContentFilter and caches per-scope results
-keyed by trimmed query (maps capped at 12; `cappedInsert`/`nicheRows` extracted + unit-tested
-in `SearchScopeResultsTest` — cap eviction, blank-id drop, blocked-preview-gif row drop).
-New API surface: `search(type=)`, `creatorSearchPreviews`, `nicheSearchPreviews`, `tagsMatch`
-(tagsMatch wired endpoint-side only — the Tags section is the existing Trending-tags one; a
-typed-query tags row was NOT built: the empty/suggestion state already covers it). Images
-render a 3-up static poster strip (avgColor placeholder, no player path, no tap target);
-Creators/Niches render preview-thumb rows → `onOpenCreator`/`onOpenNiche` callbacks wired in
-MainActivity (search closes, feed opens — same swap as NichesScreen).niches suggest remains
-a fallback (explicitly independent of this spec).
+SearchViewModel injects ContentFilter and caches per-scope results keyed by trimmed query
+(maps capped at 12; `cappedInsert`/`nicheRows` unit-tested in `SearchScopeResultsTest` —
+cap eviction, blank-id drop, blocked-preview-gif row drop). Creators/Niches rows →
+`onOpenCreator`/`onOpenNiche` (search closes, feed opens — same swap as NichesScreen).
 
 Rules:
 - Tabs lazy-load (1 request on first open, cached in the VM, never refetched per
-  recomposition) — the ≤10-req/5s invariant stays intact.
-- ContentFilter: every gif-backed row (GIFs/Images tiles, creator previews, niche previews)
-  flows the single ContentFilter — a row whose preview gif is blocked drops the whole row
-  (leak-zero at the cheapest check point, no second filter surface).
+  recomposition) — the rate-limit invariant stays intact.
+- ContentFilter: every gif-backed row (GIFs/Images tiles, creator previews, niche
+  previews) flows the single ContentFilter — a row whose preview gif is blocked drops
+  the whole row (leak-zero at the cheapest check point, no second filter surface).
 - History: app keeps local Room history only; the site's `POST /v2/search/user-history`
   (202) stays a spec'd-not-scheduled fallback.
-- TV: unchanged — search stays in the TV parity-gap list (D-pad device work).
-- Skipped: no Collections search scope (site has none), no tags results page (site has
-  none), no search-scope selector in the app header (the tab row on the search surface
-  covers it — the site's header scope strip is a redundant desktop affordance).
+- TV: BUILT batch 12 — the shared SearchScreen is hosted on TV (home "Search" pill;
+  submit opens `FeedSource.Search` via TvSourceFeedScreen), D-pad-verified.
+- Skipped: no Collections search scope, no tags results page, no search-scope selector
+  in the app header (the tab row on the search surface covers it — the site has none of
+  these either).
 
-## Hold-to-2× on the swipe player (BUILT 2026-10-02 batch 14 — UX-PATTERNS graduation)
-The last cheap Phone candidate from AGENTS-UX-PATTERNS.md graduated (user slice
-="implement the pending items"). Inside the swipe player only (never on tiles): a
-long-press on the player body plays at **2× while held** and restores the session
-speed on release — a "2× speed" chip shows while engaged; a swipe (pager consumption)
-or movement ≥ touch-slop cancels, so the VerticalPager drag and the pinch zoom are
-untouched; tap + double-tap handling is unchanged (the race runs up / cancel /
-movement against the platform long-press timeout before the tap path). Speed state
-gains `holdSpeed`; ONE `LaunchedEffect(speed, holdSpeed)` is now the only
-`setPlaybackSpeed` application point (the quick-sheet slider and the hold both write
-state, the effect applies — no dual writers).
+## Hold-to-2× on the swipe player (BUILT 2026-10-02 batch 14)
+Inside the swipe player only (never on tiles): a long-press on the player body plays at
+**2× while held** and restores the session speed on release — a "2× speed" chip shows
+while engaged; a swipe (pager consumption) or movement ≥ touch-slop cancels, so the
+VerticalPager drag and the pinch zoom are untouched; tap + double-tap handling is
+unchanged (the race runs up / cancel / movement against the platform long-press timeout
+before the tap path). Speed state gains `holdSpeed`; ONE `LaunchedEffect(speed,
+holdSpeed)` is the only `setPlaybackSpeed` application point (the quick-sheet slider
+and the hold both write state, the effect applies — no dual writers).
 
-## Quick actions — submenu restructure (BUILT 2026-10-01; was spec'd 2026-10-02)
-Quick sheets must stop growing flat rows. Two more sheet items already land this
-window (Report, Add to a Collection — see the parity audit below); a flat main
-pane would be ~10 rows. Spec: generalize the mechanism QuickBlockSheet already
-has (`var view by remember` — "main"/"tags" today) into four panes, identical
-shape on mobile + TV. No new component, no navigation — in-place content swap.
-BUILT: QuickSheet.kt (extracted from FeedScreen.kt) + TvQuickActions — main /
-addto / tags / block panes; TV re-requests pane-first-row focus on swap
-(LaunchedEffect(view)). DEVIATION (deliberate): the spec omitted the Pin row
-and claimed TV has no pinned rows — both are wrong (pinned creators feed the
-home top-row pills on BOTH apps), so Pin/Unpin stays on main on both.
+## Quick actions — four-pane restructure (BUILT 2026-10-01)
+Quick sheets must stop growing flat rows. Generalized mechanism (`var view by remember`
+panes): main / addto / tags / block panes, identical shape on mobile + TV; no new
+component, no navigation — in-place content swap. BUILT: QuickSheet.kt + TvQuickActions;
+TV re-requests pane-first-row focus on swap (`LaunchedEffect(view)`). DEVIATION
+(deliberate): the original spec omitted the Pin row — Pin/Unpin stays on main on both
+(pinned creators feed the home top-row pills on BOTH apps).
 
 **Main pane** (everyday toggles + pane entries only):
 - Favorite/Unfavorite @creator — state-aware toggle (both platforms).
 - Like/Unlike + Mute — **TV card dialog only** (mobile has these on the rail /
-double-tap / mute button; TV player keeps its own cluster).
+  double-tap / mute button; TV player keeps its own cluster).
 - "Add to…" ›  · "Tags…" › (only when the gif has tags)  · "Block…" ›
 - Close / ‹ Cancel.
 
-**"Add to…" pane:** Add to custom feed… (existing picker stays as the second
-level — same depth as today). When the spec'd parity writes land, **Add to a
-Niche / Add to a Collection** slot here, NOT as new main rows. "Speed
-<n>× — tap to change" stays a main pane row (TV; mobile keeps the slider) —
-live tuning, not a destination.
+**"Add to…" pane:** Add to custom feed… (existing picker stays as the second level).
+Add to a Niche / Add to a Collection slot here, NOT as new main rows. "Speed <n>× — tap
+to change" stays a main pane row (TV; mobile keeps the slider) — live tuning, not a
+destination.
 
-**"Tags…" pane:** unchanged — per tag (top 3): Favorite/Unfavorite tag, Block
-tag; ‹ Back.
+**"Tags…" pane:** per tag (top 3): Favorite/Unfavorite tag, Block tag; ‹ Back.
 
-**"Block…" pane:** every hide action in one place — Block creator · Block
-keyword "<first tag>" · per-tag Block tag reusing the existing tag state rows.
-Instant as today, no confirm dialog; grouping is separation, not a guard.
+**"Block…" pane:** every hide action in one place — Block creator · Block keyword
+"<first tag>" · per-tag Block tag reusing the existing tag state rows. Instant, no
+confirm dialog; grouping is separation, not a guard.
 
 Per-surface deltas:
-- **Mobile QuickBlockSheet** (both entry points: tile long-press + player ⋯
-  overflow): moves `Block creator` + `Block keyword` out of main → Block…;
-  `Add to custom feed…` → Add to…; `Tags…` becomes one of three equal panes.
-  Speed slider (`showSpeed=true`, player entry) stays on main. Header
-  (@user + VerifiedTick + shuffle-seed line) unchanged. Main pane drops
-  7 rows → 5 incl. Close.
-- **TV TvQuickActions** (MENU on focused card; also player username focus):
-  same panes as in-place swap (the AddToFeed swap already proves the pattern);
-  no Pin row (no pinned rows on TV). ‹ Back is the last focusable row of each
-  pane; MutableInteractionSource + giffyFocus ring pattern applies to any new
-  focusable consumers.
+- **Mobile QuickBlockSheet** (tile long-press + player ⋯ overflow): Block creator +
+  Block keyword live in Block…; `Add to custom feed…` → Add to…; `Tags…` is one of three
+  equal panes. Speed slider (`showSpeed=true`, player entry) stays on main. Header
+  (@user + VerifiedTick + shuffle-seed line) unchanged.
+- **TV TvQuickActions** (hold-Center/MENU on focused card; player username focus): same
+  panes as in-place swap; ‹ Back is the last focusable row of each pane; rows carry an
+  explicit interactionSource + focus treatment (ring-test rule above).
 
-Hard caps: pane depth 2 (main → pane → existing picker dialog/screen, same as
-today); no labels outside the site-lingo table — pane titles reuse existing
-wording ("Add to…", "Tags", "Block…", "Block creator", "Block keyword").
+Hard caps: pane depth 2 (main → pane → existing picker dialog/screen); no labels outside
+the site-lingo table — pane titles reuse existing wording ("Add to…", "Tags", "Block…",
+"Block creator", "Block keyword").
 
-## TV menu-less-remote keymap (BUILT + D-pad-verified 2026-10-02, TV36 — was spec'd same day, user ask)
+## TV menu-less-remote keymap (BUILT + D-pad-verified 2026-10-02; reworked 2026-10-04)
 No-button-limitation rule: **every feature reachable with only D-pad + Back + Center**;
-MENU and media keys are bonus parity, never the only path. Gap: TV quick actions open
-only via `Key.Menu` (tiles / niche rows / player) — unreachable on Menu-less remotes
-(projectors, basic smart-TV remotes). Full rationale + anti-confusion rule amendments
-in AGENTS-UX-PATTERNS.md "No-button-limitation rule"; spec here (graduation step 2):
+MENU and media keys are bonus parity, never the only path. Full rationale +
+anti-confusion rule amendments in AGENTS-UX-PATTERNS.md "No-button-limitation rule".
 
-- **Long-press Center = quick-actions panel** (the same TvQuickActionsDialog MENU opens):
-  a press released after ≥500ms opens the panel on every Center-meaningful surface —
-  TvPlayerScreen (focused card modifier already carries the onPreviewKeyEvent),
-  TvHomeScreen focused card, TvNiches row. The action fires ON KeyUp (release-evaluated —
-  user ask 2026-10-03: "no need to keep holding"), not on a while-held timer.
-- **KeyUp suppression:** when the long press fired, that same KeyUp must NOT also run the
-  surface's Center action (play/pause toggle in the player, card open). Track the press
-  start per press; reset on KeyUp.
-  - **Panel KeyUp swallow (2026-10, user report #3):** the hold-open's own release
-  KeyUp is routed into the NEW TvQuickActionsDialog window — a focused row activates
-  on Center KeyUp, so the release closed the panel AND fired its first row (accidental
-  like). The dialog now swallows exactly ONE Center KeyUp when opened via a hold
-  (`openViaHold` flag threaded from every open surface: player CenterHold, GifCard
-  hold path — MENU-opened panels keep today's behavior).
-- **TvNiches row:** hold-Center = `viewModel.togglePin(niche)` (the row's MENU action);
-  no panel there.
-- **TvPlayerScreen note:** Center KeyDown is currently unconsumed (KeyUp-only) — the
-  KeyDown branch must consume the held press without triggering the seek/table paths;
-  short-tap behavior (play/pause, restart-at-end) unchanged.
-- **Device-verify gate (TV36):** short-tap Center still play/pauses with no regression;
-  hold ≥500ms opens the panel in the player, on a focused home card, and on a niche row;
-  panel closes with BACK before navigation; MENU (where present) still opens the same
-  panel.
-- **TV player error overlay is D-pad-operable (2026-10, user report #24):
-  previously Retry/Skip existed but could never win focus** — the root Column pinned
-  focus and its onPreviewKeyEvent pre-consumed Up/Down/Center. Now: when the overlay
-  appears the Retry button takes focus (`LaunchedEffect(playError)`), EVERY key
-  falls through to the overlay while it is up (`if (playError) return false` at the top
-  of the root key handler — Up/Down walk Retry↔Skip, CENTER/ENTER activates, BACK stays
-  the Root BackHandler = exit player), and overlay close restores root focus. While the
-  overlay is up the gif does NOT advance with Up/Down — the honest behavior for a
-  failing video.
-[BUILT 2026-10-02 batch 17 — `CenterHold` (app-tv): per-focused-node hold state;
-REWORKED 2026-10-04 (user expectation: standard long-press semantics — the panel must
-OPEN at the 500ms threshold WHILE STILL HOLDING, not on KeyUp). Fire-while-held:
-`down()` schedules a hold timer on the initial (non-repeat) KeyDown via an injectable
-`HoldScheduler` (production: android.os.Handler main looper — `MainHoldScheduler`); the
-~500ms timer FIRES onHold mid-press; `up()` cancels an unfired timer and returns true
-ONLY when a hold already fired (suppresses the surface's short-tap action, no re-fire);
-state resets per press so a swallowed KeyUp cannot leak into the next press. No
-coroutine/scope needed from the callers. `CenterHoldTest` (4 cases: fires-while-held,
-KeyUp-after-fire suppression without re-fire, short tap cancels the timer,
-swallowed-KeyUp reset) — first test source set in :app-tv (+ junit dep). Wired on all
-three Center-meaningful surfaces:
-TvPlayerScreen (hold = quick-actions panel, tap = play/pause unchanged), shared GifCard
-(hold = panel, tap = card open — covers home rows AND TvSourceFeedScreen grids),
-TvNiches row (hold = togglePin in place, tap = open the niche feed).
-Device-verified on TV36 (fresh profile): hold-Center opened the quick-actions panel in
-the player (Like/Mute/Speed rows), on a focused Continue Watching card, and pinned the
-first niche row in place — the niche-row case directly proves KeyUp suppression (focus
-never leaves the row; the feed did NOT open after the hold); short-tap Center kept
-every prior action (card → player, row → niche feed, player play/pause proven via
-watch_history position advance→static); BACK closed the panel before navigation;
-MENU still opens the same panel. Device-input lesson (corrected 2026-10-03): on SDK-34
-AVD images `input keyevent` supports NEITHER `-t` NOR `--duration` (silently ignored →
-instant tap) — `keyevent` only takes `--longpress`/`--doubletap`, and `--longpress` just
-stamps FLAG_LONG_PRESS with an instant UP (no wall-clock hold). To inject a REAL held key
-on this image: `input keycombination -t <ms> <key> <key>` (same key twice) — the hold
-lands between the down and up phases; the extra final UP fires a tap action behind the
-hold (harmless in the panel-open test).]
-- Explicitly unchanged/parked: number keys, double-click, hold-for-2× (built batch 14),
-  media keys stay player-internal parity only. preview-on-focus + show-more panel
-  graduated batch 18 (AGENTS-UX-PATTERNS "TV"; build record this file).
+- **Long-press Center = quick-actions panel** (the same TvQuickActionsDialog MENU opens)
+  on every Center-meaningful surface — TvPlayerScreen, GifCard (home rows AND
+  source-feed grids), TvNiches row. **Fire-while-held contract:** the initial
+  (non-repeat) Center KeyDown schedules a ~500ms hold timer (`CenterHold.down()` via an
+  injectable `HoldScheduler`; production = android.os.Handler main looper); the timer
+  FIRES `onHold` mid-press at 500ms — the panel opens while the key is still held, not
+  on KeyUp.
+- **KeyUp suppression:** `CenterHold.up()` cancels an unfired timer and returns true ONLY
+  when a hold already fired — the caller then suppresses the surface's short-tap action
+  (play/pause toggle, card open) with no re-fire; state resets per press so a swallowed
+  KeyUp cannot leak into the next press. No coroutine/scope needed from callers
+  (`CenterHoldTest`: fires-while-held, suppression without re-fire, short tap cancels,
+  swallowed-KeyUp reset).
+  - **Panel KeyUp swallow:** the hold-open's own release KeyUp is routed into the NEW
+  TvQuickActionsDialog window — a focused row would activate on Center KeyUp. The dialog
+  swallows exactly ONE Center KeyUp when opened via a hold (`openViaHold` flag threaded
+  from every open surface; MENU-opened panels keep normal behavior).
+- **TvNiches row:** hold-Center = `viewModel.togglePin(niche)` (the row's MENU action)
+  in place, focus never leaves the row; short tap = open the niche feed.
+- **Tap semantics unchanged:** short-tap Center = play/pause (+ restart-at-end) in the
+  player, card open on GifCard. BACK closes the panel before navigation; MENU still
+  opens the same panel. Unchanged/parked: number keys, double-click, hold-for-2×
+  (player-only, see Hold-to-2×), media keys stay player-internal parity only.
+- **TV player error overlay is D-pad-operable:** when the overlay appears the Retry
+  button takes focus (`LaunchedEffect(playError)`), EVERY key falls through to the
+  overlay while it is up (`if (playError) return false` at the top of the root key
+  handler — Up/Down walk Retry↔Skip, CENTER/ENTER activates, BACK = exit player), and
+  overlay close restores root focus. While the overlay is up the gif does NOT advance
+  with Up/Down — the honest behavior for a failing video.
+- Device-verified on TV36 (hold opens the panel on player/card/niche row, KeyUp
+  suppression proven by the in-place niche pin, short-tap actions intact).
 
-## TV preview-on-focus + show-more panel (BUILT + D-pad-verified 2026-10-02 batch 18, TV36 — former decided skips, user ask "do these")
-Both built per AGENTS-UX-PATTERNS' own advisories; the "decided skip" layer is superseded
-by the user slice.
+## TV preview-on-focus + show-more panel (BUILT 2026-10-02 batch 18)
+**Preview-on-focus (`FocusPreview`, app-tv, shared by home rows AND source-feed grids):**
+the SETTLED focus (card holds D-pad focus ≥600ms — fast walking never decodes) starts a
+muted+looped preview on that card; focus leaving clears it. ONE player instance per
+screen moves gif-to-gif (no decoder churn) — `GiffyPlayerFactory` threaded into
+TvHomeScreen/TvSourceFeedScreen; card poster swaps to a `PlayerView` while
+`settledId == gif.id`; released when the screen leaves composition (player open =
+release). Always SD rendition (`playGif(gif, dataSaver = true)`) — a preview must not
+burn HD data (gif-id cache key means the real player later replays from cache).
+Muted+REPEAT_ONE set at creation; no watch-history writes (screens own history).
+Data-saver ON = posters stay static (same rule as the mobile inline autoplay).
+Device-verified: dwell → preview, follows focus, absent with data-saver ON.
 
-**Preview-on-focus (TikTok TV pattern — `FocusPreview`, app-tv, shared by home rows AND
-source-feed grids):** the SETTLED focus (card holds D-pad focus ≥600ms — fast walking
-never decodes) starts a muted+looped preview on that card; focus leaving clears it.
-ONE player instance per screen moves gif-to-gif (no decoder churn) — `GiffyPlayerFactory`
-threaded into TvHomeScreen/TvSourceFeedScreen; card poster swaps to a `PlayerView` while
-`settledId == gif.id`; released when the screen leaves composition (player open = release).
-Always SD rendition (`playGif(gif, dataSaver = true)`) — a preview must not burn HD data
-(gif-id cache key means the real player later replays from cache). Muted+REPEAT_ONE set
-at creation; no watch-history writes (screens own history). Data-saver ON = posters stay
-static (same rule as the mobile inline autoplay). Device-verified: surface appears in the
-focused card after dwell (home row + source-feed grid), follows the focus move, absent
-with data-saver ON, absent after unfocus.
+**Show-more panel:** a "Show more" main-pane row in TvQuickActionsDialog (when the gif
+has a description or niches) opens a pane with the FULL description (the player cluster
+truncates to 2 lines) + one row per gif niche (Open niche: …, no ≤3 cap) — DOWN-routing
+was NOT taken (DOWN is the item-walk key per the keymap's spatially-honest rule; this
+panel is the sanctioned path). Niche rows open the feed via `onOpenNiche` wired on all
+three panel call sites (player: exits first; home/source feed: in-place swap).
+Device-verified.
 
-**Show-more panel (TikTok TV "show more"):** a "Show more" main-pane row in
-TvQuickActionsDialog (when the gif has a description or niches) opens a pane with the
-FULL description (the player cluster truncates to 2 lines) + one row per gif niche
-(Open niche: …, no ≤3 cap) — DEVIATION from the original UX-PATTERNS candidate: the
-DOWN-routing was NOT taken (DOWN is the item-walk key per the keymap's spatially-honest
-rule; this panel is the rule-5 sanctioned path). Niche rows open the feed via a new
-`onOpenNiche` hook wired on all three panel call sites (player: exits first; home/source
-feed: in-place swap). Device-verified: hold-Center → panel → Show more → full description
-+ niche rows render; ‹ Back returns.
+Batch-18 note on this file's topics: the merged niche-group management moved into the
+shared CustomFeedsScreen (AGENTS-CONTENT-FILTER.md DONE section).
 
-Also batch 18 on this file's topics: the merged niche-group management moved into the
-shared CustomFeedsScreen (state cycle + TV focus-ring treatment on the row buttons;
-AGENTS-CONTENT-FILTER.md DONE section).
-
-## TV parity gaps vs mobile (audited 2026-10-01, deferred — doc-only)
-Code-verified inventory. Ranked, biggest first:
-
-**Missing entirely on TV:**
-[Search / Groups management / Custom-feed management / Collections — ALL BUILT
-2026-10-02 batch 12: shared :feature:* screens hosted from TvMainActivity (home
-pill + More ▾ menu), D-pad-verified on TV36. See AGENTS.md batch 12 for detail.]
-- **Player text auto-hide** (reported 2026-10, doc-only spec): the mobile player
-  clears creator/description/tags after 3s idle (playing && not scrubbing only,
-  `IDLE_HIDE_MS`) and keeps just the thin progress line; `TvPlayerScreen` shows
-  creator + description + niche pills statically while playing. Spec for the TV
-  slice (D-pad device work, parked with the other TV items):
-  - Same idle rule as mobile: playing && not seeking → after 3s fade the whole
-    text cluster; paused or mid-seek → visible. Progress line stays always-on
-    (that contract above is unchanged).
-  - Any D-pad key press (seek / center / play-pause) resets the timer and
-    re-reveals — the 10-foot standard is "text hides while watching", not
-    "text is unreachable".
-  - When hidden the niche pills leave focus traversal entirely — invisible
-    focus targets are a D-pad trap; first DOWN re-reveals the cluster instead
-    of landing on an unseen pill.
-  - MENU quick actions keep working regardless of visibility state.
-  [BUILT 2026-10-02 batch 5 — one LaunchedEffect per gif (playbackState!=IDLE &&
-  playing && !seekFlash → 3s → visible=false); any onPreviewKeyEvent sets visible=true;
-  hidden cluster (incl. pills) leaves composition so focus traversal stays clean;
-  progress line + seekFlash outside the AnimatedVisibility. D-pad visual verify
-  still pending (emulator).
-  [D-pad verify DONE 2026-10-02 (later session, TV36): player entry → 3s+ idle →
-  uiautomator dump has NO text nodes (cluster left composition); any key (LEFT)
-  re-revealed it (@creator visible); idle again → gone. Both directions verified.]]
-- **For You row** — BUILT 2026-10-03 (mobile↔TV parity): TV home gains a
-  logged-in "For You" FIRST row (site home order, verified sweep — mobile
-  chips: For You first when logged in). FeedRepository now serves
-  `FeedSource.ForYou` NETWORK-LIVE (`ForYouNetworkPagingSource`, same
-  no-cache rule as Liked — per-user server personalization must not ride the
-  shared Room feed cache; behavioural side-effect: For You no longer renders
-  from cache in airplane mode, intended). Scope (Creators·Niches·All) stays a
-  read-time filter over the server pages via the repo's 5-min ForYouContext
-  (the endpoint has no scope param — verified in GifsApi). Signed-out: row
-  absent, ZERO for-you network activity (paging collected only when the row
-  composes) — device-verified Television_AOSP 2026-10-03, 0 FATALs.
-  SIGNED-IN device verify DONE 2026-10-03 (Television_1080p, real in-app
-  WebView login by the user): For You FIRST row (order fix landed mid-verify:
-  the row shipped after Trending despite the comment — Trending ↔ For You
-  swapped, site order now exact), personalized content visibly distinct from
-  Trending, D-pad walk → card opens player, ZERO Auth401s the whole session,
-  0 FATALs, row survives force-stop → relaunch.
-- **Search** — ~~zero `api.search` calls~~ BUILT 2026-10-02 batch 12: home "Search"
-  pill → shared SearchScreen (feature:search dep added to app-tv); submit opens
-  `FeedSource.Search` via TvSourceFeedScreen. D-pad-verified on TV36.
-- **Groups management** — ~~no GroupsScreen equivalent~~ BUILT batch 12: create/favorite/BLOCK niche
-  groups unreachable on TV. Mobile's blockable group bundles are the macro-filter
-  path (leak-zero); TV only has per-item tag/creator quick-action blocks.
-- **Custom-feed management** — ~~create/rename/delete is mobile-only~~ BUILT batch 12
-  (More ▾ → My feeds → shared CustomFeedsScreen).
-- **Collections** — ~~mobile-only~~ BUILT batch 12 (More ▾ → Collections).
-- **§8 shuffle** — ~~no shuffle on TV source feeds~~ CLOSED round 3: TvSourceFeedScreen
-  renders the shared FeedFilterDialog (Shuffle/Off/Reshuffle) over the same feedprefs blob;
-  shuffle applies via the shared FeedRepository path. Mobile parity holds.
-
-**Broken on TV (own sections):** auto-swipe dead toggle + end-of-media parking +
-play-after-end (AGENTS-PLAYER.md), TvNichesViewModel copy-paste paging +
-TvSourceFeedScreen misplaced (ponytail audit below).
-
-**Inverse gap:** [CLOSED 2026-10: SettingsScreen now takes showGridColumns=false
-on TV — the mobile-only Grid columns row no longer renders.] Export/Import SAF
-picker CANNOT be D-pad-verified on any available TV image — AOSP-TV system
-images ship **no DocumentsUI** (`pm list packages` has no com.android.documentsui,
-verified on Television_AOSP and Television_1080p, API 36); CREATE_DOCUMENT
-launches silently no-op and the app stays alive (no crash, graceful no-op).
-Gate 7 stands on mobile (DocumentsUI present). When a picker-equipped TV image
-or real leanback device appears, re-run: Settings → Export → drive dialog with
-D-pad only.
-
-**Found during the empty-homepage incident (2026-10, doc-only next steps):**
-- TV SettingsScreen D-pad traversal is messy: directional searches skip chip
-  rows (Orientation/Video-fit chips) or escape to the top-bar back button.
-  [Initial focus on entry FIXED 2026-10-01: SettingsScreen takes
-  requestInitialFocus — AuthSection's first button carries the FocusRequester
-  (new firstButtonModifier param); TV passes true.] The chip-skip traversal
-  itself ~~is still open~~ — **CLOSED 2026-10-02 (later session, device-verified on
-  TV36):** root cause is directional-search geometry, not lazy composition — from a
-  right-edge focusable (Set PIN) the wrap-content chip Row's rect has no beam overlap
-  with the source, so the full-width row below wins the DOWN. Fix:
+## TV parity gaps vs mobile (audited 2026-10-01 — CLOSED 2026-10; all items built or resolved)
+- **Search / Groups management / Custom-feed management / Collections — ALL BUILT
+  2026-10-02 batch 12:** shared :feature:* screens hosted from TvMainActivity (home
+  pill + More ▾ menu), D-pad-verified on TV36.
+- **Player text auto-hide — BUILT (TV parity with mobile):** playing && not seeking →
+  after 3s fade the whole text cluster (creator/description/tags); paused or mid-seek →
+  visible. Progress line + seekFlash stay always-on. Any D-pad key press resets the
+  timer and re-reveals — the 10-foot standard is "text hides while watching", not "text
+  is unreachable". When hidden the cluster (incl. niche pills) leaves composition so
+  focus traversal stays clean — invisible focus targets are a D-pad trap. MENU quick
+  actions keep working regardless of visibility state. Device-verified both directions.
+- **For You row — BUILT 2026-10-03 (mobile↔TV parity):** TV home gains a logged-in
+  "For You" FIRST row (site home order, verified sweep — Trending ↔ For You swap fixed;
+  site order now exact). FeedRepository serves `FeedSource.ForYou` NETWORK-LIVE
+  (`ForYouNetworkPagingSource`, same no-cache rule as Liked — per-user server
+  personalization must not ride the shared Room feed cache; intended side-effect: For
+  You does not render from cache in airplane mode). Scope (Creators·Niches·All) is a
+  read-time filter over the server pages via the repo's 5-min ForYouContext (the
+  endpoint has no scope param). Signed-out: row absent, ZERO for-you network activity.
+  Device-verified signed-out and signed-in (real in-app login).
+- **§8 shuffle on TV — CLOSED:** TvSourceFeedScreen renders the shared FeedFilterDialog
+  (Shuffle/Off/Reshuffle) over the same feedprefs blob; shuffle applies via the shared
+  FeedRepository path. Mobile parity holds.
+- **Inverse gap — Export/Import SAF picker on TV:** the picker CANNOT be D-pad-verified
+  on any available TV image — AOSP-TV system images ship **no DocumentsUI**
+  (`pm list packages` has no com.android.documentsui); CREATE_DOCUMENT launches silently
+  no-op and the app stays alive (graceful no-op). Gate 7 stands on mobile (DocumentsUI
+  present). When a picker-equipped TV image or real leanback device appears, re-run:
+  Settings → Export → drive dialog with D-pad only. SettingsScreen takes showGridColumns=false
+  on TV (mobile-only Grid columns row doesn't render).
+- **TV Settings D-pad traversal — FIXED:** initial focus on entry (requestInitialFocus —
+  AuthSection's first button); chip-skip traversal root cause is directional-search
+  geometry, not lazy composition — from a right-edge focusable the wrap-content chip
+  Row's rect has no beam overlap with the source. Fix:
   `Modifier.focusGroup().fillMaxWidth()` on all three chip rows (grid-columns,
   Orientation, Video-fit) so the group participates as one full-width unit; plus
-  `giffyFocus(interactionSource)` per chip (M3 FilterChip draws nothing on D-pad focus
-  — same ring-test lesson; the shared MutableInteractionSource avoids the
-  two-focusable race). Verified: DOWN from Set PIN now lands on the Orientation chip
-  group (enters at the rightmost chip — beam-logical), zoomed screenshot shows the
-  BrandRed ring, chip click moves selection, DOWN leaves the group cleanly.
-- **Orientation filter is data-bound, not fetch-bound (probed 2026-10):** the
-  API has no orientation parameter, so the filter is client-side over whatever
-  pool the feed returns. Live trending pool = 99/99 portrait (0 landscape);
-  with the global filter "horizontal" the home rows legitimately show nothing
-  (the empty-homepage incident: a stale "horizontal" pref over an
-  all-portrait cache hid every Trending/Top-This-Week tile behind the
-  reserved empty strip — live-reproduced, fixed by restoring Any).
-  Horizontal-on-TV works only when a pool actually contains landscape gifs.
-  User decision (2026-10-02): this is accepted as the pool's shape, not a defect
-  to pave over — on TV horizontal is the wanted filter (see the Orientation
-  filter section above), and when a pool is all-portrait the empty-state hint is
-  the honest answer, not a silent Any-fallback.
-  Pickup: FeedRow shows a small "No videos match your filters — Settings →
-  Orientation" hint when itemCount==0 && refresh NotLoading. [DONE 2026-10-01:
-  FeedRow shows the hint; live-verified conditions in code, on-device check
-  pending a filtered-empty state.] [ON-DEVICE VERIFY DONE 2026-10-02 (later
-  session, TV36, fresh profile): orientation Horizontal over an all-portrait
-  cache → Trending row renders the hint under the title (zoomed screenshot,
-  also in uiautomator once the recomposition settles). Verification lesson:
-  the flatMapLatest pager restart + mediator refresh + empty-walk takes ~15-30s,
-  and suspending an in-flight composition (debug breakpoint) freezes the
-  pre-hint frame — take the observation only at steady state, or the hint
-  looks missing when it isn't.]
+  `giffyFocus(interactionSource)` per chip (M3 FilterChip draws nothing on D-pad focus —
+  ring-test rule; the shared MutableInteractionSource avoids the two-focusable race).
+- **Orientation filter honest empty:** the pool's shape is accepted (see Orientation
+  filter section); FeedRow shows a small "No videos match your filters — Settings →
+  Orientation" hint when itemCount==0 && refresh NotLoading. Device-verified.
+- **Minor — NicheAbout + Follow entries:** both closed (see In-app links audit).
+- **Parity OK (verified in code):** age gate, PIN lock, Settings/data saver/video
+  fit/verified-only, per-feed prefs (same feedprefs blob + shared dialog),
+  favorites/likes, watch history, quick actions, Surprise me, mute/speed.
 
-**Minor:** ~~no NicheAbout entry from TvNichesScreen~~ CLOSED batch 12 (About
-focusable per row → shared NicheAboutScreen, D-pad-verified); TV "Following"
-row is read-only — ~~unverified whether a follow action exists anywhere on TV~~
-**CLOSED 2026-10-03 (batch 19):** follow/unfollow is now wired BOTH apps via
-FeedViewModel (refreshFollowedCreators + toggleFollowCreator over the verified
-PUT/DELETE v1/me/follows, optimistic flip on success): mobile quick-sheet row
-+ TV TvQuickActions row, same main-pane position after "Open @user's feed".
-Anonymous (no token) shows no row on either app — device-verified on
-Television_AOSP (panel dump: Like/Mute/Speed/Favorite/Open/Pin rows, no
-Follow row signed-out). Signed-in on-device verify (row flips Follow ↔
-Unfollow) needs a fresh token bundle.
+## Design-system consistency (batch-15 audit — landed batch 16; palette SUPERSEDED by issue-#7)
+The batch-15 reconciliation rule survives in this form: **sizes/roles/tracking/shape =
+the standard platform scales — M3 for mobile, tv-material defaults for TV**. The palette
+half ("borrowed site brand" GiffyColors lime/BrandRed mappings, findings F3–F6: AMOLED
+surface mapping, inversePrimary, direct `GiffyColors.*` bypasses, bare-white scrim
+alphas) was **superseded by the issue-#7 theme rebrand below** — do not apply those
+older color fixes; the theme block is the current color truth (overlay tokens live in
+the shared `PlayerOverlay` object in :core:ui, used by BOTH player screens). What still
+holds from the batch-15 audit:
 
-**Parity OK (verified in code):** age gate, PIN lock, Settings/data saver/video
-fit/verified-only, per-feed prefs (same feedprefs blob + shared dialog),
-favorites/likes, watch history, quick actions, Surprise me, mute/speed.
-
-## Pending backlog batch (2026-10-02 — executed from the parked/deferred items)
-Worked off the doc'd pending lists (round-3 simplification winners, links audit #1–#3,
-residual Low a11y, Tags parity gap). Compiled + ktlint + detekt + unit tests green on
-all touched modules (:core:ui/:core:network/:feature:feed/:feature:search/:feature:settings/
-:feature:auth/:app-tv/:app-mobile). What landed:
-- core:ui `CreatorLabel` (10 sites), `GiffyScaffold` (9 sites), `AudioBadge`+`avgColorOr`
-  (2 sites each), feature:feed `packNicheRef`/`parseNicheRef` (+ `NicheRefTest`).
-- Mobile links: tile-caption @user → creator feed (in-place open), player cluster
-  @user + tag chips → creator/tag feed (player closes — feed behind swaps),
-  quick-sheet "Open @user's feed" row; TV parity via the TvQuickActions row.
-- Tags parity: `GET /v2/tags/trending` wired as a "Trending tags" section in the
-  search empty state (endpoint was live-verified 2026-10-02; new call = 1 request on
-  search open, rate-limit-safe; silent degradation to an absent section).
-- PIN pad: keypress KeyboardTap haptic + LongPress haptic on wrong PIN.
-Deliberately NOT built this batch (still parked, with reasons):
-- Picker-dialog family merge (#4) — needs the on-device giffyFocus ring check the doc
-  itself demands before deciding how much to share.
-- List-fetch state-machine VM convergence (#3) — Explore's failure path now works;
-  idiom-consistency conversion is optional churn until a shared skeleton is wanted.
-- AuthSection @username — blocked on a verified "who am I" source (no stored username,
-  v2/user_profile 404'd; not guessing a JWT claim).
-- TV parity gaps (Search/Groups/custom-feed mgmt/Collections screens) and the TV
-  chip-skip traversal — D-pad device work, must be built with emulator verification.
-- UX-PATTERNS candidates (hold-for-speed, minimised player, TV preview-on-focus) —
-  still user-slice gated per that doc's graduation rule.
-
-## Design-system consistency audit — colors/typography/shapes mobile ↔ TV (2026-10-02 batch 15, doc-only — spec, no code)
-**STATUS (batch 16, same day): ALL FOUR BUILD SLICES LANDED + device-verified** — see the
-batch-16 entry in root AGENTS.md. The findings text below is the original audit, kept for
-the evidence; each F-item notes its fix in the code.
-User ask: "colors, typography, styling still not consistent in mobile and TV. Use standard
-mobile and TV UI/UX design. Match theming to the browsed site." Findings below are
-static-source evidence (line-checked this session); every fix is a build slice with its own
-device-verify gate. THE RECONCILIATION RULE this spec follows:
-
-**Palette + typeface = borrowed site brand (GiffyColors + DM Sans, verified from the
-site's CSS 2026-09-30 — the "match the site" half). Sizes/roles/tracking/shape = the
-standard platform scales — M3 for mobile, tv-material defaults for TV (the "standard
-UI/UX" half).** Site brand colors ride inside the standard role system; the platform
-supplies the scale. No invented sizes, no invented shapes, palette stays borrowed.
-
-**Standards grounded (verified this session, not from memory):**
-- tv-material 1.0.1 default Typography tokens were decoded from the AAR in the gradle
-  cache (`TypeScaleTokens` bytecode) — they are the standard M3 type scale exactly:
-  Display 57/45/36 (lh 64/52/44), Headline 32/28/24 (lh 40/36/32), Title 22/16/14
-  (lh 28/24/20), Body 16/14/12 (lh 24/20/16), Label 14/12/11 (lh 20/16/16), tracking
-  bodyLarge 0.5sp, titleMedium 0.2sp, labelLarge 0.1sp, titleSmall/labelSmall 0.1–0.5sp —
-  with Roboto as the default family. The TV standard scale exists and is bigger than
-  mobile (10-foot); it is currently overridden wholesale (F1).
-- Mobile standard = the same M3 scale via `androidx.compose.material3` (m3.material.io).
-- M3 shape scale: extra-small 4dp, small 8, medium 12, large 16, extra-large 28, full
-  (999). tv-material Cards carry their own shape tokens (leave those).
-
-**Findings (evidence-checked):**
-
-- **F1 — TV typography is phone-sized (worst offender).** `TvTheme.tvTypography()` copies
-  the mobile `Typography` verbatim — zero 10-foot scaling — while its own comment claims
-  "10-foot sizes aside". TV screens compensate by jumping to bigger slots for the same
-  semantic element (screen titles = headlineMedium, row titles = titleLarge vs mobile's
-  titleLarge default in GiffyScaffold), so slot semantics diverge per platform AND the
-  rendered sizes are still phone-sized on a 3m screen: `labelSmall` renders 10sp on TV
-  (mobile scale) where the TV standard is 11sp at minimum and titles should be 22–32sp.
-  Standard fix: `tvTypography` = tv-material default token SIZES + line-heights + tracking,
-  with ONLY the family swapped to DM Sans (and weights as borrowed). TV screens then use
-  the same slot-per-semantic-element mapping as mobile (screen title = titleLarge like
-  GiffyScaffold, row title = titleSmall, meta = bodySmall) — re-check each Tv* screen's
-  slot after the rebase; the current slot-jumps (F8) become unnecessary.
-
-- **F2 — mobile Typography is off the standard M3 scale it sits on.** Borrowed scale:
-  display 32/32/32, headline 32/24/20, title 18/16/14, label 14/12/10. Standard:
-  headline 32/28/24, title 22/16/14, label 14/12/11. Body 16/14/12 already matches.
-  Also hardcoded `letterSpacing = 1.sp` on labelMedium/labelSmall instead of the standard
-  fractional tracking. Standard fix: titleLarge 22 (GiffyScaffold titles + TV row titles
-  then match), headlineSmall 24, labelSmall 11, drop the 1sp tracking for the standard
-  values. Display slots (32) stay — nothing renders display today; correct when used.
-
-- **F3 — TV surface color ignores AMOLED.** `giffyTvColors()` hardcodes
-  `GiffyColors.Widget` (#191919) for TV `surface`/`surfaceVariant` instead of reading the
-  (already AMOLED-adjusted) compose scheme it receives. AMOLED ON: mobile collapses to
-  true black, TV cards stay grey — the "AMOLED option shared with mobile" claim in the
-  TvMainActivity comment is broken for surfaces. Fix: take `surface`/`surfaceVariant`
-  from `c.surfaceContainer*` (whatever AMOLED resolved them to); keep GiffyColors as the
-  scheme's only input, not a bypass around it.
-
-- **F4 — dead `inversePrimary = lime` mapping on TV.** `giffyTvColors` maps
-  inversePrimary to lime while mobile maps it to BrandRed; no TV code reads
-  inversePrimary (grep, this session) — dead + inconsistent. Verify-then-remove: check
-  tv-material's internal focus/elevation states don't read it (they use border/primary
-  per the token set), then delete the override so both platforms agree on BrandRed.
-
-- **F5 — palette bypass: direct `GiffyColors.*` reads in composables.** 11×
-  `GiffyColors.Lime`, 4× `GiffyColors.BrandRed`, 2× Info across PlayerScreen/QuickSheet/
-  Focus.kt/CreatorLabel/TvPlayerScreen — the palette reads around the ColorScheme, so
-  AMOLED and dynamic-color modes can't re-map those accents and a future palette update
-  has 17 call-site edits instead of one. Standard fix: composables read roles —
-  Lime → `colorScheme.secondary`, BrandRed → `colorScheme.primary`, Info →
-  `colorScheme.tertiary`; `GiffyColors` stays as the single token source that feeds the
-  scheme (Theme.kt) and nothing else.
-
-- **F6 — bare `Color.White`/`Color.Black` scatter (~33 sites) with no scrim tokens.**
-  Two classes with different verdicts:
-  (a) **Over-video overlay layer** (PlayerScreen + TvPlayerScreen scrims, progress-track
-  fills, on-video text/icons): white/black over video is the media-overlay standard and
-  is correct — but the alphas drift (0.55/0.6/0.3/0.7 across the two players, same
-  elements built twice). Spec: one shared overlay token set (scrim 55%, track 30%,
-  secondary-on-video 70%) in a small `PlayerOverlay` object in :core:ui used by BOTH
-  player screens — this is also the two-players-diverging problem at its root.
-  (b) **Plain-surface white text** (PinLock title, Focus.kt contentColor): bypasses the
-  theme; switch to `colorScheme` roles.
-
-- **F7 — shape scatter: 3/6/8/12/16/24/32/999dp, all ad hoc.** Standard fix: define the
-  M3 shape scale once (`Shapes` in GiffyTheme, mirrored for tv-material where screens
-  need it): 4/8/12/16/28/full. Map the ad-hoc values: 3→4, 6→8, 12/16 stay, 24/32→28,
-  999→full (progress/badge pills). No new radii without a slot.
-
-- **F8 — slot-mapping drift (consequence of F1).** Screen title: TV = headlineMedium,
-  mobile = GiffyScaffold's TopAppBar (titleLarge). Row title: TV = titleLarge, mobile
-  = titleSmall. After F1 lands, remap TV screens to mobile's slot-per-element mapping so
-  "same element, same slot" holds and only the scale differs. GiffyScaffold itself is
-  already the mobile standard (TopAppBar via shared scaffold) — TV has no direct
-  equivalent; the slot mapping is the consistency contract.
-
-**Build order (each slice compile+ktlint+detekt+tests green, device-verified before next):**
-1. S1 typography rebase (F1+F2+F8) — highest visual delta, one PR; verify side-by-side on
-   Medium_Phone + TV36 (shared Settings screen is the cleanest comparison surface) and
-   D-pad legibility on TV36 at 3m-equivalent (screen-size zoom).
-2. S2 colors (F3+F4+F5+F6b) — AMOLED toggle verified on TV36 (cards collapse to black).
-3. S3 shapes (F7) — mechanical; verify FeedFilterDialog chips + player pills (the
-   previous ring-check stop rule still applies to any dialog change).
-4. Build-time palette re-verify (the "match the site" half): Playwright re-read of the
-   site's CSS variables → GiffyColors diff report, since values were pinned 2026-09-30.
-   No drift expected (site is stable), but the check belongs in the S2 session.
-
-Skipped by design: no light theme (stays dark-only — root AGENTS.md decision stands),
-no new dynamic-color work (existing opt-in), no font swap (DM Sans stays), no TV
-overscan changes (leanback skill's 48dp rule — separate D-pad device work, untouched).
+- **Type scales (landed):** tv-material 1.0.1 default Typography tokens ARE the standard
+  M3 type scale: Display 57/45/36 (lh 64/52/44), Headline 32/28/24 (lh 40/36/32), Title
+  22/16/14 (lh 28/24/20), Body 16/14/12 (lh 24/20/16), Label 14/12/11 (lh 20/16/16),
+  fractional standard tracking. Mobile Typography = the standard M3 scale (titleLarge
+  22, headlineMedium 28, headlineSmall 24, labelSmall 11; display slots stay 32 —
+  nothing renders display today). TV `tvTypography()` = tv-material's own default token
+  sizes/line-heights/tracking with ONLY the family swapped to DM Sans (no phone-sized
+  copy).
+- **Shape scale (F7, landed):** the M3 shape scale defined once (`Shapes` in GiffyTheme,
+  mirrored for tv-material where screens need it): 4/8/12/16/28/full. Ad-hoc radii
+  mapped: 3→4, 6→8, 12/16 stay, 24/32→28, 999→full. No new radii without a slot.
+- **Slot-per-element rule (F8):** same semantic element = same text slot on both
+  platforms (screen title = titleLarge via GiffyScaffold/TV titleLarge-line, row title =
+  titleSmall, meta = bodySmall) — only the scale differs per platform. GiffyScaffold is
+  the mobile standard; TV has no direct scaffold equivalent — the slot mapping is the
+  consistency contract.
+- Skipped by design: no light theme (stays dark-only — root AGENTS.md decision stands),
+  no font swap (DM Sans stays), no TV overscan changes.
 
 ## Issue-#7 theme rebrand (DESIGN-theme-stream.md, landed 2026-10) — palette + focus tokens
 
@@ -1194,9 +665,8 @@ changed where:
   MainActivity wiring — seed-derived neutrality is not user-selectable anymore.
 - **AMOLED:** `giffyColors(amoled)` overwrites background/surface/surfaceVariant
   + the surface-container ladder to pure black; accent-container rows untouched
-  (the batch-16 collapse shape preserved verbatim). TV cards
-  ride the collapsed compose scheme through `giffyTvColors` — no TV-specific
-  neutral logic (batch-16 F3 rule intact).
+  (the batch-16 collapse shape preserved verbatim). TV cards ride the collapsed
+  compose scheme through `giffyTvColors` — no TV-specific neutral logic.
 - **TV focus tokens (§3.1, giffyFocus retired in app-tv)** — focused fill
   `primaryContainer` **#7D0030**, focused content `onPrimaryContainer`
   **#FFD9E1**, focused border/glow `primary` **#FF668F**, unfocused rings
@@ -1211,21 +681,20 @@ changed where:
   header pills replaced GiffyPillButton per the §4 audit (shared widget stays
   for mobile AgeGate, rest-look parity via §3.1 tokens).
 - **Documented exception (the one giffyFocus survivor):** the SHARED feature
-  screens hosted on TV (SettingsScreen/CustomFeedsScreen) cannot carry
-  tv-material deps, so their M3 chip/button rows keep `giffyFocus` in :core:ui,
-  recolored to the same trio (focused fill primaryContainer + primary border;
-  M3 chips keep their own outlineVariant rest ring). GiffyFocus's
-  `fillOnFocus` parameter is gone — primaryContainer is the default fill.
+  screens hosted on TV (SettingsScreen/CustomFeedsScreen) cannot carry tv-material
+  deps, so their M3 chip/button rows keep `giffyFocus` in :core:ui, recolored to the
+  same trio (focused fill primaryContainer + primary border; M3 chips keep their own
+  outlineVariant rest ring). GiffyFocus's `fillOnFocus` parameter is gone —
+  primaryContainer is the default fill.
 - **Scrims (§7):** PlayerOverlay.scrim keeps 55% black (inside the issue's
   40–60% art-scrim band); `secondaryOnVideo` tint moved white → onSurface
   #F7E9EC@70% (desc text on both players, bookkeeping for the issue's
   onSurface wording). Bare-white glyphs (seek flash, action rail) stay white
   (media icons, not themed text) per the audit.
 - Device gates: PASSED 2026-10-17 (batch 28, TV36 + Medium_Phone) — see AGENTS.md
-  batch-28 record. Focus pixels verified live (fill #7D0030-family, border
-  #FF668F, no purple/blue) on header pills, Settings chips, quick-action panel
-  rows, error-overlay rows and player niche pills; AMOLED sampled (0,0,0) on
-  BOTH shells; CenterHold/MENU/quick-actions re-walked; overscan margins
-  ≈62dp. ONE OPEN §3.4 finding: TV quick-action panel rows measure ≈37.5dp
-  visual height — under the 48dp target guideline (D-pad-first surface;
-  decision doc'd below, not a theme defect).
+  batch-28 record. Focus pixels verified live (fill #7D0030-family, border #FF668F,
+  no purple/blue) on header pills, Settings chips, quick-action panel rows,
+  error-overlay rows and player niche pills; AMOLED sampled (0,0,0) on BOTH shells;
+  CenterHold/MENU/quick-actions re-walked. ONE OPEN §3.4 finding: TV quick-action
+  panel rows measure ≈37.5dp visual height — under the 48dp target guideline
+  (D-pad-first surface; decision doc'd in AGENTS.md, not a theme defect).

@@ -24,7 +24,6 @@ conventions* are fine; its *retention playbook* is not.
 | Instagram "New posts" scroll-top + refresh pill, pull-to-refresh | implemented in AGENTS-APP.md |
 | Bottom bar ≤5 items, everything else as in-Home chips (both apps' nav discipline) | implemented in AGENTS-APP.md |
 | Hold hints / one-time coach toasts (first-use affordance onboarding) | implemented in AGENTS-APP.md |
-| Continue Watching resume (TikTok "watch history" inset; IG auto-resume) | §5 watch_history, §9 Tabs |
 | Live-preview trends aside — preview-on-hover is TV only (see candidates) | this doc, TV section |
 | Reduced-motion honored — animations collapse to instant | implemented in AGENTS-APP.md |
 | 48dp targets, tap zones sized to thumb reach (mobile bare-thumb ergonomics) | implemented in AGENTS-APP.md |
@@ -51,15 +50,12 @@ conventions* are fine; its *retention playbook* is not.
   behaves (Phase 9 slice set). Verify parity when touching it; nothing to build.
 
 ### Tablet / foldable / expanded window
-- **Two-column expanded view (TikTok web / IG desktop pattern):** expanded
-  widths show the swipe player with a related-items column beside it instead
-  of one full-bleed column. Possible without breaking the responsive-first
-  rule — it's the LayoutHint seam expanding an existing surface ("more like
-  this" beside the video), not a new screen. Mark: enhanced, not forked.
+- **Two-column expanded view (TikTok web / IG desktop pattern):** DECIDED SKIP
+  (batch 22 task 20, documented cost reasons). Only re-open on an explicit user ask.
 - **Reels rail retention:** IG keeps the played-position marker on tile
-  thumbnails ("more of what you watched"). Already covered by avgColor +
-  resume badge on TV rows; extend the resume badge overlay to mobile tiles
-  only if Continue Watching proves discoverable enough on its own.
+  thumbnails ("more of what you watched"). Already covered by avgColor on TV rows
+  (watch_history was dropped 2026-10 — no played-position data exists anymore; this
+  candidate is dead unless a future resume feature returns).
 
 ### TV
 - **Preview-on-focus (TikTok TV app):** BUILT 2026-10-02 batch 18 in the low-cost
@@ -102,7 +98,7 @@ jump on YouTube only — nicety, not a convention worth copying.
 |---|---|---|
 | Tap pause | Center = play/pause | shipped (audit gap closed) |
 | Swipe next/prev | Down/Up = next/prev | shipped |
-| Overflow quick sheet | MENU = quick-actions panel | shipped (partial parity) |
+| Overflow quick sheet | MENU = quick-actions panel (hold-Center opens the same panel) | shipped (full parity incl. hold-Center, batch 17 rework) |
 | Playback speed 0.5–2× | MENU panel item (cycling row 0.5→1→1.5→2) | shipped (verified in TvPlayerScreen 2026-10-02) |
 | Like / double-tap like | MENU panel Like (no double-tap binding — see rules) | shipped 2026-10-02 |
 | Mute rail (Sound On/Off) | MENU panel Mute, `hasAudio`-aware per §9 | shipped 2026-10-02 |
@@ -144,11 +140,12 @@ mainstream table above with no button-dependent features (Center play/pause, L/R
 hold-repeat, Back dismiss-first, speed panel-only, deliberately no number keys / no
 double-click).
 
-**Hold-Center spec (the fix, D-pad+Back-only; amended 2026-10-03: release-evaluated —
-  press-then-release ≥500ms, action fires ON KeyUp, no need to keep holding):**
-- Long-press Center (≥500ms press duration) opens the quick-actions panel (same panel MENU
+**Hold-Center spec (the fix, D-pad+Back-only; REWORKED 2026-10-04 to fire-while-held
+  semantics — standard long-press behavior, not release-evaluated):**
+- Holding Center ≥500ms opens the quick-actions panel (same panel MENU
   opens — one panel, two openers, rule 2 intact) on every surface Center is meaningful:
-  player, focused home card, niche row.
+  player, focused home card, niche row. The panel opens while the press is still held;
+  release cancels the pending hold without firing the short-tap action.
 - A press held past the 500ms mark must NOT also fire the KeyUp action on release — when the
   panel opened from the hold, suppress the pending play/pause (player) or open (cards).
 - Niche rows: hold-Center = toggle pin (the row's MENU action); no new panel there.
