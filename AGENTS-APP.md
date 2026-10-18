@@ -235,12 +235,15 @@ per-appear latch; header-pill initial focus runs only while no saved row focus e
 **Search-submit semantics under nav:** stay-on-stack (BACK returns to the draft/history, §8.4);
 Niches/Following/About/CustomFeeds opens also stay on the stack (no manual clears).
 
-**Owed device gates:** design §8's 15-step list on both emulators. PARTIAL PASS 2026-10-17
-(batch 28): player pop restores the feed's grid position + saved card focus, sign-in
-survives process death on both shells, D-pad walk into rows + card open + BACK restores.
-STILL OWED: the full 15-step walk (MainFeed source re-assert + S3 reset-emit must not
-flash the grid on pop) and the R8-build D-pad focus walk; >1MB-serialized-route
-risk (R3) stays theoretical.
+**Device gates:** the §8 15-step walk CLOSED 2026-10-18 (batch 39) — the original step
+list died with PLAN.md, so the walk was reconstructed from the surviving §8.x assertions
+above and run on TV: grid walk → card open → BACK restore ×3 (immediate re-open/pops,
+same card re-armed, no stranded focus), search stay-on-stack (§8.4: BACK returns to the
+draft, not home), top-nav Niches open → BACK → home restore, player OK-reveal overlay,
+process death mid-player → relaunch to home (0 FATALs). Mobile side: niche preview tiles
+render on the phone (batch-39 screencap). STILL OWED: the R8-build D-pad focus walk;
+>1MB-serialized-route risk (R3) stays theoretical; §8.15 fresh-PIN demand unexercised
+(no PIN set on the test device).
 
 ## Feature audit (2026-10-02) — parity writes
 GifsApi has `POST v2/me/collections` (create) + `DELETE v2/me/collections/{id}` but NO

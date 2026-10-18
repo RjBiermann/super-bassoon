@@ -204,8 +204,9 @@ When unsure: check the matching AGENTS doc first, then ask. Don't invent endpoin
   KBs = black) + one process restart; never open a player regression from this signature alone.
 
 ## Open items (current truth)
-- §8 full 15-step D-pad walk still owed (partial pass: player-pop grid restore + sign-in
-  process-death survival verified on both shells).
+- §8 walk CLOSED 2026-10-18 (derived from surviving §8.x assertions; original 15-step list
+  lost with PLAN.md — R8-build variant still owed, fresh-PIN demand unexercised). Mobile
+  niche-preview-tiles device gate CLOSED same batch.
 - TV quick-action panel rows measure ≈37.5dp visual height vs the 48dp M3 guideline — decision
   owed (D-pad-first surface; bump only if touch-on-TV or a strict-a11y ask lands).
 - Dependabot dependency-submission noise unresolved (auto-submitted gradle tooling deps make
