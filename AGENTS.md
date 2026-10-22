@@ -216,7 +216,14 @@ When unsure: check the matching AGENTS doc first, then ask. Don't invent endpoin
 - Report unprobeable.
 - Server search-history sync + niches suggest: spec'd-not-scheduled fallbacks (niches suggest
   additionally user-token-gated — 401 with the anon token; context param name never recorded).
-- Mobile niche-preview-tiles device gate owed (shared VM already TV-verified).
+- Mobile niche-preview-tiles device gate CLOSED 2026-10-18 (doc line was stale).
+- Issue stream 2026-10-22 (batch 40): #52 #53 #56 #57 #58 CLOSED with evidence comments (main @ 4c106655);
+  #54 interleave shipped unit-covered, signed-in device gate pending a fresh debug bundle;
+  #55 NO-REPRO on emulator, awaiting reporter device details.
+- Search scopes have no visible failure state while unavailable (silent `runCatching` UX hole,
+  surfaced by the #57 fix; building one is a design decision, not owed by any issue).
+- TV quick-actions MENU-open focus anomaly: one session saw D-pad unable to enter the panel
+  (touch taps also didn't toggle; prior gates passed the same path) — one focused re-check owed.
 - Minimap player / two-column expanded / RateLimitBus indicator: decided skips (documented
   cost reasons).
 
