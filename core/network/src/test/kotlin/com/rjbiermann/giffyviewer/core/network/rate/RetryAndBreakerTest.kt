@@ -147,6 +147,29 @@ class RetryAndBreakerTest {
         assertEquals("application/json", recorded.headers["Content-Type"]?.substringBefore(';'))
     }
 
+    /** #58: a single request exhausting ALL its attempts must feed the breaker
+     *  exactly ONE failure — the per-attempt recording let one request's retry
+     *  storm (1 initial + 3 retries) open the circuit (5 min) for every feed
+     *  at once. Restores the intended "3 consecutive failed CALLS" semantics. */
+    @Test
+    fun `one request exhausting all attempts records exactly one breaker failure`() {
+        val breaker = CircuitBreaker(failureThreshold = 3, openDurationMs = 60_000)
+        repeat(3) { server.enqueue(resp(500)) } // 1 initial + 2 retries, all 5xx
+        runCatching { client(breaker).newCall(get()).execute() }
+        assertEquals(3, server.requestCount) // every attempt was really made
+        assertFalse("one request's retry storm must not open the breaker", breaker.isOpen())
+    }
+
+    @Test
+    fun `three exhausted requests open the breaker, not three attempt-failures`() {
+        val breaker = CircuitBreaker(failureThreshold = 3, openDurationMs = 60_000)
+        repeat(9) { server.enqueue(resp(500)) }
+        val c = client(breaker) // 3 attempts per call → exactly 1 failure per call
+        repeat(3) { runCatching { c.newCall(get()).execute() } }
+        assertEquals(9, server.requestCount)
+        assertTrue("3 exhausted calls must open the circuit", breaker.isOpen())
+    }
+
     @Test
     fun `429 does not count toward circuit breaker`() {
         val breaker = CircuitBreaker(failureThreshold = 3, openDurationMs = 60_000)

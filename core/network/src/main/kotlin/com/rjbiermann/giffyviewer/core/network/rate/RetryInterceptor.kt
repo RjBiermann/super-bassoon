@@ -50,7 +50,6 @@ class RetryInterceptor(
                 val response = chain.proceed(request)
                 when {
                     response.code in 500..599 -> {
-                        breaker.recordFailure()
                         response.close() // failed responses are never returned; close to free the connection
                         lastException = IOException("HTTP ${response.code} (attempt $attempt)")
                     }
@@ -80,11 +79,20 @@ class RetryInterceptor(
                     }
                 }
             } catch (e: IOException) {
-                breaker.recordFailure()
                 lastException = e
             }
         }
-        throw lastException ?: IOException("max retries exhausted")
+        // #58: ONE failure per EXHAUSTED request, not per attempt — a single
+        // request's retry storm (1 initial + 3 retries) used to feed the breaker
+        // 4 consecutive failures and open the circuit (5 min) for every feed at
+        // once on one flaky window. Restores the intended "3 consecutive failed
+        // CALLS" semantics. 429-only exhaustion never feeds the breaker
+        // (throttling is not a failure), matching the 429 branch above.
+        lastException?.let { exhausted ->
+            breaker.recordFailure()
+            throw exhausted
+        }
+        throw IOException("max retries exhausted")
     }
 
     companion object {

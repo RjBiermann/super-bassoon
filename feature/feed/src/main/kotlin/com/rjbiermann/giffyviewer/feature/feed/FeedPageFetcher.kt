@@ -13,7 +13,9 @@ import com.rjbiermann.giffyviewer.core.network.dto.toModel
  * paging source (the source fills an unfetched page itself: Paging consults
  * the mediator only when the source's data is exhausted, so a fast scroll
  * used to reach an unfetched page and stall the feed — user report).
- * Rate-limit invariant: one API request per call.
+ * Rate-limit invariant: every API request is limiter-accounted; a Favorites
+ * fill issues one sub-fetch per favorited creator (#54 interleave), paced
+ * sequentially by the shared limiter like every other multi-call path.
  */
 class FeedPageFetcher(
     private val feed: FeedSource,
@@ -108,30 +110,39 @@ class FeedPageFetcher(
                     order = feed.sort.ifEmpty { "trending" },
                 )
             is FeedSource.Favorites -> {
-                // ponytail: page n maps to ONE creator's inner page at fetch time;
-                // a changed favorite set shifts the mapping until the cache refreshes
-                // (read-time filter in FeedPagingSource keeps unfavorited rows out).
-                // The mediator guards an empty favorite set, but the paging source
-                // self-fills unfetched pages too — a fresh install with zero favorited
-                // creators walks an unfetched Favorites page → degenerate empty page,
-                // not a divide-by-zero (live-proven on TV36).
+                // ponytail: a changed favorite set shifts the mapping until the
+                // cache refreshes (read-time filter in FeedPagingSource keeps
+                // unfavorited rows out). The mediator guards an empty favorite set,
+                // but the paging source self-fills unfetched pages too — a fresh
+                // install with zero favorited creators walks an unfetched Favorites
+                // page → degenerate empty page, not a divide-by-zero (live-proven
+                // on TV36).
                 // #5 shuffle-on-refresh: the volatile seed drives loop 0's creator
                 // order; #36 endless-favorites: each LOOP past loop 0 re-shuffles
-                // the order with a new derived seed (favoritesLoopOrder), so the
-                // served creator-grouping sequence never repeats the previous
-                // loop's. Inner-page math unchanged: page n → slot (n-1) % size,
-                // inner page (n-1) / size + 1 (each loop visits every creator
-                // exactly once — one API call per fetch, rate-limit invariant).
+                // the order with a new derived seed (favoritesLoopOrder).
+                // #54 interleave: ONE fill fetches EVERY creator — the page's gif
+                // list is the round-robin merge of all creators' shares
+                // (ceil(pageSize/creators) each), so a screenful alternates creators
+                // instead of running one creator for 20 gifs. Inner pages advance
+                // one per PAGE (inner = page): a (creator, inner page) pair is
+                // served by exactly one page — no duplicates, no loss — so the #36
+                // exhaustion machinery works unchanged. Each fill's sub-fetches are
+                // limiter-paced sequential API calls (still counted requests).
                 val creators = favorites()
                 if (creators.isEmpty()) {
                     GifsPageDto()
                 } else {
                     val order = favoritesLoopOrder(creators, favoritesSeed(), (page - 1) / creators.size)
-                    api.userGifs(
-                        username = order[(page - 1) % creators.size],
-                        count = pageSize,
-                        page = (page - 1) / creators.size + 1,
-                    )
+                    val perCreator = (pageSize + creators.size - 1) / creators.size
+                    val chunks =
+                        List(creators.size) { i ->
+                            api.userGifs(
+                                username = order[(page - 1 + i) % creators.size],
+                                count = perCreator,
+                                page = page,
+                            ).gifs
+                        }
+                    GifsPageDto(gifs = interleaveChunks(chunks))
                 }
             }
             is FeedSource.ForYou -> api.feedForYou(count = pageSize, page = page)
@@ -228,6 +239,20 @@ internal fun favoritesLoopOrder(
     java.util.Collections.shuffle(order, java.util.Random(loopSeed(seed, loop)))
     return order
 }
+
+/** #54 interleave merge (pure, unit-tested): round-robin across the
+ *  per-creator chunks in fetch order — every chunk's first gif, then every
+ *  chunk's second gif, … Unequal pools interleave honestly: a chunk that ran
+ *  dry stops contributing while the others continue. */
+internal fun <T> interleaveChunks(chunks: List<List<T>>): List<T> =
+    buildList {
+        val depth = chunks.maxOfOrNull { it.size } ?: 0
+        for (index in 0 until depth) {
+            for (chunk in chunks) {
+                if (index < chunk.size) add(chunk[index])
+            }
+        }
+    }
 
 /** Volatile session seed → per-loop re-seed. Both coefficients are odd, so
  *  for a fixed session seed the map loop → seed is injective over Z/2⁶⁴:

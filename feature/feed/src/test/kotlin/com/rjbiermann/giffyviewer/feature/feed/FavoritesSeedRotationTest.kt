@@ -93,9 +93,6 @@ class FavoritesSeedRotationTest {
             // Seed 2 rotates [a,b,c] → [c,a,b]: page 1 maps to creator c, not a.
             assertEquals("a", unseeded.users.first())
             assertEquals("c", seeded.users.first())
-            // Rotation keeps the round-robin's slot math: page 3 maps to slot 2
-            // (inner page 1, third slot) → still from the rotated order, never
-            // a re-mixed per-call order.
             runBlocking {
                 FeedPageFetcher(
                     FeedSource.Favorites,
@@ -107,8 +104,13 @@ class FavoritesSeedRotationTest {
                     favoritesSeed = { 2L },
                 ).fill(3)
             }
-            // rotated = [c, a, b]; page 3 slot index = (3-1) % 3 = 2 → "b".
-            assertEquals("b", seeded.users.last())
-            assertTrue(seeded.users.size == 2 && unseeded.users.size == 1)
+            // #54 interleave: fill 3 fetches the WHOLE rotation (chunk order
+            // rotates forward → anchored at slot (3-1) % 3 = 2 → "b" first)
+            // at inner page 3 — one sub-fetch per creator.
+            assertEquals("b", seeded.users[3])
+            assertEquals(setOf("a", "b", "c"), seeded.users.drop(3).toSet())
+            // Every fill now issues one sub-fetch per favorited creator
+            // (3 creators → 3 calls per fill).
+            assertTrue(seeded.users.size == 6 && unseeded.users.size == 3)
         }
 }

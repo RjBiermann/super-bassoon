@@ -39,6 +39,22 @@ data class NetworkComponents(
 )
 
 /**
+ * #58: image traffic (Coil posters) must NOT ride the API's retry/breaker
+ * path — a burst of failing poster loads used to record up to 4 breaker
+ * failures per request and open the circuit for EVERY feed at once
+ * ("Couldn't load [feed]" everywhere). The image client keeps the browser
+ * identity, the auth headers and the SHARED rate limiter (the ≤15/5s
+ * invariant covers media too); only [RetryInterceptor] is stripped — a
+ * failed poster load just fails its own image, it never retries into the
+ * breaker.
+ */
+fun buildImageClient(base: OkHttpClient): OkHttpClient =
+    base
+        .newBuilder()
+        .apply { interceptors.removeAll { it is RetryInterceptor } }
+        .build()
+
+/**
  * Builds the full network stack. [authToken] binds the Bearer for signed-in calls;
  * pass null for anonymous browsing (token added per-request via [AuthCarrier] mutates).
  */

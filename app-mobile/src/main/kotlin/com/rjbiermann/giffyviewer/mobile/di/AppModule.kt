@@ -15,6 +15,7 @@ import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.network.AnonymousSession
 import com.rjbiermann.giffyviewer.core.network.GifsApi
 import com.rjbiermann.giffyviewer.core.network.NetworkComponents
+import com.rjbiermann.giffyviewer.core.network.buildImageClient
 import com.rjbiermann.giffyviewer.core.network.buildNetwork
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.ui.NetworkMonitor
@@ -98,8 +99,10 @@ object AppModule {
             ).build()
 
     /**
-     * Images share the API's OkHttp instance so media requests go through the same
-     * rate limiter (≤10/5s invariant covers media too).
+     * Images get a derivative of the API's OkHttp client: SAME rate limiter
+     * (the ≤15/5s invariant covers media too), same identity/auth headers,
+     * but NO RetryInterceptor — a burst of failing poster loads must not feed
+     * the API circuit breaker (issue #58: one breaker opened every feed).
      */
     @Provides
     @Singleton
@@ -109,7 +112,7 @@ object AppModule {
     ): ImageLoader =
         ImageLoader
             .Builder(context)
-            .components { add(OkHttpNetworkFetcherFactory(network.client)) }
+            .components { add(OkHttpNetworkFetcherFactory(buildImageClient(network.client))) }
             .build()
 
     @Provides
