@@ -14,8 +14,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * ExoPlayer wrapper (PLAN §5). [SimpleCache] is keyed by gif ID — passed as
- * MediaItem.customCacheKey so URL rotation never matters. Streaming + caching:
+ * ExoPlayer wrapper (PLAN §5). [SimpleCache] is keyed by "gif ID + rendition
+ * tier" ([renditionCacheKey], issue #56) so an SD-cached stream can never
+ * serve an HD request. Streaming + caching:
  * CacheDataSource (non-blocking flag) plays while writing to cache.
  */
 class GiffyPlayer internal constructor(
@@ -31,7 +32,8 @@ class GiffyPlayer internal constructor(
      * Preferred quality (§5, issue #4) picks the stream URL via the shared
      * [Gif.qualityStreamUrl] (dataSaver keeps its first rule; the probe-closed
      * sd/hd vocabulary is a stream-URL pick, no track machinery). The custom
-     * cache key stays the gif ID — a pref flip re-picks the URL, not the key.
+     * cache key is rendition-namespaced ([renditionCacheKey], issue #56) so a
+     * pref flip re-picks both URL and tier.
      */
     fun playGif(
         gif: Gif,
@@ -45,7 +47,7 @@ class GiffyPlayer internal constructor(
             MediaItem
                 .Builder()
                 .setUri(url)
-                .setCustomCacheKey(gif.id) // cache key = gif ID, never the URL (PLAN §5)
+                .setCustomCacheKey(gif.renditionCacheKey(url))
                 .build()
         setMediaItem(item, resumeMs)
         prepare()
@@ -78,7 +80,7 @@ class GiffyPlayer internal constructor(
                     MediaItem
                         .Builder()
                         .setUri(url)
-                        .setCustomCacheKey(gif.id)
+                        .setCustomCacheKey(gif.renditionCacheKey(url))
                         .build()
                 }
             }
@@ -99,3 +101,15 @@ class GiffyPlayer internal constructor(
         player.play()
     }
 }
+
+/**
+ * Rendition-namespaced SimpleCache key (issue #56): the pick that resolves to
+ * the SD stream caches under `<id>:sd`, anything else `<id>:hd`, so a cached
+ * SD rendition (TV focus preview, data-saver watch) can never serve an HD
+ * request. Same-tier URL rotation still doesn't matter — the key follows the
+ * picked tier, not the URL bytes. Pre-#56 un-namespaced `<id>` entries are
+ * dead bytes; LRU evicts them (no migration).
+ */
+internal fun Gif.renditionCacheKey(pickedUrl: String): String =
+    if (pickedUrl == sdUrl) "$id:sd" else "$id:hd"
+
