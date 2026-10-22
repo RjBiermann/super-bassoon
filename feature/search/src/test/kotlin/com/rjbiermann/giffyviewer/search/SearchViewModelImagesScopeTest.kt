@@ -8,7 +8,6 @@ import com.rjbiermann.giffyviewer.core.database.ContentFilter
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.network.API_JSON
 import com.rjbiermann.giffyviewer.core.network.GifsApi
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancelAndJoin
@@ -33,6 +32,7 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import java.util.concurrent.TimeUnit
 
 /**
  * Issue #57 device gate: the search page's Images scope stayed permanently
@@ -76,8 +76,11 @@ class SearchViewModelImagesScopeTest {
 
     /** The Images scope's live response shape (type=i stills: duration=null, jpg urls). */
     private fun enqueueImagesResponse(bodyDelayMs: Long) {
-        val fixture = javaClass.getResourceAsStream("/images-scope-search-type-i.json")!!
-            .bufferedReader().readText()
+        val fixture =
+            javaClass
+                .getResourceAsStream("/images-scope-search-type-i.json")!!
+                .bufferedReader()
+                .readText()
         server.enqueue(
             MockResponse
                 .Builder()

@@ -61,6 +61,9 @@ dependencies {
     testImplementation(libs.okhttp)
     testImplementation(libs.retrofit)
     testImplementation(libs.okhttp.mockwebserver)
+    // Issue #57 test replays the real converter + Json config end to end.
+    testImplementation(libs.kotlinx.serialization.json)
+    testImplementation(libs.retrofit.kotlinx.serialization)
 }
 
 detekt {
