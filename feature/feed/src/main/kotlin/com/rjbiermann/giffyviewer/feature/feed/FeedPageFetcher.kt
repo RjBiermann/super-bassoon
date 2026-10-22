@@ -136,11 +136,12 @@ class FeedPageFetcher(
                     val perCreator = (pageSize + creators.size - 1) / creators.size
                     val chunks =
                         List(creators.size) { i ->
-                            api.userGifs(
-                                username = order[(page - 1 + i) % creators.size],
-                                count = perCreator,
-                                page = page,
-                            ).gifs
+                            api
+                                .userGifs(
+                                    username = order[(page - 1 + i) % creators.size],
+                                    count = perCreator,
+                                    page = page,
+                                ).gifs
                         }
                     GifsPageDto(gifs = interleaveChunks(chunks))
                 }

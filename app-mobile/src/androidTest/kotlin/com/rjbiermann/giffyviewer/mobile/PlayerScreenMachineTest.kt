@@ -9,7 +9,6 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -64,7 +63,12 @@ class PlayerScreenMachineTest {
         graph = TestFeedGraph(context)
         // The asset ships in the TEST apk's source set — read it from the
         // instrumentation context, not the target app's.
-        val wav = InstrumentationRegistry.getInstrumentation().context.assets.open(MEDIA_ASSET).use { it.readBytes() }
+        val wav =
+            InstrumentationRegistry
+                .getInstrumentation()
+                .context.assets
+                .open(MEDIA_ASSET)
+                .use { it.readBytes() }
         graph.startHappy(mediaPath = "/media.wav", wav = wav)
         // Synthetic sign-in: isLoggedIn drives the double-tap like write path.
         assertTrue(graph.tokenStore.save("test.jwt.token"))
@@ -216,10 +220,16 @@ class PlayerScreenMachineTest {
         // Give the on-open syncLikes() its turn so it cannot race the flip.
         Thread.sleep(1_000)
         rule.onRoot().performTouchInput { doubleClick() }
-        rule.waitUntil(10_000) { graph.viewModel.likedIds.value.contains(GIF_ID) }
+        rule.waitUntil(10_000) {
+            graph.viewModel.likedIds.value
+                .contains(GIF_ID)
+        }
         // The write is confirmed (server 204) — the optimistic flip sticks.
         Thread.sleep(1_500)
-        assertTrue(graph.viewModel.likedIds.value.contains(GIF_ID))
+        assertTrue(
+            graph.viewModel.likedIds.value
+                .contains(GIF_ID),
+        )
     }
 
     companion object {

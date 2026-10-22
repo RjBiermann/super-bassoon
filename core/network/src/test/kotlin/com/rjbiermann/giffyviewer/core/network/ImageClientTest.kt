@@ -34,14 +34,19 @@ class ImageClientTest {
         server.close()
     }
 
-    private fun ok(): MockResponse = MockResponse.Builder().code(200).body("{}").build()
+    private fun ok(): MockResponse =
+        MockResponse
+            .Builder()
+            .code(200)
+            .body("{}")
+            .build()
 
     private fun get(): Request = Request.Builder().url(server.url("/v2/x")).build()
 
     @Test
     fun `image client strips the retry-breaker path and keeps limiter and identity`() {
         val network = buildNetwork(baseUrl = server.url("/").toString())
-        val image = buildImageClient(network.client)
+        val image = network.imageClient
         assertFalse("RetryInterceptor must be stripped", image.interceptors.any { it is RetryInterceptor })
         assertTrue(
             "the shared limiter must still cover image requests (invariant covers media)",
@@ -58,7 +63,7 @@ class ImageClientTest {
     @Test
     fun `image requests keep the browser UA and bearer auth`() {
         val network = buildNetwork(baseUrl = server.url("/").toString(), authToken = { "tok" })
-        val image = buildImageClient(network.client)
+        val image = network.imageClient
         server.enqueue(ok())
         val response = image.newCall(get()).execute()
         assertEquals(200, response.code)
@@ -71,7 +76,7 @@ class ImageClientTest {
     fun `an open circuit does not short-circuit image requests`() {
         val network = buildNetwork(baseUrl = server.url("/").toString())
         repeat(3) { network.breaker.recordFailure() }
-        val image = buildImageClient(network.client)
+        val image = network.imageClient
         server.enqueue(ok())
         // The API client would return the synthetic retryable 503 here; the
         // image client has no breaker, so the request really goes out.

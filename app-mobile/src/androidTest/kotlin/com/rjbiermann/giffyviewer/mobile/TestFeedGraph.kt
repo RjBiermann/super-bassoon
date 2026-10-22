@@ -82,7 +82,10 @@ internal class TestFeedGraph(
      * never reverted), the liked mirror serves [] and the JSON body keeps the
      * page at exactly one gif.
      */
-    fun startHappy(mediaPath: String, wav: ByteArray) {
+    fun startHappy(
+        mediaPath: String,
+        wav: ByteArray,
+    ) {
         server.dispatcher =
             object : Dispatcher() {
                 override fun dispatch(request: RecordedRequest): MockResponse {

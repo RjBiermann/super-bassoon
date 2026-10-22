@@ -36,27 +36,22 @@ data class NetworkComponents(
     val breaker: CircuitBreaker,
     val bus: RateLimitBus,
     val client: OkHttpClient,
+    /** #58: same stack minus the retry/breaker path — Coil posters ride this. */
+    val imageClient: OkHttpClient,
 )
-
-/**
- * #58: image traffic (Coil posters) must NOT ride the API's retry/breaker
- * path — a burst of failing poster loads used to record up to 4 breaker
- * failures per request and open the circuit for EVERY feed at once
- * ("Couldn't load [feed]" everywhere). The image client keeps the browser
- * identity, the auth headers and the SHARED rate limiter (the ≤15/5s
- * invariant covers media too); only [RetryInterceptor] is stripped — a
- * failed poster load just fails its own image, it never retries into the
- * breaker.
- */
-fun buildImageClient(base: OkHttpClient): OkHttpClient =
-    base
-        .newBuilder()
-        .apply { interceptors.removeAll { it is RetryInterceptor } }
-        .build()
 
 /**
  * Builds the full network stack. [authToken] binds the Bearer for signed-in calls;
  * pass null for anonymous browsing (token added per-request via [AuthCarrier] mutates).
+ *
+ * #58: image traffic (Coil posters) must NOT ride the API's retry/breaker
+ * path — a burst of failing poster loads used to record up to 4 breaker
+ * failures per request and open the circuit for EVERY feed at once
+ * ("Couldn't load [feed]" everywhere). [NetworkComponents.imageClient] keeps the browser
+ * identity, the auth headers and the SHARED rate limiter (the ≤15/5s
+ * invariant covers media too); it simply has no [RetryInterceptor] — a
+ * failed poster load just fails its own image, it never retries into the
+ * breaker.
  */
 fun buildNetwork(
     baseUrl: String = BASE_URL,
@@ -110,7 +105,9 @@ fun buildNetwork(
             response
         }
 
-    val client =
+    // Shared base so the API client and the image client (#58) carry the
+    // identical limiter/identity/auth stack — only the retry layer differs.
+    fun clientBuilder(): OkHttpClient.Builder =
         OkHttpClient
             .Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
@@ -122,13 +119,7 @@ fun buildNetwork(
             .addInterceptor(BrowserIdentityInterceptor())
             .addInterceptor(authInterceptor)
             .addInterceptor(RateLimitInterceptor(limiter))
-            .addInterceptor(
-                RetryInterceptor(
-                    limiter = limiter,
-                    bus = bus,
-                    breaker = breaker,
-                ),
-            ).apply {
+            .apply {
                 if (enableLogging) {
                     addInterceptor(
                         okhttp3.logging.HttpLoggingInterceptor().setLevel(
@@ -136,7 +127,18 @@ fun buildNetwork(
                         ),
                     )
                 }
-            }.build()
+            }
+
+    val client =
+        clientBuilder()
+            .addInterceptor(
+                RetryInterceptor(
+                    limiter = limiter,
+                    bus = bus,
+                    breaker = breaker,
+                ),
+            ).build()
+    val imageClient = clientBuilder().build()
 
     val retrofit =
         Retrofit
@@ -152,5 +154,6 @@ fun buildNetwork(
         breaker = breaker,
         bus = bus,
         client = client,
+        imageClient = imageClient,
     )
 }

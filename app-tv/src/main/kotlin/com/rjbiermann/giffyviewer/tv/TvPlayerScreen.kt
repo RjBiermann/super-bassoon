@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -115,6 +116,11 @@ fun TvPlayerScreen(
             mutableIntStateOf(startIndex.coerceAtLeast(0).coerceAtMost(gifs.size - 1))
         }
     val player = remember { playerFactory.create(context) }
+    // Attach-gating (#53, mobile PlayerScreen parity): flip happens BEFORE the
+    // media swaps, so the surface attaches only once this gif's media is live
+    // and lets the poster show through until its first frame lands — while a
+    // gif plays the surface stays attached (no re-entry flicker).
+    val playingId by player.currentGifId.collectAsStateWithLifecycle()
 
     DisposableEffect(Unit) {
         onDispose { player.release() }
@@ -366,33 +372,51 @@ fun TvPlayerScreen(
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
             )
-            AndroidView(
-                factory = { ctx ->
-                    (
-                        android.view.LayoutInflater
-                            .from(ctx)
-                            .inflate(
-                                com.rjbiermann.giffyviewer.tv.R.layout.player_view,
-                                null,
-                                false,
-                            ) as PlayerView
-                    ).apply { useController = false }
-                },
-                update = { view ->
-                    view.player = player
-                    view.resizeMode = fitMode
-                    // SLICE-14 (user: aspect warp on next/prev): the content
-                    // frame has no aspect until ExoPlayer reports videoSize —
-                    // with ZOOM/FILL that degenerates to fill-frame (stretch
-                    // warp). Seed the gif's own width/height at every switch;
-                    // the live videoSize update overrides when it arrives.
-                    // SLICE-16 stale guard: seed runs on EVERY switch, and an
-                    // unknown gif aspect clears (0 = unset) so the PREVIOUS
-                    // video's aspect can never warp the next one.
-                    view.seedContentAspectRatio(gif.contentAspectRatio())
-                },
-                modifier = Modifier.fillMaxSize(),
-            )
+            // Fresh surface per gif (mobile PlayerScreen parity): the persistent
+            // PlayerView's TextureView retains the previous gif's last buffer,
+            // and re-seeding its aspect while that stale buffer is still
+            // displayed is the sub-second aspect flash (#53 residual: stretched
+            // full-bleed / sliver frames in the switch window). Keying the
+            // AndroidView to the gif discards the old buffer with the old view —
+            // the fresh TextureView (transparent shutter) shows the poster until
+            // the new gif's first frame renders. Same gif → stable key → no
+            // re-entry flicker (the playingId attach-gating below still governs
+            // when the surface connects).
+            key(gif.id) {
+                AndroidView(
+                    factory = { ctx ->
+                        (
+                            android.view.LayoutInflater
+                                .from(ctx)
+                                .inflate(
+                                    com.rjbiermann.giffyviewer.tv.R.layout.player_view,
+                                    null,
+                                    false,
+                                ) as PlayerView
+                        ).apply { useController = false }
+                    },
+                    onRelease = { view ->
+                        // Leak H1/H2 (mobile parity): disposing a view that
+                        // still holds the shared player leaks a player-anchored
+                        // view subtree — detach before the keyed swap drops it.
+                        view.player = null
+                    },
+                    update = { view ->
+                        view.player = if (playingId == gif.id) player else null
+                        view.resizeMode = fitMode
+                        // SLICE-14 (user: aspect warp on next/prev): the content
+                        // frame has no aspect until ExoPlayer reports videoSize —
+                        // with ZOOM/FILL that degenerates to fill-frame (stretch
+                        // warp). Seed the gif's own width/height at every switch;
+                        // the live videoSize update overrides when it arrives.
+                        // SLICE-16 stale guard: seed runs on EVERY switch, and an
+                        // unknown gif aspect clears (0 = unset) so the PREVIOUS
+                        // video's aspect can never warp the next one.
+                        view.seedContentAspectRatio(gif.contentAspectRatio())
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
             // Thin lime progress line (mobile parity).
             var fraction by remember { mutableStateOf(0f) }
             LaunchedEffect(gif.id) {
@@ -575,6 +599,9 @@ fun TvPlayerScreen(
         player.playGif(gif, dataSaver, videoQuality = videoQuality)
     }
     val muted by settings.muted.collectAsStateWithLifecycle(false)
+    // Mute consumer (#52, mobile parity): the pref is app-global, applied on
+    // the live player as long as TvPlayerScreen is up.
+    LaunchedEffect(muted, player) { player.volume = if (muted) 0f else 1f }
     val autoSwipeOn by settings.autoSwipe.collectAsStateWithLifecycle(false)
     // End-of-media (AGENTS-PLAYER): mobile's ended-block parity. Auto-swipe
     // off (or data-saver on) → loop the gif; on → advance to the next item,

@@ -15,7 +15,6 @@ import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.network.AnonymousSession
 import com.rjbiermann.giffyviewer.core.network.GifsApi
 import com.rjbiermann.giffyviewer.core.network.NetworkComponents
-import com.rjbiermann.giffyviewer.core.network.buildImageClient
 import com.rjbiermann.giffyviewer.core.network.buildNetwork
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.ui.NetworkMonitor
@@ -113,7 +112,7 @@ object TvAppModule {
     ): ImageLoader =
         ImageLoader
             .Builder(context)
-            .components { add(OkHttpNetworkFetcherFactory(buildImageClient(network.client))) }
+            .components { add(OkHttpNetworkFetcherFactory(network.imageClient)) }
             .build()
 
     @Provides

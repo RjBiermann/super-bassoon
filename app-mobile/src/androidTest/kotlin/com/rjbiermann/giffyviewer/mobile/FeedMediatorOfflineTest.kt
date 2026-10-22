@@ -15,7 +15,6 @@ import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertTrue
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -48,7 +47,10 @@ class FeedMediatorOfflineTest {
 
     @Before
     fun setUp() {
-        val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        val context =
+            androidx.test.platform.app.InstrumentationRegistry
+                .getInstrumentation()
+                .targetContext
         graph = TestFeedGraph(context)
         graph.startOffline()
     }
@@ -56,12 +58,13 @@ class FeedMediatorOfflineTest {
     @After
     fun tearDown() = graph.tearDown()
 
-    private fun state() = PagingState<Int, com.rjbiermann.giffyviewer.core.model.Gif>(
-        pages = emptyList(),
-        anchorPosition = null,
-        config = PagingConfig(pageSize = 20),
-        leadingPlaceholderCount = 0,
-    )
+    private fun state() =
+        PagingState<Int, com.rjbiermann.giffyviewer.core.model.Gif>(
+            pages = emptyList(),
+            anchorPosition = null,
+            config = PagingConfig(pageSize = 20),
+            leadingPlaceholderCount = 0,
+        )
 
     @Test
     fun offlineRefresh_surfaces_MediatorResultError_with_IOException() {
@@ -96,8 +99,10 @@ class FeedMediatorOfflineTest {
         // honest offline copy (FeedScreen's offlineShaped branch).
         rule.waitUntil(120_000) {
             rule.onAllNodesWithText("Nothing cached yet").fetchSemanticsNodes().isNotEmpty() &&
-                rule.onAllNodesWithText("You're offline — reconnect to load the feed.")
-                    .fetchSemanticsNodes().isNotEmpty()
+                rule
+                    .onAllNodesWithText("You're offline — reconnect to load the feed.")
+                    .fetchSemanticsNodes()
+                    .isNotEmpty()
         }
     }
 }

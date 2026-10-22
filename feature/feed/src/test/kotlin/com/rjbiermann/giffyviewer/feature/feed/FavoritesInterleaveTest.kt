@@ -153,8 +153,10 @@ class FavoritesInterleaveTest {
             assertTrue(fetcher.fill(2))
             // Page 2 fetches EVERY creator at inner 2 (b's pool 2 is dry) —
             // and each (creator, inner page) pair was fetched exactly once.
+            // The lead creator rotates by page (order[(page-1+i)]) so no
+            // creator always leads a screenful — #54 novelty.
             assertEquals(
-                listOf("a", "b", "a", "b"),
+                listOf("a", "b", "b", "a"),
                 api.calls.map { it.username },
             )
             assertEquals(listOf(1, 1, 2, 2), api.calls.map { it.page })
@@ -185,7 +187,7 @@ class FavoritesInterleaveTest {
         assertEquals(listOf(1, 4, 2, 5, 3, 6), interleaveChunks(listOf(listOf(1, 2, 3), listOf(4, 5, 6))))
         assertEquals(listOf(1, 4, 2, 5, 6), interleaveChunks(listOf(listOf(1, 2), listOf(4, 5, 6))))
         assertEquals(listOf(1, 4, 2), interleaveChunks(listOf(listOf(1, 2), listOf(4))))
-        assertEquals(emptyList<Int>(), interleaveChunks(emptyList()))
-        assertEquals(emptyList<Int>(), interleaveChunks(listOf(emptyList(), emptyList())))
+        assertEquals(emptyList<Int>(), interleaveChunks<Int>(emptyList()))
+        assertEquals(emptyList<Int>(), interleaveChunks<Int>(listOf(emptyList(), emptyList())))
     }
 }
