@@ -25,6 +25,15 @@ kotlin {
     }
 }
 
+android {
+    testOptions {
+        unitTests {
+            // Robolectric reads the merged (debug) manifest + resources (issue #57 test).
+            isIncludeAndroidResources = true
+        }
+    }
+}
+
 dependencies {
     implementation(project(":core:model"))
     // Issue #11: the empty-state "Browse all" strips open browseable feeds —
@@ -45,6 +54,13 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    // Issue #57: Robolectric JVM rung for the VM scope-load contract (MockWebServer
+    // + in-memory Room, matching the feature:feed/#50 stage-2 harness style).
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.ext.junit)
+    testImplementation(libs.okhttp)
+    testImplementation(libs.retrofit)
+    testImplementation(libs.okhttp.mockwebserver)
 }
 
 detekt {

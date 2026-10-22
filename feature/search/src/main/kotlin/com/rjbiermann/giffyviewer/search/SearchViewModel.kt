@@ -18,6 +18,7 @@ import com.rjbiermann.giffyviewer.core.network.dto.toModels
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -132,76 +133,84 @@ class SearchViewModel
         private val _nichePreviews = MutableStateFlow<Map<String, List<Pair<NicheRef, Gif?>>>>(emptyMap())
         val nichePreviews: StateFlow<Map<String, List<Pair<NicheRef, Gif?>>>> = _nichePreviews.asStateFlow()
 
-        /** Loads one scope's results for [rawQuery] (no-op while cached). Runs
-         *  in the caller's coroutine — the screen's LaunchedEffect cancels it on
-         *  every keystroke/tab change, so only the settled query's request
-         *  completes (≤10-req/5s invariant). */
+        /** Loads one scope's results for [rawQuery] (no-op while cached). The
+         *  fetch runs in a VM-OWNED job: the screen's LaunchedEffect(scope,
+         *  query) cancels its caller on every keystroke/tab change
+         *  (DESIGN-search hyp 3) — issue #57: a caller killed mid-fetch had
+         *  the CancellationException swallowed by runCatching, leaving the
+         *  scope map empty forever while the tab sat parked (no re-key, no
+         *  retry, no failure state — Images blank on every visit). In
+         *  viewModelScope only a newer same-scope load or VM death cancels
+         *  it; the per-keystroke request count is unchanged (each new load
+         *  still cancels the prior in-flight one, ≤15-req/5s invariant). */
+        private val scopeJobs = mutableMapOf<String, Job>()
+
         suspend fun loadScope(
             scope: String,
             rawQuery: String,
         ) {
             val q = rawQuery.trim()
             if (q.isEmpty()) return
-            run {
-                // Session reload: the choke point's block sets before filtering.
-                filter.refreshFrom(db.contentPrefsDao())
-                filter.refreshBlockedFeeds(db.customFeedDao())
-                when (scope) {
-                    SCOPE_IMAGES -> {
-                        if (q in _images.value) return
-                        runCatching { api.search(searchText = q, type = "i", count = SCOPE_COUNT) }
-                            .onSuccess { page ->
-                                // Leak-zero: a blocked preview gif drops the row.
-                                _images.value =
-                                    cappedInsert(
-                                        _images.value,
-                                        q,
-                                        page.toModels().filter { filter.allow(it.userName, it.tags, it.description) },
-                                    )
-                            }
-                    }
-                    SCOPE_CREATORS -> {
-                        if (q in _creatorPreviews.value) return
-                        runCatching { api.creatorSearchPreviews(query = q) }
-                            .onSuccess { dto ->
-                                _creatorPreviews.value =
-                                    cappedInsert(
-                                        _creatorPreviews.value,
-                                        q,
-                                        dto.gifs
-                                            .map { it.toModel() }
-                                            .distinctBy { it.userName }
-                                            .filter { filter.allow(it.userName, it.tags, it.description) },
-                                    )
-                            }
-                    }
-                    SCOPE_NICHES -> {
-                        if (q in _nichePreviews.value) return
-                        runCatching { api.nicheSearchPreviews(query = q) }
-                            .onSuccess { dto ->
-                                _nichePreviews.value =
-                                    cappedInsert(
-                                        _nichePreviews.value,
-                                        q,
-                                        nicheRows(dto.previews) {
-                                            filter.allow(it.userName, it.tags, it.description)
-                                        },
-                                    )
-                            }
-                    }
-                    SCOPE_GIFS -> {
-                        // Issue #11 slice C: matched tags for a typed query —
-                        // the app stays on the tag-feed submit path (batch 6
-                        // rule; no tag-results tab).
-                        if (q in _matchedTags.value) return
-                        runCatching { api.tagsMatch(query = q) }
-                            .onSuccess { tags ->
-                                _matchedTags.value =
-                                    cappedInsert(_matchedTags.value, q, tags.take(MATCHED_TAGS_LIMIT))
-                            }
+            when (scope) {
+                SCOPE_IMAGES -> if (q in _images.value) return
+                SCOPE_CREATORS -> if (q in _creatorPreviews.value) return
+                SCOPE_NICHES -> if (q in _nichePreviews.value) return
+                SCOPE_GIFS -> if (q in _matchedTags.value) return
+            }
+            scopeJobs.remove(scope)?.cancel()
+            scopeJobs[scope] =
+                viewModelScope.launch {
+                    // Session reload: the choke point's block sets before filtering.
+                    filter.refreshFrom(db.contentPrefsDao())
+                    filter.refreshBlockedFeeds(db.customFeedDao())
+                    when (scope) {
+                        SCOPE_IMAGES ->
+                            runCatching { api.search(searchText = q, type = "i", count = SCOPE_COUNT) }
+                                .onSuccess { page ->
+                                    // Leak-zero: a blocked preview gif drops the row.
+                                    _images.value =
+                                        cappedInsert(
+                                            _images.value,
+                                            q,
+                                            page.toModels().filter { filter.allow(it.userName, it.tags, it.description) },
+                                        )
+                                }
+                        SCOPE_CREATORS ->
+                            runCatching { api.creatorSearchPreviews(query = q) }
+                                .onSuccess { dto ->
+                                    _creatorPreviews.value =
+                                        cappedInsert(
+                                            _creatorPreviews.value,
+                                            q,
+                                            dto.gifs
+                                                .map { it.toModel() }
+                                                .distinctBy { it.userName }
+                                                .filter { filter.allow(it.userName, it.tags, it.description) },
+                                        )
+                                }
+                        SCOPE_NICHES ->
+                            runCatching { api.nicheSearchPreviews(query = q) }
+                                .onSuccess { dto ->
+                                    _nichePreviews.value =
+                                        cappedInsert(
+                                            _nichePreviews.value,
+                                            q,
+                                            nicheRows(dto.previews) {
+                                                filter.allow(it.userName, it.tags, it.description)
+                                            },
+                                        )
+                                }
+                        SCOPE_GIFS ->
+                            // Issue #11 slice C: matched tags for a typed query —
+                            // the app stays on the tag-feed submit path (batch 6
+                            // rule; no tag-results tab).
+                            runCatching { api.tagsMatch(query = q) }
+                                .onSuccess { tags ->
+                                    _matchedTags.value =
+                                        cappedInsert(_matchedTags.value, q, tags.take(MATCHED_TAGS_LIMIT))
+                                }
                     }
                 }
-            }
         }
 
         // --- Explore empty state (issue #11: the search page IS the explorer) ---
@@ -216,20 +225,26 @@ class SearchViewModel
         private val _matchedTags = MutableStateFlow<Map<String, List<String>>>(emptyMap())
         val matchedTags: StateFlow<Map<String, List<String>>> = _matchedTags.asStateFlow()
 
-        /** Loads one range's bare-search strip (no-op while cached). */
+        /** Loads one range's bare-search strip (no-op while cached). VM-owned
+         *  fetch like loadScope (issue #57: the caller's LaunchedEffect
+         *  cancellation used to swallow the request mid-flight). */
         suspend fun loadTopRanged(range: String) {
-            // Session reload: the choke point's block sets before filtering.
-            filter.refreshFrom(db.contentPrefsDao())
-            filter.refreshBlockedFeeds(db.customFeedDao())
             if (range in _topRanged.value) return
-            runCatching { api.search(searchText = "", order = range, count = EXPLORE_COUNT) }
-                .onSuccess { page ->
-                    _topRanged.value =
-                        cappedInsert(
-                            _topRanged.value,
-                            range,
-                            page.toModels().filter { filter.allow(it.userName, it.tags, it.description) },
-                        )
+            scopeJobs.remove("topRanged")?.cancel()
+            scopeJobs["topRanged"] =
+                viewModelScope.launch {
+                    // Session reload: the choke point's block sets before filtering.
+                    filter.refreshFrom(db.contentPrefsDao())
+                    filter.refreshBlockedFeeds(db.customFeedDao())
+                    runCatching { api.search(searchText = "", order = range, count = EXPLORE_COUNT) }
+                        .onSuccess { page ->
+                            _topRanged.value =
+                                cappedInsert(
+                                    _topRanged.value,
+                                    range,
+                                    page.toModels().filter { filter.allow(it.userName, it.tags, it.description) },
+                                )
+                        }
                 }
         }
 
@@ -241,15 +256,19 @@ class SearchViewModel
 
         suspend fun loadTrendingPhotos() {
             if (_trendingPhotos.value.isNotEmpty()) return
-            // Session reload: the choke point's block sets before filtering.
-            filter.refreshFrom(db.contentPrefsDao())
-            filter.refreshBlockedFeeds(db.customFeedDao())
-            runCatching {
-                api.search(searchText = "", order = "trending", type = "i", count = EXPLORE_COUNT)
-            }.onSuccess { page ->
-                _trendingPhotos.value =
-                    page.toModels().filter { filter.allow(it.userName, it.tags, it.description) }
-            }
+            scopeJobs.remove("trendingPhotos")?.cancel()
+            scopeJobs["trendingPhotos"] =
+                viewModelScope.launch {
+                    // Session reload: the choke point's block sets before filtering.
+                    filter.refreshFrom(db.contentPrefsDao())
+                    filter.refreshBlockedFeeds(db.customFeedDao())
+                    runCatching {
+                        api.search(searchText = "", order = "trending", type = "i", count = EXPLORE_COUNT)
+                    }.onSuccess { page ->
+                        _trendingPhotos.value =
+                            page.toModels().filter { filter.allow(it.userName, it.tags, it.description) }
+                    }
+                }
         }
 
         /** Trending niches (v2/niches/trending/search — parses NichesPageDto).
