@@ -929,3 +929,11 @@ User slice: "work on all the open github issues; triage, plan, design, implement
 - **#54 CLOSED.** TV signed-in parity UNCOVERED (shared fetcher, behavioral proof is mobile-side) —
   bundle deleted, so a fresh one is needed if TV parity is ever demanded.
 - Teardown clean (emul-stop, no daemons, no emulator, bundle gone).
+
+### Session 2026-10-23 batch 41 (#59 favorites stale ledger + #60 stale player entry — both closed)
+- **Two parallel jj lanes, merged linear:** 743d3fcf fix #59 (favorites feed endless paging regression from #54 — walkFill now revalidates Favorites rows older than the feed TTL via the shared fetcher; FavoritesStaleLedgerTest, TDD red→green) → a6c5267c fix #60 (player restores correct feed after back navigation — `navigateReplacing(route, poppedClass)` seam replaces the broken `popUpTo(entry.id)` idiom at all 4 call sites, MainActivity onOpenFeed + TvMainActivity sort/creator/niche; PlayerClusterReplaceNavTest) → 3df77ca9 style: ktlint fixes for the #59/#60 diffs.
+- **JVM gate PASS** (:feature:feed, 113 tests 0 failures; ktlint fixed in-batch).
+- **Device gates PASS for both** (API-35 emulator): #60 feed1 player → creator link → creator feed → BACK ×2 → feed1 grid restored with identical tile bounds, no stale player entry; #59 5 anon likes, Favorites deep-scrolled 8 page-loads, no dead end, no duplicates. #59 verified live (~40 paced probes, ≤15/5s intact).
+- **Issues #59 #60 CLOSED with evidence comments** (comment API; they'd been closed comment-less 2 min before the batch — comments posted after the fact). Pushed main → 3df77ca9.
+- **Residual:** TV re-eyeball of #60 on a TV AVD still owed (mobile AVD can't be TV-shaped).
+- **Session lesson:** 2 device-gate agent timeouts on the long gate — split device gates into small single-purpose agents with explicit sub-budgets, and reuse the already-live emulator instead of each agent booting its own.
