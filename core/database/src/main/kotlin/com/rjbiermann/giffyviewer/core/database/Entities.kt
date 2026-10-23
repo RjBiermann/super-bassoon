@@ -90,8 +90,12 @@ data class HideCountEntity(
 )
 
 /** Favorites page-key prefix — the [FeedPageDao.evictFavorites] like-pattern.
- *  Must stay "fav:v1" + ":p" (FeedSource.Favorites.keyBase, feature:feed). */
-const val FAVORITES_PAGE_PREFIX = "fav:v1:p"
+ *  Generation-agnostic on purpose: it stops before the generation slot, so
+ *  "fav:v%" sweeps the rows of EVERY favorites mapping generation
+ *  ("fav:v1:p<n>", "fav:v2:p<n>", …) — one favorites edit or refresh clears
+ *  the stale generations too. No other feed base starts with "fav:v". The
+ *  current generation lives in FeedSource.Favorites.keyBase (feature:feed). */
+const val FAVORITES_PAGE_PREFIX = "fav:v"
 
 /**
  * Custom feed definition (PLAN §7): named blend of creators, tags and niches.

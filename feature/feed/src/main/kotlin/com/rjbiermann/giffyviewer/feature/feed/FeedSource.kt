@@ -87,10 +87,13 @@ sealed interface FeedSource {
         override val ttlMs: Long get() = TTL_TRENDING
     }
 
-    /** Recency round-robin over favorited creators (PLAN §7). */
+    /** Recency round-robin over favorited creators (PLAN §7). The cache base
+     *  carries the mapping generation: #62 changed the page→content mapping,
+     *  so rows written by an older mapping generation can't be served as this
+     *  one's pages (#59 lesson: mapping changed, keys didn't). */
     @Serializable
     data object Favorites : FeedSource {
-        override val keyBase: String get() = "fav:v1"
+        override val keyBase: String get() = "fav:v2"
         override val ttlMs: Long get() = TTL_TRENDING
     }
 

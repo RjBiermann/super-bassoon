@@ -8,14 +8,18 @@ import com.rjbiermann.giffyviewer.core.network.GifsApi
 import com.rjbiermann.giffyviewer.core.network.dto.GifsPageDto
 import com.rjbiermann.giffyviewer.core.network.dto.toModel
 
+/** #62 favorites fan-out bound: creators fetched per fill (one limiter burst). */
+internal const val FAVORITES_CREATORS_PER_FILL = 5
+
 /**
  * One page = one fetch + cache write, shared by the RemoteMediator and the
  * paging source (the source fills an unfetched page itself: Paging consults
  * the mediator only when the source's data is exhausted, so a fast scroll
  * used to reach an unfetched page and stall the feed — user report).
  * Rate-limit invariant: every API request is limiter-accounted; a Favorites
- * fill issues one sub-fetch per favorited creator (#54 interleave), paced
- * sequentially by the shared limiter like every other multi-call path.
+ * fill issues one sub-fetch per creator in its round window (#62 fan-out
+ * bound), paced sequentially by the shared limiter like every other
+ * multi-call path.
  */
 class FeedPageFetcher(
     private val feed: FeedSource,
@@ -30,45 +34,53 @@ class FeedPageFetcher(
 ) {
     /** Fetches and caches [page]; false = nothing fetched (empty/degenerate). */
     suspend fun fill(page: Int): Boolean {
-        // Favorites rotation size (#5): one local DB read per fill — read
-        // separately from fetch's pool read, so the END decision below uses the
-        // same size the cached row's mapping assumed. A mid-fill favorites edit
-        // shifts the mapping entirely (accepted — a new generation refetches).
-        val rotationSize = if (feed is FeedSource.Favorites) favorites().size else 0
-        // (page - 1) / rotationSize > 0 = loop 1 or later: loop 0 has no
-        // previous loop to consult (no content probed yet).
-        // rotationSize is 0 for every non-Favorites feed (and an empty
-        // favorites set) — the division must stay guarded behind the and.
-        val loopOver = rotationSize > 0 && (page - 1) / rotationSize > 0
-        if (feed is FeedSource.Favorites && rotationSize > 0 && loopOver && previousRotationExhausted(page, rotationSize)) {
-            // #36 endless favorites: the PREVIOUS loop probed empty across the
-            // board — every creator's pool ran dry at its inner loop page, and
-            // inner pages only advance, so no later loop can regain content.
-            // Serve the honest end WITHOUT probing the dead loop again: the
-            // exhaustion cost is one dead rotation, never two.
+        // Favorites: ONE local read per fill (#62) drives both the page mapping
+        // and the END decision below, so the row's mapping and the exhaustion
+        // rule always agree. A mid-fill favorites edit shifts the mapping
+        // entirely (accepted — a new generation refetches).
+        val plan =
+            if (feed is FeedSource.Favorites) {
+                favoritesPagePlan(favorites(), favoritesSeed(), page, pageSize)
+            } else {
+                null
+            }
+        // (page - 1) / windowPages > 0 = round 1 or later: round 0 has no
+        // previous round to consult (no content probed yet). windowPages is 0
+        // for a non-Favorites feed and an empty favorites set — the divisions
+        // must stay guarded. For k <= FAVORITES_CREATORS_PER_FILL a round is a
+        // single page and the window stays k pages (the pre-#62 #36 margin);
+        // above it the window is the round's page count.
+        val windowPages = plan?.roundPages ?: 0
+        val loopOver = windowPages > 0 && (page - 1) / windowPages > 0
+        if (plan != null && loopOver && previousRotationExhausted(page, windowPages)) {
+            // #36 endless favorites: the PREVIOUS round probed empty across the
+            // board — every creator's pool ran dry at its inner page, and inner
+            // pages only advance, so no later round can regain content.
+            // Serve the honest end WITHOUT probing the dead round again: the
+            // exhaustion cost is one dead round, never two.
             return false
         }
-        val dto = fetch(page)
+        val dto = fetch(page, plan)
         val gifs = dto.gifs.map { it.toModel().toEntity(now()) }
-        if (feed is FeedSource.Favorites && gifs.isEmpty() && rotationSize == 0) {
+        if (plan != null && gifs.isEmpty() && plan.usernames.isEmpty()) {
             // Nothing favorited → don't pin an empty "no favorites" row (§5).
             return false
         }
         val nowMs = now()
         gifDao.upsertAll(gifs)
-        // #5/#36 empty-slot semantics: an empty slot mid-loop chains forward
-        // (a later loop's slot may still carry inner pages). An EMPTY BOUNDARY
+        // #5/#36 empty-slot semantics: an empty slot mid-round chains forward
+        // (a later round's slot may still carry inner pages). An EMPTY BOUNDARY
         // slot no longer ends the feed on its own (the old exhaustion-stride
         // rule stopped while other creators still had unfetched inner pages —
-        // user bug #36): keep chaining while the loop ONE rotation back was
+        // user bug #36): keep chaining while the round ONE rotation back was
         // not entirely empty. The pre-check above + this rule together bound
-        // the dead-pass cost at exactly ONE fully-empty rotation.
+        // the dead-pass cost at exactly ONE fully-empty round.
         val more =
             gifs.isNotEmpty() ||
                 when {
-                    feed !is FeedSource.Favorites || rotationSize == 0 -> false
-                    (page - 1) / rotationSize == 0 -> true
-                    else -> !previousRotationExhausted(page, rotationSize)
+                    plan == null || windowPages == 0 -> false
+                    (page - 1) / windowPages == 0 -> true
+                    else -> !previousRotationExhausted(page, windowPages)
                 }
         pageDao.upsert(
             FeedPageEntity(
@@ -81,26 +93,30 @@ class FeedPageFetcher(
         return more
     }
 
-    /** #36 pool-exhaustion rule: true when EVERY row of the rotation before
-     *  [page] exists and holds NO gif — a full loop that wanted content and
-     *  got none. Inner pages only advance, so no later loop can regain
+    /** #36 pool-exhaustion rule: true when EVERY row of the round before
+     *  [page] exists and holds NO gif — a full round that wanted content and
+     *  got none. Inner pages only advance, so no later round can regain
      *  content for a creator that is past its pool end. Missing rows count
      *  as NOT exhausted (a slot never fetched is unknown, not empty), so a
-     *  partially-walked chain keeps probing up to the same rule. [rotationSize]
-     *  is the size read at fill time — mid-fill favorites-set edits shift the
-     *  mapping (accepted, as in [fetch]). */
+     *  partially-walked chain keeps probing up to the same rule. [roundPages]
+     *  is the plan's round length (= the exhaustion window), read before the
+     *  fetch — a mid-fill favorites-set edit shifts the mapping (accepted,
+     *  as in [fetch]). */
     private suspend fun previousRotationExhausted(
         page: Int,
-        rotationSize: Int,
+        roundPages: Int,
     ): Boolean {
-        val loopStart = page - rotationSize
+        val loopStart = page - roundPages
         if (loopStart < 1) return false
         return (loopStart until page).all { slot ->
             pageDao.page(feedPageKey(feed, slot))?.gifIds?.isEmpty() == true
         }
     }
 
-    private suspend fun fetch(page: Int): GifsPageDto =
+    private suspend fun fetch(
+        page: Int,
+        plan: FavoritesPlan?,
+    ): GifsPageDto =
         when (feed) {
             is FeedSource.Search ->
                 api.search(
@@ -109,43 +125,7 @@ class FeedPageFetcher(
                     page = page,
                     order = feed.sort.ifEmpty { "trending" },
                 )
-            is FeedSource.Favorites -> {
-                // ponytail: a changed favorite set shifts the mapping until the
-                // cache refreshes (read-time filter in FeedPagingSource keeps
-                // unfavorited rows out). The mediator guards an empty favorite set,
-                // but the paging source self-fills unfetched pages too — a fresh
-                // install with zero favorited creators walks an unfetched Favorites
-                // page → degenerate empty page, not a divide-by-zero (live-proven
-                // on TV36).
-                // #5 shuffle-on-refresh: the volatile seed drives loop 0's creator
-                // order; #36 endless-favorites: each LOOP past loop 0 re-shuffles
-                // the order with a new derived seed (favoritesLoopOrder).
-                // #54 interleave: ONE fill fetches EVERY creator — the page's gif
-                // list is the round-robin merge of all creators' shares
-                // (ceil(pageSize/creators) each), so a screenful alternates creators
-                // instead of running one creator for 20 gifs. Inner pages advance
-                // one per PAGE (inner = page): a (creator, inner page) pair is
-                // served by exactly one page — no duplicates, no loss — so the #36
-                // exhaustion machinery works unchanged. Each fill's sub-fetches are
-                // limiter-paced sequential API calls (still counted requests).
-                val creators = favorites()
-                if (creators.isEmpty()) {
-                    GifsPageDto()
-                } else {
-                    val order = favoritesLoopOrder(creators, favoritesSeed(), (page - 1) / creators.size)
-                    val perCreator = (pageSize + creators.size - 1) / creators.size
-                    val chunks =
-                        List(creators.size) { i ->
-                            api
-                                .userGifs(
-                                    username = order[(page - 1 + i) % creators.size],
-                                    count = perCreator,
-                                    page = page,
-                                ).gifs
-                        }
-                    GifsPageDto(gifs = interleaveChunks(chunks))
-                }
-            }
+            is FeedSource.Favorites -> favoritesPage(plan)
             is FeedSource.ForYou -> api.feedForYou(count = pageSize, page = page)
             is FeedSource.Niche ->
                 api.nicheGifs(
@@ -202,6 +182,83 @@ class FeedPageFetcher(
                 api.search(searchText = "", order = feed.range, count = pageSize, page = page)
             else -> api.trendingPopular(count = pageSize, page = page)
         }
+
+    /** #62: one sub-fetch per creator in the round window, at the round's inner
+     *  page, merged round-robin (#54 interleave). Each fill's sub-fetches are
+     *  limiter-paced sequential API calls (still counted requests); the window
+     *  rotates per page, so consecutive pages surface new creators. No
+     *  favorites → empty page (the paging source self-fills unfetched pages
+     *  too: a fresh install with zero favorited creators walks an unfetched
+     *  Favorites page → degenerate empty page, not a divide-by-zero,
+     *  live-proven on TV36). A changed favorite set shifts the mapping until
+     *  the cache refreshes (read-time filter in FeedPagingSource keeps
+     *  unfavorited rows out). */
+    private suspend fun favoritesPage(plan: FavoritesPlan?): GifsPageDto {
+        if (plan == null || plan.usernames.isEmpty()) return GifsPageDto()
+        val chunks =
+            plan.usernames.map { username ->
+                api.userGifs(username = username, count = plan.perCreator, page = plan.innerPage).gifs
+            }
+        return GifsPageDto(gifs = interleaveChunks(chunks))
+    }
+}
+
+/** #62 favorites page mapping (pure, unit-tested) for [page] of [creators]. */
+internal data class FavoritesPlan(
+    /** The creators this fill fetches — one round-window of the favorite set. */
+    val usernames: List<String>,
+    /** The creators' inner page (round number + 1). */
+    val innerPage: Int,
+    /** Gifs per creator: ceil(pageSize / window size). */
+    val perCreator: Int,
+    /** Page count of one round = the exhaustion window: rounds of this many
+     *  pages cover the whole favorite set at a single inner page. For a set
+     *  that fits one fan-out it is the set size — the pre-#62 window, so the
+     *  #36 "one empty page never ends the feed" margin is unchanged there.
+     *  0 = no creators (nothing to fetch, nothing to exhaust). */
+    val roundPages: Int,
+)
+
+/** #62 fan-out bound (pure, unit-tested): [FAVORITES_CREATORS_PER_FILL]
+ *  creators per fill — one limiter burst — instead of the whole favorite set
+ *  (#54 cost k limiter-paced requests per page, so a screenful scaled with k
+ *  and the dead round at the pool's end cost k²). A ROUND walks the whole set
+ *  at ONE inner page across ceil(k / 5) pages; consecutive rounds advance the
+ *  inner page, so a (creator, inner page) pair is still served by exactly one
+ *  page — no duplicates, no loss — and the #36 exhaustion machinery works on
+ *  the round's page count. Leader rotation (#54 novelty) and the loop
+ *  reshuffle (#36) are unchanged.
+ *
+ *  k <= 5 is byte-identical to the #54 mapping: one page per round holds the
+ *  whole set at inner page = page, perCreator = ceil(pageSize / k), creator
+ *  order = the loop order rotated by (page-1) % k. */
+internal fun favoritesPagePlan(
+    creators: List<String>,
+    seed: Long,
+    page: Int,
+    pageSize: Int,
+): FavoritesPlan {
+    val size = creators.size
+    if (size == 0) return FavoritesPlan(emptyList(), page, 0, 0)
+    val roundPages = (size + FAVORITES_CREATORS_PER_FILL - 1) / FAVORITES_CREATORS_PER_FILL
+    val round = (page - 1) / roundPages
+    // k <= 5: one page per round, so every page advances the inner page — the
+    // pre-#62 mapping. Its reshuffle generation stays (page-1)/k (one
+    // generation per k pages) so the served order is byte-identical.
+    val generation = if (roundPages == 1) (page - 1) / size else round
+    val order = favoritesLoopOrder(creators, seed, generation)
+    val windowStart = ((page - 1) % roundPages) * FAVORITES_CREATORS_PER_FILL
+    val windowSize = minOf(FAVORITES_CREATORS_PER_FILL, size - windowStart)
+    // Leader rotation: a page doesn't always start with the same creator. With
+    // one page per round the window is the whole set, so this is exactly the
+    // #54 order[(page-1+i) % k].
+    val lead = (page - 1) % windowSize
+    return FavoritesPlan(
+        usernames = List(windowSize) { i -> order[windowStart + (lead + i) % windowSize] },
+        innerPage = round + 1,
+        perCreator = (pageSize + windowSize - 1) / windowSize,
+        roundPages = if (roundPages == 1) size else roundPages,
+    )
 }
 
 /** #5 shuffle-on-refresh rotation: creators rotated forward by

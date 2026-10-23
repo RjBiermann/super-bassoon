@@ -131,7 +131,7 @@ class FavoritesRoundRobinExhaustionTest {
             // [b,c,a] (offset 7 % 3 = 1). One API call per fill — the rate-limit
             // invariant rides on the fetch count per page, unchanged.
             assertEquals(listOf("b", "c", "a"), api.calls.take(3).map { it.first })
-            assertEquals("an early empty slot must still chain forward", "fav:v1:p2", pageDao.pages["fav:v1:p1"]!!.nextPageKey)
+            assertEquals("an early empty slot must still chain forward", "fav:v2:p2", pageDao.pages["fav:v2:p1"]!!.nextPageKey)
         }
 
     @Test

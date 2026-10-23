@@ -60,10 +60,12 @@ interface FeedPageDao {
      *  change (quick-toggle, Settings unfavorite, backup import) invalidates
      *  the cached round-robin pages — they were built against the OLD set, so
      *  the read-time favorites filter dropped every row. Evicting makes the
-     *  next load self-fill against the NEW set. The prefix pins "fav:v1"
-     *  (FeedSource.Favorites.keyBase — the feature:feed contract test guards
-     *  drift); the key lives here because every favorites-write module reaches
-     *  this DAO (feature:settings has no feature:feed dependency). */
+     *  next load self-fill against the NEW set. The prefix is
+     *  generation-agnostic ("fav:v" + ":p") so it also sweeps rows from
+     *  older mapping generations (#62 fan-out bound; FeedSource.Favorites
+     *  carries the current one — the feature:feed contract test guards drift);
+     *  the key lives here because every favorites-write module reaches this
+     *  DAO (feature:settings has no feature:feed dependency). */
     @Query("DELETE FROM feed_pages WHERE pageKey LIKE :prefix || '%'")
     suspend fun evictFavorites(prefix: String = FAVORITES_PAGE_PREFIX)
 }
