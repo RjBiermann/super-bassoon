@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Giffy Viewer — TV mockup: tv-player.svg (controls REVEALED state)
+  Source: app-tv/src/main/kotlin/com/rjbiermann/giffyviewer/tv/TvPlayerScreen.kt
+          (+ core/ui PlayerOverlay.kt overlay tokens, CreatorLabel)
+  Keymap (issue #48): controls start HIDDEN; OK/Center reveals, BACK hides then
+  exits; UP/DOWN switch while hidden; LEFT/RIGHT seek ±10s with "m:ss / m:ss"
+  flash; short CENTER = play/pause; hold-Center / MENU = quick actions.
+  Revealed cluster (bottom-left): creator + description pill + niche pills
+  (tv-material Surface, issue-#7 focus tokens). Thin progress line is always on.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" font-family="DM Sans, sans-serif">
+  <!-- Player body: pure black (Color.Black background) -->
+  <rect x="0" y="0" width="1920" height="1080" fill="#000000"/>
+
+  <!-- Poster under the TextureView surface (issue #8), ContentScale.Fit —
+       letterboxed 16:9 frame in the gif's avgColor -->
+  <rect x="0" y="34" width="1920" height="1012" fill="#2A2026"/>
+  <rect x="210" y="120" width="420" height="266" fill="#3B2A32"/>
+  <rect x="1330" y="640" width="380" height="240" fill="#33261E"/>
+
+  <!-- Thin progress line (mobile parity, always visible):
+       track = PlayerOverlay.track (white 30%), fill = colorScheme.secondary #E3BDC4.
+       Shown at ~40% elapsed. -->
+  <rect x="0" y="1076" width="1920" height="4" fill="#FFFFFF" fill-opacity="0.3"/>
+  <rect x="0" y="1076" width="768" height="4" fill="#E3BDC4"/>
+
+  <!-- ===== Revealed controls cluster (AnimatedVisibility, bottom-left) ===== -->
+  <g id="revealed-cluster">
+    <!-- CreatorLabel, titleMedium 16sp, white over video -->
+    <text x="24" y="958" font-size="24" fill="#FFFFFF">@b0ssfight</text>
+    <circle cx="206" cy="950" r="9" fill="#FFFFFF"/>
+
+    <!-- Description: max 2 lines in the dark pill scrim
+         (PlayerOverlay.secondaryOnVideoBackdrop, text 95% onSurface) -->
+    <rect x="24" y="974" width="664" height="34" rx="6" fill="#000000" fill-opacity="0.8"/>
+    <text x="30" y="998" font-size="21" fill="#F7E9EC" fill-opacity="0.95">8-bit boss fight loop · 2.4k uses · sound on</text>
+
+    <!-- Niche pills (≤3): pill 1 FOCUSED — focused fill primaryContainer
+         #7D0030, text #FFD9E1, 3dp #FF668F border; pill 2 at rest — black 80%
+         backdrop, secondary #E3BDC4 text -->
+    <rect x="22" y="1014" width="118" height="58" rx="16" fill="none" stroke="#FF668F" stroke-width="9" stroke-opacity="0.18"/>
+    <rect x="24" y="1016" width="114" height="52" rx="14" fill="#7D0030" stroke="#FF668F" stroke-width="4.5"/>
+    <text x="81" y="1049" font-size="20" fill="#FFD9E1" text-anchor="middle">retro</text>
+    <rect x="152" y="1020" width="118" height="48" rx="14" fill="#000000" fill-opacity="0.8"/>
+    <text x="211" y="1051" font-size="20" fill="#E3BDC4" text-anchor="middle">pixelart</text>
+  </g>
+
+  <!-- Seek feedback (transient, shows while seeking): "1:23 / 2:45"
+       — depicted in its faded state for reference -->
+  <g id="seek-flash-reference" opacity="0.55">
+    <text x="960" y="1038" font-size="26" fill="#FFFFFF" text-anchor="middle">1:23 / 2:45</text>
+  </g>
+</svg>

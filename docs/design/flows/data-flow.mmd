@@ -1,0 +1,84 @@
+%% Derived from: feature/feed/FeedViewModel.kt (generation wiring, forceRefresh, notifyRefreshError),
+%% feature/feed/FeedRepository.kt (paging router, For-You context memo), feature/feed/FeedMediator.kt,
+%% FeedPageFetcher.kt, FeedPagingSource.kt (cache-first read chain + read-time filter),
+%% feature/feed/ForYouNetworkPagingSource.kt + LikedNetworkPagingSource.kt (network-live feeds),
+%% core/database/ContentFilter.kt (the single choke point), core/network/NetworkModule.kt.
+%% Stage 0 note: the promoted-drop promised by AGENTS.md has NO code yet (verified 2026-10-23,
+%% grep across all modules incl. tests: only GifDto.promoted and the LiveSmokeTest probe exist).
+flowchart TD
+    subgraph VM["FeedViewModel — one feed at a time, activity-scoped"]
+        gen["source + refreshGen combined — flatMapLatest<br/>swaps the pager per feed + generation.<br/>Each new generation first emits<br/>resetGenerationPagingData: last gen's tiles<br/>and latched error are dropped (A2/S3 fix)"]
+    end
+
+    subgraph Repo["FeedRepository.paging(feed)"]
+        cached["Cached feeds — Trending, Search, Creator,<br/>Niche, Custom, Favorites, TopRanged...<br/>Pager over FeedPagingSource + FeedMediator"]
+        live["Network-live feeds — Liked + For You:<br/>never cached, no Room, no RemoteMediator.<br/>For-You context (scope, follows) memoized 5 min"]
+    end
+
+    subgraph Store["Room giffy.db — source of truth"]
+        pages[("feed_pages: ordered gif ids + nextPageKey + fetchedAt")]
+        gifs[("gifs")]
+    end
+
+    subgraph Mediator["FeedMediator / FeedPageFetcher — one page = one fetch + one cache write"]
+        ttl["REFRESH: TTL gate — skip network while the<br/>first page is fresh; a cached EMPTY first page is<br/>never fresh (#30). forceRefresh (pull-to-refresh)<br/>bypasses the TTL once per generation"]
+        append["APPEND: follow nextPageKey, or derive the<br/>page from the cache when fast scroll outran the<br/>source; the PagingSource self-fills unfetched<br/>pages through the same fetcher"]
+        api["GifsApi fetch — dto.toModel().toEntity()"]
+        write["gifDao.upsertAll + pageDao.upsert(row)"]
+    end
+
+    subgraph Read["FeedPagingSource read chain"]
+        reload["Filter-set session reload:<br/>ContentFilter.refreshFrom + refreshBlockedFeeds"]
+        dedup["Upstream-overlap DB dedup +<br/>per-generation sessionSeen"]
+        stage["Stage 0 (SPEC'D-NOT-SCHEDULED,<br/>no code today — verified 2026-10-23):<br/>promoted:true drop. Only GifDto.promoted<br/>and the live probe exist; probe asserts 0<br/>promoted items in public feeds"]
+        filterChain["ContentFilter.allow, then read-time prefs:<br/>verified-only, favorites scope, orientation,<br/>untagged-only, duration, resolution,<br/>shuffle order, For-You scope"]
+        walk["Filtered-empty walk — bounded hops<br/>(MAX_WALK_HOPS) to the first non-empty page;<br/>a page-level 400 = end of pool"]
+    end
+
+    subgraph Screen["FeedScreen / PlayerScreen"]
+        ui["LazyPagingItems — collects PagingData of Gif"]
+        fallback["notifyRefreshError — seeded default (For You)<br/>failing before any user navigation with no<br/>content → revert to Trending (Room-backed,<br/>airplane-mode gate 3)"]
+    end
+
+    subgraph Net["OkHttp chain per request"]
+        chain["BrowserIdentityInterceptor → AuthInterceptor<br/>(Bearer; 401 = one token-refresh retry) →<br/>RateLimitInterceptor → RetryInterceptor (breaker)<br/>— see rate-limit-breaker.mmd"]
+    end
+
+    gen --> cached
+    gen --> live
+
+    cached -- "REFRESH" --> ttl
+    ttl -- "fresh cached page" --> readPage
+    ttl -- "stale / forced / empty page" --> api
+    append --> api
+    cached -- "APPEND / self-fill" --> append
+    api --> write
+    write --> pages
+    write --> gifs
+    readPage["Read the page row + gifs<br/>(offline-first: airplane mode renders cache)"]
+
+    readPage --> dedup
+    dedup --> reload
+    reload --> filterChain
+    filterChain --> stage
+    filterChain --> walk
+    filterChain --> ui
+    walk --> ui
+
+    live --> filterChain
+    live --> walk
+    live -- "per-page API call" --> chain
+
+    ui --> user(["Rendered feed / player"])
+    ui -- "load error, no content, no user nav yet" --> fallback
+    fallback --> Trending["source = FeedSource.Trending<br/>(cached grid still renders)"]
+
+    server(("Upstream site API"))
+    chain --> server
+
+    force["forceRefresh bumps refreshGen"]
+    ui -- "pull-to-refresh / Refresh pill" --> force
+    force --> gen
+
+    family["No WorkManager — background refresh is silent<br/>network-on-open (stale-while-revalidate)"]
+    ttl -.-> family

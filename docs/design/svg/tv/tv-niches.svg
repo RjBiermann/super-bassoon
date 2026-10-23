@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Giffy Viewer — TV mockup: tv-niches.svg (first row FOCUSED)
+  Source: app-tv/src/main/kotlin/com/rjbiermann/giffyviewer/tv/TvNiches.kt
+  Niches browser (mobile NichesScreen parity): title, category chips + Sort
+  button, vertical list of niche rows — focusable Surface (name block, opens
+  feed) + About TextButton per row. Focused row = primaryContainer fill +
+  3dp primary border (issue-#7 tokens); pinned rows show a PushPin icon.
+  Short CENTER opens the feed; hold-Center / MENU toggles the home pin.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" font-family="DM Sans, sans-serif">
+  <rect x="0" y="0" width="1920" height="1080" fill="#161617"/>
+
+  <text x="24" y="58" font-size="33" font-weight="600" fill="#F7E9EC">Niches</text>
+
+  <!-- Category chips (M3 FilterChip + giffyFocus): "All" selected
+       (secondaryContainer #5E4349 / #FBD9E1); others unselected. -->
+  <rect x="24" y="84" width="84" height="48" rx="12" fill="#5E4349"/>
+  <text x="66" y="114" font-size="21" fill="#FBD9E1" text-anchor="middle">All</text>
+  <rect x="116" y="84" width="106" height="48" rx="12" fill="none" stroke="#51444A" stroke-width="1.5"/>
+  <text x="169" y="114" font-size="21" fill="#DCA1AB" text-anchor="middle">Retro</text>
+  <rect x="230" y="84" width="112" height="48" rx="12" fill="none" stroke="#51444A" stroke-width="1.5"/>
+  <text x="286" y="114" font-size="21" fill="#DCA1AB" text-anchor="middle">Anime</text>
+  <rect x="350" y="84" width="94" height="48" rx="12" fill="none" stroke="#51444A" stroke-width="1.5"/>
+  <text x="397" y="114" font-size="21" fill="#DCA1AB" text-anchor="middle">Art</text>
+  <rect x="452" y="84" width="112" height="48" rx="12" fill="none" stroke="#51444A" stroke-width="1.5"/>
+  <text x="508" y="114" font-size="21" fill="#DCA1AB" text-anchor="middle">Music</text>
+
+  <!-- Sort button (tv Button, transparent at rest) opens the M3 sort menu -->
+  <text x="1896" y="117" font-size="21" fill="#F7E9EC" text-anchor="end">Sort: Trending</text>
+
+  <!-- ===== Row 1 — FOCUSED niche row (Surface fills primaryContainer) ===== -->
+  <g id="niche-row-focused">
+    <rect x="22" y="168" width="1244" height="766" rx="18" fill="none" stroke="#FF668F" stroke-width="9" stroke-opacity="0.18"/>
+    <rect x="24" y="170" width="1240" height="760" rx="18" fill="#7D0030" stroke="#FF668F" stroke-width="4.5"/>
+    <!-- 16:9 preview tile (drawn at reduced scale — see the note below) -->
+    <rect x="42" y="182" width="1204" height="677" rx="12" fill="#3A2A2E"/>
+    <rect x="120" y="260" width="300" height="188" fill="#47333A"/>
+    <!-- Name row: titleMedium + PushPin icon (pinned) -->
+    <text x="42" y="896" font-size="24" font-weight="500" fill="#FFD9E1">Retro Gaming</text>
+    <g transform="translate(208,878) rotate(45)">
+      <rect x="-4" y="-2" width="8" height="14" rx="2" fill="#FFD9E1"/>
+      <line x1="0" y1="12" x2="0" y2="20" stroke="#FFD9E1" stroke-width="3"/>
+      <line x1="-6" y1="12" x2="6" y2="12" stroke="#FFD9E1" stroke-width="3"/>
+    </g>
+    <text x="42" y="924" font-size="21" fill="#FFD9E1" fill-opacity="0.9">24,180 gifs · 96,400 subscribers</text>
+  </g>
+  <!-- About (M3 TextButton, primary-tinted label) — second focusable of the row -->
+  <text x="1876" y="556" font-size="21" fill="#FF668F" text-anchor="middle">About</text>
+
+  <!-- ===== Row 2 — unfocused: no fill (containerColor = background),
+       content only; partially below the fold ===== -->
+  <g id="niche-row-unfocused">
+    <rect x="42" y="962" width="1204" height="118" rx="12" fill="#2C3644"/>
+  </g>
+
+  <!-- Note: this frame draws preview tiles at reduced scale to show two
+       rows; real tiles render full-width (fillMaxWidth, 16:9). -->
+  <g font-size="18" fill="#9C7A80">
+    <text x="1310" y="200">Note: preview tiles drawn at reduced scale —</text>
+    <text x="1310" y="226">real tiles render full-width, 16:9 (crop).</text>
+  </g>
+</svg>

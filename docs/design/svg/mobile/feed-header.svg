@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="452" height="420" viewBox="0 0 452 420">
+<rect x="0" y="0" width="452" height="420" fill="#100E14"/>
+<text x="20" y="34" font-family="Roboto, sans-serif" font-size="13" fill="#E6E1E5">Shared components — FeedHeader.kt (identity headers, info-only)</text>
+<rect x="20" y="408" width="12" height="12" fill="#1C1B1F" stroke="#938F99" stroke-width="1"/>
+<text x="36" y="417.5" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">surface</text>
+<rect x="94" y="408" width="12" height="12" fill="#E6E1E5" stroke="#938F99" stroke-width="1"/>
+<text x="110" y="417.5" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">onSurface</text>
+<rect x="180" y="408" width="12" height="12" fill="#D0BCFF" stroke="#938F99" stroke-width="1"/>
+<text x="196" y="417.5" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">primary</text>
+<rect x="254" y="408" width="12" height="12" fill="#CAC4D0" stroke="#938F99" stroke-width="1"/>
+<text x="270" y="417.5" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">onSurfaceVariant</text>
+<rect x="382" y="408" width="12" height="12" fill="#938F99" stroke="#938F99" stroke-width="1"/>
+<text x="398" y="417.5" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">outline</text>
+<text x="20" y="64" font-family="Roboto, sans-serif" font-size="12" fill="#D0BCFF">CreatorFeedHeader (creator feeds):</text>
+<circle cx="40" cy="96" r="20" fill="#322F37" stroke="#938F99"/>
+<text x="70" y="92" font-family="Roboto, sans-serif" font-size="14" fill="#E6E1E5" font-weight="500">@username</text>
+<circle cx="186" cy="88" r="7" fill="#D0BCFF"/><path d="M 183 88 L 185 90.2 L 189 85.8" fill="none" stroke="#381E72" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="70" y="110" font-family="Roboto, sans-serif" font-size="12" fill="#CAC4D0">Short bio line, one line with ellipsis…</text>
+<text x="20" y="148" font-family="Roboto, sans-serif" font-size="12" fill="#CAC4D0">1,234 posts · 5,678 followers · 90,123 views</text>
+<text x="20" y="192" font-family="Roboto, sans-serif" font-size="12" fill="#D0BCFF">NicheFeedHeader (niche feeds):</text>
+<text x="20" y="220" font-family="Roboto, sans-serif" font-size="15" fill="#E6E1E5" font-weight="500">Niche name</text>
+<text x="20" y="242" font-family="Roboto, sans-serif" font-size="12" fill="#CAC4D0">Niche description, up to two lines with ellipsis…</text>
+<text x="20" y="264" font-family="Roboto, sans-serif" font-size="12" fill="#CAC4D0">12,345 members · 67,890 posts</text>
+<rect x="20" y="282" width="86" height="32" fill="#4A4458" rx="16.0"/>
+<text x="63.0" y="302.68" font-family="Roboto, sans-serif" font-size="13" fill="#E8DEF8" text-anchor="middle">Join</text>
+<text x="20" y="336" font-family="Roboto, sans-serif" font-size="12" fill="#D0BCFF">For You scope-selector row (logged-in only):</text>
+<rect x="20" y="348" width="38" height="32" fill="#4A4458" rx="16.0"/>
+<text x="39.0" y="368.68" font-family="Roboto, sans-serif" font-size="13" fill="#E8DEF8" text-anchor="middle">All</text>
+<rect x="66" y="348" width="78" height="32" fill="#1C1B1F" rx="16.0" stroke="#938F99" stroke-width="1"/>
+<text x="105.0" y="368.68" font-family="Roboto, sans-serif" font-size="13" fill="#CAC4D0" text-anchor="middle">Creators</text>
+<rect x="152" y="348" width="62" height="32" fill="#1C1B1F" rx="16.0" stroke="#938F99" stroke-width="1"/>
+<text x="183.0" y="368.68" font-family="Roboto, sans-serif" font-size="13" fill="#CAC4D0" text-anchor="middle">Niches</text>
+</svg>

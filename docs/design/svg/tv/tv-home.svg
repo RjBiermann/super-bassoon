@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Giffy Viewer — TV mockup: tv-home.svg
+  Source: app-tv/src/main/kotlin/com/rjbiermann/giffyviewer/tv/TvHomeScreen.kt
+          (+ core/ui Focus.kt, TvTheme.kt, core/ui Theme.kt palette)
+  10-foot vertical row lists (For You / Trending / Explore / Top This Week /
+  Favorites / Liked / Following). Focused cards carry the issue-#7 focus
+  tokens: 3dp primary border + glow, no zoom (CardScale.None).
+  Scale note: ~1.5 px per dp (1080p TV, common TV density).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" font-family="DM Sans, sans-serif">
+  <!-- Screen background: colorScheme.background #161617 -->
+  <rect x="0" y="0" width="1920" height="1080" fill="#161617"/>
+
+  <!-- Header: titleLarge 22sp — same slot as mobile GiffyScaffold title -->
+  <text x="24" y="58" font-size="33" font-weight="600" fill="#F7E9EC">Giffy Viewer</text>
+
+  <!-- ===== Row: For You (logged-in first row, site home order) ===== -->
+  <text x="24" y="112" font-size="21" font-weight="600" fill="#F7E9EC">For You</text>
+
+  <!-- Scope chips (ForYouScopeRow): M3 FilterChip + giffyFocus tokens.
+       Selected "All" = secondaryContainer #5E4349 / #FBD9E1;
+       unselected = transparent fill, outlineVariant #51444A rest ring. -->
+  <rect x="24" y="124" width="90" height="48" rx="12" fill="#5E4349"/>
+  <text x="69" y="154" font-size="21" fill="#FBD9E1" text-anchor="middle">All</text>
+  <rect x="138" y="124" width="146" height="48" rx="12" fill="none" stroke="#51444A" stroke-width="1.5"/>
+  <text x="211" y="154" font-size="21" fill="#DCA1AB" text-anchor="middle">Creators</text>
+  <rect x="300" y="124" width="130" height="48" rx="12" fill="none" stroke="#51444A" stroke-width="1.5"/>
+  <text x="365" y="154" font-size="21" fill="#DCA1AB" text-anchor="middle">Niches</text>
+
+  <!-- Cards: fixed 170dp row band (h=255px), width per gif aspect, 10dp gaps.
+       Poster placeholders use avgColor tones (surfaceVariant-family), 12dp corner radius. -->
+  <g id="for-you-row">
+    <rect x="24" y="190" width="281" height="255" rx="18" fill="#3A2A2E"/>
+    <rect x="320" y="190" width="127" height="255" rx="18" fill="#2C3A2E"/>
+    <!-- Audio badge (gif.hasAudio), top-end inside the card -->
+    <rect x="320" y="198" width="104" height="36" rx="10" fill="#000000" fill-opacity="0.45"/>
+    <text x="372" y="223" font-size="18" fill="#F7E9EC" text-anchor="middle">AUDIO</text>
+    <rect x="462" y="190" width="420" height="255" rx="18" fill="#3E2429"/>
+    <rect x="897" y="190" width="281" height="255" rx="18" fill="#333942"/>
+    <rect x="1193" y="190" width="420" height="255" rx="18" fill="#42272B"/>
+    <rect x="1628" y="190" width="281" height="255" rx="18" fill="#2E2733"/>
+  </g>
+  <!-- CreatorLabel captions (labelSmall 11sp), onSurfaceVariant #DCA1AB -->
+  <g font-size="16" fill="#DCA1AB">
+    <text x="30" y="463">@pixelmuse</text><circle cx="128" cy="458" r="5" fill="#DCA1AB"/>
+    <text x="326" y="463">@retrokit</text>
+    <text x="468" y="463">@loopfall</text><circle cx="556" cy="458" r="5" fill="#DCA1AB"/>
+    <text x="903" y="463">@vekt0r</text>
+    <text x="1199" y="463">@ditherdame</text>
+    <text x="1634" y="463">@scan_h</text><circle cx="1706" cy="458" r="5" fill="#DCA1AB"/>
+  </g>
+
+  <!-- ===== Row: Trending — FIRST CARD IS FOCUSED (D-pad focus ring) ===== -->
+  <text x="24" y="512" font-size="21" font-weight="600" fill="#F7E9EC">Trending</text>
+  <g id="trending-row">
+    <!-- Focused card: glow behind, then card, then 3dp primary border -->
+    <rect x="16" y="532" width="297" height="261" rx="26" fill="none" stroke="#FF668F" stroke-width="11" stroke-opacity="0.18"/>
+    <rect x="24" y="540" width="281" height="255" rx="18" fill="#3A2430"/>
+    <rect x="21" y="537" width="287" height="261" rx="20" fill="none" stroke="#FF668F" stroke-width="4.5"/>
+    <rect x="320" y="540" width="127" height="255" rx="18" fill="#2C3644"/>
+    <rect x="462" y="540" width="420" height="255" rx="18" fill="#3E3420"/>
+    <rect x="897" y="540" width="281" height="255" rx="18" fill="#2A3A2E"/>
+    <rect x="1193" y="540" width="420" height="255" rx="18" fill="#38222C"/>
+    <rect x="1628" y="540" width="162" height="255" rx="18" fill="#33263A"/>
+  </g>
+  <g font-size="16" fill="#DCA1AB">
+    <text x="30" y="813">@b0ssfight</text>
+    <text x="326" y="813">@cityloop</text>
+    <text x="468" y="813">@pastelray</text><circle cx="552" cy="808" r="5" fill="#DCA1AB"/>
+    <text x="903" y="813">@mosscore</text>
+    <text x="1199" y="813">@vinylghost</text>
+  </g>
+
+  <!-- ===== Row: Explore (Top Creators — avatar cards; rest of the list
+       continues below the fold: Top This Week / Favorites / Liked / Following) ===== -->
+  <text x="24" y="866" font-size="21" font-weight="600" fill="#F7E9EC">Explore</text>
+  <g id="explore-row">
+    <rect x="24" y="892" width="230" height="240" rx="18" fill="#221F20"/>
+    <circle cx="139" cy="988" r="72" fill="#4A3A40"/>
+    <rect x="269" y="892" width="230" height="240" rx="18" fill="#221F20"/>
+    <circle cx="384" cy="988" r="72" fill="#3D4550"/>
+    <rect x="514" y="892" width="230" height="240" rx="18" fill="#221F20"/>
+    <circle cx="629" cy="988" r="72" fill="#51413A"/>
+  </g>
+</svg>

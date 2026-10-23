@@ -1,0 +1,61 @@
+%% Derived from: app-mobile/src/main/kotlin/com/rjbiermann/giffyviewer/mobile/MainActivity.kt
+%% (Host gates, route objects, MobileNavHost), feature/feed/FeedViewModel.kt (seedSource
+%% For-You/Trending rule), core/ui/PinLock.kt + core/ui/AgeGate.kt (app-level gates).
+flowchart TD
+    launch([App launch]) --> gatePin{PIN set?
+    settings.pinHash != null}
+
+    gatePin -- "yes + not unlocked" --> PinLock["PinLockScreen
+    verifies via settings.verifyPin"]
+    PinLock -- unlock --> nav
+    gatePin -- "no pin" --> gateAge{age confirmed?
+    settings.ageConfirmed}
+    gatePin -- "pin exists, then unlock" --> gateAge
+
+    gateAge -- "not confirmed" --> AgeGate["AgeGate"]
+    AgeGate -- "I am 18 or older" --> confirm["settings.confirmAge()
+    persists"] --> nav
+    AgeGate -- "Exit" --> exit(["finishAffinity()"])
+
+    gateAge -- confirmed --> nav["MobileNavHost
+    (start: MainFeedDefault)"]
+
+    nav --> defaultFeed["MainFeedDefault — NO source arg:
+    FeedViewModel.seedSource = For You when a
+    token exists, else Trending"]
+    nav --> feedRoute["MainFeed(source: FeedSource)
+    custom NavType arg, non-null"]
+    nav --> search["MainSearch"]
+    nav --> niches["MainNiches"]
+    nav --> nicheAbout["MainNicheAbout(id, name)"]
+    nav --> following["MainFollowing"]
+    nav --> collections["MainCollections"]
+    nav --> customFeeds["MainCustomFeeds"]
+    nav --> settings["MainSettings"]
+    nav --> player["MainPlayer(startIndex)"]
+
+    defaultFeed -- "open gif" --> player
+    feedRoute -- "open gif" --> player
+
+    search -- "submit q (recorded to history)" --> feedRoute
+    search -- "creator row" --> feedRoute
+    search -- "niche row" --> feedRoute
+    search -- "BACK" --> back("popBackStack — search stays
+    on the stack, BACK returns to the draft")
+
+    niches -- "open niche" --> feedRoute
+    niches -- "about" --> nicheAbout
+    nicheAbout -- "creator / niche link" --> feedRoute
+    following -- "creator / niche link" --> feedRoute
+    collections -- "BACK" --> back
+    customFeeds -- "open feed" --> feedRoute
+    settings -- "BACK" --> back
+
+    player -- "overlay tag / creator / niche link
+    = EXIT: navigate(MainFeed) +
+    popUpTo(player) inclusive" --> feedRoute
+    player -- "like while logged out" --> settings
+    player -- "BACK" --> back
+
+    player -- "on top" --> screenOn["window FLAG_KEEP_SCREEN_ON"]
+    player -- "not on top" --> screenOff["flag cleared"]

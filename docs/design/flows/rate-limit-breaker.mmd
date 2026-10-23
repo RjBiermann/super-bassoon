@@ -1,0 +1,57 @@
+%% Derived from: core/network/NetworkModule.kt (client build, interceptor order, image client),
+%% core/network/rate/RateLimiter.kt (RollingWindowRateLimiter, cooldown, RateLimitBus),
+%% core/network/rate/RetryInterceptor.kt (429/5xx/IOException handling), core/network/rate/CircuitBreaker.kt,
+%% feature/feed/FeedViewModel.kt + AGENTS-NETWORK.md (invariant ownership).
+flowchart TD
+    req(["API request — every interceptor travels the full chain"]) --> decode["circuit breaker open?
+    (CircuitBreaker.isOpen)"]
+    decode -- "yes" --> synth503["synthetic retryable 503 response with
+    Retry-After = time until reopen — never a thrown
+    exception (a throw crashed the app live, 2026-09-30)"]
+    decode -- "no" --> limiter["RateLimitInterceptor — first in chain:
+    RollingWindowRateLimiter.acquire
+    15 requests in any rolling 5s window
+    (browser-like budget, retuned 2026-10-03);
+    waits out a 429 cooldown first"]
+    limiter -- "slot granted" --> attempt["RetryInterceptor — attempt 1 of 4"] --> site["call the site (with BrowserIdentity +
+    Auth interceptors already applied)"]
+
+    site -- "200..499 except 429" --> ok["recordSuccess + publish Recovered
+    on the RateLimitBus (UI cooling-down
+    indicator clears)"]
+    ok --> done(["response returned"])
+
+    site -- "429" --> cool["honor Retry-After, clamped
+    min 5s, max retryAfter + 30s:
+    limiter.startCooldown + bus publish
+    CoolingDown (429 is throttling,
+    NOT a breaker failure)"]
+    cool --> retry["retry the attempt"] --> limiter
+
+    site -- "500..599 or IOException" --> backoff["backoff 1s / 4s / 15s + 50-150% jitter,
+    max 3 retries — a limiter slot is reserved
+    BEFORE each backoff sleep (never breaks
+    the rolling-window invariant)"]
+    backoff --> retry
+    backoff -- "attempts exhausted" --> oneFailure["exactly ONE breaker.recordFailure per
+    EXHAUSTED request (#58 — one per attempt
+    opened the circuit for every feed at once)"]
+    oneFailure --> throwex["throw IOException — surfaces
+    as a retryable error to Paging"]
+
+    chk["CircuitBreaker: 3 consecutive failures
+    (IOException or any 5xx call) → open for
+    5 minutes; any success resets the count.
+    checkOrThrow throws CircuitOpenException
+    (retryAtEpochMs) to eligible callers."]
+
+    synth503 --> done
+
+    subgraph imageclient["#58 image client (Coil posters) — separate OkHttpClient"]
+        imgShared["keeps: BrowserIdentity, Auth,
+        the SHARED limiter (the <=15/5s invariant
+        covers media too)"]
+        imgMissing["drops: RetryInterceptor — a failed
+        poster load only fails its own image, it
+        never retries into the breaker"]
+    end

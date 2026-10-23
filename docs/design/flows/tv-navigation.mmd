@@ -1,0 +1,75 @@
+%% Derived from: app-tv/src/main/kotlin/com/rjbiermann/giffyviewer/tv/TvMainActivity.kt
+%% (Root gates, route objects, TvNav, TvHomeDestination: header pills + More menu),
+%% app-tv/.../TvHomeScreen.kt (rows, quick-actions, focus preview), TvPlayerScreen.kt
+%% (player exits replace the popped entry), core/ui/PinLock.kt + AgeGate.kt.
+flowchart TD
+    launch(["App launch (offline banner is an overlay,
+    never LocalIsOnline on TV)"]) --> gatePin{"PIN set? (settings.pinHash)"}
+
+    gatePin -- "yes + not unlocked" --> PinLock["PinLockScreen
+    (shared compose; unlocked is NOT saveable —
+    a PIN demands re-entry after process death)"]
+    PinLock -- unlock --> gate
+    gatePin -- "no pin" --> gate{"age confirmed?"}
+    gatePin -- "unlock precedes age gate" --> gate
+
+    gate -- "not confirmed" --> AgeGate["AgeGate
+    (requestInitialFocus = true)"]
+    AgeGate -- "I am 18 or older" --> confirm["settings.confirmAge()"] --> nav
+    AgeGate -- "Exit" --> exit(["finishAffinity()"])
+
+    gate -- confirmed --> nav["TvNav — NavHost start: TvHome,
+    5% overscan margins, D-pad throughout"]
+
+    nav --> home["TvHome"]
+    nav --> feedRoute["TvFeed(source: FeedSource)
+    entry-scoped TvNicheFeedViewModel +
+    NicheJoinViewModel"]
+    nav --> search["TvSearch"]
+    nav --> niches["TvNiches"]
+    nav --> nicheAbout["TvNicheAbout(about: FeedSource.Niche)"]
+    nav --> collections["TvCollections"]
+    nav --> customFeeds["TvCustomFeeds"]
+    nav --> settings["TvSettings"]
+    nav --> player["TvPlayer(gifs: List Gif, startIndex)
+    payload = the loaded window, one-shot per
+    opened window; BACK relands the covered
+    grid resume-free"]
+
+    home -- "header pill: Settings" --> settings
+    home -- "header pill: Niches" --> niches
+    home -- "header pill: Search" --> search
+    home -- "pinned-niche pills" --> feedRoute
+    home -- "More ▾ item:" --> collections
+    home -- "More ▾ (Feature.CUSTOM_FEEDS)" --> customFeeds
+    home -- "More ▾ custom feed / pinned entry" --> feedRoute
+    home -- "row card Enter / OK (CenterHold)" --> player
+    home -- "creator link on card" --> feedRoute
+    home -- "niche link on card" --> feedRoute
+    home -- "quick-actions → Open feed
+    (full-page path, slice 10)" --> feedRoute
+    home -- "focus saveables (rowTitle, itemIndex)
+    rearmed on BACK" --> home
+
+    feedRoute -- "open gif → TvPlayer(gifs, index)" --> player
+    feedRoute -- "sort change REPLACES this entry
+    (navigate + popUpTo inclusive, no stacking)" --> feedRoute
+    feedRoute -- "open niche" --> feedRoute
+
+    player -- "BACK" --> back("popBackStack — covered surface
+    (home rows / grid) relands")
+    player -- "overlay creator link: replace the
+    popped player entry" --> feedRoute
+    player -- "overlay niche link: replace the
+    popped player entry" --> feedRoute
+
+    search -- "submit q" --> feedRoute
+    search -- "creator / niche row" --> feedRoute
+    search -- "BACK" --> back
+    niches -- "open niche" --> feedRoute
+    niches -- "about" --> nicheAbout
+    nicheAbout -- "creator / niche link" --> feedRoute
+    collections -- "BACK" --> back
+    customFeeds -- "open feed" --> feedRoute
+    settings -- "BACK (grid-column + feed-autoplay
+    sections hidden, TV row-height shown)" --> back

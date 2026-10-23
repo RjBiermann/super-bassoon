@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Giffy Viewer — TV mockup: tv-source-feed.svg
+  Source: app-tv/src/main/kotlin/com/rjbiermann/giffyviewer/tv/TvSourceFeedScreen.kt
+  Pinned feed full-page (niche/creator/custom). Title + Refresh / Sort & filter
+  icon buttons beside it (issue-#7 focus tokens on tv-material IconButton),
+  niche identity header + Join, For You-style filter chips (giffyFocus on M3
+  chips), body = home-page-style card bands (4 cards per band, FEED_ROW_CARDS).
+  Scale note: ~1.5 px per dp (1080p TV).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" font-family="DM Sans, sans-serif">
+  <rect x="0" y="0" width="1920" height="1080" fill="#161617"/>
+
+  <!-- Title row: source.title() as titleLarge + top-end icon buttons -->
+  <text x="24" y="58" font-size="33" font-weight="600" fill="#F7E9EC">Retro Gaming</text>
+
+  <!-- Refresh IconButton — unfocused: transparent fill, outlineVariant hairline ring -->
+  <g id="icon-refresh">
+    <circle cx="1794" cy="48" r="30" fill="none" stroke="#51444A" stroke-width="1.5"/>
+    <path d="M1810 48 a16 16 0 1 1 -6 -13" fill="none" stroke="#F7E9EC" stroke-width="4" stroke-linecap="round"/>
+    <path d="M1800 30 l5 6 l-8 2" fill="none" stroke="#F7E9EC" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <!-- Sort & filter IconButton — FOCUSED: primaryContainer fill + 3dp primary border -->
+  <g id="icon-sort-focused">
+    <circle cx="1866" cy="48" r="33" fill="none" stroke="#FF668F" stroke-width="8" stroke-opacity="0.18"/>
+    <circle cx="1866" cy="48" r="30" fill="#7D0030" stroke="#FF668F" stroke-width="4.5"/>
+    <line x1="1858" y1="36" x2="1858" y2="58" stroke="#FFD9E1" stroke-width="4" stroke-linecap="round"/>
+    <path d="M1852 52 l6 8 l6 -8" fill="none" stroke="#FFD9E1" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <line x1="1878" y1="60" x2="1878" y2="38" stroke="#FFD9E1" stroke-width="4" stroke-linecap="round"/>
+    <path d="M1872 44 l6 -8 l6 8" fill="none" stroke="#FFD9E1" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Niche identity header (#31): niche stats + Join (logged-in; tv Button,
+       transparent at rest) -->
+  <text x="24" y="98" font-size="21" fill="#DCA1AB">8,214 members · 12,480 gifs · 412,000 views</text>
+  <text x="1866" y="106" font-size="21" font-weight="600" fill="#F7E9EC" text-anchor="middle">Join</text>
+
+  <!-- Niche filter chips (NicheFilterChipsRow): orientation per-feed +
+       verified-only global. "Vertical" is selected AND focused: focused fill
+       primaryContainer #7D0030 / #FFD9E1 text + 3dp primary border. -->
+  <rect x="24" y="132" width="110" height="48" rx="12" fill="none" stroke="#51444A" stroke-width="1.5"/>
+  <text x="79" y="162" font-size="21" fill="#DCA1AB" text-anchor="middle">Global</text>
+  <rect x="142" y="132" width="84" height="48" rx="12" fill="none" stroke="#51444A" stroke-width="1.5"/>
+  <text x="184" y="162" font-size="21" fill="#DCA1AB" text-anchor="middle">Any</text>
+  <rect x="234" y="127" width="142" height="58" rx="14" fill="none" stroke="#FF668F" stroke-width="9" stroke-opacity="0.18"/>
+  <rect x="234" y="132" width="130" height="48" rx="12" fill="#7D0030" stroke="#FF668F" stroke-width="4.5"/>
+  <text x="299" y="162" font-size="21" fill="#FFD9E1" text-anchor="middle">Vertical</text>
+  <rect x="376" y="132" width="168" height="48" rx="12" fill="none" stroke="#51444A" stroke-width="1.5"/>
+  <text x="460" y="162" font-size="21" fill="#DCA1AB" text-anchor="middle">Horizontal</text>
+  <rect x="556" y="132" width="322" height="48" rx="12" fill="none" stroke="#51444A" stroke-width="1.5"/>
+  <text x="717" y="162" font-size="21" fill="#DCA1AB" text-anchor="middle">Verified creators only</text>
+
+  <!-- Band 1 (rows of exactly 4 cards): second card FOCUSED -->
+  <g id="band-1">
+    <rect x="24" y="210" width="420" height="255" rx="18" fill="#3A2A2E"/>
+    <rect x="456" y="207" width="426" height="261" rx="20" fill="none" stroke="#FF668F" stroke-width="4.5"/>
+    <rect x="451" y="202" width="436" height="271" rx="24" fill="none" stroke="#FF668F" stroke-width="11" stroke-opacity="0.18"/>
+    <rect x="459" y="210" width="420" height="255" rx="18" fill="#33283C"/>
+    <rect x="894" y="210" width="420" height="255" rx="18" fill="#2C3A2E"/>
+    <rect x="1329" y="210" width="420" height="255" rx="18" fill="#3E2429"/>
+  </g>
+  <g font-size="16" fill="#DCA1AB">
+    <text x="30" y="483">@arcade64</text>
+    <text x="465" y="483">@identitkbuilt</text>
+    <text x="900" y="483">@crtglow</text><circle cx="984" cy="478" r="5" fill="#DCA1AB"/>
+    <text x="1335" y="483">@joystickjenn</text>
+  </g>
+
+  <!-- Band 2 -->
+  <g id="band-2">
+    <rect x="24" y="520" width="420" height="255" rx="18" fill="#33263A"/>
+    <rect x="459" y="520" width="420" height="255" rx="18" fill="#2E2733"/>
+    <rect x="894" y="520" width="420" height="255" rx="18" fill="#3A3020"/>
+    <rect x="1329" y="520" width="420" height="255" rx="18" fill="#26353B"/>
+  </g>
+  <g font-size="16" fill="#DCA1AB">
+    <text x="30" y="793">@spritegx</text>
+    <text x="465" y="793">@dempalace</text><circle cx="560" cy="788" r="5" fill="#DCA1AB"/>
+    <text x="900" y="793">@tiledream</text>
+    <text x="1335" y="793">@wavetracker</text>
+  </g>
+
+  <!-- Band 3 (partial band at the content edge, slightly cropped below) -->
+  <g id="band-3">
+    <rect x="24" y="830" width="420" height="255" rx="18" fill="#2A3A2E"/>
+    <rect x="459" y="830" width="420" height="255" rx="18" fill="#3E2A36"/>
+  </g>
+</svg>

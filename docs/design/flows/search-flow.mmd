@@ -1,0 +1,53 @@
+%% Derived from: feature/search/SearchViewModel.kt + SearchScreen.kt, and the nav hosts
+%% app-mobile/.../MainActivity.kt (MainSearch route) + app-tv/.../TvMainActivity.kt (TvSearch);
+%% core/database/ContentFilter.kt (leak-zero on preview rows), Room search_history (cap 50).
+flowchart TD
+    open(["Search route opened — MainSearch (mobile) / TvSearch (TV);
+    mobile BACK walks to the draft: the route STAYS on the
+    stack after submit (#13 §8.4)"]) --> idle["Idle state: Room history rows (cap 50,
+    newest first) + trending tags (one fetch per VM,
+    failure degrades to an absent section)"]
+
+    tap(["Tap query field"]) --> typing["User types — SearchViewModel.query
+    (restored across process death via SavedStateHandle)"]
+    idle --> tap
+
+    typing -- "every trim+distinct value, after 300ms debounce" --> suggest["api.suggest(q) via mapLatest —
+    the previous in-flight request is CANCELLED;
+    empty query = ZERO requests, history only"]
+    suggest -- "drop first 8 rows into the field's dropdown" --> typing
+
+    idle -- "explore empty state (still open)" --> explore["Explore sections, one request each, VM-cached:
+    trending photos (stills), trending niches,
+    verified-creator strip (paged, no-growth = exhausted),
+    top-ranged bare-search strips (verified top7/top28/top)"]
+    explore -- "row tap → preview already filtered via allow()" --> rownav["Rows carry blocked-creator leak-zero
+    through the same ContentFilter choke point"]
+
+    tap -- "submit / enter" --> submit["SearchViewModel.submit:
+    record into Room history + trim cap 50,
+    clear the field"]
+    submit -- "opens the results feed" --> feed["MainFeed(FeedSource.Search) —
+    a FULL filterable feed: cache-first Room +
+    FeedMediator + TTL, read-time ContentFilter,
+    per-feed sort/adoption (day-1 lifecycle parity
+    with niche/creator feeds)"]
+
+    tap -- "scope tab selected (gifs / images / creators / niches)" --> scope["SearchViewModel.loadScope(scope, q):
+    VM-cached (12 most recent queries), no refetch
+    on recomposition or revisit — the per-tab budget
+    stays within the <=15-req/5s rolling window"]
+    idle -- "explore strip end-of-list" --> creators
+    
+    creators["Verified-creator pagination:
+    distinct-by-username merge;
+    no growth = end reached"] --> scope
+    scope -- "session reload first" --> chokepoint["ContentFilter.refreshFrom
+    + refreshBlockedFeeds (single choke point)"]
+    chokepoint -- "runCatching api.search / creatorSearchPreviews /
+    nicheSearchPreviews / tagsMatch" --> fetch["Result mapped + filter.allow —
+    rows for blocked creators/tags/keywords are DROPPED,
+    preview gif null → niche row dropped entirely"]
+    fetch -- "VM-owned job — a caller's LaunchedEffect
+    cancellation cannot leave the scope map empty
+    forever (issue #57)" --> ui["Result sheet / strip renders"]

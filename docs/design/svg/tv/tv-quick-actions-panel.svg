@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Giffy Viewer — TV mockup: tv-quick-actions-panel.svg (main pane)
+  Source: app-tv/src/main/kotlin/com/rjbiermann/giffyviewer/tv/TvQuickActions.kt
+          (+ component TvButton: issue-#7 focus tokens — at rest the M3 fill
+           primary/onPrimary, on focus primaryContainer/onPrimaryContainer +
+           3dp primary border)
+  MENU (or held Center ≥500 ms) on a focused card / player opens this dialog.
+  Shown: NON-player context (home card), so rows = Favorite / Open feed /
+  Follow / Pin / Add to… / Tags… / Show more / Block… / Close.
+  Scale note: ~1.5 px per dp (1080p TV). Dialog = 420 dp wide M3 Surface.
+  An open-issue note is annotated on the right (row height vs M3 guideline).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" font-family="DM Sans, sans-serif">
+  <!-- Screen behind the dialog scrim (M3 Dialog dims the background) -->
+  <rect x="0" y="0" width="1920" height="1080" fill="#161617"/>
+  <g id="dimmed-home-cards">
+    <rect x="300" y="560" width="420" height="310" fill="#3A2A2E"/>
+    <rect x="1220" y="120" width="520" height="330" fill="#2C3A2E"/>
+    <rect x="1180" y="760" width="560" height="240" fill="#3E2429"/>
+    <circle cx="1760" cy="240" r="90" fill="#4A3A40"/>
+  </g>
+  <rect x="0" y="0" width="1920" height="1080" fill="#000000" fill-opacity="0.45"/>
+
+  <!-- Dialog Surface: shapes.medium 12dp corners; tonalElevation 6dp over the
+       #161617 background gives a slightly lifted container tone -->
+  <rect x="645" y="170" width="630" height="656" rx="18" fill="#221D1E"/>
+
+  <!-- Header: CreatorLabel titleMedium 16sp -->
+  <text x="669" y="214" font-size="24" font-weight="500" fill="#F7E9EC">@retrocreator</text>
+  <circle cx="864" cy="206" r="8" fill="#F7E9EC"/>
+
+  <!-- Rows: tv-material Button, fillMaxWidth, 56 px tall here (37.5 dp —
+       see the open-issue note). First row FOCUSED. -->
+  <g id="quick-action-rows">
+    <!-- 48 dp M3 minimum guideline ghost (dashed) around the focused row -->
+    <rect x="640" y="222" width="640" height="72" rx="18" fill="none" stroke="#9C7A80" stroke-width="2" stroke-dasharray="8 6"/>
+    <rect x="645" y="230" width="630" height="56" rx="18" fill="#7D0030" stroke="#FF668F" stroke-width="4.5"/>
+    <text x="960" y="267" font-size="21" fill="#FFD9E1" text-anchor="middle">Favorite @retrocreator</text>
+
+    <rect x="645" y="292" width="630" height="56" rx="18" fill="#FF668F"/>
+    <text x="960" y="329" font-size="21" fill="#5E0B25" text-anchor="middle">Open @retrocreator's feed</text>
+
+    <rect x="645" y="354" width="630" height="56" rx="18" fill="#FF668F"/>
+    <text x="960" y="391" font-size="21" fill="#5E0B25" text-anchor="middle">Unfollow @retrocreator</text>
+
+    <rect x="645" y="416" width="630" height="56" rx="18" fill="#FF668F"/>
+    <text x="960" y="453" font-size="21" fill="#5E0B25" text-anchor="middle">Pin @retrocreator to home</text>
+
+    <line x1="669" y1="482" x2="1251" y2="482" stroke="#51444A" stroke-width="2"/>
+
+    <rect x="645" y="490" width="630" height="56" rx="18" fill="#FF668F"/>
+    <text x="960" y="527" font-size="21" fill="#5E0B25" text-anchor="middle">Add to…</text>
+
+    <rect x="645" y="552" width="630" height="56" rx="18" fill="#FF668F"/>
+    <text x="960" y="589" font-size="21" fill="#5E0B25" text-anchor="middle">Tags…</text>
+
+    <rect x="645" y="614" width="630" height="56" rx="18" fill="#FF668F"/>
+    <text x="960" y="651" font-size="21" fill="#5E0B25" text-anchor="middle">Show more</text>
+
+    <rect x="645" y="676" width="630" height="56" rx="18" fill="#FF668F"/>
+    <text x="960" y="713" font-size="21" fill="#5E0B25" text-anchor="middle">Block…</text>
+
+    <rect x="645" y="738" width="630" height="56" rx="18" fill="#FF668F"/>
+    <text x="960" y="775" font-size="21" fill="#5E0B25" text-anchor="middle">Close</text>
+  </g>
+
+  <!-- ===== Open-issue note (AGENTS.md "Open items") ===== -->
+  <g id="open-issue-note">
+    <line x1="1283" y1="258" x2="1305" y2="258" stroke="#9C7A80" stroke-width="2"/>
+    <text x="1320" y="222" font-size="22" font-weight="600" fill="#F7E9EC">Open issue — row height</text>
+    <g font-size="18" fill="#DCA1AB">
+      <text x="1320" y="254">Quick-action panel rows measure</text>
+      <text x="1320" y="280">≈ 37.5 dp visual height vs the</text>
+      <text x="1320" y="306">48 dp Material 3 minimum</text>
+      <text x="1320" y="332">guideline. Decision owed</text>
+      <text x="1320" y="358">(repo Open items, AGENTS-APP).</text>
+      <text x="1320" y="392">Dashed outline = 48 dp target</text>
+      <text x="1320" y="418">drawn around the focused row.</text>
+    </g>
+  </g>
+</svg>

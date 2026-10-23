@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Giffy Viewer — TV mockup: focus-states.svg
+  Source: app-tv/src/main/kotlin/com/rjbiermann/giffyviewer/tv/TvHomeScreen.kt
+          (GifCard, scale = CardScale.None) + core/ui Focus.kt (giffyFocus)
+          + core/ui Theme.kt (issue-#7 focus tokens, DESIGN-theme-stream §3.1)
+  The one-perpetrating difference between a resting and a D-pad-focused card:
+  NO zoom/scale anywhere (issue #37) — focus is signalled only by the ring.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" font-family="DM Sans, sans-serif">
+  <rect x="0" y="0" width="1920" height="1080" fill="#161617"/>
+
+  <text x="24" y="58" font-size="33" font-weight="600" fill="#F7E9EC">Focus states — D-pad focus ring</text>
+
+  <!-- ===== Left: UNFOCUSED card (resting state) ===== -->
+  <text x="24" y="212" font-size="21" font-weight="600" fill="#DCA1AB">Unfocused — resting</text>
+  <g id="card-unfocused">
+    <!-- One full row-band card: 281 x 255 px (185 x 170 dp), 12dp corners -->
+    <rect x="24" y="240" width="281" height="255" rx="18" fill="#3E2429"/>
+    <rect x="60" y="290" width="120" height="80" fill="#4A3740"/>
+    <text x="30" y="527" font-size="16" fill="#DCA1AB">@retrokit</text>
+  </g>
+
+  <!-- Arrow / traversal hint: D-pad RIGHT moves focus -->
+  <g id="dpad-hint">
+    <line x1="346" y1="368" x2="422" y2="368" stroke="#51444A" stroke-width="3"/>
+    <path d="M414 360 l10 8 l-10 8" fill="none" stroke="#51444A" stroke-width="3" stroke-linecap="round"/>
+    <text x="384" y="352" font-size="16" fill="#9C7A80" text-anchor="middle">D-pad →</text>
+  </g>
+
+  <!-- ===== Right: FOCUSED card (D-pad focus) ===== -->
+  <text x="460" y="212" font-size="21" font-weight="600" fill="#FF668F">Focused — D-pad focus ring</text>
+  <g id="card-focused">
+    <!-- Glow (tv-material derives focus glow from borderVariant = primary) -->
+    <rect x="452" y="232" width="297" height="261" rx="26" fill="none" stroke="#FF668F" stroke-width="11" stroke-opacity="0.18"/>
+    <!-- Card itself: identical content, NO scale-up -->
+    <rect x="460" y="240" width="281" height="255" rx="18" fill="#3E2429"/>
+    <rect x="496" y="290" width="120" height="80" fill="#4A3740"/>
+    <!-- 3 dp focused border, color primary #FF668F -->
+    <rect x="457" y="237" width="287" height="261" rx="20" fill="none" stroke="#FF668F" stroke-width="4.5"/>
+    <text x="466" y="527" font-size="16" fill="#DCA1AB">@retrokit</text>
+  </g>
+
+  <!-- ===== Token legend ===== -->
+  <g id="focus-token-legend">
+    <text x="460" y="600" font-size="21" font-weight="600" fill="#F7E9EC">Focus tokens (issue-#7, DESIGN-theme-stream.md §3.1)</text>
+    <g font-size="20" fill="#DCA1AB">
+      <text x="460" y="640">Focused border: 3 dp primary #FF668F + outer glow (#FF668F at low opacity)</text>
+      <text x="460" y="674">Focused fill is unchanged for cards — ring only; buttons/chips additionally fill</text>
+      <text x="460" y="708">primaryContainer #7D0030 and switch text to onPrimaryContainer #FFD9E1</text>
+      <text x="460" y="742">Unfocused: no border, no zoom — scale = CardScale.None anywhere (issue #37)</text>
+      <text x="460" y="776">Corners: 12 dp rest / 16 dp focused rounded — focus ring rides the outline</text>
+      <text x="460" y="810">Text: DM Sans; TV type scale is the M3 default token scale (10-foot sizes)</text>
+    </g>
+    <!-- Mini comparison: chip row pair (M3 FilterChip with giffyFocus) -->
+    <text x="460" y="880" font-size="21" font-weight="600" fill="#F7E9EC">Same tokens on chips and buttons</text>
+    <rect x="460" y="900" width="106" height="48" rx="12" fill="none" stroke="#51444A" stroke-width="1.5"/>
+    <text x="513" y="930" font-size="21" fill="#DCA1AB" text-anchor="middle">Chip</text>
+    <rect x="582" y="895" width="118" height="58" rx="14" fill="none" stroke="#FF668F" stroke-width="9" stroke-opacity="0.18"/>
+    <rect x="582" y="900" width="106" height="48" rx="12" fill="#7D0030" stroke="#FF668F" stroke-width="4.5"/>
+    <text x="635" y="930" font-size="21" fill="#FFD9E1" text-anchor="middle">Chip</text>
+
+    <rect x="740" y="904" width="150" height="56" rx="18" fill="#FF668F"/>
+    <text x="815" y="938" font-size="21" fill="#5E0B25" text-anchor="middle">Button</text>
+    <rect x="910" y="899" width="162" height="66" rx="20" fill="none" stroke="#FF668F" stroke-width="9" stroke-opacity="0.18"/>
+    <rect x="910" y="904" width="150" height="56" rx="18" fill="#7D0030" stroke="#FF668F" stroke-width="4.5"/>
+    <text x="985" y="938" font-size="21" fill="#FFD9E1" text-anchor="middle">Button</text>
+  </g>
+</svg>

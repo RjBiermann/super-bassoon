@@ -1,0 +1,60 @@
+%% Derived from: feature/feed/PlayerScreen.kt (PlayerScreen + PlayerPage: pager, gestures,
+%% ended/error listeners, idle hide, player adoption), core/player/GiffyPlayer.kt (playGif,
+%% preloadNeighbors, rendition cache key), app-mobile/src/androidTest/.../PlayerScreenMachineTest.kt
+%% (tap toggles controls without pausing, hold 2x, double-tap like — verified on device).
+stateDiagram-v2
+    direction LR
+    [*] --> Preparing
+
+    note right of Preparing
+      Player route pushed - playGif(gif, dataSaver, resumeMs = 0, videoQuality).
+      Player adoption issue #9 - an already-playing inline preview is adopted
+      at its live position (just playWhenReady = true) instead of re-preparing.
+    end note
+
+    Preparing --> PlaybackFailed: Player.onPlayerError
+    Preparing --> Playing: ready (playWhenReady = true)
+
+    Playing --> Paused: control-row pause
+    Paused --> Playing: control-row play (playOrRestart - seek 0 first at stream end)
+    Playing --> Ended: playback reaches end
+
+    Ended --> Playing: auto-swipe OFF - loop, seekTo(0) + play
+    Ended --> NextPage: autoSwipe && !dataSaver - animate or scroll to next page
+
+    Playing --> NextPage: swipe prev or next (zoom 1x-3x + pan reset per page)
+    Paused --> NextPage: swipe
+
+    PlaybackFailed --> Playing: Retry (re-run playGif)
+    PlaybackFailed --> NextPage: Skip
+
+    NextPage --> Preparing: next gif - every play starts at 0 (resume removed 2026-10)
+    NextPage --> PoolEndPending: currentPage + 1 == itemCount - ended while the next page fetches
+    PoolEndPending --> Preparing: pendingAdvance - next page lands, advance re-fired
+    PoolEndPending --> Playing: no more pages - loop last (or random jump when shuffleSeed active)
+
+    state "controls visible" as CV
+    state "controls hidden" as CH
+    Playing --> CV: single tap - UI only, never pauses (issue #2)
+    CV --> CH: tap again, or 3s idle auto-hide (only while playing and not scrubbing)
+    CH --> CV: tap, or a11y custom action "Show playback controls"
+
+    note right of CV
+      Double-tap = like once, never unlike (logged out opens the account surface);
+      heart pop animation. Holding the body engages hold-to-2x, restores on release.
+    end note
+
+    Playing --> Closed: BACK
+    Paused --> Closed: BACK
+
+    note right of Closed
+      Overlay creator/tag/niche link opens ARE exits - the nav push pops this
+      player entry, so BACK lands the covered feed with its scroll state intact.
+    end note
+
+    note right of Closed
+      On close an adopted player is RETURNED to the FeedViewModel (parks for
+      the feed again), a freshly built player is RELEASED; system bars restored.
+    end note
+
+    Closed --> [*]

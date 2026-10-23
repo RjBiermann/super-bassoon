@@ -1,0 +1,45 @@
+%% Derived from: feature/auth/AuthSection.kt (sign-in/out UI), feature/auth/AuthViewModel.kt
+%% (currentPkce, exchangeCode, signOut, username claim), feature/auth/WebViewLoginScreen.kt
+%% (code interception), core/auth/TokenStore.kt (authorizeUrl, extractCode, exchangeBlocking,
+%% save, clear, refreshBlocking, EncryptedSharedPreferences alias giffy_auth),
+%% feature/auth/DebugSignIn.kt (debug-only injection), core/network/NetworkModule.kt (401 refresh hook).
+%% Note: the TV paste-token fallback was REMOVED 2026-10 — WebView PKCE is the only sign-in path.
+sequenceDiagram
+    autonumber
+    participant UI as AuthSection (Settings, mobile + TV)
+    participant VM as AuthViewModel
+    participant WV as WebViewLoginScreen
+    participant Site as auth2 / Kinde authorize page
+    participant TS as TokenStore<br/>EncryptedSharedPreferences alias giffy_auth
+
+    UI->>VM: currentPkce() (cached until consumed)
+    VM-->>UI: Pkce(verifier, challenge, state)
+    UI->>WV: onOpenWebView(pkce) — host renders it full-screen over Settings
+
+    WV->>Site: loadUrl authorizeUrl(pkce) — client_id public SPA, redirect_uri = site root, response_type=code, scope=openid profile email offline, code_challenge S256, state
+    Note over Site: 302s to redirect_uri with code + scope offline (yields refresh token)
+    Site->>WV: shouldOverrideUrlLoading(redirect url)
+    WV->>WV: TokenStore.extractCode(url, expectedState) — null when not our redirect or state mismatch
+    WV->>VM: onCodeCaptured(code)
+    VM->>WV: pkce consumed (verifier cleared)
+    VM->>Site: exchangeBlocking(code, verifier) on Dispatchers.IO
+    Site->>TS: POST oauth token, grant_type=authorization_code → id_token + refresh_token
+    TS->>TS: parseTokenBundle + looksLikeJwt → save(idToken, refreshToken)
+    TS-->>UI: token StateFlow — UI shows "Signed in as @user"
+    Note over VM: username = id_token preferred_username claim (live-verified vs v1/users)
+
+    UI->>VM: signOut()
+    VM->>TS: store.clear() (bearer + refresh token wiped)
+    VM->>Site: CookieManager removeAllCookies + removeSessionCookies
+    Note over VM: next login starts clean instead of auto-reusing the session
+
+    alt 401 on an authed API call (NetworkModule authInterceptor)
+        Site->>TS: refreshBlocking() — grant_type=refresh_token, mints fresh id_token
+        TS-->>Site: true (saved) / false → caller falls back to anonymous
+    end
+
+    alt debug builds only (BuildConfig.DEBUG guard)
+        Note over TS: DebugSignIn.apply(tokenStore, intent extra giffy_debug_bundle) — same shape-tolerant bundle parse as the removed paste path (token never in source, release never reaches it)
+    end
+
+    Note over WV: BackHandler: WebView.canGoBack() → goBack, else onClose (no token saved without a captured code)

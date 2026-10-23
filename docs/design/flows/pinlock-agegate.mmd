@@ -1,0 +1,38 @@
+%% Derived from: core/ui/PinLock.kt (PinLockScreen), core/ui/AgeGate.kt, and the shell hosts
+%% app-mobile/.../MainActivity.kt.Host() + app-tv/.../TvMainActivity.Root() (both place the
+%% gates OUTSIDE the NavHost — issue #13: they gate the app, not pages).
+flowchart TD
+    start(["Activity content starts — shared rule for mobile + TV"]) --> q1{"PIN set?
+    settings.pinHash != null
+    && !unlocked"}
+
+    q1 -- "yes, locked" --> pin["PinLockScreen (shared compose)
+    12-key grid, D-pad friendly on TV;
+    entry announced for TalkBack as
+    'N of 4 digits entered'"]
+
+    pin -- "4th digit collected or ✓ pressed" --> verify{"verifyPin(entry) —
+    async settings check"}
+    verify -- "correct" --> unlocked["onUnlock — composition moves on"]
+    verify -- "wrong (fail count +1)" --> wrong["haptic feedback + 'Wrong PIN',
+    wait 400ms — or 15s after 3+ wrong
+    tries (brute-force slow-down), entry cleared"]
+    wrong --> pin
+
+    unlocked --> q2{"age confirmed?
+    settings.ageConfirmed"}
+    q1 -- "PIN not set" --> q2
+
+    q2 -- "yes" --> main(["Main navigation — mobile MobileNavHost / TV TvNav"])
+    q2 -- "no" --> gate["AgeGate (one definition, both shells)
+    normative copy: app shows adult content,
+    18 or older, no-affiliation disclaimer"]
+
+    gate -- "I am 18 or older — Enter" --> confirm["settings.confirmAge() — persists,
+    next launch skips the gate"] --> main
+    gate -- "Exit (leaves app)" --> finish(["finishAffinity()"])
+
+    shellnote["Host wiring differences:
+    mobile — unlocked is rememberSaveable, no PIN re-ask after process death;
+    TV — unlocked is deliberately NOT saveable, a PIN demands re-entry after
+    process death (issue #13 §8.15); TV adds requestInitialFocus on both gates."]
