@@ -88,6 +88,39 @@ class FavoritesFanOutTest {
         }
     }
 
+    /** userGifs as the site behaves: `count` gifs starting at (page-1)*count
+     *  from the creator's own pool. [PlanApi] keys its ids by (user, page) and
+     *  therefore hides a per-slice-size defect; this double honours the count,
+     *  so a count that varies across pages overlaps the same creator's pool. */
+    private class SliceApi : FakeApi() {
+        val calls = mutableListOf<PlanApi.Call>()
+        val pools = mutableMapOf<String, List<String>>()
+
+        override suspend fun userGifs(
+            username: String,
+            count: Int,
+            page: Int,
+            order: String,
+        ): GifsPageDto {
+            calls.add(PlanApi.Call(username, page, count))
+            val pool = pools[username] ?: emptyList()
+            val from = (page - 1) * count
+            return GifsPageDto(gifs = pool.drop(from).take(count).map { gifDtoShell(it, username) })
+        }
+    }
+
+    /** k=6 = a 2-page round (5 + 1 slots) over 60-gif pools: round 0 leaves c6
+     *  alone in the tail window, later rounds reshuffle. */
+    private fun sliceFetcher(
+        pageDao: FeedPageDao,
+        seed: Long = 0L,
+    ): Pair<FeedPageFetcher, SliceApi> {
+        val creators = fakeCreators(6)
+        val api = SliceApi()
+        creators.forEach { api.pools[it] = (1..60).map { n -> "$it-$n" } }
+        return fetcher(api, creators, pageDao, seed) to api
+    }
+
     private fun fakeCreators(count: Int): List<String> = (1..count).map { "c$it" }
 
     /** [perPage] gifs for every (creator, inner page) in [pages]. */
@@ -105,7 +138,7 @@ class FavoritesFanOutTest {
     }
 
     private fun fetcher(
-        api: PlanApi,
+        api: FakeApi,
         creators: List<String>,
         pageDao: FeedPageDao,
         seed: Long = 0L,
@@ -261,7 +294,7 @@ class FavoritesFanOutTest {
         }
 
     @Test
-    fun `perCreator is ceil pageSize over window size`() =
+    fun `perCreator is ceil pageSize over the fan-out, never over the window size`() =
         runBlocking {
             val creators = fakeCreators(12)
             val api = PlanApi().also { seedPool(it, creators, 1..3) }
@@ -272,9 +305,58 @@ class FavoritesFanOutTest {
                 assertTrue(fetcher.fill(page))
                 val calls = api.calls.drop(seen)
                 seen = api.calls.size
-                // 5-slot windows: ceil(20/5) = 4; the 2-slot tail: ceil(20/2) = 10.
-                val expected = if (calls.size == 2) 10 else 4
-                assertEquals("page $page: ceil(20 / ${calls.size})", expected, calls.first().count)
+                // A creator's slice must not depend on the window it lands in:
+                // ceil(20 / min(12, 5)) = 4 for the 5-slot windows AND the
+                // 2-slot tail (a window-sized count made the tail fetch 10).
+                assertEquals("page $page: ceil(20 / min(k, 5))", 4, calls.first().count)
             }
+        }
+
+    @Test
+    fun `a creator moving between windows across rounds never repeats an item`() =
+        runBlocking {
+            val pageDao = FakeFeedPageDao()
+            val (fetcher, api) = sliceFetcher(pageDao)
+
+            var seen = 0
+            val rounds = mutableListOf<List<PlanApi.Call>>()
+            for (page in 1..6) {
+                assertTrue("page $page chains", fetcher.fill(page))
+                rounds += api.calls.drop(seen)
+                seen = api.calls.size
+            }
+
+            // Precondition: round 0 leaves c6 alone in the 1-slot tail window;
+            // a later round's reshuffle puts it in a 5-slot window. Its slice
+            // then depends on which round it sat in — the device defect.
+            assertEquals(listOf("c6"), rounds[1].map { it.username })
+            assertTrue(
+                "c6 moves from the 1-slot tail into a 5-slot window",
+                (2..rounds.lastIndex).any { i -> rounds[i].size == 5 && rounds[i].any { it.username == "c6" } },
+            )
+
+            val rows = (1..6).map { pageDao.pages[feedPageKey(FeedSource.Favorites, it)]!!.gifIds }
+            for (a in rows.indices) {
+                for (b in a + 1 until rows.size) {
+                    val shared = rows[a].toSet() intersect rows[b].toSet()
+                    assertTrue("pages ${a + 1} and ${b + 1} serve the same item: $shared", shared.isEmpty())
+                }
+            }
+            val owners = rows.flatten().groupingBy { it }.eachCount()
+            assertTrue("every served gif has exactly one owning row", owners.values.all { it == 1 })
+        }
+
+    @Test
+    fun `trailing window stays thin but keeps chaining`() =
+        runBlocking {
+            val pageDao = FakeFeedPageDao()
+            val (fetcher, _) = sliceFetcher(pageDao)
+
+            assertTrue(fetcher.fill(1))
+            assertEquals("5 creators x 4 gifs", 20, pageDao.pages["fav:v2:p1"]!!.gifIds.size)
+            assertTrue(fetcher.fill(2))
+            val trailing = pageDao.pages["fav:v2:p2"]!!
+            assertEquals("the 1-slot tail asks for 4, not ceil(20/1)", 4, trailing.gifIds.size)
+            assertEquals("a thin trailing window still chains", "fav:v2:p3", trailing.nextPageKey)
         }
 }

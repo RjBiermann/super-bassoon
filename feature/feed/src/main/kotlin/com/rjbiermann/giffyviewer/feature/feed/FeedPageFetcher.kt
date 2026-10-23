@@ -209,7 +209,9 @@ internal data class FavoritesPlan(
     val usernames: List<String>,
     /** The creators' inner page (round number + 1). */
     val innerPage: Int,
-    /** Gifs per creator: ceil(pageSize / window size). */
+    /** Gifs per creator: ceil(pageSize / min(k, fan-out)) — independent of
+     *  the window the creator lands in, so its inner-page slice stays a pure
+     *  function of [innerPage]. */
     val perCreator: Int,
     /** Page count of one round = the exhaustion window: rounds of this many
      *  pages cover the whole favorite set at a single inner page. For a set
@@ -231,7 +233,12 @@ internal data class FavoritesPlan(
  *
  *  k <= 5 is byte-identical to the #54 mapping: one page per round holds the
  *  whole set at inner page = page, perCreator = ceil(pageSize / k), creator
- *  order = the loop order rotated by (page-1) % k. */
+ *  order = the loop order rotated by (page-1) % k.
+ *
+ *  perCreator = ceil(pageSize / min(k, 5)) is deliberately NOT window-sized:
+ *  a creator's slice is a pure function of its inner page, so it cannot overlap
+ *  a slice fetched for it in another round's window. Consequence accepted: a
+ *  trailing window (k % 5 != 0) serves a thinner page (k=6 → 20 + 4 items). */
 internal fun favoritesPagePlan(
     creators: List<String>,
     seed: Long,
@@ -249,6 +256,13 @@ internal fun favoritesPagePlan(
     val order = favoritesLoopOrder(creators, seed, generation)
     val windowStart = ((page - 1) % roundPages) * FAVORITES_CREATORS_PER_FILL
     val windowSize = minOf(FAVORITES_CREATORS_PER_FILL, size - windowStart)
+    // Slice budget from the FAN-OUT, never the window: a window-sized count
+    // made a creator's slice depend on which round it sat in (the 1-slot tail
+    // fetched 20 gifs at inner page 1, then the same ids again in a 5-slot
+    // window at inner page 2 — cross-page duplicates). k <= 5: min = size =
+    // the window, so the #54 mapping (ceil(pageSize / k)) is unchanged; above
+    // it every creator gets 4 per round and a thin tail page is accepted.
+    val perCreatorSlots = minOf(size, FAVORITES_CREATORS_PER_FILL)
     // Leader rotation: a page doesn't always start with the same creator. With
     // one page per round the window is the whole set, so this is exactly the
     // #54 order[(page-1+i) % k].
@@ -256,7 +270,7 @@ internal fun favoritesPagePlan(
     return FavoritesPlan(
         usernames = List(windowSize) { i -> order[windowStart + (lead + i) % windowSize] },
         innerPage = round + 1,
-        perCreator = (pageSize + windowSize - 1) / windowSize,
+        perCreator = (pageSize + perCreatorSlots - 1) / perCreatorSlots,
         roundPages = if (roundPages == 1) size else roundPages,
     )
 }

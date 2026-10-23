@@ -113,11 +113,16 @@ Dead-pool cost is worse: ending costs **one full dead round = k pages × k reque
   `internal fun favoritesPagePlan(creators, seed, page, pageSize): FavoritesPlan`
   (`usernames`, `innerPage`, `perCreator`, `roundPages`): `R = ceil(k/5)`; `round = (page-1)/R`;
   window offset `((page-1) % R) * 5` into the round's `favoritesLoopOrder` (`:233-242`, unchanged);
-  `innerPage = round + 1`; `perCreator = ceil(pageSize / window.size)`.
+  `innerPage = round + 1`; `perCreator = ceil(pageSize / min(k, 5))` — **device-found correction
+  (2026-10)**: a window-sized count made a creator's slice depend on which round it sat in (a 1-slot
+  tail fetched 20 gifs at inner page 1, the same ids again in a 5-slot window at inner page 2 →
+  cross-page duplicates). The fan-out-sized count makes the slice a pure function of `innerPage`;
+  accepted cost: a trailing window serves a thinner page (k=6 → 20 + 4 items, chaining kept).
 - `fill` computes the plan from **one** `favorites()` read (today it reads twice, `:37` and `:131`)
   and uses `R` (not k) in the `loopOver` / `previousRotationExhausted` / `more` rules
   (`:37-50,66-72`); `fetch(Favorites)` uses the plan and keeps `interleaveChunks`.
-- Properties kept: ≤ 5 requests per fill (≈ one burst, ≤1.7 s sustained); ~20 gifs per page;
+- Properties kept: ≤ 5 requests per fill (≈ one burst, ≤1.7 s sustained); ~20 gifs per page (a
+  trailing window is thinner: 4 gifs per creator);
   **k ≤ 5 byte-identical to today** (#54's 5-creator gate and every existing test use k ≤ 5); each
   `(creator, round)` pair still maps to exactly one page ⇒ no duplicates, no loss; dead-round cost
   drops from k² to ≈ k requests.
@@ -146,7 +151,8 @@ no schema change, no migration, no new endpoint, no WorkManager.
    `innerPage = page`, `perCreator = 4` (pins that `FavoritesInterleaveTest` stays valid unmodified).
 5. `the exhaustion window is the round length, not the creator count` — k=12, all pools dry at inner
    page 1: the walk ends after a 3-page dead round costing ≤ 12 requests (today 12 × 12).
-6. `perCreator is ceil(pageSize / window size)` — k=12 page 3 (window 2) → 10.
+6. `perCreator is ceil(pageSize / min(k, 5))` — k=12: 4 on the 5-slot windows AND page 3 (the
+   2-slot tail). (Original plan said 10 = `ceil(20/2)`; the device duplicate report replaced it.)
 
 `FavoritesMappingKeyTest` (fails before step 2):
 7. `the favorites cache base carries the mapping generation`.
