@@ -168,7 +168,12 @@ class FavoritesStaleLedgerTest {
             // Every live pool gif reached a row — the dead ledger is refilled,
             // not served (no old_* id survives the refill).
             val served = pageDao.pages.values.flatMapTo(HashSet()) { it.gifIds }
-            assertEquals(api.pool.values.flatten().toSet(), served)
+            assertEquals(
+                api.pool.values
+                    .flatten()
+                    .toSet(),
+                served,
+            )
             assertFalse("stale-ledger content must not survive the refill", served.any { it.startsWith("old") })
             // The refill is the interleave: ONE sub-fetch per creator per
             // inner page (the loop orders shuffle per loop — pinned exactly by

@@ -91,8 +91,10 @@ internal suspend fun walkFill(
     // stale — rate-limit invariant untouched).
     if (
         cached != null &&
-        !(feed is FeedSource.Favorites &&
-            System.currentTimeMillis() - cached.fetchedAt >= feed.ttlMs)
+        !(
+            feed is FeedSource.Favorites &&
+                System.currentTimeMillis() - cached.fetchedAt >= feed.ttlMs
+        )
     ) {
         return cached
     }

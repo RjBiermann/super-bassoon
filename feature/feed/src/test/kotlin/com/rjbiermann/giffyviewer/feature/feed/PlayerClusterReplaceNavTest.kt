@@ -57,9 +57,7 @@ class PlayerClusterReplaceNavTest {
 
     private val holder = NavHostHolder()
 
-    private fun setContent(
-        clusterClick: () -> Unit,
-    ) {
+    private fun setContent(clusterClick: () -> Unit) {
         rule.setContent {
             GiffyTheme {
                 val nc = rememberNavController()
@@ -82,7 +80,12 @@ class PlayerClusterReplaceNavTest {
         // "start by playing 1st feed": the player is open over the home feed.
         rule.runOnIdle { holder.nc.navigate(TestNavPlayer) }
         rule.waitUntil(10_000) {
-            rule.onAllNodes(androidx.compose.ui.test.hasText("cluster")).fetchSemanticsNodes().isNotEmpty()
+            rule
+                .onAllNodes(
+                    androidx.compose.ui.test
+                        .hasText("cluster"),
+                ).fetchSemanticsNodes()
+                .isNotEmpty()
         }
         // "click a link to 2nd feed (creator feed)" through the host seam.
         rule.onNodeWithText("cluster").performClick()
