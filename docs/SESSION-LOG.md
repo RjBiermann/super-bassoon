@@ -918,3 +918,14 @@ User slice: "work on all the open github issues; triage, plan, design, implement
 - **Gates:** ktlint + detekt (touched modules) + unit tests + assembleDebug ×2 GREEN at every merge point (RAM-serialized, --no-daemon --max-workers=2, free-h before each).
 - **Session lessons:** (a) OkHttp 5.x: `OkHttpClient.Builder.interceptors` is internal — stripping interceptors needs a second client built from a shared `clientBuilder()` closure (public API only); (b) `runCatching` around API calls inside `LaunchedEffect` swallows CancellationException — any screen-caller-coroutine fetch that can be cancelled mid-flight must be VM-owned or rethrow; (c) this workspace lacked the `ANDROID_EMU_MEDIA_DECODER_CUDA=0` environment.d config (first TV boot wedged, relaunched with exports) — re-apply before emulator work here; (d) subagent device children time out at 30 min — brief them with coverage-priorities so a resume converges; resume-first worked twice.
 - **New open items:** search scopes have no visible failure state while unavailable (silent runCatching UX hole, pre-existing); TV quick-actions MENU-open focus anomaly (D-pad couldn't enter the panel in one session; prior gates passed it — one focused re-check owed).
+
+### Session 2026-10-23 batch 40b (#54 signed-in gate CLOSED with fresh bundle)
+- **#54 mobile signed-in device gate PASS (fresh giffy_debug_bundle, deleted after per convention):**
+  favorited 5 creators (@metart, @mericutedeee, @boston.727, @user581640250782, @cherrymoon__) →
+  fav:v1:p1 stored order is item-wise round-robin (metart,mericutedeee,boston.727,cherrymoon__,metart,…),
+  one screenful = 3 creators, refresh re-seeded rotation (metart→mericutedeee leads), paging continues,
+  0 FATAL/0 429. Thin pools (1/0 gifs) drop out honestly per dry-chunk contract; early fills during
+  rapid favoriting cached fewer-creator pages until refresh — observation only.
+- **#54 CLOSED.** TV signed-in parity UNCOVERED (shared fetcher, behavioral proof is mobile-side) —
+  bundle deleted, so a fresh one is needed if TV parity is ever demanded.
+- Teardown clean (emul-stop, no daemons, no emulator, bundle gone).

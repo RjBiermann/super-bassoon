@@ -218,7 +218,7 @@ When unsure: check the matching AGENTS doc first, then ask. Don't invent endpoin
   additionally user-token-gated — 401 with the anon token; context param name never recorded).
 - Mobile niche-preview-tiles device gate CLOSED 2026-10-18 (doc line was stale).
 - Issue stream 2026-10-22 (batch 40): #52 #53 #56 #57 #58 CLOSED with evidence comments (main @ 4c106655);
-  #54 interleave shipped unit-covered, signed-in device gate pending a fresh debug bundle;
+  #54 CLOSED 2026-10-23 (mobile signed-in gate PASS: item-wise interleave, refresh re-seed, endless paging);
   #55 NO-REPRO on emulator, awaiting reporter device details.
 - Search scopes have no visible failure state while unavailable (silent `runCatching` UX hole,
   surfaced by the #57 fix; building one is a design decision, not owed by any issue).
