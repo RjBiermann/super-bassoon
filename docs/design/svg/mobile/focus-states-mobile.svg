@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="452" height="588" viewBox="0 0 452 588">
+<rect x="0" y="0" width="452" height="588" fill="#100E14"/>
+<text x="20" y="34" font-family="Roboto, sans-serif" font-size="13" fill="#E6E1E5">Shared components — Focus.kt on mobile (GiffyPillButton, giffyFocus)</text>
+<text x="20" y="74" font-family="Roboto, sans-serif" font-size="12" fill="#E6E1E5" font-weight="500">GiffyPillButton — rest vs focused (site button pattern §9)</text>
+<rect x="20" y="90" width="130" height="40" rx="20" fill="#2C2B2F" stroke="#D0BCFF" stroke-width="1"/>
+<text x="85" y="115" font-family="Roboto, sans-serif" font-size="13" fill="#E6E1E5" text-anchor="middle">Follow @u</text>
+<rect x="170" y="90" width="130" height="40" rx="20" fill="#4F378B" stroke="#D0BCFF" stroke-width="1"/>
+<text x="235" y="115" font-family="Roboto, sans-serif" font-size="13" fill="#EADDFF" text-anchor="middle">Follow @u</text>
+<text x="20" y="152" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">rest: onSurface @ 8% fill · 1 dp primary outline</text>
+<text x="170" y="152" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">focused/pressed: primaryContainer fill · onPrimaryContainer text</text>
+<text x="20" y="192" font-family="Roboto, sans-serif" font-size="12" fill="#E6E1E5" font-weight="500">Tile focus treatment — GifTile (touch-first, combinedClickable)</text>
+<rect x="20" y="208" width="170" height="120" rx="10" fill="#322F37"/>
+<text x="20" y="346" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">rest — no ring; ripple only on press</text>
+<rect x="210" y="208" width="170" height="120" rx="10" fill="#322F37"/>
+<text x="210" y="346" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">focused — identical: GifTile draws no</text>
+<text x="210" y="360" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">focus ring (giffyFocus not applied to tiles)</text>
+<line x1="196" y1="268" x2="206" y2="268" stroke="#CAC4D0" stroke-width="2"/>
+<path d="M 203 264 L 208 268 L 203 272" fill="none" stroke="#CAC4D0" stroke-width="2" stroke-linecap="round"/>
+<text x="20" y="404" font-family="Roboto, sans-serif" font-size="12" fill="#E6E1E5" font-weight="500">For contrast: rows/chips DO get the giffyFocus ring</text>
+<rect x="20" y="420" width="90" height="32" rx="12" fill="#1C1B1F" stroke="#938F99" stroke-width="1"/>
+<text x="65" y="441" font-family="Roboto, sans-serif" font-size="12" fill="#CAC4D0" text-anchor="middle">Chip</text>
+<rect x="130" y="420" width="90" height="32" rx="12" fill="#4F378B" stroke="#D0BCFF" stroke-width="3"/>
+<text x="175" y="441" font-family="Roboto, sans-serif" font-size="12" fill="#EADDFF" text-anchor="middle">Chip</text>
+<text x="20" y="478" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">giffyFocus: 3 dp primary border + primaryContainer fill (animate on focus)</text>
+<text x="20" y="496" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">no-op on touch — focus lands via D-pad/keyboard only (TV hosting); pass the</text>
+<text x="20" y="510" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">row’s interactionSource when the node is also clickable (two-focusable race).</text>
+<rect x="20" y="532" width="12" height="12" fill="#1C1B1F" stroke="#938F99" stroke-width="1"/>
+<text x="36" y="541.5" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">surface</text>
+<rect x="94" y="532" width="12" height="12" fill="#E6E1E5" stroke="#938F99" stroke-width="1"/>
+<text x="110" y="541.5" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">onSurface</text>
+<rect x="180" y="532" width="12" height="12" fill="#D0BCFF" stroke="#938F99" stroke-width="1"/>
+<text x="196" y="541.5" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">primary</text>
+<rect x="254" y="532" width="12" height="12" fill="#CAC4D0" stroke="#938F99" stroke-width="1"/>
+<text x="270" y="541.5" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">onSurfaceVariant</text>
+<rect x="382" y="532" width="12" height="12" fill="#938F99" stroke="#938F99" stroke-width="1"/>
+<text x="398" y="541.5" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">outline</text>
+<rect x="20" y="556" width="12" height="12" fill="#4F378B" stroke="#938F99" stroke-width="1"/>
+<text x="36" y="565.5" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">primaryContainer</text>
+<rect x="150" y="556" width="12" height="12" fill="#EADDFF" stroke="#938F99" stroke-width="1"/>
+<text x="166" y="565.5" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">onPrimaryContainer</text>
+</svg>

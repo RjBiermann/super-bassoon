@@ -1,0 +1,44 @@
+%% Derived from: feature/feed/FollowingScreen.kt + FollowingViewModel.kt
+%% (refresh: paged GET v2/me/following + GET v2/niches/following, logged-out
+%% surface hidden), app-mobile/.../MainActivity.kt (MainFollowing route) and
+%% app-tv/.../TvHomeScreen.kt (TV home "Following" row reuses the same
+%% FollowingViewModel, creators only). 
+%% BLOCKED / no-guess annotate: the FOLLOWERS counterpart (v2/me/followers)
+%% is NOT diagrammed and NOT built — the live endpoint returns items=[] and
+%% the row shape is unprovable (AGENTS "no-guess rule"); re-check only if the
+%% server ever returns real follower rows.
+flowchart TD
+    open(["Following page opened — MainFollowing (mobile);
+    TV home hosts a 'Following' creators row on the
+    same ViewModel instead of a page"]) --> gate{"TokenStore
+    tokenOrNull != null?"}
+
+    gate -- "no (logged out)" --> hidden["Surface HIDDEN entirely —
+    no dead tabs, no failed fetches"]
+    hidden --> stop(["end"])
+
+    gate -- "yes" --> refresh["FollowingViewModel.refresh()
+    (LaunchedEffect on open, Retry re-fires it)"]
+    refresh --> creators["GET v2/me/following?page=N — paged loop:
+    append items, page >= pages ends it
+    (269 follows → 3 pages of 100; read-only, rate-limited)"]
+    creators --> niches["GET v2/niches/following — single call,
+    niches list in one page"]
+    niches --> outcome{"runCatching on
+    both calls"}
+
+    outcome -- "either failed" --> failed["loadFailed = true →
+    EmptyState 'Couldn't load your follows' + Retry"]
+    failed -- "Retry" --> refresh
+
+    outcome -- "both ok" --> render["GiffyScaffold 'Following':
+    Creators section (avatar, verified tick,
+    followers · gifs) + Niches section (gifs · members);
+    scroll-to-top Fab (#23) on deep lists"]
+
+    render -- "tap creator row" --> cf["Creator feed —
+    FeedSource.Creator(username) via onOpenCreator"]
+    render -- "tap niche row" --> nf["Niche feed —
+    FeedSource.Niche(id, name) via onOpenNiche"]
+    cf --> stop
+    nf --> stop

@@ -1,0 +1,46 @@
+%% Derived from: core/ui/NetworkMonitor.kt (ConnectivityManager default-network
+%% callback, VALIDATED capability — captive portal counts as offline),
+%% core/ui/OfflineBanner.kt (LocalIsOnline carrier + offlineBannerVisible
+%% rule), both shell mounts (mobile MainActivity CompositionLocalProvider +
+%% GiffyScaffold banner; TV TvMainActivity root overlay) and
+%% feature/feed/FeedViewModel.kt (seeded-For-You revert — airplane-mode cold
+%% start, AGENTS gate 3: cache renders, zero network, no crash).
+flowchart TD
+    monitor["NetworkMonitor (app singleton, one per shell):
+    ConnectivityManager.registerDefaultNetworkCallback —
+    initial truth = activeNetwork read, then
+    onAvailable / onCapabilitiesChanged /
+    onLost (default-network loss only) events"]
+    monitor -- "NET_CAPABILITY_VALIDATED only" --> flow["isOnline: StateFlow&lt;Boolean&gt;
+    (no request probes — OS truth, not response truth;
+    a captive portal reports a network WITHOUT VALIDATED)"]
+
+    flow -- "mobile" --> mountm["MainActivity provides LocalIsOnline
+    app-wide → GiffyScaffold renders OfflineBanner"]
+    flow -- "TV" --> mountt["TvMainActivity never provides LocalIsOnline —
+    the root renders the banner as a non-focusable
+    OVERLAY inside overscan margins (no double-banner
+    on TV-hosted shared screens)"]
+    mountm --> banner["OfflineBanner (40dp, errorContainer,
+    'You're offline — showing cached gifs') —
+    unprovided hosts default to ONLINE (no phantom banner)"]
+    mountt --> banner
+
+    cold(["Airplane-mode cold start (gate 3)"]) --> seed["seededForYou = defaultLandingSource(has token):
+    a stored token lands on For You (network-live,
+    NO Room cache); none → Trending"]
+    seed --> failswap{"For You pager errors BEFORE
+    any user navigation, nothing
+    rendered?"}
+    failswap -- "yes → shouldRevertToTrending" --> revert["notifyRefreshError re-reads the CURRENT source's
+    loadState (A2 stale-error guard) →
+    source reverts to Trending — Room-backed,
+    the cached grid renders"]
+    failswap -- "no (user opened a feed)" --> honest["Stays put — FeedScreen's IOException branch
+    shows the honest request-failure copy instead
+    (banner speaks about the DEVICE network,
+    request copy about a RESPONSE; different mechanisms)"]
+    revert --> cache["Airplane gate: Room cache renders,
+    zero network, no crash; banner visible"]
+    cache --> stop(["end"])
+    honest --> stop

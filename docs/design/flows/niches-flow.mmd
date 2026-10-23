@@ -1,0 +1,58 @@
+%% Derived from: feature/feed/NichesScreen.kt + NichesViewModel.kt (preview
+%% listing v2/niches/search/previews, category chips v2/niches/categories,
+%% five live-verified sorts, auto-retry issue #49, pin), NicheJoinViewModel.kt
+%% (join/leave subscription writes 202 + rollback) and NicheAboutScreen.kt
+%% (detail, rules, share, top creators, related).
+flowchart TD
+    open(["Niches page opened — TvNiches / mobile Niches route,
+    one shared paging path (mobile + TV)"]) --> init["init: loadMore() page 1 +
+    GET v2/niches/categories → filter chips (All + one per
+    category, toggle-off re-selects All)"]
+
+    init --> fetch["loadMore(): ContentFilter.refreshFrom +
+    refreshBlockedFeeds FIRST (single choke point,
+    issue #42 shape) → GET v2/niches/search/previews
+    {order, category, page} — rate-limited budget"]
+    fetch --> rows["Rows mapped + filter.allow(preview gif) —
+    LEAK-ZERO: a row whose preview gif is blocked
+    drops entirely (search niche-scope rule)"]
+    rows --> paging{"page < pages?"}
+    paging -- "yes" --> more["Load more row / scroll → loadMore() next page"]
+    more --> fetch
+    paging -- "no" --> endmarker["endReached → 'That's all N niches'"]
+
+    fetch -- "runCatching fails" --> fail["loadFailed → 'Couldn't load niches' +
+    Retry; AutoRetryEffect re-fires on its own once
+    back online (issue #49 — no more silent hang)"]
+    fail -- "retry / reconnect" --> fetch
+
+    chips["Sort menu (five live-verified orders):
+    Subscribers · Posts · Name A-Z · Name Z-A ·
+    Randomize — selectCategory / resort RESTART:
+    page 1, list cleared, fetch again"] --> fetch
+
+    rows --> tile["Preview tiles (two per row): poster →
+    title → gifs · members → Join/Leave (logged-in
+    only) · About ⓘ · Pin"]
+    tile -- "tile tap" --> nichefeed["Niche feed — FeedSource.Niche(id, name)"]
+    tile -- "Pin toggle" --> pin["settings.togglePinnedNiche —
+    'id|name' packed pin (feed-tab entry)"]
+    tile -- "About ⓘ" --> about["NicheAboutScreen: GET niche detail
+    (description, N Members / N Posts, rules, tags)
+    + Top Creators + 'Niches you might also like';
+    share = ACTION_SEND chooser of the niche URL;
+    load failure → honest empty state + Retry"]
+    nichefeed --> stop(["end"])
+    pin --> tile
+    about -- "top creator tap → creator feed;
+    related niche tap → its feed/about" --> stop
+
+    tile -- "Join / Leave" --> join["NicheJoinViewModel.toggle — optimistic flip
+    welded to a pending-guard (repeat presses can't
+    stack writes) → POST/DELETE v2/niches/{id}/subscription
+    → 202 verified; write failure rolls the flip back
+    + 'Couldn't update join' (server state is source
+    of truth: joined ids = GET v2/niches/following,
+    refreshed on page/about entry; anon 401 → buttons hidden)"]
+    join -- "failure" --> tile
+    join -- "success" --> tile

@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Giffy Viewer — TV mockup: tv-settings.svg (TV variant of the shared screen)
+  Source: app-tv/src/main/kotlin/com/rjbiermann/giffyviewer/tv/TvMainActivity.kt
+          (TvSettings destination) + feature/settings/src/main/kotlin/…
+          /SettingsScreen.kt (GeneralPanel).
+  TV variant wiring: SettingsScreen(showGridColumns = false,
+  showFeedAutoplay = false, showTvRowHeight = true, requestInitialFocus = true,
+  backIcon = Close via GiffyScaffold) — the shared mobile screen hosted bare
+  on TV. Shown: the General panel — App lock (PIN), the DASHED GHOSTS where
+  the mobile-only Grid columns / Autoplay-in-feed rows are HIDDEN, the TV
+  home row size chip block (TV-visible, mirrors the Orientation chip pattern:
+  focusGroup + giffyFocus ring on M3 chips — "Default" selected, "XL"
+  focused), and the AMOLED true-black switch row (unchecked).
+  Scale note: ~1.5 px per dp (1080p TV).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" font-family="DM Sans, sans-serif">
+  <rect x="0" y="0" width="1920" height="1080" fill="#161617"/>
+
+  <!-- Top bar: GiffyScaffold TopAppBar — backIcon = Close on TV, title = panel title -->
+  <g id="top-bar">
+    <line x1="40" y1="44" x2="64" y2="68" stroke="#F7E9EC" stroke-width="4" stroke-linecap="round"/>
+    <line x1="64" y1="44" x2="40" y2="68" stroke="#F7E9EC" stroke-width="4" stroke-linecap="round"/>
+    <text x="104" y="76" font-size="33" font-weight="600" fill="#F7E9EC">General</text>
+  </g>
+
+  <!-- Overscan: content sits inside the 48dp/27dp host Column padding too -->
+  <!-- App lock (PIN) row -->
+  <g id="pin-row">
+    <text x="24" y="172" font-size="21" font-weight="600" fill="#F7E9EC">App lock (PIN)</text>
+    <text x="24" y="202" font-size="18" fill="#DCA1AB">Require a 4-digit PIN when the app starts</text>
+    <!-- TextButton: borderless, primary-colored label -->
+    <text x="24" y="248" font-size="21" font-weight="600" fill="#FF668F">Set PIN</text>
+  </g>
+
+  <!-- Dashed ghosts: mobile-only rows HIDDEN on TV (showGridColumns /
+       showFeedAutoplay = false) — the row skip is the point, not a fold -->
+  <g id="hidden-rows-ghosts">
+    <rect x="24" y="278" width="1872" height="104" rx="12" fill="none" stroke="#9C7A80" stroke-width="2" stroke-dasharray="10 8"/>
+    <text x="48" y="318" font-size="21" fill="#9C7A80" font-weight="600">Grid columns (1 · 2 · 3 · Auto)</text>
+    <text x="48" y="348" font-size="18" fill="#9C7A80">Hidden on TV — the grid is fixed</text>
+
+    <rect x="24" y="396" width="1872" height="104" rx="12" fill="none" stroke="#9C7A80" stroke-width="2" stroke-dasharray="10 8"/>
+    <text x="48" y="436" font-size="21" fill="#9C7A80" font-weight="600">Autoplay in feed</text>
+    <text x="48" y="466" font-size="18" fill="#9C7A80">Hidden on TV — the 1-column feed surface is mobile-only</text>
+  </g>
+
+  <!-- TV home row size (slice 11) — the row that SHOWS on TV -->
+  <g id="tv-row-size-block">
+    <text x="24" y="576" font-size="21" font-weight="600" fill="#F7E9EC">TV home row size</text>
+    <text x="24" y="606" font-size="18" fill="#DCA1AB">Bigger video cards in the TV home feed rows</text>
+
+    <!-- Chips (M3 FilterChip + giffyFocus): "Default" = selected
+         (secondaryContainer #5E4349 / #FBD9E1); "XL" = FOCUSED (rest ring
+         flips to the issue-#7 tokens: primaryContainer fill + 3dp primary
+         border + soft glow); others rest ring outlineVariant -->
+    <rect x="24" y="626" width="130" height="48" rx="12" fill="#5E4349"/>
+    <text x="89" y="656" font-size="21" fill="#FBD9E1" text-anchor="middle">Default</text>
+    <rect x="166" y="626" width="112" height="48" rx="12" fill="none" stroke="#51444A" stroke-width="1.5"/>
+    <text x="222" y="656" font-size="21" fill="#DCA1AB" text-anchor="middle">Large</text>
+    <rect x="290" y="621" width="94" height="58" rx="14" fill="none" stroke="#FF668F" stroke-width="9" stroke-opacity="0.18"/>
+    <rect x="290" y="626" width="82" height="48" rx="12" fill="#7D0030" stroke="#FF668F" stroke-width="4.5"/>
+    <text x="331" y="656" font-size="21" fill="#FFD9E1" text-anchor="middle">XL</text>
+    <rect x="384" y="626" width="100" height="48" rx="12" fill="none" stroke="#51444A" stroke-width="1.5"/>
+    <text x="434" y="656" font-size="21" fill="#DCA1AB" text-anchor="middle">XXL</text>
+  </g>
+
+  <!-- AMOLED true-black switch row (unchecked at rest) -->
+  <g id="amoled-row">
+    <text x="24" y="756" font-size="21" font-weight="600" fill="#F7E9EC">AMOLED true-black</text>
+    <text x="24" y="786" font-size="18" fill="#DCA1AB">Pure black background — saves power on OLED screens</text>
+    <rect x="1748" y="742" width="88" height="52" rx="26" fill="#2C2426" stroke="#51444A" stroke-width="2"/>
+    <circle cx="1774" cy="768" r="22" fill="#51444A"/>
+  </g>
+
+  <!-- ===== TV-variant notes (right side, clear of content) ===== -->
+  <g id="settings-notes">
+    <text x="1336" y="150" font-size="22" font-weight="600" fill="#F7E9EC">TV variant (TvSettings destination)</text>
+    <g font-size="18" fill="#DCA1AB">
+      <text x="1336" y="188">Shared SettingsScreen hosted on TV:</text>
+      <text x="1336" y="216">showGridColumns = false,</text>
+      <text x="1336" y="244">showFeedAutoplay = false,</text>
+      <text x="1336" y="272">showTvRowHeight = true — so the</text>
+      <text x="1336" y="300">row-size block appears and the two</text>
+      <text x="1336" y="328">mobile rows collapse (dashed ghosts).</text>
+      <text x="1336" y="364">Host padding = the overscan Column;</text>
+      <text x="1336" y="392">BACK pops a panel first, the host</text>
+      <text x="1336" y="420">onBack only at the root; the first</text>
+      <text x="1336" y="448">row of each page takes initial D-pad</text>
+      <text x="1336" y="476">focus (requestInitialFocus = true).</text>
+      <text x="1336" y="512">Chips rows are the giffyFocus-ringed</text>
+      <text x="1336" y="540">M3 exceptions (core/ui Focus.kt).</text>
+    </g>
+  </g>
+
+  <!-- Note rider: Root panel thumbnail for orientation (below notes) -->
+  <g id="root-panel-note">
+    <text x="1336" y="640" font-size="22" font-weight="600" fill="#F7E9EC">Root panel below this page</text>
+    <g font-size="18" fill="#DCA1AB">
+      <text x="1336" y="678">Account block + one caption row per</text>
+      <text x="1336" y="706">panel (General / Video / Feeds &amp;</text>
+      <text x="1336" y="734">filters / Blocked / Backup / About)</text>
+      <text x="1336" y="762">— plain rows with chevrons, no chips.</text>
+    </g>
+  </g>
+</svg>

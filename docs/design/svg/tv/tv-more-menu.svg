@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Giffy Viewer — TV mockup: tv-more-menu.svg
+  Source: app-tv/src/main/kotlin/com/rjbiermann/giffyviewer/tv/TvMainActivity.kt
+          (TvHomeDestination — the header LazyRow of TvHeaderPill + More ▾
+          DropdownMenu; TvHeaderPill: neutral 8% fill + 1dp primary border,
+          focus carries the issue-#7 tokens — not focused here, the MENU owns
+          D-pad focus while it is open).
+  Shown: home with the More ▾ dropdown open (D-pad Center on the pill).
+  Items: Collections · My feeds + per-custom-feed shortcuts (Feature.CUSTOM_FEEDS)
+         · HorizontalDivider · pinned niches + pinned creators (@creator form).
+  The first menu row takes focus after D-pad open; M3 DropdownMenu renders NO
+  dim scrim over the content (unlike the quick-actions Dialog).
+  Scale note: ~1.5 px per dp (1080p TV).
+  Menu container: dialog-container tone #221D1E (menu surfaceContainer ≈ the
+  6dp dialog tone over #161617 — same approximation the other mocks carry).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" font-family="DM Sans, sans-serif">
+  <rect x="0" y="0" width="1920" height="1080" fill="#161617"/>
+
+  <!-- Overscan margins (PLAN §1): 48dp horizontal / 27dp vertical on everything -->
+  <!-- Header pill row — SITS ABOVE the home screen title (column order in
+       TvHomeDestination: pills LazyRow → TvHomeScreen). -->
+  <g id="header-pill-row">
+    <rect x="72" y="40" width="150" height="64" rx="32" fill="#282728" stroke="#FF668F" stroke-width="1.5"/>
+    <text x="147" y="80" font-size="21" fill="#F7E9EC" text-anchor="middle">Settings</text>
+    <rect x="240" y="40" width="126" height="64" rx="32" fill="#282728" stroke="#FF668F" stroke-width="1.5"/>
+    <text x="303" y="80" font-size="21" fill="#F7E9EC" text-anchor="middle">Niches</text>
+    <rect x="384" y="40" width="140" height="64" rx="32" fill="#282728" stroke="#FF668F" stroke-width="1.5"/>
+    <text x="454" y="80" font-size="21" fill="#F7E9EC" text-anchor="middle">Search</text>
+    <rect x="542" y="40" width="196" height="64" rx="32" fill="#282728" stroke="#FF668F" stroke-width="1.5"/>
+    <text x="640" y="80" font-size="21" fill="#F7E9EC" text-anchor="middle">Retro Gaming</text>
+    <rect x="756" y="40" width="130" height="64" rx="32" fill="#282728" stroke="#FF668F" stroke-width="1.5"/>
+    <text x="821" y="80" font-size="21" fill="#F7E9EC" text-anchor="middle">More ▾</text>
+  </g>
+
+  <!-- Home content behind the dropdown (no scrim — DropdownMenu floats) -->
+  <text x="24" y="194" font-size="33" font-weight="600" fill="#F7E9EC">Giffy Viewer</text>
+  <text x="24" y="256" font-size="21" font-weight="600" fill="#F7E9EC">For You</text>
+  <text x="24" y="296" font-size="21" fill="#DCA1AB">Home rows continue under the open dropdown — untouched focus restore.</text>
+  <g id="for-you-row">
+    <rect x="24" y="330" width="281" height="255" rx="18" fill="#3A2A2E"/>
+    <rect x="320" y="330" width="127" height="255" rx="18" fill="#2C3A2E"/>
+    <rect x="462" y="330" width="420" height="255" rx="18" fill="#3E2429"/>
+    <rect x="897" y="330" width="281" height="255" rx="18" fill="#333942"/>
+    <rect x="1193" y="330" width="420" height="255" rx="18" fill="#42272B"/>
+    <rect x="1628" y="330" width="268" height="255" rx="18" fill="#2E2733"/>
+  </g>
+
+  <!-- DropdownMenu anchored under the More ▾ pill. First row FOCUSED. -->
+  <g id="more-dropdown">
+    <rect x="746" y="114" width="330" height="372" rx="12" fill="#221D1E"/>
+
+    <!-- Focused recognizable first row: issue tokens (fill primaryContainer,
+         3dp primary border, onPrimaryContainer text) -->
+    <rect x="752" y="118" width="318" height="66" rx="12" fill="#7D0030" stroke="#FF668F" stroke-width="4.5"/>
+    <text x="770" y="159" font-size="24" fill="#FFD9E1">Collections</text>
+
+    <text x="770" y="231" font-size="24" fill="#F7E9EC">My feeds</text>
+    <text x="770" y="303" font-size="24" fill="#F7E9EC">90s arcade</text>
+
+    <!-- HorizontalDivider between custom feeds and pinned entries -->
+    <line x1="746" y1="334" x2="1076" y2="334" stroke="#51444A" stroke-width="2"/>
+    <text x="770" y="379" font-size="24" fill="#F7E9EC">Retro Gaming</text>
+    <text x="770" y="451" font-size="24" fill="#F7E9EC">@crthaven</text>
+  </g>
+
+  <!-- ===== Gating + shape notes (right side) ===== -->
+  <g id="menu-notes">
+    <line x1="1082" y1="150" x2="1120" y2="150" stroke="#9C7A80" stroke-width="2"/>
+    <text x="1136" y="158" font-size="22" font-weight="600" fill="#F7E9EC">More ▾ menu fact sheet</text>
+    <g font-size="18" fill="#DCA1AB">
+      <text x="1136" y="196">- "My feeds" + every per-custom-feed</text>
+      <text x="1136" y="224">shortcut sit behind Feature.CUSTOM_FEEDS;</text>
+      <text x="1136" y="252">DB rows + the BLOCKED-feed filter stage</text>
+      <text x="1136" y="280">keep working underneath (flag off = rows</text>
+      <text x="1136" y="308">collapse, divider + pins stay).</text>
+      <text x="1136" y="344">After the divider: pinned niches</text>
+      <text x="1136" y="372">("id|name") + pinned creators ("@user").</text>
+      <text x="1136" y="408">Pills row lives ABOVE the home title;</text>
+      <text x="1136" y="436">custom feeds come from Room ordered by</text>
+      <text x="1136" y="464">creation (db.customFeedDao().all()).</text>
+      <text x="1136" y="500">Menu carries no dim scrim; the first</text>
+      <text x="1136" y="528">item takes D-pad focus when the pill opens it.</text>
+    </g>
+  </g>
+</svg>

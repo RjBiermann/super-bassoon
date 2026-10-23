@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="452" height="932" viewBox="0 0 452 932">
+<rect x="0" y="0" width="452" height="932" fill="#0C0B0F"/>
+<rect x="20" y="20" width="412" height="892" fill="#1C1B1F" rx="36" stroke="#938F99" stroke-width="1"/>
+<rect x="20" y="920" width="12" height="12" fill="#1C1B1F" stroke="#938F99" stroke-width="1"/>
+<text x="36" y="929.5" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">surface</text>
+<rect x="94" y="920" width="12" height="12" fill="#E6E1E5" stroke="#938F99" stroke-width="1"/>
+<text x="110" y="929.5" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">onSurface</text>
+<rect x="180" y="920" width="12" height="12" fill="#D0BCFF" stroke="#938F99" stroke-width="1"/>
+<text x="196" y="929.5" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">primary</text>
+<rect x="254" y="920" width="12" height="12" fill="#CAC4D0" stroke="#938F99" stroke-width="1"/>
+<text x="270" y="929.5" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">onSurfaceVariant</text>
+<rect x="382" y="920" width="12" height="12" fill="#938F99" stroke="#938F99" stroke-width="1"/>
+<text x="398" y="929.5" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">outline</text>
+<text x="374" y="42" font-family="Roboto, sans-serif" font-size="12" fill="#E6E1E5">12:30</text>
+<rect x="392" y="32" width="26" height="12" fill="#E6E1E5" rx="3"/>
+<rect x="421" y="34" width="4" height="8" fill="#938F99" rx="1"/>
+<rect x="20" y="84" width="412" height="56" fill="#1C1B1F"/>
+<text x="36" y="119" font-family="Roboto, sans-serif" font-size="19" fill="#E6E1E5" font-weight="500">Backup</text>
+<line x1="396" y1="108" x2="408" y2="120" stroke="#E6E1E5" stroke-width="2" stroke-linecap="round"/><line x1="408" y1="108" x2="396" y2="120" stroke="#E6E1E5" stroke-width="2" stroke-linecap="round"/>
+<rect x="20" y="139" width="412" height="1" fill="#36343B"/>
+<text x="36" y="190" font-family="Roboto, sans-serif" font-size="14" fill="#D0BCFF" font-weight="500">Preferences backup</text>
+<rect x="36" y="210" width="104" height="40" fill="#D0BCFF" rx="20"/>
+<text x="88" y="235" font-family="Roboto, sans-serif" font-size="14" fill="#381E72" text-anchor="middle" font-weight="500">Export</text>
+<rect x="148" y="210" width="104" height="40" fill="none" rx="20" stroke="#938F99" stroke-width="1"/>
+<text x="200" y="235" font-family="Roboto, sans-serif" font-size="14" fill="#D0BCFF" text-anchor="middle">Import</text>
+<text x="36" y="282" font-family="Roboto, sans-serif" font-size="11" fill="#CAC4D0">Export saves blocked &amp; favorited creators, tags, keywords</text>
+<text x="36" y="298" font-family="Roboto, sans-serif" font-size="11" fill="#CAC4D0">and data saver. Import merges them in.</text>
+<text x="36" y="340" font-family="Roboto, sans-serif" font-size="11" fill="#E6E1E5">SAF affordance — the Android system document picker</text>
+<text x="36" y="355" font-family="Roboto, sans-serif" font-size="11" fill="#CAC4D0">(CreateDocument / OpenDocument, no storage permission):</text>
+<rect x="36" y="370" width="380" height="118" fill="#36343B" rx="16" stroke="#938F99" stroke-width="1"/>
+<text x="56" y="396" font-family="Roboto, sans-serif" font-size="12" fill="#E6E1E5" font-weight="500">Create document</text>
+<text x="56" y="414" font-family="Roboto, sans-serif" font-size="11" fill="#CAC4D0">giffy-prefs.json — picker suggests the file name</text>
+<rect x="56" y="432" width="340" height="1" fill="#938F99"/>
+<text x="56" y="456" font-family="Roboto, sans-serif" font-size="12" fill="#E6E1E5" font-weight="500">Open document</text>
+<text x="56" y="474" font-family="Roboto, sans-serif" font-size="11" fill="#CAC4D0">application/json — any JSON file; validated on import</text>
+</svg>

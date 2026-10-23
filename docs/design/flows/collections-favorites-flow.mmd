@@ -1,0 +1,59 @@
+%% Derived from: feature/feed/CollectionsScreen.kt + CollectionsViewModel.kt
+%% (Saved Collections: GET v2/me/collections, create POST {name, published} +
+%% live-probed PATCH quirk, rename PATCH folderName, delete DELETE by id),
+%% feature/feed/QuickSheet.kt (Add to… dialogs) and feature/feed/FeedViewModel.kt
+%% (like/favorite/follow/add-to writes — JSON bodies + Json encodeDefaults per
+%% AGENTS write-shape rules; bare PUT/DELETE 400).
+flowchart TD
+    subgraph collections["Saved Collections management (CollectionsScreen)"]
+        co(["Collections page opened"]) --> colfetch["CollectionsViewModel.refresh():
+        GET v2/me/collections (token-gated;
+        logged-out → surface hidden by the shell)"]
+        colfetch --> colrows["Rows: folderName (contentCount items),
+        per-row Edit (rename) + Delete (confirm-first:
+        unrecoverable); Create via header + icon"]
+        colrows -- "Create New Collection" --> named1["NameDialog — Save enabled only
+        when name is NOT blank (2026-10 fix: dismiss
+        no longer submits a blank name)"]
+        colrows -- "rename" --> named2["NameDialog prefilled with the name"]
+        named1 -- "POST v2/me/collections
+        body {name, published} (required)" --> quirk["Live-probed quirk: creation ignores
+        the name field → immediately PATCH
+        v2/me/collections/{id} {folderName}"]
+        quirk --> refetch
+        named2 -- "PATCH {folderName}" --> refetch["refresh() — server list re-renders"]
+        colrows -- "delete + confirm" --> coldel["DELETE v2/me/collections/{id} → refresh()"]
+        refetch --> colrows
+        coldel --> colrows
+    end
+
+    subgraph writes["Quick-sheet writes (QuickBlockSheet → FeedViewModel)"]
+        qs(["⋯ / quick sheet opened for a gif"]) --> rows["Rows: Favorite/Unfavorite @user (LOCAL Room
+        ContentPref toggle + evictFavoritesCache),
+        Open @user's feed, Follow row (LOGGED-IN ONLY —
+        a write would 401), Pin to home (DataStore), Tags…, Block…"]
+        rows -- "Like/unlike gif (mobile action rail + TV player)" --> like["Optimistic flip in Room liked_ids mirror →
+        PUT v2/gifs/{id}/like (like) / DELETE with body
+        {context, source, position} (unlike) — JSON body
+        + Json encodeDefaults, else bare writes 400;
+        failure REVERTS the mirror to the pre-tap state"]
+        rows -- "Follow/Unfollow (awaited, issue #27)" --> follow["Single-flight guarded toggle:
+        PUT v1/me/follows/{username} / DELETE hasBody
+        + FollowBody JSON — success flips the server
+        list locally and closes; FAILURE keeps the
+        sheet open, row in its pre-toggle state"]
+        rows -- "Add to a Collection…" --> addcol["refreshCollections() →
+        AddToCollectionDialog (token-gated read) →
+        POST v2/me/collections/{id}/gifs {gifId} → 204"]
+        rows -- "Add to a Niche…" --> addniche["refreshJoinedNiches() → AddToNicheDialog
+        (tag-matching niches first) →
+        PUT v2/gifs/{id}/niches {nicheId} → 202"]
+        rows -- "Add to custom feed… (Feature.CUSTOM_FEEDS)" --> addcf["AddToCustomFeedDialog (radio feed +
+        checkbox refs) → LOCAL Room append to
+        sourcesJson, deduped + cached pages evicted"]
+        addcol --> close(["dialog + sheet close"])
+        addniche --> close
+        addcf --> close
+        like --> close
+        follow --> close
+    end

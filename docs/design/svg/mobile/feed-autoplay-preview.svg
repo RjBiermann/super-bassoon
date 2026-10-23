@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="452" height="932" viewBox="0 0 452 932">
+<rect x="0" y="0" width="452" height="932" fill="#0C0B0F"/>
+<rect x="20" y="20" width="412" height="892" fill="#1C1B1F" rx="36" stroke="#938F99" stroke-width="1"/>
+<rect x="20" y="920" width="12" height="12" fill="#1C1B1F" stroke="#938F99" stroke-width="1"/>
+<text x="36" y="929.5" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">surface</text>
+<rect x="94" y="920" width="12" height="12" fill="#E6E1E5" stroke="#938F99" stroke-width="1"/>
+<text x="110" y="929.5" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">onSurface</text>
+<rect x="180" y="920" width="12" height="12" fill="#D0BCFF" stroke="#938F99" stroke-width="1"/>
+<text x="196" y="929.5" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">primary</text>
+<rect x="254" y="920" width="12" height="12" fill="#CAC4D0" stroke="#938F99" stroke-width="1"/>
+<text x="270" y="929.5" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">onSurfaceVariant</text>
+<rect x="382" y="920" width="12" height="12" fill="#938F99" stroke="#938F99" stroke-width="1"/>
+<text x="398" y="929.5" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">outline</text>
+<text x="374" y="42" font-family="Roboto, sans-serif" font-size="12" fill="#E6E1E5">12:30</text>
+<rect x="392" y="32" width="26" height="12" fill="#E6E1E5" rx="3"/>
+<rect x="421" y="34" width="4" height="8" fill="#938F99" rx="1"/>
+<rect x="20" y="84" width="412" height="56" fill="#1C1B1F"/>
+<text x="36" y="119" font-family="Roboto, sans-serif" font-size="19" fill="#E6E1E5" font-weight="500">Following</text>
+<circle cx="336" cy="104" r="7" fill="none" stroke="#E6E1E5" stroke-width="2"/><line x1="341.25" y1="109.25" x2="347.2" y2="115.2" stroke="#E6E1E5" stroke-width="2" stroke-linecap="round"/>
+<circle cx="376" cy="104" r="7" fill="none" stroke="#E6E1E5" stroke-width="2"/><line x1="376.0" y1="98.0" x2="376.0" y2="94.0" stroke="#E6E1E5" stroke-width="2" stroke-linecap="round"/><line x1="381.2" y1="101.0" x2="384.7" y2="99.0" stroke="#E6E1E5" stroke-width="2" stroke-linecap="round"/><line x1="381.2" y1="107.0" x2="384.7" y2="109.0" stroke="#E6E1E5" stroke-width="2" stroke-linecap="round"/><line x1="376.0" y1="110.0" x2="376.0" y2="114.0" stroke="#E6E1E5" stroke-width="2" stroke-linecap="round"/><line x1="370.8" y1="107.0" x2="367.3" y2="109.0" stroke="#E6E1E5" stroke-width="2" stroke-linecap="round"/><line x1="370.8" y1="101.0" x2="367.3" y2="99.0" stroke="#E6E1E5" stroke-width="2" stroke-linecap="round"/>
+<rect x="20" y="139" width="412" height="1" fill="#36343B"/>
+<text x="32" y="170" font-family="Roboto, sans-serif" font-size="11" fill="#CAC4D0">Autoplay on — settled tile plays muted</text>
+<text x="246" y="170" font-family="Roboto, sans-serif" font-size="11" fill="#CAC4D0">Data saver on — poster stays static</text>
+<line x1="226" y1="160" x2="226" y2="640" stroke="#36343B" stroke-width="1"/>
+<rect x="32" y="180" width="186" height="232" fill="#322F37" rx="10"/>
+<circle cx="204" cy="195" r="9" fill="#000000" opacity="0.6"/>
+<text x="204" y="199" font-family="Roboto, sans-serif" font-size="10" fill="#FFFFFF" text-anchor="middle">♪</text>
+<text x="32" y="430" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">settled — shared muted player surface</text>
+<text x="32" y="444" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">over the poster · tap = full player</text>
+<rect x="32" y="458" width="186" height="140" fill="#322F37" rx="10"/>
+<text x="34" y="614" font-family="Roboto, sans-serif" font-size="11" fill="#CAC4D0">@other</text>
+<rect x="246" y="180" width="186" height="232" fill="#322F37" rx="10"/>
+<text x="246" y="430" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">static poster — no inline player</text>
+<text x="246" y="444" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">attached (autoplayOn needs !dataSaver)</text>
+<rect x="246" y="458" width="186" height="140" fill="#322F37" rx="10"/>
+<text x="248" y="614" font-family="Roboto, sans-serif" font-size="11" fill="#CAC4D0">@other</text>
+<text x="32" y="668" font-family="Roboto, sans-serif" font-size="11" fill="#CAC4D0">autoplayOn = gridColumns == 1 &amp;&amp; feedAutoplay &amp;&amp; !dataSaver</text>
+<text x="32" y="688" font-family="Roboto, sans-serif" font-size="11" fill="#CAC4D0">One shared VM-owned player: first tile ≥50% visible after a 150 ms</text>
+<text x="32" y="706" font-family="Roboto, sans-serif" font-size="11" fill="#CAC4D0">settle, paused while scrolling, parked on leave — no watch history.</text>
+<text x="32" y="726" font-family="Roboto, sans-serif" font-size="11" fill="#CAC4D0">1 stream fetch per settled tile — rate-limit invariant respected.</text>
+<text x="32" y="746" font-family="Roboto, sans-serif" font-size="11" fill="#CAC4D0">PlayerView takes no touches (controller off) — tile tap/long-press</text>
+<text x="32" y="764" font-family="Roboto, sans-serif" font-size="11" fill="#CAC4D0">keep working; the poster shows through until the first frame.</text>
+</svg>

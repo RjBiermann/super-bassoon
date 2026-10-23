@@ -1,0 +1,34 @@
+%% Derived from: feature/settings/SettingsScreen.kt (SAF launchers +
+%% BackupPanel + snackbar outcomes), SettingsViewModel.kt (exportJson /
+%% importJson) and core/database/ContentPrefsBackup.kt (giffy-prefs v3 JSON,
+%% merge-upsert import). AGENTS gate 7: export → import round-trip on a
+%% fresh install.
+sequenceDiagram
+    autonumber
+    participant UI as SettingsScreen — BackupPanel
+    participant SAF as SAF document picker (native, no storage permission)
+    participant VM as SettingsViewModel
+    participant CB as ContentPrefsBackup (core:database)
+    participant DAO as Room ContentPrefsDao + CustomFeedDao
+
+    UI->>SAF: Export — CreateDocument(application/json) launcher, suggested name giffy-prefs.json
+    SAF-->>UI: user picks destination → uri (null = cancelled, no-op)
+    UI->>VM: exportJson()
+    VM->>CB: export(dao, dataSaver, customFeeds)
+    CB->>DAO: allCreatorPrefs + allTagPrefs + allKeywordBlocks + custom feeds (incl. state)
+    CB-->>VM: JSON string {format: giffy-prefs, version: 3, dataSaver, creatorPrefs, tagPrefs, keywordBlocks, customFeeds}
+    UI->>SAF: openOutputStream(uri) → write bytes
+    Note over UI,SAF: write failure → 'Export failed' snackbar, success → 'Preferences exported'
+
+    UI->>SAF: Import — OpenDocument launcher (application/json)
+    SAF-->>UI: user picks file → uri
+    UI->>SAF: openInputStream(uri) → read text (unreadable → 'Import failed — file not readable')
+    UI->>VM: importJson(json)
+    VM->>CB: import(dao, json, customFeedDao)
+    CB->>CB: decode Backup (ignoreUnknownKeys, v2 export = state absent → NEUTRAL)
+    CB->>DAO: MERGE-UPSERT every section — never destroys the target's newer edits (fresh install is empty anyway)
+    CB->>DAO: custom feeds restored WITH their exported ids (chips/cache keys keep pointing at the same definitions)
+    CB-->>VM: restored entry count
+    VM->>VM: settings.setDataSaver(parseDataSaver) + evictFavoritesCache (restored FAVORITED rows change the favorites set)
+    Note over UI,VM: malformed JSON → 'Import failed — not a Giffy preferences file', success → 'Imported N entries'
+    Note over VM: Gate 7: the exported JSON round-trips on a fresh install — export → import on an empty Room restores every list verbatim

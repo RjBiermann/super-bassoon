@@ -18,8 +18,23 @@ quoted labels only.
 | [`pinlock-agegate.mmd`](pinlock-agegate.mmd) | App gates: PIN lock (retry slow-down) + age gate, host-wiring differences between shells | `core/ui/PinLock.kt`, `core/ui/AgeGate.kt`, both shell `MainActivity`/`TvMainActivity` hosts |
 | [`player-state-machine.mmd`](player-state-machine.mmd) | Player states: open/prepare/play/pause/ended/error, auto-swipe + pool-end, controls visibility, close semantics | `feature/feed/PlayerScreen.kt`, `core/player/GiffyPlayer.kt`, `app-mobile/src/androidTest/.../PlayerScreenMachineTest.kt` |
 | [`search-flow.mmd`](search-flow.mmd) | Search: debounced suggest, explore sections, scope tabs (leak-zero), history, submit → results feed | `feature/search/SearchViewModel.kt`, `SearchScreen.kt`, both shell nav hosts |
+| [`following-flow.mmd`](following-flow.mmd) | Following page: logged-out hidden, paged `v2/me/following` + `v2/niches/following`, retry, entries → creator/niche feeds | `feature/feed/FollowingScreen.kt`, `FollowingViewModel.kt`, mobile route + TV home row |
+| [`collections-favorites-flow.mmd`](collections-favorites-flow.mmd) | Saved Collections management (create/rename/delete via NameDialog) + quick-sheet writes: like/favorite/follow/add-to (JSON-body PUT/DELETE) | `feature/feed/CollectionsScreen.kt`, `CollectionsViewModel.kt`, `QuickSheet.kt`, `FeedViewModel.kt`, `core/network/GifsApi.kt` |
+| [`custom-feeds-flow.mmd`](custom-feeds-flow.mmd) | Custom feeds: builder (name + creator/tag/niche refs), state cycle FAVORITED→BLOCKED→NEUTRAL, delete evicts cached pages, `Feature.CUSTOM_FEEDS` gating | `feature/feed/CustomFeedsScreen.kt`, `core/ui/Feature.kt`, `app-tv/TvMainActivity.kt`, `feature/feed/FeedTabStrip.kt` |
+| [`niches-flow.mmd`](niches-flow.mmd) | Niches: preview-tile listing (leak-zero rows), category chips, five sorts, auto-retry (#49), join/leave with rollback, About page, pin | `feature/feed/NichesScreen.kt`, `NichesViewModel.kt`, `NicheJoinViewModel.kt`, `NicheAboutScreen.kt` |
+| [`settings-backup-flow.mmd`](settings-backup-flow.mmd) | Settings backup: SAF export/import of the giffy-prefs v3 JSON, merge-upsert round-trip (gate 7) | `feature/settings/SettingsScreen.kt`, `SettingsViewModel.kt`, `core/database/ContentPrefsBackup.kt` |
+| [`offline-flow.mmd`](offline-flow.mmd) | Offline: NetworkMonitor truth → banner mounts per shell; airplane-mode cold start reverts seeded For You to the cached Trending grid (gate 3) | `core/ui/NetworkMonitor.kt`, `OfflineBanner.kt`, `feature/feed/FeedViewModel.kt`, both shell hosts |
+| [`tv-player-quick-actions.mmd`](tv-player-quick-actions.mmd) | TV player: window-payload entry, hidden/visible keymap, auto-swipe + end popup, quick-actions panel (like/mute/speed/favorite/block/follow/pin/add-to), entry-replacing exits | `app-tv/TvPlayerScreen.kt`, `TvQuickActions.kt`, `TvMainActivity.kt` |
 
 ## Deliberate omissions / verified gaps
+
+- **`watch-history.mmd` — no diagram, BY DESIGN.** Watch history / "Continue
+  Watching" / resume was **removed 2026-10** (user decision): `watch_history`
+  dropped in `MIGRATION_10_11` (DB v11), both players start every gif at 0, and
+  no surface reads played positions anymore (see `AGENTS-DATABASE.md`,
+  `AGENTS-PLAYER.md`). A removed feature gets no flow diagram — the removal is
+  annotated where it matters (`player-state-machine.mmd`,
+  `tv-player-quick-actions.mmd`).
 
 - **`auth-tv-paste-token.mmd` — SKIPPED, no file.** The TV paste-token fallback was
   **removed 2026-10** (user decision, recorded in `feature/auth/AuthSection.kt`:

@@ -4,8 +4,11 @@
   Source: app-tv/src/main/kotlin/com/rjbiermann/giffyviewer/tv/TvSourceFeedScreen.kt
   Pinned feed full-page (niche/creator/custom). Title + Refresh / Sort & filter
   icon buttons beside it (issue-#7 focus tokens on tv-material IconButton),
-  niche identity header + Join, For You-style filter chips (giffyFocus on M3
-  chips), body = home-page-style card bands (4 cards per band, FEED_ROW_CARDS).
+  niche identity header + Join (up from the chips), For You-style filter chips
+  (giffyFocus on M3 chips), body = home-page-style card bands (4 cards per
+  band, FEED_ROW_CARDS), end-of-feed footer after the last band: "End of feed"
+  caption + the focused Refresh button (RefreshFooterButton, F4 — error and
+  filtered-empty states share this footer; refresh is D-pad reachable).
   Scale note: ~1.5 px per dp (1080p TV).
 -->
 <svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" font-family="DM Sans, sans-serif">
@@ -80,9 +83,16 @@
     <text x="1335" y="793">@wavetracker</text>
   </g>
 
-  <!-- Band 3 (partial band at the content edge, slightly cropped below) -->
-  <g id="band-3">
-    <rect x="24" y="830" width="420" height="255" rx="18" fill="#2A3A2E"/>
-    <rect x="459" y="830" width="420" height="255" rx="18" fill="#3E2A36"/>
+  <!-- End-of-feed footer (#22 / F4 — RefreshFooterButton after the last
+       band): bodySmall onSurfaceVariant caption + the Refresh button
+       FOCUSED (transparent rest → primaryContainer fill #7D0030 /
+       onPrimaryContainer text + 3dp primary border + soft glow). The same
+       footer renders under the "Something went wrong
+       / No videos match this filter" empty states. -->
+  <g id="end-of-feed-footer">
+    <text x="960" y="888" font-size="19" fill="#DCA1AB" text-anchor="middle">End of feed</text>
+    <rect x="838" y="914" width="244" height="70" rx="18" fill="none" stroke="#FF668F" stroke-width="11" stroke-opacity="0.18"/>
+    <rect x="846" y="920" width="228" height="58" rx="18" fill="#7D0030" stroke="#FF668F" stroke-width="4.5"/>
+    <text x="960" y="958" font-size="21" font-weight="600" fill="#FFD9E1" text-anchor="middle">Refresh</text>
   </g>
 </svg>

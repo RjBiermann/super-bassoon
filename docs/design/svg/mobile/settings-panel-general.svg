@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="452" height="932" viewBox="0 0 452 932">
+<rect x="0" y="0" width="452" height="932" fill="#0C0B0F"/>
+<rect x="20" y="20" width="412" height="892" fill="#1C1B1F" rx="36" stroke="#938F99" stroke-width="1"/>
+<rect x="20" y="920" width="12" height="12" fill="#1C1B1F" stroke="#938F99" stroke-width="1"/>
+<text x="36" y="929.5" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">surface</text>
+<rect x="94" y="920" width="12" height="12" fill="#E6E1E5" stroke="#938F99" stroke-width="1"/>
+<text x="110" y="929.5" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">onSurface</text>
+<rect x="180" y="920" width="12" height="12" fill="#D0BCFF" stroke="#938F99" stroke-width="1"/>
+<text x="196" y="929.5" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">primary</text>
+<rect x="254" y="920" width="12" height="12" fill="#CAC4D0" stroke="#938F99" stroke-width="1"/>
+<text x="270" y="929.5" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">onSurfaceVariant</text>
+<rect x="382" y="920" width="12" height="12" fill="#938F99" stroke="#938F99" stroke-width="1"/>
+<text x="398" y="929.5" font-family="Roboto, sans-serif" font-size="10" fill="#CAC4D0">outline</text>
+<text x="374" y="42" font-family="Roboto, sans-serif" font-size="12" fill="#E6E1E5">12:30</text>
+<rect x="392" y="32" width="26" height="12" fill="#E6E1E5" rx="3"/>
+<rect x="421" y="34" width="4" height="8" fill="#938F99" rx="1"/>
+<rect x="20" y="84" width="412" height="56" fill="#1C1B1F"/>
+<text x="36" y="119" font-family="Roboto, sans-serif" font-size="19" fill="#E6E1E5" font-weight="500">General</text>
+<line x1="396" y1="108" x2="408" y2="120" stroke="#E6E1E5" stroke-width="2" stroke-linecap="round"/><line x1="408" y1="108" x2="396" y2="120" stroke="#E6E1E5" stroke-width="2" stroke-linecap="round"/>
+<rect x="20" y="139" width="412" height="1" fill="#36343B"/>
+<text x="36" y="186" font-family="Roboto, sans-serif" font-size="14" fill="#E6E1E5" font-weight="500">App lock (PIN)</text>
+<text x="36" y="204" font-family="Roboto, sans-serif" font-size="11" fill="#CAC4D0">Require a 4-digit PIN when the app starts</text>
+<text x="416" y="200" font-family="Roboto, sans-serif" font-size="14" fill="#D0BCFF" text-anchor="end">Set PIN</text>
+<text x="36" y="252" font-family="Roboto, sans-serif" font-size="14" fill="#E6E1E5" font-weight="500">Grid columns</text>
+<text x="36" y="270" font-family="Roboto, sans-serif" font-size="11" fill="#CAC4D0">Auto follows window width (1 phone · 2 medium · 3 wide)</text>
+<rect x="36" y="284" width="30" height="32" fill="#1C1B1F" rx="16.0" stroke="#938F99" stroke-width="1"/>
+<text x="51.0" y="304.32" font-family="Roboto, sans-serif" font-size="12" fill="#CAC4D0" text-anchor="middle">1</text>
+<rect x="72" y="284" width="30" height="32" fill="#1C1B1F" rx="16.0" stroke="#938F99" stroke-width="1"/>
+<text x="87.0" y="304.32" font-family="Roboto, sans-serif" font-size="12" fill="#CAC4D0" text-anchor="middle">2</text>
+<rect x="108" y="284" width="30" height="32" fill="#1C1B1F" rx="16.0" stroke="#938F99" stroke-width="1"/>
+<text x="123.0" y="304.32" font-family="Roboto, sans-serif" font-size="12" fill="#CAC4D0" text-anchor="middle">3</text>
+<text x="150" y="304" font-family="Roboto, sans-serif" font-size="13" fill="#D0BCFF" font-weight="500">Auto</text>
+<text x="36" y="336" font-family="Roboto, sans-serif" font-size="10" fill="#938F99">mobile-only row — hidden on TV (fixed grid there)</text>
+<text x="36" y="372" font-family="Roboto, sans-serif" font-size="14" fill="#E6E1E5" font-weight="500">Autoplay in feed</text>
+<text x="36" y="390" font-family="Roboto, sans-serif" font-size="11" fill="#CAC4D0">Play a muted preview on the settled tile in the 1-column feed</text>
+<rect x="364" y="368" width="52" height="32" fill="#D0BCFF" rx="16"/>
+<circle cx="400" cy="384" r="12" fill="#381E72"/>
+<text x="36" y="448" font-family="Roboto, sans-serif" font-size="14" fill="#E6E1E5" font-weight="500">AMOLED true-black</text>
+<text x="36" y="466" font-family="Roboto, sans-serif" font-size="11" fill="#CAC4D0">Pure black background — saves power on OLED screens</text>
+<rect x="364" y="444" width="52" height="32" fill="#36343B" rx="16" stroke="#938F99" stroke-width="1"/>
+<circle cx="380" cy="460" r="12" fill="#CAC4D0"/>
+</svg>

@@ -1,0 +1,59 @@
+%% Derived from: app-tv/.../TvPlayerScreen.kt (window-payload route TvPlayer
+%% {gifs, startIndex} — the loaded snapshot list travels in the route, no
+%% startIndex-only fallback; keymap issue #48: OK/Center reveal, BACK hide
+%% then exit, UP/DOWN switch while hidden, ±10s seek, auto-swipe, end-of-feed
+%% popup #22; entry-replacing exits: creator/niche navigation pops the player
+%% entry inclusively) and app-tv/.../TvQuickActions.kt (TvQuickActionsDialog:
+%% player rows Like/Mute/Speed/Auto-swipe + shared panes, hold-Center KeyUp
+%% swallow issue #3).
+flowchart TD
+    entry(["TvPlayer route — navigate(TvPlayer(gifs, startIndex)):
+    the WINDOW PAYLOAD carries the already-loaded gif
+    snapshot + start index (backdrop rows / tiles pass
+    their live slice); controls start HIDDEN"]) --> play["playGif at position 0 every time —
+    watch-history/resume REMOVED (DB v11 dropped the
+    table); mute pref applied to the live player"]
+
+    play --> hidden["HIDDEN state: UP/DOWN switch videos
+    (DOWN at last → end popup), LEFT/RIGHT seek ±10s
+    with a '1:23 / 2:45' flash, CENTER tap reveals"]
+    hidden -- "BACK" --> exit(["BACK unconsumed → system back →
+    nav pop exits the player"])
+    hidden -- "reveal (OK/short CENTER)" --> visible["VISIBLE: creator + description cluster,
+    niche pills (≤3, tap → niche feed), auto-hide 3s
+    while playing; BACK hides again (progress line stays)"]
+    visible -- "CENTER tap" --> pauseplay["play/pause (restart at the ended frame)"]
+    visible -- "BACK" --> hidden
+
+    menu(["MENU, or CENTER held ≥500ms (CenterHold,
+    openViaHold: the panel swallows its own release
+    KeyUp — issue #3)"]) --> panel["TvQuickActionsDialog — player rows first:
+    Like/Unlike (optimistic liked_ids flip + revert
+    on write failure), Mute/Unmute (hasAudio-aware),
+    Speed row (LEFT/RIGHT ±0.25, clamped 0.5–2×,
+    applied immediately), Auto-swipe ON/OFF"]
+    panel --> shared["Shared panes (mobile QuickSheet parity):
+    Favorite/Unfavorite @user · Open @user's feed ·
+    Follow (awaited, hidden logged-out) · Pin to home ·
+    Add to… (custom row rides Feature.CUSTOM_FEEDS) ·
+    Tags… · Show more (full description + niche rows) ·
+    Block… · Close"]
+    shared -- "open creator / niche feed" --> replace["onBack() first, then navigate TvFeed(...) —
+    ENTRY-REPLACING EXIT: the player's entry is popped
+    inclusively so BACK lands the covered surface
+    (swapping sources under the live pager is the
+    soak-crash class)"]
+    replace --> stop(["end"])
+    shared -- "Close / dismiss" --> hidden
+
+    ended{"Media ended"} -- "auto-swipe ON and not data-saver
+    and not the last gif" --> swipe["index++ under HIDDEN UI (no flash)"]
+    swipe --> play
+    ended -- "otherwise" --> loop["seekTo(0) + play — loops in place"]
+    loop --> play
+    hidden -- "manual next at the LAST gif" --> popup["End-of-feed popup (#22): 'Start over'
+    (index=0) or 'Back to feed' (onBack)"]
+    popup --> stop
+    play -- "onPlayerError" --> error["Retry/Skip overlay (Retry re-resolves,
+    Skip advances; no Up/Down switching while failing)"]
+    error -- "resolved / skipped" --> play

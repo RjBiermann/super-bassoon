@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Giffy Viewer — TV mockup: tv-quick-actions-tags.svg (tags sub-view)
+  Source: app-tv/src/main/kotlin/com/rjbiermann/giffyviewer/tv/TvQuickActions.kt
+          (TvQuickActionsDialog view == "tags"; rows are QuickAction → TvButton:
+           at rest the M3 fill primary #FF668F / onPrimary #5E0B25, on focus
+           primaryContainer #7D0030 / onPrimaryContainer #FFD9E1 + 3dp primary
+           border + soft glow).
+  Shown: reached from the main pane's "Tags…" row (gif.tags non-empty). Per
+  tag (gif.tags.take(3)) two rows — Favorite/Unfavorite tag + Block tag; the
+  Favorite label flips on the server tagState ("crt" is FAVORITED here).
+  Pane swap is in place ("two views — too many options"); ‹ Back is the last
+  focused-capable row; the pane's first row takes focus after the swap.
+  Scale note: ~1.5 px per dp (1080p TV). Dialog = 420 dp wide M3 Surface.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" font-family="DM Sans, sans-serif">
+  <!-- Screen behind the dialog scrim (M3 Dialog dims the background) -->
+  <rect x="0" y="0" width="1920" height="1080" fill="#161617"/>
+  <g id="dimmed-feed-cards">
+    <rect x="300" y="560" width="420" height="310" fill="#3A2A2E"/>
+    <rect x="1220" y="120" width="520" height="330" fill="#2C3A2E"/>
+    <rect x="1180" y="760" width="560" height="240" fill="#3E2429"/>
+  </g>
+  <rect x="0" y="0" width="1920" height="1080" fill="#000000" fill-opacity="0.45"/>
+
+  <!-- Dialog Surface: shapes.medium 12dp; tonalElevation 6dp container tone -->
+  <rect x="645" y="170" width="630" height="534" rx="18" fill="#221D1E"/>
+
+  <!-- Header: CreatorLabel titleMedium 16sp (stays across pane swaps) -->
+  <text x="669" y="214" font-size="24" font-weight="500" fill="#F7E9EC">@retrocreator</text>
+  <circle cx="864" cy="206" r="8" fill="#F7E9EC"/>
+
+  <!-- Rows: 2 per tag × 3 tags + ‹ Back. First row FOCUSED. -->
+  <g id="tag-rows">
+    <rect x="637" y="227" width="646" height="62" rx="20" fill="none" stroke="#FF668F" stroke-width="11" stroke-opacity="0.18"/>
+    <rect x="645" y="230" width="630" height="56" rx="18" fill="#7D0030" stroke="#FF668F" stroke-width="4.5"/>
+    <text x="960" y="267" font-size="21" fill="#FFD9E1" text-anchor="middle">Unfavorite tag “crt”</text>
+
+    <rect x="645" y="292" width="630" height="56" rx="18" fill="#FF668F"/>
+    <text x="960" y="329" font-size="21" fill="#5E0B25" text-anchor="middle">Block tag “crt”</text>
+
+    <rect x="645" y="354" width="630" height="56" rx="18" fill="#FF668F"/>
+    <text x="960" y="391" font-size="21" fill="#5E0B25" text-anchor="middle">Favorite tag “90s”</text>
+
+    <rect x="645" y="416" width="630" height="56" rx="18" fill="#FF668F"/>
+    <text x="960" y="453" font-size="21" fill="#5E0B25" text-anchor="middle">Block tag “90s”</text>
+
+    <rect x="645" y="478" width="630" height="56" rx="18" fill="#FF668F"/>
+    <text x="960" y="515" font-size="21" fill="#5E0B25" text-anchor="middle">Favorite tag “arcade”</text>
+
+    <rect x="645" y="540" width="630" height="56" rx="18" fill="#FF668F"/>
+    <text x="960" y="577" font-size="21" fill="#5E0B25" text-anchor="middle">Block tag “arcade”</text>
+
+    <rect x="645" y="602" width="630" height="56" rx="18" fill="#FF668F"/>
+    <text x="960" y="639" font-size="21" fill="#5E0B25" text-anchor="middle">‹ Back</text>
+  </g>
+
+  <!-- ===== Pane notes (right side) ===== -->
+  <g id="tags-notes">
+    <line x1="1283" y1="302" x2="1320" y2="302" stroke="#9C7A80" stroke-width="2"/>
+    <text x="1336" y="310" font-size="22" font-weight="600" fill="#F7E9EC">Tags pane</text>
+    <g font-size="18" fill="#DCA1AB">
+      <text x="1336" y="348">gif.tags.take(3) — two rows per tag:</text>
+      <text x="1336" y="376">Favorite/Unfavorite (server tagState</text>
+      <text x="1336" y="404">flips the label) + Block.</text>
+      <text x="1336" y="440">Every write dismisses the panel;</text>
+      <text x="1336" y="468">‹ Back returns to the main pane.</text>
+      <text x="1336" y="504">Reached via the main pane's</text>
+      <text x="1336" y="532">"Tags…" row (hidden when the gif</text>
+      <text x="1336" y="560">carries no tags).</text>
+    </g>
+  </g>
+</svg>

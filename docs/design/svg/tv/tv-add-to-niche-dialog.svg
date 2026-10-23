@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Giffy Viewer — TV mockup: tv-add-to-niche-dialog.svg
+  Source: app-tv/src/main/kotlin/com/rjbiermann/giffyviewer/tv/TvQuickActions.kt
+          (TvAddToNicheDialog, reached from the main pane's Add-to… pane row
+           "Add to a Niche…").
+  Shown: joined niches (FollowedNicheDto) as QuickAction rows — the same
+  TvButton rows as the panel (rest primary #FF668F / onPrimary #5E0B25;
+  focus primaryContainer #7D0030 / onPrimaryContainer #FFD9E1 + 3dp primary
+  border + soft glow) + Cancel. First row takes focus on open. Ordering is
+  the shared orderNichesByTagMatch rule (niches matching the gif's tags
+  first); take(8) caps the pane. Empty state: "No joined niches — join
+  niches to add content to them."
+  Scale note: ~1.5 px per dp (1080p TV). Dialog = 420 dp wide M3 Surface.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" font-family="DM Sans, sans-serif">
+  <!-- Screen behind the dialog scrim (M3 Dialog dims the background) -->
+  <rect x="0" y="0" width="1920" height="1080" fill="#161617"/>
+  <g id="dimmed-feed-cards">
+    <rect x="300" y="560" width="420" height="310" fill="#3A2A2E"/>
+    <rect x="1220" y="120" width="520" height="330" fill="#2C3A2E"/>
+    <rect x="1180" y="760" width="560" height="240" fill="#3E2429"/>
+  </g>
+  <rect x="0" y="0" width="1920" height="1080" fill="#000000" fill-opacity="0.45"/>
+
+  <!-- Dialog Surface: shapes.medium 12dp; tonalElevation 6dp container tone -->
+  <rect x="645" y="170" width="630" height="260" rx="18" fill="#221D1E"/>
+
+  <!-- Title: titleMedium 16sp (site popup parity heading) -->
+  <text x="669" y="210" font-size="24" font-weight="500" fill="#F7E9EC">Add Content to a Niche</text>
+
+  <!-- Niche rows -->
+  <g id="niche-rows">
+    <rect x="637" y="223" width="646" height="62" rx="20" fill="none" stroke="#FF668F" stroke-width="11" stroke-opacity="0.18"/>
+    <rect x="645" y="226" width="630" height="56" rx="18" fill="#7D0030" stroke="#FF668F" stroke-width="4.5"/>
+    <text x="960" y="263" font-size="21" fill="#FFD9E1" text-anchor="middle">Retro Gaming</text>
+
+    <rect x="645" y="288" width="630" height="56" rx="18" fill="#FF668F"/>
+    <text x="960" y="325" font-size="21" fill="#5E0B25" text-anchor="middle">Japan Arcade</text>
+
+    <rect x="645" y="350" width="630" height="56" rx="18" fill="#FF668F"/>
+    <text x="960" y="387" font-size="21" fill="#5E0B25" text-anchor="middle">Cancel</text>
+  </g>
+
+  <!-- ===== Picker notes (right side) ===== -->
+  <g id="niche-notes">
+    <line x1="1283" y1="256" x2="1320" y2="256" stroke="#9C7A80" stroke-width="2"/>
+    <text x="1336" y="264" font-size="22" font-weight="600" fill="#F7E9EC">Add-to-niche picker</text>
+    <g font-size="18" fill="#DCA1AB">
+      <text x="1336" y="302">Joined niches only (refreshed on open);</text>
+      <text x="1336" y="330">shared orderNichesByTagMatch rule —</text>
+      <text x="1336" y="358">mobile and TV agree), take(8).</text>
+      <text x="1336" y="394">Activating a row adds the gif to the</text>
+      <text x="1336" y="422">niche and dismisses everything.</text>
+    </g>
+  </g>
+</svg>

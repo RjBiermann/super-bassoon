@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Giffy Viewer — TV mockup: tv-add-to-feed-dialog.svg
+  Source: app-tv/src/main/kotlin/com/rjbiermann/giffyviewer/tv/TvQuickActions.kt
+          (TvAddToFeedDialog, reached from the main pane's Add-to… pane row
+           "Add to custom feed…" — gated by core/ui Feature.CUSTOM_FEEDS;
+           the Collection/Niche rows stay reachable beneath the flag).
+  Shown: radio feeds (customFeeds from Room, "Retro finds" selected) +
+  divider + checkbox refs (gifFeedRefs summary via customRefSummary:
+  "@creator" / "Niche: name" / "#tag"; the creator ref is preselected).
+  Picker rows: tv-material Surface carrying the issue-#7 focus tokens — at
+  rest background #161617 on the dialog container, on focus primaryContainer
+  #7D0030 / onPrimaryContainer #FFD9E1 + 3dp primary border + soft glow.
+  Add/Cancel are TvButtons (rest primary #FF668F / onPrimary #5E0B25); Add is
+  disabled until a feed radio + ≥1 ref are selected (both hold here).
+  Scale note: ~1.5 px per dp (1080p TV). Dialog = 420 dp wide M3 Surface.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" font-family="DM Sans, sans-serif">
+  <!-- Screen behind the dialog scrim (M3 Dialog dims the background) -->
+  <rect x="0" y="0" width="1920" height="1080" fill="#161617"/>
+  <g id="dimmed-feed-cards">
+    <rect x="300" y="560" width="420" height="310" fill="#3A2A2E"/>
+    <rect x="1220" y="120" width="520" height="330" fill="#2C3A2E"/>
+    <rect x="1180" y="760" width="560" height="240" fill="#3E2429"/>
+  </g>
+  <rect x="0" y="0" width="1920" height="1080" fill="#000000" fill-opacity="0.45"/>
+
+  <!-- Dialog Surface: shapes.medium 12dp; tonalElevation 6dp container tone -->
+  <rect x="645" y="170" width="630" height="530" rx="18" fill="#221D1E"/>
+
+  <!-- Title: titleMedium 16sp -->
+  <text x="669" y="210" font-size="24" font-weight="500" fill="#F7E9EC">Add to custom feed</text>
+
+  <!-- Feed radio rows. First row FOCUSED (first.requestFocus on open). -->
+  <g id="feed-radio-rows">
+    <rect x="637" y="221" width="646" height="62" rx="20" fill="none" stroke="#FF668F" stroke-width="11" stroke-opacity="0.18"/>
+    <rect x="645" y="224" width="630" height="56" rx="18" fill="#7D0030" stroke="#FF668F" stroke-width="4.5"/>
+    <circle cx="683" cy="252" r="9" fill="none" stroke="#FFD9E1" stroke-width="3"/>
+    <circle cx="683" cy="252" r="4" fill="#FFD9E1"/>
+    <text x="706" y="260" font-size="21" fill="#FFD9E1">Retro finds</text>
+
+    <rect x="645" y="288" width="630" height="56" rx="18" fill="#161617"/>
+    <circle cx="683" cy="316" r="9" fill="none" stroke="#DCA1AB" stroke-width="3"/>
+    <text x="706" y="324" font-size="21" fill="#F7E9EC">90s arcade</text>
+  </g>
+
+  <line x1="669" y1="358" x2="1251" y2="358" stroke="#51444A" stroke-width="2"/>
+
+  <!-- Ref checkbox rows (gifFeedRefs labels via customRefSummary) -->
+  <g id="ref-checkbox-rows">
+    <rect x="645" y="364" width="630" height="56" rx="18" fill="#161617"/>
+    <rect x="669" y="379" width="26" height="26" rx="6" fill="#FF668F"/>
+    <path d="M675 392 l6 6 l10 -12" fill="none" stroke="#161617" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="706" y="400" font-size="21" fill="#F7E9EC">@retrocreator</text>
+
+    <rect x="645" y="426" width="630" height="56" rx="18" fill="#161617"/>
+    <rect x="669" y="441" width="26" height="26" rx="6" fill="none" stroke="#DCA1AB" stroke-width="3"/>
+    <text x="706" y="462" font-size="21" fill="#F7E9EC">Niche: Retro Gaming</text>
+
+    <rect x="645" y="488" width="630" height="56" rx="18" fill="#161617"/>
+    <rect x="669" y="503" width="26" height="26" rx="6" fill="none" stroke="#DCA1AB" stroke-width="3"/>
+    <text x="706" y="524" font-size="21" fill="#F7E9EC">#crt</text>
+  </g>
+
+  <!-- Add / Cancel TvButtons (both here enabled → rest accent fill) -->
+  <rect x="645" y="558" width="630" height="56" rx="18" fill="#FF668F"/>
+  <text x="960" y="595" font-size="21" fill="#5E0B25" text-anchor="middle">Add</text>
+  <rect x="645" y="620" width="630" height="56" rx="18" fill="#FF668F"/>
+  <text x="960" y="657" font-size="21" fill="#5E0B25" text-anchor="middle">Cancel</text>
+
+  <!-- ===== Picker notes (right side) ===== -->
+  <g id="picker-notes">
+    <line x1="1283" y1="252" x2="1320" y2="252" stroke="#9C7A80" stroke-width="2"/>
+    <text x="1336" y="260" font-size="22" font-weight="600" fill="#F7E9EC">Add-to-feed picker</text>
+    <g font-size="18" fill="#DCA1AB">
+      <text x="1336" y="298">Radio = the custom feed (ROOM rows</text>
+      <text x="1336" y="326">ordered by creation); checkboxes =</text>
+      <text x="1336" y="354">refs the gif contributes: creator,</text>
+      <text x="1336" y="382">the gif's niches (≤3) + first 3 tags,</text>
+      <text x="1336" y="410">plus the open-feed ref when present.</text>
+      <text x="1336" y="446">The creator ref is preselected.</text>
+      <text x="1336" y="482">Empty-feed state: "No custom feeds</text>
+      <text x="1336" y="510">yet — create one on the phone</text>
+      <text x="1336" y="538">(\"Custom feeds\")."</text>
+      <text x="1336" y="574">Writes: addToCustomFeed(defId, ref)</text>
+      <text x="1336" y="602">per checked ref, then dismiss.</text>
+    </g>
+  </g>
+</svg>

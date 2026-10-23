@@ -33,7 +33,7 @@ prefs + the normative UI-lingo table below (formerly PLAN.md §3, §7–9).
   Tags… · Block… · Close; panes are in-place swaps.
 - Creator profile: Follow/Unfollow (server-backed, `v1/me/follows`; button states Follow ↔ Following per site); niche cards show Join/Leave state (site wording "Join Niche / Leave Niche", API `v2/niches/{id}/subscription`).
 - Tap username → profile-like view (follow/block/manage lists).
-- Feeds: Trending / Explore / Top(day…all), group feeds, custom feeds, For You, Search, Favorites, Groups, Settings — plus **"Continue Watching"** in More ▾ (mobile, 2026-10; app-only label): Room-only partial-watches surface — shared `FeedSource.Continue` reads `WatchHistoryDao.continueWatching(20)` through the SAME read-time chain TV's ContinueWatchingViewModel applies (ContentFilter + verified-only + orientation) plus §8 per-feed prefs; invalidation via the source's invalidation-tracker observer (watch_history/gifs/pref tables → per-load re-derivation), no hide-count increment (watch-time counted); helpful empty state when nothing partial; resume rides the swipe player's existing watch_history position.
+- Feeds: Trending / Explore / Top(day…all), group feeds, custom feeds, For You, Search, Favorites, Groups, Settings. (**Continue Watching removed 2026-10** — `watch_history` dropped at DB v11, see AGENTS-DATABASE.md; no partial-watches surface or resume positions exist.)
 - **UI lingo = site words (verified live via logged-in sweep, 2026-10-01 — normative for every user-visible label):**
   - For You / Trending (home tabs; For You scope dropdown **Creators · Niches · All**).
   - **Explore** (NOT "Discover" — site nav renders Home · Explore · Niches · Profile); Explore = "Top Creators" surface (`/explore/creators`).
@@ -45,7 +45,7 @@ prefs + the normative UI-lingo table below (formerly PLAN.md §3, §7–9).
   - Settings content-prefs heading **"Select Your Content Preferences"** with **"Blocked Tags"** + **"add tag"**; result tabs **GIFs / Creators / Niches** (Images is a site-only upload surface).
   - Sorts (niche/creator/profile): **Hot · Latest · Top**; tag/search pages: **Trending · Top This Week · Top This Month · Latest**.
   - **"Pinned" stays "Pinned"** — the API's own word (`v2/pins`); no site UI surface exists.
-  - **App-only surfaces keep app labels** (no site equivalent — do not retrofit site wording): Continue Watching · Surprise me · Groups (niche groups) · Favorite creator · Data saver · autoplay toggle · Grid columns · Preferences backup.
+  - **App-only surfaces keep app labels** (no site equivalent — do not retrofit site wording): Surprise me · Groups (niche groups) · Favorite creator · Data saver · autoplay toggle · Grid columns · Preferences backup.
 
 ## TV app
 - androidx.tv, minSdk 26, full D-pad navigation incl. Groups + settings + PIN pad; 5% overscan margins.
@@ -60,7 +60,7 @@ prefs + the normative UI-lingo table below (formerly PLAN.md §3, §7–9).
   10-foot UI, D-pad, communal device; tv-material is a separate component set). Running
   touch UI on TV via sideload compatibility mode is rejected as poor UX. One source of
   truth = shared logic in :core:/:feature:, NOT shared screens.
-- `TvLazyRow`s: Trending · Explore · Top This Week · Continue Watching · Favorites · one row per favorited group · custom feeds.
+- `TvLazyRow`s: Trending · Explore · Top This Week · Favorites · one row per favorited group · custom feeds. (Continue Watching row removed 2026-10, DB v11.)
 - Focus on username in now-playing → quick actions panel.
 - "Why did this get hidden" toast on filtered-item skip: **obsoleted 2026-10-01** —
   filtering happens upstream (ContentFilter in the paging sources), so the player
@@ -273,7 +273,7 @@ per feed (`feed_prefs` key), survive restart, applied strictly AFTER ContentFilt
   use case on TV** — the TV grid is a shared 10-foot screen, vertical/portrait tiles
   waste it, so filtering to horizontal is the primary TV orientation behavior and any
   future filter-path change must not regress TV (TV bypass notes below:
-  `LikedNetworkPagingSource` + the TV Continue Watching row). Vertical-only on TV is
+  `LikedNetworkPagingSource`; the TV Continue-Watching row is gone with DB v11). Vertical-only on TV is
   accepted as a dead end, not a target: portrait tiles letterbox against the row
   height and waste the screen.
 - **Vertical video on TV: BUILT** — TvPlayerScreen maps the shared video-fit pref
@@ -302,8 +302,9 @@ date/dateFrom — a future bound still returns 2019 gifs); untagged-only exists 
 Global DataStore pref `orientation_filter` (`any` default / `horizontal` / `vertical`) in the
 shared SettingsScreen — one toggle covers both apps (TV: horizontal-only use case, mobile:
 vertical-only). Per-feed §6 orientation chips, when they land, default to this value.
-Applied read-time in `FeedPagingSource` AFTER ContentFilter; `LikedNetworkPagingSource` and
-the TV Continue Watching row need the same manual check (they bypass the paging choke point).
+Applied read-time in `FeedPagingSource` AFTER ContentFilter; `LikedNetworkPagingSource` needs
+the same manual check (it bypasses the paging choke point; the TV Continue-Watching
+row is gone with DB v11).
 NOT counted in hide counts, no "why hidden" toast — a pref, not a block. Shuffle /
 "Surprise me" must wire it when implemented (leak-zero). Predicate: `height > width`
 (`Gif.width/height` already on the model); 0×0 unknown → pass-through (same fallback as
@@ -435,7 +436,7 @@ Scope → endpoint (all 200-verified 2026-10-02; row shapes in AGENTS-NETWORK.md
 - **GIFs** — existing `GET /v2/gifs/search`; the site sends `type=g` explicitly (default `g`).
 - **Images** — same endpoint, `type=i`. Same envelope + GifDto rows, but rows are
   stills (`type=2`, `duration=null`, `urls.sd/hd` are jpgs). Rendered as a 3-up
-  static-poster strip — **no player path** (nothing to play, no watch-history write).
+  static-poster strip — **no player path** (nothing to play).
 - **Creators** — `GET /v2/creators/search/previews?order=best_match&page=1&count=30&query=`
   → `{gifs:[…]}`, one preview gif per matched creator (dedupe by `gif.userName`); tap →
   `FeedSource.Creator`.
@@ -559,7 +560,7 @@ TvHomeScreen/TvSourceFeedScreen; card poster swaps to a `PlayerView` while
 `settledId == gif.id`; released when the screen leaves composition (player open =
 release). Always SD rendition (`playGif(gif, dataSaver = true)`) — a preview must not
 burn HD data (gif-id cache key means the real player later replays from cache).
-Muted+REPEAT_ONE set at creation; no watch-history writes (screens own history).
+Muted+REPEAT_ONE set at creation; no watch-history writes (none exist — watch_history dropped DB v11).
 Data-saver ON = posters stay static (same rule as the mobile inline autoplay).
 Device-verified: dwell → preview, follows focus, absent with data-saver ON.
 
@@ -618,7 +619,7 @@ shared CustomFeedsScreen (AGENTS-CONTENT-FILTER.md DONE section).
 - **Minor — NicheAbout + Follow entries:** both closed (see In-app links audit).
 - **Parity OK (verified in code):** age gate, PIN lock, Settings/data saver/video
   fit/verified-only, per-feed prefs (same feedprefs blob + shared dialog),
-  favorites/likes, watch history, quick actions, Surprise me, mute/speed.
+  favorites/likes, quick actions, Surprise me, mute/speed. (Watch history removed 2026-10, DB v11 — no parity surface.)
 
 ## Design-system consistency (batch-15 audit — landed batch 16; palette SUPERSEDED by issue-#7)
 The batch-15 reconciliation rule survives in this form: **sizes/roles/tracking/shape =

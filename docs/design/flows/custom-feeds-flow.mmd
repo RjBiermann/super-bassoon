@@ -1,0 +1,42 @@
+%% Derived from: feature/feed/CustomFeedsScreen.kt (builder + list +
+%% nextCycleState FAVORITED→BLOCKED→NEUTRAL cycle, delete evicts cached
+%% pages), core/database/GiffyDatabase.kt (CustomFeedEntity v7) and the
+%% Feature.CUSTOM_FEEDS gating (core/ui/Feature.kt = false): TV More ▾
+%% 'My feeds' (TvMainActivity) and mobile FeedTabStrip chips + quick-sheet
+%% 'Add to custom feed…' rows ride the flag; DB rows and the BLOCKED-feed
+%% filter stage keep working underneath.
+flowchart TD
+    open(["Custom feeds screen — mobile route always reachable;
+    TV: More ▾ → My feeds ONLY while Feature.CUSTOM_FEEDS"])
+    open --> build["Builder: name field + Creator / Tag inputs →
+    refs pills (creator:<u> / tag:<text> /
+    niche:<id>|<name>), chip click removes the ref"]
+    build -- "Save feed (enabled only with a name)" --> save["viewModel.save → Room upsert CustomFeedEntity —
+    EMPTY feed is valid: name-only definitions are
+    created to be filled later from any tile's
+    long-press 'Add to custom feed…'"]
+    save --> list["'Your feeds' list: name + ref summary;
+    row click opens the feed — a BLOCKED feed opens
+    NO feed (macro-filter only, merged-group rule)"]
+    list -- "cycle button" --> cycle["State cycle (nextCycleState, ONE owner shared with
+    the Settings 'Blocked' panel): FAVORITED → pinned
+    home tab · BLOCKED → ContentFilter macro-filter ·
+    NEUTRAL → openable only"]
+    cycle -- "re-render with new state" --> list
+    list -- "Delete + confirm dialog" --> delete["evictBase custom:<id> FIRST (stale cached pages
+    would linger to TTL and resurrect tiles if an id
+    is ever reused) → Room delete"]
+    delete --> list
+
+    list -- "row click (non-BLOCKED)" --> feed["FeedSource.Custom(id, name, parsed refs) →
+    the blend feed: round-robin across creator/tag/
+    niche refs through the normal feed pipeline"]
+    feed --> close(["end"])
+
+    gated["Gating (Feature.CUSTOM_FEEDS = false today):
+    TV More ▾ hides 'My feeds' + named-feed entries;
+    mobile FeedTabStrip hides the chips; quick-sheet
+    'Add to custom feed…' rows hide on BOTH shells —
+    while definitions, state cycle and the BLOCKED
+    macro-filter stage keep working underneath"]
+    gated -. "flag flipped on" .-> open
