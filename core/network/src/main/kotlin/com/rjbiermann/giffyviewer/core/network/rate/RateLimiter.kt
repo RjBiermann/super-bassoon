@@ -55,6 +55,8 @@ class RollingWindowRateLimiter(
         nowMs: Long = now(),
     ) {
         val clamped = retryAfterMs.coerceIn(MIN_COOLDOWN_MS, retryAfterMs + MAX_COOLDOWN_EXTRA_MS)
+        // shortcut: concurrent 429s keep the longest cooldown, so a later shorter
+        // Retry-After is under-reported — no reader depends on that value.
         cooldownUntil.updateAndGet { current -> maxOf(current, nowMs + clamped) }
     }
 

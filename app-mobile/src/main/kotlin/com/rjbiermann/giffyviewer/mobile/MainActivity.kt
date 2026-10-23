@@ -318,6 +318,9 @@ class MainActivity : ComponentActivity() {
             modifier = Modifier.fillMaxSize(),
             gridColumns = hint.gridColumns,
             onOpenPlayer = { index -> navController.navigate(MainPlayer(index)) },
+            // Issue #63: the sign-in-required card routes to Account (§8.6),
+            // same destination the Player's account affordance uses.
+            onOpenAccount = { navController.navigate(MainSettings) },
             onOpenSettings = { navController.navigate(MainSettings) },
             onOpenSearch = { navController.navigate(MainSearch) },
             onOpenNiches = { navController.navigate(MainNiches) },

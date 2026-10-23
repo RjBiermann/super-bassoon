@@ -37,6 +37,7 @@ class RetryInterceptor(
         }
 
         var lastException: IOException? = null
+        var throttleMs = 0L // last 429 cooldown (ms) — 0 = no throttle seen
 
         val attempts = backoffMs.size + 1 // 1 initial + N retries
         for (attempt in 0 until attempts) {
@@ -62,6 +63,7 @@ class RetryInterceptor(
                                 ?.times(1_000) ?: DEFAULT_RETRY_AFTER_MS
                         val clamped = retryAfterMs.coerceIn(MIN_COOLDOWN_MS, retryAfterMs + MAX_COOLDOWN_EXTRA_MS)
                         limiter.startCooldown(retryAfterMs)
+                        throttleMs = clamped
                         bus.publish(
                             RateLimitEvent.CoolingDown(
                                 untilEpochMs = System.currentTimeMillis() + clamped,
@@ -92,6 +94,11 @@ class RetryInterceptor(
             breaker.recordFailure()
             throw exhausted
         }
+        // #63: an all-429 exhaustion is throttling, not a dead network — it has no
+        // exception of its own (429 sets no lastException), so it used to end in the
+        // generic message and the UI could only render the offline copy. Still an
+        // IOException, so every existing catch site keeps working.
+        if (throttleMs > 0) throw RateLimitedException(throttleMs)
         throw IOException("max retries exhausted")
     }
 
@@ -131,3 +138,13 @@ class RateLimitInterceptor(
             limiter.acquire { chain.proceed(chain.request()) }
         }
 }
+
+/**
+ * Issue #63: every attempt of this call was throttled (429) — the connection is
+ * fine, the client is being rate limited for [retryAfterMs] more. An [IOException]
+ * on purpose: paging sources, mediators and the #61 retry affordances all catch
+ * that supertype, so surfacing the real cause changes no existing behaviour.
+ */
+class RateLimitedException(
+    val retryAfterMs: Long,
+) : IOException("rate limited (429), retry after ${retryAfterMs}ms")

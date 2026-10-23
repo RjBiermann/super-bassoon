@@ -395,6 +395,9 @@ private fun CreatorRow(
     Column(modifier = Modifier.padding(vertical = 8.dp).heightIn(min = ROW_RESERVED_HEIGHT)) {
         RowTitle(title)
         if (creators.isEmpty() && failed) {
+            // Row state carries only a failure flag (no Throwable), so it cannot
+            // classify the cause — keep the row's own title context instead
+            // (issue #63: the shared card always lands on Generic here).
             Text(
                 text = "Couldn't load $title",
                 style = MaterialTheme.typography.bodySmall,
@@ -532,7 +535,8 @@ private fun FeedRow(
             )
         }
         if (gifs.loadState.refresh is LoadState.Error) {
-            // Offline home row: explain + one-press retry (Niches parity).
+            // Offline home row: explain + one-press retry (Niches parity). The row
+            // has no Throwable, so keep the title copy rather than a Generic card.
             Text(
                 text = "Couldn't load $title",
                 style = MaterialTheme.typography.bodySmall,

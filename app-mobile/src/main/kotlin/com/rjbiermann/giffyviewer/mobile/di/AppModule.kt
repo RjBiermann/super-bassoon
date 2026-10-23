@@ -16,6 +16,7 @@ import com.rjbiermann.giffyviewer.core.network.AnonymousSession
 import com.rjbiermann.giffyviewer.core.network.GifsApi
 import com.rjbiermann.giffyviewer.core.network.NetworkComponents
 import com.rjbiermann.giffyviewer.core.network.buildNetwork
+import com.rjbiermann.giffyviewer.core.network.rate.BreakerReconnectReset
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.ui.NetworkMonitor
 import dagger.Module
@@ -66,6 +67,18 @@ object AppModule {
 
     @Provides
     fun api(network: NetworkComponents): GifsApi = network.api
+
+    /** Issue #63: an offline -> online flip resets the shared breaker (its 5-minute
+     *  cooldown is time-based and nothing else generates traffic while parked, so
+     *  the reconnect retries used to burn their budget against an open circuit).
+     *  Reads the SAME #33 NetworkMonitor singleton the offline banner uses — no
+     *  second ConnectivityManager callback, and core:network stays Android-free. */
+    @Provides
+    @Singleton
+    fun breakerReconnectReset(
+        network: NetworkComponents,
+        networkMonitor: NetworkMonitor,
+    ): BreakerReconnectReset = BreakerReconnectReset(network.breaker, networkMonitor.isOnline)
 
     /** Issue #33: OS connectivity behind the offline banner (TokenStore shape). */
     @Provides

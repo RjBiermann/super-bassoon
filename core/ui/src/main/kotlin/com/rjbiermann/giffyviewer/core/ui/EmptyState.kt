@@ -14,6 +14,8 @@ import androidx.compose.ui.semantics.Role
  * Shared empty state (PLAN §9 gap #8): dark fill, one line (+ optional hint).
  * onClick (issue #61): when set, the whole card becomes a retry target
  * (role Button); null leaves the card inert for all other callers.
+ * onClickLabel (issue #63): the semantics action label, so a card that opens
+ * sign-in instead of retrying announces what it will actually do.
  */
 @Composable
 fun EmptyState(
@@ -21,11 +23,12 @@ fun EmptyState(
     modifier: Modifier = Modifier,
     hint: String? = null,
     onClick: (() -> Unit)? = null,
+    onClickLabel: String = "Retry",
 ) {
     Box(
         modifier =
             if (onClick != null) {
-                modifier.clickable(onClickLabel = "Retry", role = Role.Button) { onClick() }
+                modifier.clickable(onClickLabel = onClickLabel, role = Role.Button) { onClick() }
             } else {
                 modifier
             },
