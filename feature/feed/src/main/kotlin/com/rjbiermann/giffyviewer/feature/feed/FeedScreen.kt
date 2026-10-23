@@ -75,6 +75,7 @@ import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.ui.AudioBadge
 import com.rjbiermann.giffyviewer.core.ui.CreatorLabel
 import com.rjbiermann.giffyviewer.core.ui.GiffyScaffold
+import com.rjbiermann.giffyviewer.core.ui.LocalIsOnline
 import com.rjbiermann.giffyviewer.core.ui.SCROLL_TO_TOP_THRESHOLD
 import com.rjbiermann.giffyviewer.core.ui.ScrollToTopFab
 import com.rjbiermann.giffyviewer.core.ui.avgColorOr
@@ -403,12 +404,23 @@ fun FeedScreen(
             }
 
             val refreshError = items.loadState.refresh as? LoadState.Error
-            // A3 (S1 fix, no probes): the copy was hardcoded "offline" for ANY
-            // empty+error path — breaker-open synthetic 503 / rate-limit
-            // exhaustion / plain HTTP failures read the same. An IOException is
-            // the only connectivity-shaped signal; everything else gets a
-            // "went wrong — retry" copy.
-            val offlineShaped = refreshError?.error is java.io.IOException
+            // Issue #63: one honest kind per failure shape (breaker-open 503,
+            // 401, 429 exhaustion, IO) instead of the single "is it an
+            // IOException" boolean that filed unrelated causes as offline.
+            val errorKind = feedErrorKind(refreshError?.error)
+            val errorCard = feedErrorCard(errorKind)
+            // Issue #63: this card was the only error surface with no automatic
+            // recovery — a breaker cooldown ending, the network returning or the
+            // upstream healing all left it latched until the user tapped. Same
+            // budget/shape as the niches page (≤2 debounced retries, re-armed by
+            // a new failure or the connectivity flip).
+            AutoRetryEffect(
+                error = refreshError != null && items.itemCount == 0,
+                success = items.loadState.refresh is LoadState.NotLoading,
+                key = items.loadState.refresh,
+                isOnline = LocalIsOnline.current,
+                retry = viewModel::forceRefresh,
+            )
             // Offline fallback (mobile For-You default slice): the SEEDED For
             // You source (network-live, no Room cache) that fails its FIRST
             // refresh reverts to Trending so the cached grid renders — gate 3
@@ -438,21 +450,22 @@ fun FeedScreen(
                 // composed in the grid branch. Wire both to forceRefresh()
                 // (generation bump → full pager restart with TTL bypass).
                 // Same-tab re-tap stays a no-op — the copy no longer promises it.
+                // Issue #63: a durable 401 (For You / Liked without a user token)
+                // can never be retried into success — that card opens Account
+                // instead; pull-down stays a plain retry.
+                val signInRequired = errorKind == FeedErrorKind.SignInRequired
+                val cardClick: () -> Unit = if (signInRequired) onOpenAccount else viewModel::forceRefresh
                 PullToRefreshBox(
                     isRefreshing = items.loadState.refresh is LoadState.Loading,
                     onRefresh = { viewModel.forceRefresh() },
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     com.rjbiermann.giffyviewer.core.ui.EmptyState(
-                        message = if (offlineShaped) "Nothing cached yet" else "Something went wrong",
-                        hint =
-                            if (offlineShaped) {
-                                "You're offline — reconnect to load the feed."
-                            } else {
-                                "Tap to retry, or pull down."
-                            },
+                        message = errorCard.message,
+                        hint = errorCard.hint,
                         modifier = Modifier.fillMaxSize(),
-                        onClick = { viewModel.forceRefresh() },
+                        onClick = cardClick,
+                        onClickLabel = if (signInRequired) "Sign in" else "Retry",
                     )
                 }
             } else if (items.itemCount == 0 &&

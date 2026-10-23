@@ -43,6 +43,25 @@ class EmptyStateClickTest {
         assertEquals(1, clicks.intValue)
     }
 
+    /** Issue #63: the sign-in-required card routes its click to Account, so the
+     *  semantics action label must not keep saying "Retry" (TalkBack lies). */
+    @Test
+    fun `emptyStateUsesCustomClickLabelForSignInCard`() {
+        rule.setContent {
+            GiffyTheme {
+                EmptyState(
+                    message = "Sign in required",
+                    hint = "Sign in again to load this feed.",
+                    onClick = {},
+                    onClickLabel = "Sign in",
+                )
+            }
+        }
+        val node = rule.onNodeWithText("Sign in required").fetchSemanticsNode()
+        val onClick = node.config.getOrNull(SemanticsActions.OnClick)
+        assertEquals("Sign in", onClick?.label)
+    }
+
     @Test
     fun `without onClick the card stays non-clickable`() {
         rule.setContent {

@@ -71,6 +71,8 @@ import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
 import com.rjbiermann.giffyviewer.feature.feed.NicheFeedHeader
 import com.rjbiermann.giffyviewer.feature.feed.NicheJoinViewModel
 import com.rjbiermann.giffyviewer.feature.feed.activeSort
+import com.rjbiermann.giffyviewer.feature.feed.feedErrorCard
+import com.rjbiermann.giffyviewer.feature.feed.feedErrorKind
 import com.rjbiermann.giffyviewer.feature.feed.joinNicheLabel
 import com.rjbiermann.giffyviewer.feature.feed.nicheSourceId
 import com.rjbiermann.giffyviewer.feature.feed.packNicheRef
@@ -369,12 +371,15 @@ fun TvSourceFeedScreen(
                             feedPrefs.untaggedOnly ||
                             verifiedOnlyPref
                     if (gifs.itemCount == 0 && refreshState is LoadState.Error) {
+                        // Issue #63: the honest failure kind (offline / rate limited /
+                        // sign-in / upstream) instead of one generic sentence.
+                        val errorCard = feedErrorCard(feedErrorKind(refreshState.error))
                         item {
                             Column(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
-                                EmptyState(message = "Something went wrong", hint = "Retry the feed")
+                                EmptyState(message = errorCard.message, hint = errorCard.hint)
                                 RefreshFooterButton(onClick = ::refreshAndReturnToTop)
                             }
                         }
