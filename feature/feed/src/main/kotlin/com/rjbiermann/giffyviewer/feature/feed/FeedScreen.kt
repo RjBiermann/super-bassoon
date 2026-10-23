@@ -433,16 +433,28 @@ fun FeedScreen(
             }
             val verifiedOnlyPref by viewModel.verifiedOnly.collectAsStateWithLifecycle(false)
             if (items.itemCount == 0 && refreshError != null) {
-                com.rjbiermann.giffyviewer.core.ui.EmptyState(
-                    message = if (offlineShaped) "Nothing cached yet" else "Something went wrong",
-                    hint =
-                        if (offlineShaped) {
-                            "You're offline — reconnect to load the feed."
-                        } else {
-                            "Tap to retry — pull down or tap the tab again."
-                        },
+                // Issue #61: every retry affordance on this card was dead —
+                // EmptyState had no click handling and PullToRefreshBox only
+                // composed in the grid branch. Wire both to forceRefresh()
+                // (generation bump → full pager restart with TTL bypass).
+                // Same-tab re-tap stays a no-op — the copy no longer promises it.
+                PullToRefreshBox(
+                    isRefreshing = items.loadState.refresh is LoadState.Loading,
+                    onRefresh = { viewModel.forceRefresh() },
                     modifier = Modifier.fillMaxSize(),
-                )
+                ) {
+                    com.rjbiermann.giffyviewer.core.ui.EmptyState(
+                        message = if (offlineShaped) "Nothing cached yet" else "Something went wrong",
+                        hint =
+                            if (offlineShaped) {
+                                "You're offline — reconnect to load the feed."
+                            } else {
+                                "Tap to retry, or pull down."
+                            },
+                        modifier = Modifier.fillMaxSize(),
+                        onClick = { viewModel.forceRefresh() },
+                    )
+                }
             } else if (items.itemCount == 0 &&
                 items.loadState.refresh is LoadState.NotLoading &&
                 (
