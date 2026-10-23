@@ -59,7 +59,8 @@ internal data class WalkedPage(
 
 /** One walk iteration's page acquisition: read the cached row; an unfetched
  *  page is self-filled here through the shared fetcher (fast-scroll race — same
- *  fetcher the mediator uses → one API call, rate-limit safe).
+ *  fetcher the mediator uses → one API call, rate-limit safe). For Favorites a
+ *  row past the feed's TTL is revalidated too (#59 stale-mapping ledger).
  *
  *  B2 on the cached path (mirrors the network-live sources' catch): past the
  *  server pool's far end the fetch hard-400s (live-proven: trending pool ~100
@@ -78,7 +79,23 @@ internal suspend fun walkFill(
     page: Int,
 ): FeedPageEntity? {
     val cached = pageDao.page(feedPageKey(feed, page))
-    if (cached != null) return cached
+    // #59: a Favorites row past the feed's TTL was written by ANOTHER mapping
+    // generation (the pre-#54 one-creator ledger / a favorites-set shift the
+    // UI evictions didn't cover). Serving it caps the walk at the old depth —
+    // the first fresh probe lands past every pool and
+    // previousRotationExhausted ends the feed while unfetched pool pages
+    // remain ("feed doesn't load endlessly anymore"). Revalidate the stale
+    // hit through the shared fetcher, exactly what the mediator's REFRESH
+    // already does for page 1. Within the TTL the row still serves
+    // (stale-while-revalidate unchanged; no extra requests when nothing is
+    // stale — rate-limit invariant untouched).
+    if (
+        cached != null &&
+        !(feed is FeedSource.Favorites &&
+            System.currentTimeMillis() - cached.fetchedAt >= feed.ttlMs)
+    ) {
+        return cached
+    }
     try {
         fetcher?.fill(page)
     } catch (e: retrofit2.HttpException) {
