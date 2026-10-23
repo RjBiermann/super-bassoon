@@ -64,6 +64,7 @@ import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.ui.EmptyState
 import com.rjbiermann.giffyviewer.core.ui.giffyFocus
 import com.rjbiermann.giffyviewer.feature.feed.CreatorFeedHeader
+import com.rjbiermann.giffyviewer.feature.feed.FeedErrorKind
 import com.rjbiermann.giffyviewer.feature.feed.FeedFilterDialog
 import com.rjbiermann.giffyviewer.feature.feed.FeedRepository
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
@@ -372,14 +373,17 @@ fun TvSourceFeedScreen(
                             verifiedOnlyPref
                     if (gifs.itemCount == 0 && refreshState is LoadState.Error) {
                         // Issue #63: the honest failure kind (offline / rate limited /
-                        // sign-in / upstream) instead of one generic sentence.
-                        val errorCard = feedErrorCard(feedErrorKind(refreshState.error))
+                        // sign-in / upstream) instead of one generic sentence. The hint
+                        // is TV copy — this slot retries with the D-pad Refresh button
+                        // below, there is no tap/pull-down gesture on a 10-foot surface.
+                        val kind = feedErrorKind(refreshState.error)
+                        val errorCard = feedErrorCard(kind)
                         item {
                             Column(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
-                                EmptyState(message = errorCard.message, hint = errorCard.hint)
+                                EmptyState(message = errorCard.message, hint = tvErrorHint(kind))
                                 RefreshFooterButton(onClick = ::refreshAndReturnToTop)
                             }
                         }
@@ -665,6 +669,15 @@ private fun NicheJoinButton(
         }
     }
 }
+
+/** Issue #63: the shared card's touch hints ("tap", "pull down") don't exist on
+ *  TV — this error slot always carries the D-pad [RefreshFooterButton] below it. */
+private fun tvErrorHint(kind: FeedErrorKind): String =
+    when (kind) {
+        FeedErrorKind.Upstream -> "Server trouble — press Refresh."
+        FeedErrorKind.Generic -> "Press Refresh to try again."
+        else -> feedErrorCard(kind).hint
+    }
 
 /** F4: the footer Refresh button (error / empty / end-of-feed states share it) —
  *  issue-#7 tv-material focus tokens, same look the old inline footer had. */

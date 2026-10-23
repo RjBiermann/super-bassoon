@@ -67,8 +67,6 @@ import com.rjbiermann.giffyviewer.core.ui.giffyFocus
 import com.rjbiermann.giffyviewer.core.ui.toTileContentScale
 import com.rjbiermann.giffyviewer.feature.feed.AutoRetryEffect
 import com.rjbiermann.giffyviewer.feature.feed.FeedSource
-import com.rjbiermann.giffyviewer.feature.feed.feedErrorCard
-import com.rjbiermann.giffyviewer.feature.feed.feedErrorKind
 import kotlinx.coroutines.delay
 
 /**
@@ -397,20 +395,14 @@ private fun CreatorRow(
     Column(modifier = Modifier.padding(vertical = 8.dp).heightIn(min = ROW_RESERVED_HEIGHT)) {
         RowTitle(title)
         if (creators.isEmpty() && failed) {
-            // Issue #63: this row only carries a failure flag (no Throwable), so the
-            // honest classification is Generic — same copy as every other surface.
-            val errorCard = feedErrorCard(feedErrorKind(null))
+            // Row state carries only a failure flag (no Throwable), so it cannot
+            // classify the cause — keep the row's own title context instead
+            // (issue #63: the shared card always lands on Generic here).
             Text(
-                text = errorCard.message,
+                text = "Couldn't load $title",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 16.dp, top = 4.dp),
-            )
-            Text(
-                text = errorCard.hint,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 16.dp),
             )
             onRetry?.let {
                 androidx.compose.material3.TextButton(onClick = it, modifier = Modifier.padding(start = 8.dp)) {
@@ -543,20 +535,13 @@ private fun FeedRow(
             )
         }
         if (gifs.loadState.refresh is LoadState.Error) {
-            // Offline home row: explain + one-press retry (Niches parity).
-            // Issue #63: copy names the honest cause instead of "Couldn't load".
-            val errorCard = feedErrorCard(feedErrorKind((gifs.loadState.refresh as LoadState.Error).error))
+            // Offline home row: explain + one-press retry (Niches parity). The row
+            // has no Throwable, so keep the title copy rather than a Generic card.
             Text(
-                text = errorCard.message,
+                text = "Couldn't load $title",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 16.dp, top = 4.dp),
-            )
-            Text(
-                text = errorCard.hint,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 16.dp),
             )
             androidx.compose.material3.TextButton(
                 onClick = { gifs.retry() },

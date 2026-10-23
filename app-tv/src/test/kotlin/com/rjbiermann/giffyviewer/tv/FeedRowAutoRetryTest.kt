@@ -12,8 +12,8 @@ import org.junit.Test
  * they (re)compose or the network returns — silently, capped so a breaker
  * outage can't turn the row into a retry loop. The gate rule:
  * up to [com.rjbiermann.giffyviewer.feature.feed.AUTO_RETRY_MAX] consecutive auto-retries per row
- * appearance; the counter resets only when a load succeeds (offline/re-entry
- * resets naturally with the row's own remember state).
+ * appearance; the counter resets when a load succeeds or the network returns
+ * (issue #63 follow-up: offline attempts never count against the budget).
  */
 class FeedRowAutoRetryTest {
     @Test

@@ -79,17 +79,55 @@ class RetryInterceptorThrottleExhaustionTest {
 
     private fun get(): Request = Request.Builder().url(server.url("/v2/x")).build()
 
-    private fun all429Exhaustion(breaker: CircuitBreaker = CircuitBreaker()): Throwable? {
-        repeat(3) { server.enqueue(resp(429, retryAfter = "0")) } // 1 initial + 2 retries
+    private fun all429Exhaustion(
+        breaker: CircuitBreaker = CircuitBreaker(),
+        retryAfter: String? = null,
+    ): Throwable? {
+        repeat(3) { server.enqueue(resp(429, retryAfter = retryAfter)) } // 1 initial + 2 retries
         return runCatching { client(breaker).newCall(get()).execute() }.exceptionOrNull()
     }
 
     @Test
-    fun `all429 exhaustion throws RateLimitedException carrying the cooldown`() {
+    fun `429 then success returns the successful response`() {
+        server.enqueue(resp(429))
+        server.enqueue(resp(200))
+        val response = client().newCall(get()).execute()
+        assertEquals("throttling that recovers must not surface as an error", 200, response.code)
+        assertEquals(2, server.requestCount)
+    }
+
+    @Test
+    fun `no Retry-After header exhausts with the 5s default cooldown`() {
         val error = all429Exhaustion()
         assertTrue("expected RateLimitedException, got $error", error is RateLimitedException)
-        assertEquals("429 without Retry-After clamps to the 5s floor", 5_000L, (error as RateLimitedException).retryAfterMs)
+        assertEquals("429 without Retry-After uses the 5s default", 5_000L, (error as RateLimitedException).retryAfterMs)
         assertEquals(3, server.requestCount) // every attempt was really made
+    }
+
+    @Test
+    fun `a 12s Retry-After is reported as 12000ms`() {
+        val error = all429Exhaustion(retryAfter = "12")
+        assertEquals(12_000L, (error as RateLimitedException).retryAfterMs)
+    }
+
+    @Test
+    fun `a real failure plus throttling throws the plain IOException and counts one breaker failure`() {
+        val breaker = CircuitBreaker(failureThreshold = 2)
+
+        fun exhaust() {
+            server.enqueue(resp(500))
+            server.enqueue(resp(429))
+            server.enqueue(resp(429))
+            val error = runCatching { client(breaker).newCall(get()).execute() }.exceptionOrNull()
+            assertTrue(
+                "a real failure wins over the throttling: got $error",
+                error is IOException && error !is RateLimitedException,
+            )
+        }
+        exhaust()
+        assertFalse("one exhausted call = one breaker failure (threshold 2 not reached)", breaker.isOpen())
+        exhaust()
+        assertTrue("two exhausted calls = two consecutive breaker failures", breaker.isOpen())
     }
 
     @Test

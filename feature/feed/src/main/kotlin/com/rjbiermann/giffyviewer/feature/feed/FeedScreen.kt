@@ -415,7 +415,12 @@ fun FeedScreen(
             // budget/shape as the niches page (≤2 debounced retries, re-armed by
             // a new failure or the connectivity flip).
             AutoRetryEffect(
-                error = refreshError != null && items.itemCount == 0,
+                // Issue #63 follow-up: a sign-in-required failure can never be
+                // retried into success — the card opens Account instead.
+                error =
+                    refreshError != null &&
+                        items.itemCount == 0 &&
+                        errorKind != FeedErrorKind.SignInRequired,
                 success = items.loadState.refresh is LoadState.NotLoading,
                 key = items.loadState.refresh,
                 isOnline = LocalIsOnline.current,
