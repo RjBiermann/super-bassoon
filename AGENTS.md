@@ -226,5 +226,17 @@ When unsure: check the matching AGENTS doc first, then ask. Don't invent endpoin
   (touch taps also didn't toggle; prior gates passed the same path) — one focused re-check owed.
 - Minimap player / two-column expanded / RateLimitBus indicator: decided skips (documented
   cost reasons).
+- #62 (favorites fan-out) + #63 (feed error honesty) CLOSED 2026-10-23 with device evidence (main @ 2e3e7311).
+  #62: bounded 5-creator-per-fill fan-out with a rotating window, `perCreator` window-independent,
+  favorites cache generation `fav:v3` (prefs identity pinned at `fav:v1`). #63: honest error kinds,
+  mobile feed `AutoRetryEffect`, breaker reset on reconnect. Honest ends not exercised on device:
+  #62's true end-of-pool (still chaining at p9) and #63's TV copy (blocked by the TV issue below).
+- TV offline cold start deadlocks in the auth interceptor (#64, pre-existing; found by the #63 TV gate):
+  all 5 OkHttp threads park in `runBlocking { authToken() }` (`NetworkModule.kt:88`) re-entering the
+  AnonymousSession mutex, so rows never leave `LoadState.Loading` and no error copy can render. Needs a
+  design pass (token resolved off the interceptor chain, or its own executor + timeout).
+- Pre-existing `FeedViewModel` mismatch: `setSort` adds `source.baseKey` to `pendingForce` (~:535) while
+  the read checks `feed.keyBase` (~:134) — Search/Creator/Niche `baseKey` drops the `:sort=` suffix, so a
+  post-sort force-refresh never matches for them. Reachable, unobserved; one-line fix when next touched.
 
 Per-batch session history: docs/SESSION-LOG.md.

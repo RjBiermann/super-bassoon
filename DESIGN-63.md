@@ -3,6 +3,32 @@
 Investigation + design only; no product code changed. Fix owner modules: `:core:network`, `:core:ui`,
 `:feature:feed` (+ copy-only reuse in `app-tv`).
 
+## LANDED (2026-10-23) — `7c21d33..2e3e7311`, main @ `2e3e7311`
+
+Steps 1–3 landed as designed (`5a8a474`): `RateLimitedException : IOException` at 429 exhaustion, the pure
+`feedErrorKind`/`feedErrorCard`, the mobile card's `AutoRetryEffect`, the sign-in tap route, and
+`EmptyState.onClickLabel`. Three deltas from the design (`2f14690`, plus two in `5a8a474`):
+
+1. **`feedErrorKind` grew an `isOnline` argument** (design had `(Throwable?)`). Device showed the breaker's
+   synthetic 503 outranking the real cause while the radio was off, so `!isOnline → Offline` is now decided
+   first, above the exception class.
+2. **§10.2's deferred breaker decision was taken:** `BreakerReconnectReset` (both shells) calls
+   `recordSuccess()` on an offline→online flip. Without it the reconnect gate could not pass inside the 5-min
+   open window, i.e. the automatic-recovery half of this issue does not work without it.
+3. **TV copy deviates from step 4.** `TvSourceFeedScreen` uses `feedErrorCard` with a TV-specific hint
+   (`tvErrorHint`: "press Refresh", no tap/pull-down gestures on a 10-foot surface); `TvHomeScreen` rows keep
+   their own `"Couldn't load <title>"` because a row carries only a failure flag, so the shared card would
+   always land on Generic there.
+
+Device gate (mobile, API-35): offline cold start holds "Nothing cached yet / You're offline — reconnect to
+load the feed." at 12 s and 45 s *while the breaker was open on 503s*; airplane OFF → tiles in ~4 s with no
+tap; 0 FATAL/ANR.
+
+Known limits: the TV error copy could not be device-verified — the TV gate hit a pre-existing offline
+deadlock (filed as **#64**: all OkHttp threads parked in `runBlocking { authToken() }`, so no row ever reaches
+`LoadState.Error`). The sign-in-required card path is compile-verified only (no user token this session);
+§8.2–8.4's breaker/429/sign-in gates were not run as written.
+
 ## Objective
 
 Issue #63 says a feed still refuses to load on v0.7.2 with copy that names no cause. #61 already gave

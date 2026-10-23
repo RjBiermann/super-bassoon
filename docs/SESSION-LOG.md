@@ -954,3 +954,49 @@ User slice: "work on all the open github issues; triage, plan, design, implement
   cooldown; only all-fails WITH healthy connection and no recent failures warrants a reopen.
 - **Session lesson:** favorites are LOCAL `creator_prefs` rows — there is NO server restore;
   device pools for signed-in gates must be built via quick-sheets, not assumed from server data.
+
+### Session 2026-10-23 batch 43 (#62 favorites fan-out + #63 feed error honesty — both closed with device evidence)
+- **Shape:** two DESIGN docs (7c21d33) → two jj lanes (`lane-62`, `lane-63`) → central gates → one mobile
+  device gate per issue (plus a re-gate per device-found correction) → one TV sanity gate → merge to main
+  (2e3e7311) → close-out. Issues auto-closed by the `fix #62`/`fix #63` pushes; evidence comments posted after.
+- **#62 LANDED — favorites page latency was the #54 fan-out, not the API:** one `userGifs` per favorited
+  creator per fill, limiter-paced ⇒ k=20 ≈6.7 s/page, k=40 ≈13 s, and k² requests per dry round. Fix: pure
+  `favoritesPagePlan` with `FAVORITES_CREATORS_PER_FILL = 5`, R = ceil(k/5) window pages per round,
+  `innerPage = round+1`; k ≤ 5 mapping unchanged. Cache generation → `fav:v3` (mapping changed, keys must
+  follow — the #59 lesson), prefs identity pinned at `fav:v1`, eviction prefix `fav:v` sweeps all generations.
+  Tests: `FavoritesFanOutTest` 10, `FavoritesMappingKeyTest` 3, 23 key literals across 7 test files.
+- **#62 device gate (API-35 mobile, 6 creators via the real quick-sheet):** 9 `fav:v3` pages / 116 ids /
+  116 distinct / **0 cross-page duplicates**; the same DB's `fav:v2` rows still show 9 duplicate occurrences
+  (contrast). Appends p1..p9 with no dead end, no error card, 0 429, 0 FATAL/ANR. **Device-found correction:**
+  the first gate showed 8 real cross-page duplicate ids — per-creator count was window-size dependent, so a
+  creator moving windows across rounds got overlapping slices; `perCreator = ceil(pageSize/min(k,5))` makes
+  each slice a pure function of `innerPage` (trailing window serves a thinner page, chaining kept). Necessitated
+  the second generation bump (`fav:v2`→`v3`) before merge.
+- **#63 LANDED — one boolean lied about every failure, and the card never self-cleared:** breaker-open
+  (synthetic 503 ⇒ `HttpException`), sign-in-required (401) and rate-limited (plain `IOException` from all-429
+  exhaustion) all rendered the wrong copy, and the mobile feed card was the only error surface without
+  `AutoRetryEffect`. Fix: `RateLimitedException : IOException` at 429 exhaustion; pure
+  `feedErrorKind`/`feedErrorCard` (Offline wins on `!isOnline`, then RateLimited/401 SignInRequired/other
+  HttpException Upstream/Generic); mobile card wires `AutoRetryEffect` (≤2, 2 s, `AutoRetryBudget` re-armed on
+  reconnect) and routes the sign-in kind to Account; `BreakerReconnectReset` on an offline→online flip in both
+  shells; `EmptyState.onClickLabel`. TV keeps its wiring + D-pad copy. Tests: 6/9/3/5/1.
+- **#63 device gate (mobile, API-35):** offline cold start holds "Nothing cached yet / You're offline —
+  reconnect to load the feed." at 12 s AND 45 s *while the breaker was open on 503s* (the old lie); airplane OFF
+  → tiles in ~4 s with no tap; 0 FATAL/ANR.
+- **Gates:** final tree 280 unit tests / 0 failures / 0 errors / 5 planned `LiveSmokeTest` skips (core:network,
+  core:ui, core:database, feature:feed, app-tv); assembleDebug green both apps (mobile 27,643,770 B,
+  TV 28,063,697 B). ~37 new tests; 7 existing test files touched for the new mapping/key/copy.
+- **TV gate — copy UNVERIFIABLE, new pre-existing bug found (#64):** offline cold start on TV renders rows with
+  only their titles + the offline banner, forever (4 min 40 s; no "Couldn't load <title>", no Retry; 0 FATAL/0
+  ANR; no recovery 90 s after the network returned). Thread dumps ×3: all 5 OkHttp dispatcher threads parked in
+  `runBlocking { authToken() }` (`NetworkModule.kt:88`) re-entering the AnonymousSession mutex, so no request
+  ever completes and `loadState.refresh` never becomes `Error` (`TvHomeScreen.kt:537` never composes). Filed as
+  #64 with repro + fix direction; unrelated to #62/#63.
+- **Session lessons:** (a) a device gate is also a *mapping* oracle — the duplicate-id check that found the
+  window-dependent slice bug cost one DB query and would have been invisible to the whole JVM suite; (b) bump
+  the cache generation for every mapping change *and* pin the prefs identity separately, or the upgrade either
+  serves stale pages or wipes user filters; (c) `error is IOException` is not an offline test — 429 exhaustion
+  and timeouts both land there; classify before copy.
+- **Residuals:** #62's honest end-of-pool not reached on device (still chaining at p9 with k=6); #63's
+  sign-in-required card compile-verified only (no user token this session); TV error copy blocked by #64;
+  `FeedViewModel` `baseKey`/`keyBase` mismatch for post-sort force-refresh (pre-existing, logged in AGENTS.md).

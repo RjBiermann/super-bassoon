@@ -3,6 +3,31 @@
 Investigation + design only (no product code touched). Reporter is on **v0.7.2 = main `32251dec`**,
 i.e. *after* #54 (interleave), #59 (stale-ledger revalidation) and #61 (error retry).
 
+## LANDED (2026-10-23) — `7c21d33..2e3e7311`, main @ `2e3e7311`
+
+Shipped as designed (step 1 `a2c5836`), with one addition and two device-found corrections that forced a
+**second** cache-generation bump:
+
+1. `e7588d5` — **not in the design:** the prefs identity rode on `keyBase`, so the generation bump would
+   have reset every user's favorites filters/sort/seed. `FeedSource.Favorites` now pins
+   `baseKey = "fav:v1"` (prefs identity) separately from `keyBase` (cache identity).
+2. `b810810` — **device-found correction:** the first gate measured 8 real cross-page duplicate ids. A
+   per-creator count derived from the window size makes a creator's slice depend on which round window it
+   sits in. `perCreator = ceil(pageSize / min(k, 5))` makes it a pure function of `innerPage`; a trailing
+   window serves a thinner page (chaining kept).
+3. `2e3e7311` — the correction changes the mapping again ⇒ generation lands at **`fav:v3`**, not `v2`.
+   Rows of both earlier generations are unreachable and swept by the `fav:v` eviction prefix.
+
+Device gate (API-35 mobile, 6 favorited creators via the real quick-sheet, §device gate below):
+9 `fav:v3` pages / 116 ids / 116 distinct / **0 cross-page duplicates** — the same DB's `fav:v2` rows still
+show 9 duplicate occurrences for contrast; appends p1..p9, no dead end, no error card; 0 HTTP 429, 0
+FATAL/ANR.
+
+Known limits: the honest end-of-pool was not reached inside the gate budget (still chaining at p9), so
+open-question 2 (exhaustion margin shrunk to `R` pages) stays unmeasured on device; candidate 5 (a
+per-creator 4xx aborts the fill) is untouched, as designed; the TV Favorites row was not re-gated (the TV
+copy gate was blocked by #64).
+
 ## Objective
 
 Explain, from current code, why the Favorites feed (a) takes long before tiles appear and (b) appears
