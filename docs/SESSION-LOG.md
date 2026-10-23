@@ -937,3 +937,20 @@ User slice: "work on all the open github issues; triage, plan, design, implement
 - **Issues #59 #60 CLOSED with evidence comments** (comment API; they'd been closed comment-less 2 min before the batch — comments posted after the fact). Pushed main → 3df77ca9.
 - **Residual:** TV re-eyeball of #60 on a TV AVD still owed (mobile AVD can't be TV-shaped).
 - **Session lesson:** 2 device-gate agent timeouts on the long gate — split device gates into small single-purpose agents with explicit sub-budgets, and reuse the already-live emulator instead of each agent booting its own.
+
+### Session 2026-10-23 batch 42 (#59/#60 signed-in gates + #61 feed error-state retry — closed)
+- **#59/#60 signed-in device gates PASS (API-35):** Walk A (favorites flow) PASS signed-in; Walk B
+  (feed/paging) PASS — 40-page deep scroll, no dead end, 0 429s.
+- **#61 fix shipped (main @ ccf9e6aa, pushed):** worker lane with TDD — EmptyState gained optional
+  `onClick` (:core:ui), the feed empty+error card is tappable → `forceRefresh()` (full generation
+  restart, TTL bypass), `PullToRefreshBox` now wraps the error branch too, hint copy → "Tap to
+  retry, or pull down." Same-tab re-tap stays a no-op by design. EmptyStateClickTest red→green +
+  :feature:feed 113/0. Device gate PASS: airplane-mode cold start → offline error card → tap fires
+  a real FeedMediator retry (logcat), airplane off → tap loads feed; pull-down variant same;
+  normal feed + player sanity PASS. Issue auto-closed by the "fix #61" commit on push — evidence
+  comment posted after the fact (known pattern).
+- **Breaker finding (#58-adjacent):** all-feeds-couldn't-load after offline bursts is legitimate
+  CircuitBreaker behavior (5-min open cooldown) — with retry wired, recovery is one tap after
+  cooldown; only all-fails WITH healthy connection and no recent failures warrants a reopen.
+- **Session lesson:** favorites are LOCAL `creator_prefs` rows — there is NO server restore;
+  device pools for signed-in gates must be built via quick-sheets, not assumed from server data.
