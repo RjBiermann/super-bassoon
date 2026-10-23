@@ -210,7 +210,7 @@ class FavoritesRefreshSurvivalTest {
         // The original crash class the dedup exists for: the server reshuffles
         // a creator's list between fetches — row p1 gets rewritten with a
         // DIFFERENT id while "g1" is still live in the pager's presented list.
-        pageDao.pages["fav:v2:p1"] = FeedPageEntity(pageKey = "fav:v2:p1", gifIds = listOf("g2"), nextPageKey = "fav:v2:p2", fetchedAt = 0)
+        pageDao.pages["fav:v3:p1"] = FeedPageEntity(pageKey = "fav:v3:p1", gifIds = listOf("g2"), nextPageKey = "fav:v3:p2", fetchedAt = 0)
         // Same instance, next page: the fake API re-lists "g1" (upstream overlap)
         // — the generation's accumulated dedup set drops it (the DB-row dedup
         // can't see the live list anymore: row p1 now holds "g2").

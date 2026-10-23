@@ -285,12 +285,12 @@ class FavoritesFanOutTest {
             val fetcher = fetcher(api, creators, pageDao)
 
             assertTrue(fetcher.fill(1))
-            val first = pageDao.pages["fav:v2:p1"]!!
+            val first = pageDao.pages["fav:v3:p1"]!!
             assertTrue("window 1 is dry", first.gifIds.isEmpty())
-            assertEquals("a dry window still chains into the next one", "fav:v2:p2", first.nextPageKey)
+            assertEquals("a dry window still chains into the next one", "fav:v3:p2", first.nextPageKey)
 
             assertTrue(fetcher.fill(2))
-            assertTrue("the live window carries content", pageDao.pages["fav:v2:p2"]!!.gifIds.isNotEmpty())
+            assertTrue("the live window carries content", pageDao.pages["fav:v3:p2"]!!.gifIds.isNotEmpty())
         }
 
     @Test
@@ -353,10 +353,10 @@ class FavoritesFanOutTest {
             val (fetcher, _) = sliceFetcher(pageDao)
 
             assertTrue(fetcher.fill(1))
-            assertEquals("5 creators x 4 gifs", 20, pageDao.pages["fav:v2:p1"]!!.gifIds.size)
+            assertEquals("5 creators x 4 gifs", 20, pageDao.pages["fav:v3:p1"]!!.gifIds.size)
             assertTrue(fetcher.fill(2))
-            val trailing = pageDao.pages["fav:v2:p2"]!!
+            val trailing = pageDao.pages["fav:v3:p2"]!!
             assertEquals("the 1-slot tail asks for 4, not ceil(20/1)", 4, trailing.gifIds.size)
-            assertEquals("a thin trailing window still chains", "fav:v2:p3", trailing.nextPageKey)
+            assertEquals("a thin trailing window still chains", "fav:v3:p3", trailing.nextPageKey)
         }
 }

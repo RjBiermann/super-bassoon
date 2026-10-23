@@ -88,12 +88,13 @@ sealed interface FeedSource {
     }
 
     /** Recency round-robin over favorited creators (PLAN §7). The cache base
-     *  carries the mapping generation: #62 changed the page→content mapping,
-     *  so rows written by an older mapping generation can't be served as this
-     *  one's pages (#59 lesson: mapping changed, keys didn't). */
+     *  carries the mapping generation: #62 changed the page→content mapping
+     *  twice (v3 = window-independent per-creator slices), so rows written by
+     *  an older mapping generation can't be served as this one's pages (#59
+     *  lesson: mapping changed, keys didn't). */
     @Serializable
     data object Favorites : FeedSource {
-        override val keyBase: String get() = "fav:v2"
+        override val keyBase: String get() = "fav:v3"
 
         /** Prefs identity stays put across cache-generation bumps. */
         override val baseKey: String get() = "fav:v1"

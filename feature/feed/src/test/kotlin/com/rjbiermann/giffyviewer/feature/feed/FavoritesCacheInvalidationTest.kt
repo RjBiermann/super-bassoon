@@ -27,7 +27,7 @@ class FavoritesCacheInvalidationTest {
     /** Contract pin: FAVORITES_PAGE_PREFIX ↔ FeedSource.Favorites keys. */
     @Test
     fun `favorites eviction pattern matches the favorites source page keys`() {
-        assertEquals("fav:v2", FeedSource.Favorites.keyBase)
+        assertEquals("fav:v3", FeedSource.Favorites.keyBase)
         assertEquals("fav:v", FAVORITES_PAGE_PREFIX)
         assertTrue(feedPageKey(FeedSource.Favorites, 1).startsWith(FAVORITES_PAGE_PREFIX))
         assertTrue(feedPageKey(FeedSource.Favorites, 12).startsWith(FAVORITES_PAGE_PREFIX))
