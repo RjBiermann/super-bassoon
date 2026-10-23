@@ -102,23 +102,23 @@ class TvHomeViewModel
          *  FeedPagingSource's read chain); the hint names the actual filter. */
         val trendingOrientation =
             repository
-                .effectiveOrientation(FeedSource.Trending.keyBase)
+                .effectiveOrientation(FeedSource.Trending.baseKey)
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "any")
         val topThisWeekOrientation =
             repository
-                .effectiveOrientation(FeedSource.TopThisWeek.keyBase)
+                .effectiveOrientation(FeedSource.TopThisWeek.baseKey)
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "any")
         val favoritesOrientation =
             repository
-                .effectiveOrientation(FeedSource.Favorites.keyBase)
+                .effectiveOrientation(FeedSource.Favorites.baseKey)
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "any")
         val likedOrientation =
             repository
-                .effectiveOrientation(FeedSource.Liked.keyBase)
+                .effectiveOrientation(FeedSource.Liked.baseKey)
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "any")
         val forYouOrientation =
             repository
-                .effectiveOrientation(FeedSource.ForYou.keyBase)
+                .effectiveOrientation(FeedSource.ForYou.baseKey)
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "any")
 
         /** Logged-in surfaces (Liked/Following rows) show only with a token —

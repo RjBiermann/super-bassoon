@@ -17,9 +17,10 @@ import org.junit.Test
  * mapping inside the last 10 min would otherwise still be served by the walk
  * and end the feed at the old tail.
  *
- * Contract pinned: the base carries the generation, and the eviction prefix
- * stays GENERATION-AGNOSTIC so one favorites edit/refresh sweeps every
- * generation's rows.
+ * Contract pinned: the base carries the generation, the eviction prefix stays
+ * GENERATION-AGNOSTIC so one favorites edit/refresh sweeps every generation's
+ * rows, and the DataStore per-feed prefs identity does NOT follow the
+ * generation (a bump must never reset the user's filters/sort/seed).
  */
 class FavoritesMappingKeyTest {
     /** FeedPageDao fake mirroring Room's `DELETE ... WHERE pageKey LIKE :prefix || '%'`. */
@@ -56,6 +57,15 @@ class FavoritesMappingKeyTest {
         assertEquals("fav:v2", FeedSource.Favorites.keyBase)
         assertTrue(feedPageKey(FeedSource.Favorites, 1).startsWith("fav:v2:p"))
         assertTrue(feedPageKey(FeedSource.Favorites, 1).startsWith(FAVORITES_PAGE_PREFIX))
+    }
+
+    @Test
+    fun `favorites prefs identity stays stable across cache generations`() {
+        // baseKey is the DataStore per-feed prefs key (FeedScreen/settings
+        // feedPrefs/feedSort): the #62 generation bump must not move it, or
+        // every upgrade silently resets Favorites filters/sort/shuffle seed.
+        assertEquals("fav:v1", FeedSource.Favorites.baseKey)
+        assertEquals("fav:v2", FeedSource.Favorites.keyBase)
     }
 
     @Test

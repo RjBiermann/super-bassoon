@@ -94,6 +94,9 @@ sealed interface FeedSource {
     @Serializable
     data object Favorites : FeedSource {
         override val keyBase: String get() = "fav:v2"
+
+        /** Prefs identity stays put across cache-generation bumps. */
+        override val baseKey: String get() = "fav:v1"
         override val ttlMs: Long get() = TTL_TRENDING
     }
 

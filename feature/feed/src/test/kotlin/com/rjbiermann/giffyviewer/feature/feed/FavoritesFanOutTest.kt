@@ -227,6 +227,40 @@ class FavoritesFanOutTest {
         }
 
     @Test
+    fun `empty favorites fill is a degenerate page, not a divide by zero`() =
+        runBlocking {
+            val api = PlanApi()
+            val pageDao = FakeFeedPageDao()
+            val fetcher = fetcher(api, emptyList(), pageDao)
+
+            // No favorited creators: no sub-fetch, no row pinned (§5) — the
+            // plan's round length is 0 and every division stays guarded.
+            assertFalse(fetcher.fill(1))
+            assertTrue("an empty favorite set must not hit the API", api.calls.isEmpty())
+            assertTrue("an empty favorite set must not pin a page row", pageDao.pages.isEmpty())
+        }
+
+    @Test
+    fun `an empty mid-round window still chains forward`() =
+        runBlocking {
+            val creators = fakeCreators(12)
+            // Window 1 (c1..c5) is dry, window 2 (c6..c10) is live: an empty
+            // slot inside round 0 never ends the feed (the #36 rule on the
+            // per-round window — page 1 of a multi-page round must chain).
+            val api = PlanApi().also { seedPool(it, creators.drop(FAVORITES_CREATORS_PER_FILL), 1..2) }
+            val pageDao = FakeFeedPageDao()
+            val fetcher = fetcher(api, creators, pageDao)
+
+            assertTrue(fetcher.fill(1))
+            val first = pageDao.pages["fav:v2:p1"]!!
+            assertTrue("window 1 is dry", first.gifIds.isEmpty())
+            assertEquals("a dry window still chains into the next one", "fav:v2:p2", first.nextPageKey)
+
+            assertTrue(fetcher.fill(2))
+            assertTrue("the live window carries content", pageDao.pages["fav:v2:p2"]!!.gifIds.isNotEmpty())
+        }
+
+    @Test
     fun `perCreator is ceil pageSize over window size`() =
         runBlocking {
             val creators = fakeCreators(12)
