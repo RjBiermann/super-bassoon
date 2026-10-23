@@ -57,6 +57,7 @@ import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
 import com.rjbiermann.giffyviewer.feature.feed.NicheJoinViewModel
 import com.rjbiermann.giffyviewer.feature.feed.feedSourceNavType
 import com.rjbiermann.giffyviewer.feature.feed.gifListNavType
+import com.rjbiermann.giffyviewer.feature.feed.navigateReplacing
 import com.rjbiermann.giffyviewer.feature.feed.nicheNavType
 import com.rjbiermann.giffyviewer.feature.feed.parseNicheRef
 import com.rjbiermann.giffyviewer.feature.settings.SettingsScreen
@@ -245,9 +246,11 @@ class TvMainActivity : ComponentActivity() {
                     // #18: the dialog's sort half re-identifies the feed — a
                     // CHANGED sort REPLACES this entry (no stacking per tap).
                     onSortChange = { sorted ->
-                        navController.navigate(TvFeed(sorted)) {
-                            popUpTo(entry.id) { inclusive = true }
-                        }
+                        // Issue #60: popUpTo(entry.id) passed a NavBackStackEntry
+                        // UUID to the ROUTE overload — matched nothing, so the
+                        // entry stacked instead of replacing. The topmost TvFeed
+                        // IS this entry (popBackStackInternal walks from the top).
+                        navController.navigateReplacing(TvFeed(sorted), TvFeed::class)
                     },
                     // #39: no shared FeedTabStrip on TV (mobile main-tab chrome
                     // reproduced as "TV was showing mobile ui") — the host seams
@@ -275,14 +278,16 @@ class TvMainActivity : ComponentActivity() {
                     // popped-entry replace puts the feed where the player was,
                     // BACK lands the covered surface (home rows / taking grid).
                     onOpenCreator = { username ->
-                        navController.navigate(TvFeed(FeedSource.Creator(username = username))) {
-                            popUpTo(entry.id) { inclusive = true }
-                        }
+                        // Issue #60: popUpTo(entry.id) passed a NavBackStackEntry
+                        // UUID to the ROUTE overload — matched nothing, so the
+                        // player stayed alive under the pushed feed.
+                        navController.navigateReplacing(
+                            TvFeed(FeedSource.Creator(username = username)),
+                            TvPlayer::class,
+                        )
                     },
                     onOpenNiche = { niche ->
-                        navController.navigate(TvFeed(niche)) {
-                            popUpTo(entry.id) { inclusive = true }
-                        }
+                        navController.navigateReplacing(TvFeed(niche), TvPlayer::class)
                     },
                 )
             }

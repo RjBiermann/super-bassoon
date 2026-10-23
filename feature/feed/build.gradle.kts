@@ -54,6 +54,9 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    // Issue #60 regression: the popped-entry-replace seam is a NavController
+    // DSL call — the JVM rung needs the navigation types to drive it.
+    testImplementation(libs.navigation.compose)
     // Issue #50 stage 2: Compose UI tests on the JVM rung (Robolectric).
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.ext.junit)

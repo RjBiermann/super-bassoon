@@ -47,6 +47,7 @@ import com.rjbiermann.giffyviewer.feature.feed.NicheAboutScreen
 import com.rjbiermann.giffyviewer.feature.feed.NichesScreen
 import com.rjbiermann.giffyviewer.feature.feed.PlayerScreen
 import com.rjbiermann.giffyviewer.feature.feed.feedSourceNavType
+import com.rjbiermann.giffyviewer.feature.feed.navigateReplacing
 import com.rjbiermann.giffyviewer.feature.settings.SettingsScreen
 import com.rjbiermann.giffyviewer.search.SearchScreen
 import dagger.hilt.android.AndroidEntryPoint
@@ -217,9 +218,10 @@ class MainActivity : ComponentActivity() {
                         // onOpen→onBack). Push the feed and pop this player
                         // entry — BACK then lands the covered feed with its
                         // scroll state, not the dead slot this player left.
-                        navController.navigate(MainFeed(source)) {
-                            popUpTo(entry.id) { inclusive = true }
-                        }
+                        // Issue #60: popUpTo(entry.id) passed the NavBackStackEntry
+                        // UUID to the ROUTE overload — matched nothing, the player
+                        // stayed under the pushed feed, and BACK relaunched it.
+                        navController.navigateReplacing(MainFeed(source), MainPlayer::class)
                     },
                     viewModel = feedViewModel,
                     playerFactory = playerFactory,
