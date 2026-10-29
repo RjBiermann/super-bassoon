@@ -1000,3 +1000,49 @@ User slice: "work on all the open github issues; triage, plan, design, implement
 - **Residuals:** #62's honest end-of-pool not reached on device (still chaining at p9 with k=6); #63's
   sign-in-required card compile-verified only (no user token this session); TV error copy blocked by #64;
   `FeedViewModel` `baseKey`/`keyBase` mismatch for post-sort force-refresh (pre-existing, logged in AGENTS.md).
+
+### Session 2026-10-29 batch 44 (#64 TV auth deadlock + #65/#66 creator feed — code merged, device gates owed)
+- **Shape:** 3 open issues → triage into 2 lanes (#65+#66 share the creator-feed seam, so one lane; #64 is
+  network/auth) → 2 parallel read-only scouts writing `docs/design/DESIGN-64.md` / `DESIGN-65-66.md` with
+  file:line evidence → one central live probe → 2 parallel writer lanes in jj workspaces → merge → central
+  `check` + both APKs. Two background children per phase, one writer per workspace, no conflicts.
+- **Probe decided the fix (no-guess):** `v2/users/{u}/search?order=trending` → **200, gifs=[], total=0**
+  (the app's creator default); **omitting `order` is equally empty**; `order=latest` → 20 gifs, total=42,
+  pages=3; `oldest` → 20 (reporter's control). So #65 is a *subset order*, not a 400/BadOrder drift, and
+  the fix had to send the explicit string `latest`. `latest` p1∩p2 overlap = 0 → the "upstream page
+  overlap" theory behind #66 was wrong; the trigger was the empty trending pool.
+- **#64 LANDED (6f8ba0ea).** Scout corrected the issue's mechanism: the binding limit is OkHttp's
+  `maxRequestsPerHost = 5` (nothing configures a Dispatcher; `maxRequests = 64` is irrelevant), interceptors
+  run on dispatcher threads holding a host slot, and `runBlocking` is not interruptible by `RealCall.cancel`
+  — so the 60 s `callTimeout` could never unstick it. Fix: dedicated `tokenClient`/`tokenApi` (own
+  Dispatcher; shared `BrowserIdentityInterceptor` instance and shared limiter — the anon token is UA-bound,
+  so identity must be byte-identical; no auth/retry interceptor; 10 s connect/read/call) +
+  `AnonymousSession.token()` bounded with `withTimeoutOrNull(10_000)` and fail-open. Both DI modules
+  repointed. `AnonymousTokenDispatchTest` (4) — red first with the old wiring: 5 concurrent calls,
+  latch timeout, zero completions, no exception (the exact #64 signature); green in 0.5 s with exactly one
+  token fetch. `AGENTS-NETWORK.md` now states the real per-host cap and the contract "no application
+  interceptor may issue a network call".
+- **#65/#66 LANDED (b5523758).** `CREATOR_DEFAULT_ORDER = "latest"` at the Creator branch, the `creator:`
+  Custom ref and every Favorites sub-fetch; `GifsApi.userGifs(order = null)`; creator/favorites cache
+  generations bumped (`user:v2:`, `fav:v4`) with `baseKey`s pinned so no pref/sort/filter resets;
+  `FeedSource.defaultSort` feeds both shells' chip fallback and the sort icon is tinted only for a
+  non-default sort or an active filter; `sortForceKey(sort) = withSort(sort).keyBase` closes the documented
+  `pendingForce`/`keyBase` mismatch. Tests: `CreatorOrderTest` 5, `CreatorMappingKeyTest` 4,
+  `SortForceKeyTest` 3; `:feature:feed` 150/0.
+- **Central gate:** `check` + `assembleDebug` both apps → BUILD SUCCESSFUL, **332 JVM tests / 0 failures /
+  0 errors / 5 planned `LiveSmokeTest` skips**, ktlint+detekt clean; mobile APK 27,643,770 B, TV
+  28,064,115 B. Daemons stopped before the build (available 4.6 Gi, `--max-workers=2`, in-process Kotlin).
+- **Device gates NOT run** — the host emulator (`emulator-5554`) is in use by another session; a gate child
+  started installing and was stopped within ~8 tool calls (it had installed the mobile APK, `pm clear`ed
+  `com.rjbiermann.giffyviewer` and brought the app to the foreground; no emulator restart, no data of the
+  other session's app touched). Owed: #65/#66 mobile (creator render with zero sort interaction, default
+  chip, player advance through the catalogue), #64 TV (airplane cold start → error copy → reconnect).
+- **Session lessons:** (a) run the live probe *before* the writers — this one flipped the design's shipping
+  constant (`latest` vs omitted param) and killed a wrong #66 theory, at 10 requests total; (b) a
+  "deadlock in the auth interceptor" report is worth re-deriving from OkHttp bytecode — the issue's thread
+  count was the symptom, the per-host cap was the cause; (c) a creator feed's *default order* is part of its
+  cache identity, so an order change is a mapping change and needs a generation bump.
+- **Residuals:** the zero-item-append stall class is still unfixed by design (F2/F3, see AGENTS open items);
+  `latest` is now the creator default for every creator (visible behaviour change → release notes);
+  fail-open can cost one unauthenticated request on a connected-but-silent network (self-healing via the
+  401 path).

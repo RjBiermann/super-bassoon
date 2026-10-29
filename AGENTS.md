@@ -231,10 +231,22 @@ When unsure: check the matching AGENTS doc first, then ask. Don't invent endpoin
   favorites cache generation `fav:v3` (prefs identity pinned at `fav:v1`). #63: honest error kinds,
   mobile feed `AutoRetryEffect`, breaker reset on reconnect. Honest ends not exercised on device:
   #62's true end-of-pool (still chaining at p9) and #63's TV copy (blocked by the TV issue below).
-- TV offline cold start deadlocks in the auth interceptor (#64, pre-existing; found by the #63 TV gate):
-  all 5 OkHttp threads park in `runBlocking { authToken() }` (`NetworkModule.kt:88`) re-entering the
-  AnonymousSession mutex, so rows never leave `LoadState.Loading` and no error copy can render. Needs a
-  design pass (token resolved off the interceptor chain, or its own executor + timeout).
+- #64 (TV offline cold start auth deadlock) FIXED 2026-10-23, main @ 6f8ba0ea — device gate still owed.
+  The binding limit is OkHttp's **per-host** cap (`maxRequestsPerHost = 5`; no `Dispatcher` is configured,
+  so `maxRequests = 64` is not the constraint): an application interceptor that issues a network call runs
+  while its own call holds a host slot, so a nested call competes for the same 5 and can lock the process.
+  Fix: `tokenClient`/`tokenApi` (own Dispatcher, shared `BrowserIdentityInterceptor` + shared limiter, no
+  auth/retry interceptor, 10 s bounds) + `AnonymousSession.token()` bounded by `withTimeoutOrNull` and
+  fail-open. `AnonymousTokenDispatchTest` reproduces the deadlock (5 concurrent calls, latch timeout, no
+  exception) before the fix.
+- Paging truth behind #66 (mechanism known, NOT fixed): an append that yields zero visible items kills the
+  append chain — paging only reacts to a NEW viewport hint — and `items.retry()` retries only `Error`
+  loads, so the swipe player cannot restart it. The creator trigger is gone (default order `latest`), but a
+  strict client filter on any feed can still freeze the player. Shape designed, not built:
+  `docs/design/DESIGN-65-66.md` F2/F3 (two-budget walk with an honest `nextKey = null`, `poolEndAction`).
+- Device gates owed: #65/#66 mobile (creator default render with zero sort interaction, player advance
+  through the whole catalogue) and #64 TV (airplane-mode cold start → honest error copy → reconnect
+  recovery). Blocked this batch — the host emulator is shared with another session.
 - ~~`FeedViewModel` `pendingForce` mismatch~~ FIXED 2026-10-23 with #65/#66: `setSort` records
   `source.sortForceKey(sort)` = `withSort(sort).keyBase`, the key the gifs flow reads (~:134);
   pinned by `SortForceKeyTest`.
