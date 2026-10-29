@@ -231,7 +231,8 @@ When unsure: check the matching AGENTS doc first, then ask. Don't invent endpoin
   favorites cache generation `fav:v3` (prefs identity pinned at `fav:v1`). #63: honest error kinds,
   mobile feed `AutoRetryEffect`, breaker reset on reconnect. Honest ends not exercised on device:
   #62's true end-of-pool (still chaining at p9) and #63's TV copy (blocked by the TV issue below).
-- #64 (TV offline cold start auth deadlock) FIXED 2026-10-23, main @ 6f8ba0ea — device gate still owed.
+- #64 (TV offline cold start auth deadlock) FIXED and device-verified 2026-10-23 (main @ 1cbbba74) — gate
+  evidence in the issue comment.
   The binding limit is OkHttp's **per-host** cap (`maxRequestsPerHost = 5`; no `Dispatcher` is configured,
   so `maxRequests = 64` is not the constraint): an application interceptor that issues a network call runs
   while its own call holds a host slot, so a nested call competes for the same 5 and can lock the process.
