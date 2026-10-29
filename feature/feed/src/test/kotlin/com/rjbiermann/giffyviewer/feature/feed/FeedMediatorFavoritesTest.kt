@@ -89,8 +89,8 @@ class FeedMediatorFavoritesTest {
     @Test
     fun `cached empty favorites page is never fresh`() {
         val pageDao = FakeFeedPageDao()
-        pageDao.pages["fav:v3:p1"] =
-            FeedPageEntity(pageKey = "fav:v3:p1", gifIds = emptyList(), nextPageKey = null, fetchedAt = 1_000)
+        pageDao.pages["fav:v4:p1"] =
+            FeedPageEntity(pageKey = "fav:v4:p1", gifIds = emptyList(), nextPageKey = null, fetchedAt = 1_000)
         val api = FakeApi()
         val result = runBlocking { mediator(pageDao, FakeGifDao(), api) { listOf("sweety.yuko") }.load(LoadType.REFRESH, state()) }
         assertTrue(result is MediatorResult.Success)
@@ -153,8 +153,8 @@ class FeedMediatorFavoritesTest {
         assertTrue(result is MediatorResult.Success)
         assertFalse((result as MediatorResult.Success).endOfPaginationReached)
         assertEquals(1, api.userGifsCalls)
-        assertEquals(listOf("g1"), pageDao.pages["fav:v3:p1"]!!.gifIds)
-        assertEquals("fav:v3:p2", pageDao.pages["fav:v3:p1"]!!.nextPageKey)
+        assertEquals(listOf("g1"), pageDao.pages["fav:v4:p1"]!!.gifIds)
+        assertEquals("fav:v4:p2", pageDao.pages["fav:v4:p1"]!!.nextPageKey)
         assertEquals(1, gifDao.upserted.size)
         assertEquals("sweety.yuko", gifDao.upserted[0][0].userName)
     }

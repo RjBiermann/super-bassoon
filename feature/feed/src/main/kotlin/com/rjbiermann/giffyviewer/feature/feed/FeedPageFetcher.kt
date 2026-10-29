@@ -12,6 +12,16 @@ import com.rjbiermann.giffyviewer.core.network.dto.toModel
 internal const val FAVORITES_CREATORS_PER_FILL = 5
 
 /**
+ * #65: the order every creator call site fetches with when the feed has no
+ * explicit sort. Live probe 2026-10 on `v2/users/perkyandpink/search`:
+ * `trending` (the old default) 200s with `gifs: []` / total 0 — a subset order
+ * a low-engagement creator has no items for — and an OMITTED param answers
+ * from that same empty pool; `latest` returns the whole catalogue. Never
+ * `trending`, never omitted.
+ */
+internal const val CREATOR_DEFAULT_ORDER = "latest"
+
+/**
  * One page = one fetch + cache write, shared by the RemoteMediator and the
  * paging source (the source fills an unfetched page itself: Paging consults
  * the mediator only when the source's data is exhausted, so a fast scroll
@@ -141,7 +151,7 @@ class FeedPageFetcher(
                     username = feed.username,
                     count = pageSize,
                     page = page,
-                    order = feed.sort.ifEmpty { "trending" },
+                    order = feed.sort.ifEmpty { CREATOR_DEFAULT_ORDER },
                 )
             is FeedSource.Custom -> {
                 // Round-robin across the blended refs ("creator:<username>" /
@@ -158,7 +168,12 @@ class FeedPageFetcher(
                     val inner = (page - 1) / refs.size + 1
                     when {
                         ref.startsWith("creator:") ->
-                            api.userGifs(username = ref.removePrefix("creator:"), count = pageSize, page = inner)
+                            api.userGifs(
+                                username = ref.removePrefix("creator:"),
+                                count = pageSize,
+                                page = inner,
+                                order = CREATOR_DEFAULT_ORDER,
+                            )
                         ref.startsWith("niche:") ->
                             api.nicheGifs(
                                 nicheId = parseNicheRef(ref)?.first ?: "",
@@ -197,7 +212,13 @@ class FeedPageFetcher(
         if (plan == null || plan.usernames.isEmpty()) return GifsPageDto()
         val chunks =
             plan.usernames.map { username ->
-                api.userGifs(username = username, count = plan.perCreator, page = plan.innerPage).gifs
+                api
+                    .userGifs(
+                        username = username,
+                        count = plan.perCreator,
+                        page = plan.innerPage,
+                        order = CREATOR_DEFAULT_ORDER,
+                    ).gifs
             }
         return GifsPageDto(gifs = interleaveChunks(chunks))
     }

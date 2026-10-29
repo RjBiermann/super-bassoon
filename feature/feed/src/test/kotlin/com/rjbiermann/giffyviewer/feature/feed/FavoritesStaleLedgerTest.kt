@@ -81,7 +81,7 @@ class FavoritesStaleLedgerTest {
             username: String,
             count: Int,
             page: Int,
-            order: String,
+            order: String?,
         ): GifsPageDto {
             calls.add(username to page)
             return GifsPageDto(gifs = (pool[username to page] ?: emptyList()).map { gifDtoShell(it, username) })

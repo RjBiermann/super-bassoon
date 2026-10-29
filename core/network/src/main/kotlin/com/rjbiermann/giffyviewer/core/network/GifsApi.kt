@@ -46,13 +46,17 @@ interface GifsApi {
     ): GifsPageDto
 
     /** One creator's gifs — live-verified: filters by userName, paginated.
-     *  Orders verified 2026-09-30: trending, oldest, latest, top, top7, top28. */
+     *  Orders verified 2026-09-30: trending, oldest, latest, top, top7, top28.
+     *  Live probe 2026-10 (#65): `trending` is a SUBSET order — 200 with an
+     *  empty page (the caller's own default, see CREATOR_DEFAULT_ORDER) — and
+     *  omitting the param answers from the same empty pool, so callers pass
+     *  `latest` explicitly. */
     @GET("v2/users/{username}/search")
     suspend fun userGifs(
         @Path("username") username: String,
         @Query("count") count: Int = 40,
         @Query("page") page: Int = 1,
-        @Query("order") order: String = "trending",
+        @Query("order") order: String? = null,
     ): GifsPageDto
 
     @GET("v2/feeds/trending/popular")

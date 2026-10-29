@@ -89,26 +89,31 @@ sealed interface FeedSource {
 
     /** Recency round-robin over favorited creators (PLAN §7). The cache base
      *  carries the mapping generation: #62 changed the page→content mapping
-     *  twice (v3 = window-independent per-creator slices), so rows written by
-     *  an older mapping generation can't be served as this one's pages (#59
-     *  lesson: mapping changed, keys didn't). */
+     *  twice (v3 = window-independent per-creator slices), and #65 changed what
+     *  every creator sub-fetch asks for (order `latest` instead of the empty
+     *  `trending` pool), so rows written by an older mapping generation can't
+     *  be served as this one's pages (#59 lesson: mapping changed, keys
+     *  didn't). */
     @Serializable
     data object Favorites : FeedSource {
-        override val keyBase: String get() = "fav:v3"
+        override val keyBase: String get() = "fav:v4"
 
         /** Prefs identity stays put across cache-generation bumps. */
         override val baseKey: String get() = "fav:v1"
         override val ttlMs: Long get() = TTL_TRENDING
     }
 
-    /** Single creator feed — v2/users/{username}/gifs (same call the Favorites
-     *  round-robin already uses). Pinned creator tabs (PLAN §7 pin-to-tabs). */
+    /** Single creator feed — v2/users/{username}/search (same call the
+     *  Favorites round-robin already uses). Pinned creator tabs (PLAN §7
+     *  pin-to-tabs). The cache base carries the mapping generation: #65 changed
+     *  the page→content order (see [CREATOR_DEFAULT_ORDER]), so pages cached
+     *  under the old `user:` base must not be served as this one's. */
     @Serializable
     data class Creator(
         val username: String,
         val sort: String = "",
     ) : FeedSource {
-        override val keyBase: String get() = "user:${username.lowercase().trim()}" + if (sort.isEmpty()) "" else ":sort=$sort"
+        override val keyBase: String get() = "user:v2:${username.lowercase().trim()}" + if (sort.isEmpty()) "" else ":sort=$sort"
         override val baseKey: String get() = "user:${username.lowercase().trim()}"
         override val ttlMs: Long get() = TTL_SEARCH
     }
@@ -187,7 +192,18 @@ val FeedSource.activeSort: String
             else -> ""
         }
 
-/** Same feed with another server sort (§8 chips); identity sources ignore it. */
+/** The order this surface fetches with when no sort is chosen (#65: the
+ *  creator endpoint's `trending` subset is empty for plenty of creators, so
+ *  its default is the explicit [CREATOR_DEFAULT_ORDER]). The sort chip falls
+ *  back to it, so the default view highlights the chip it actually serves. */
+val FeedSource.defaultSort: String
+    get() =
+        when (this) {
+            is FeedSource.Creator -> CREATOR_DEFAULT_ORDER
+            else -> ""
+        }
+
+/** The feed with [sort] applied — the identity the cache and the fetch share. */
 fun FeedSource.withSort(sort: String): FeedSource =
     when (this) {
         is FeedSource.Search -> copy(sort = sort)
@@ -196,12 +212,20 @@ fun FeedSource.withSort(sort: String): FeedSource =
         else -> this
     }
 
+/** Cache base a sort change is owed a one-shot TTL bypass for: the POST-sort
+ *  identity — exactly the key the gifs flow reads off the feed it opens
+ *  (FeedViewModel.gifs). The sortless [FeedSource.baseKey] is never it for a
+ *  sortable surface (their keyBase carries the `:sort=` suffix). */
+fun FeedSource.sortForceKey(sort: String): String = withSort(sort).keyBase
+
 /**
  * Server sort options per feed surface — ONLY orders verified live (BadOrder
  * otherwise): search {trending,latest,top7,top28,top(2026-10-15),score},
  * creator {trending,oldest,latest,top7,top28}, niche
- * {trending,oldest,latest,best,hot}. Empty sort = the surface's default
- * (trending).
+ * {trending,oldest,latest,best,hot}. Empty sort = the surface's default order
+ * ([defaultSort]: trending for search/niche, latest for the creator feed —
+ * `trending` there is a subset an inactive creator answers empty, #65).
+ * `trending` ships no chip: `""` already selects it where it is the default.
  */
 fun FeedSource.sortOptions(): List<Pair<String, String>> =
     when (this) {

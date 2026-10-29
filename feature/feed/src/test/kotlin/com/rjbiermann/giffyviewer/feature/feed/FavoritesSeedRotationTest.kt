@@ -62,7 +62,7 @@ class FavoritesSeedRotationTest {
             username: String,
             count: Int,
             page: Int,
-            order: String,
+            order: String?,
         ): GifsPageDto {
             users.add(username)
             return GifsPageDto(gifs = listOf(gifDtoShell("g" + users.size, username)))

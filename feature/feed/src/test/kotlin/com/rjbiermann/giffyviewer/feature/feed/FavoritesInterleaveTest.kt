@@ -78,7 +78,7 @@ class FavoritesInterleaveTest {
             username: String,
             count: Int,
             page: Int,
-            order: String,
+            order: String?,
         ): GifsPageDto {
             calls.add(Call(username, page, count))
             return GifsPageDto(gifs = (pool[username to page] ?: emptyList()).map { gifDtoShell(it, username) })
@@ -115,7 +115,7 @@ class FavoritesInterleaveTest {
             // gif by gif — the screenful alternates creators.
             assertEquals(
                 listOf("a1", "b1", "c1", "a2", "b2", "c2", "a3", "b3", "c3", "a4", "b4", "c4", "a5", "b5", "c5"),
-                pageDao.pages["fav:v3:p1"]!!.gifIds,
+                pageDao.pages["fav:v4:p1"]!!.gifIds,
             )
             // One sub-fetch per creator, all at the same inner page, sharing
             // the page budget: ceil(20/3) = 7 per call (a short pool just
@@ -138,7 +138,7 @@ class FavoritesInterleaveTest {
             assertTrue(fetcher.fill(1))
             assertEquals(
                 listOf("a1", "b1", "c1", "a2", "b2", "b3", "b4", "b5"),
-                pageDao.pages["fav:v3:p1"]!!.gifIds,
+                pageDao.pages["fav:v4:p1"]!!.gifIds,
             )
         }
 
@@ -179,10 +179,10 @@ class FavoritesInterleaveTest {
             // b is dry but a still feeds the row — a partially-empty fill
             // keeps chaining (the #36 mid-loop rule, now per sub-fetch).
             assertTrue(fetcher.fill(1))
-            assertEquals(listOf("a1"), pageDao.pages["fav:v3:p1"]!!.gifIds)
+            assertEquals(listOf("a1"), pageDao.pages["fav:v4:p1"]!!.gifIds)
             // Both pools dry at inner 2 → the row is empty and cached so.
             assertTrue(fetcher.fill(2))
-            assertTrue(pageDao.pages["fav:v3:p2"]!!.gifIds.isEmpty())
+            assertTrue(pageDao.pages["fav:v4:p2"]!!.gifIds.isEmpty())
         }
 
     @Test

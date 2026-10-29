@@ -532,7 +532,7 @@ class FeedViewModel
         ) {
             viewModelScope.launch {
                 settings.setFeedSort(source.baseKey, sort)
-                pendingForce.value = pendingForce.value + source.baseKey
+                pendingForce.value = pendingForce.value + source.sortForceKey(sort)
                 open(source.withSort(sort))
             }
         }

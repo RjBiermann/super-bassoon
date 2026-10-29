@@ -72,6 +72,7 @@ import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
 import com.rjbiermann.giffyviewer.feature.feed.NicheFeedHeader
 import com.rjbiermann.giffyviewer.feature.feed.NicheJoinViewModel
 import com.rjbiermann.giffyviewer.feature.feed.activeSort
+import com.rjbiermann.giffyviewer.feature.feed.defaultSort
 import com.rjbiermann.giffyviewer.feature.feed.feedErrorCard
 import com.rjbiermann.giffyviewer.feature.feed.feedErrorKind
 import com.rjbiermann.giffyviewer.feature.feed.joinNicheLabel
@@ -434,7 +435,9 @@ fun TvSourceFeedScreen(
                     source.refs.all { !it.startsWith("creator:") && !it.startsWith("niche:") },
             prefs = feedPrefs,
             sortOptions = source.sortOptions(),
-            selectedSort = source.activeSort.ifEmpty { savedSort },
+            // No chip chosen → the saved sort → the order this surface
+            // actually fetches with (creator = latest, #65).
+            selectedSort = source.activeSort.ifEmpty { savedSort.ifEmpty { source.defaultSort } },
             onApply = { next, sort ->
                 feedViewModel.setFeedPrefs(source.baseKey, next)
                 // Issue #13: the sort change REPLACES the entry via onSortChange

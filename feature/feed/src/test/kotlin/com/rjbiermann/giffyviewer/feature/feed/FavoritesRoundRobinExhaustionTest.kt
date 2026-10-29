@@ -72,7 +72,7 @@ class FavoritesRoundRobinExhaustionTest {
             username: String,
             count: Int,
             page: Int,
-            order: String,
+            order: String?,
         ): GifsPageDto {
             calls.add(username to page)
             return GifsPageDto(gifs = (pool[username to page] ?: emptyList()).map { gifDtoShell(it, username) })
@@ -131,7 +131,7 @@ class FavoritesRoundRobinExhaustionTest {
             // [b,c,a] (offset 7 % 3 = 1). One API call per fill — the rate-limit
             // invariant rides on the fetch count per page, unchanged.
             assertEquals(listOf("b", "c", "a"), api.calls.take(3).map { it.first })
-            assertEquals("an early empty slot must still chain forward", "fav:v3:p2", pageDao.pages["fav:v3:p1"]!!.nextPageKey)
+            assertEquals("an early empty slot must still chain forward", "fav:v4:p2", pageDao.pages["fav:v4:p1"]!!.nextPageKey)
         }
 
     @Test

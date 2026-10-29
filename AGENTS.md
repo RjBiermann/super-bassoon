@@ -235,8 +235,8 @@ When unsure: check the matching AGENTS doc first, then ask. Don't invent endpoin
   all 5 OkHttp threads park in `runBlocking { authToken() }` (`NetworkModule.kt:88`) re-entering the
   AnonymousSession mutex, so rows never leave `LoadState.Loading` and no error copy can render. Needs a
   design pass (token resolved off the interceptor chain, or its own executor + timeout).
-- Pre-existing `FeedViewModel` mismatch: `setSort` adds `source.baseKey` to `pendingForce` (~:535) while
-  the read checks `feed.keyBase` (~:134) — Search/Creator/Niche `baseKey` drops the `:sort=` suffix, so a
-  post-sort force-refresh never matches for them. Reachable, unobserved; one-line fix when next touched.
+- ~~`FeedViewModel` `pendingForce` mismatch~~ FIXED 2026-10-23 with #65/#66: `setSort` records
+  `source.sortForceKey(sort)` = `withSort(sort).keyBase`, the key the gifs flow reads (~:134);
+  pinned by `SortForceKeyTest`.
 
 Per-batch session history: docs/SESSION-LOG.md.

@@ -11,12 +11,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * #62 cache mapping generation (the #59 lesson: "mapping changed, keys
- * didn't"): the page→content mapping changed twice in #62 — v2 for the
- * per-creator fan-out, v3 for the window-independent slices — and each change
- * moved the Favorites page keys to its own generation ("fav:v3"). A row
- * written by an older mapping inside the last 10 min would otherwise still be
- * served by the walk and end the feed at the old tail.
+ * #62/#65 cache mapping generation (the #59 lesson: "mapping changed, keys
+ * didn't"): the Favorites page→content mapping changed three times — v2 for
+ * the per-creator fan-out, v3 for the window-independent slices, v4 for #65's
+ * creator sub-fetch order (`latest` instead of the empty `trending` pool) —
+ * and each change moved the Favorites page keys to its own generation
+ * ("fav:v4"). A row written by an older mapping inside the last 10 min would
+ * otherwise still be served by the walk and end the feed at the old tail.
  *
  * Contract pinned: the base carries the generation, the eviction prefix stays
  * GENERATION-AGNOSTIC so one favorites edit/refresh sweeps every generation's
@@ -56,8 +57,8 @@ class FavoritesMappingKeyTest {
         // The #62 slice mapping is a NEW generation: rows of the older
         // mappings stay out of the walk's reach (the eviction prefix still
         // sweeps them).
-        assertEquals("fav:v3", FeedSource.Favorites.keyBase)
-        assertTrue(feedPageKey(FeedSource.Favorites, 1).startsWith("fav:v3:p"))
+        assertEquals("fav:v4", FeedSource.Favorites.keyBase)
+        assertTrue(feedPageKey(FeedSource.Favorites, 1).startsWith("fav:v4:p"))
         assertTrue(feedPageKey(FeedSource.Favorites, 1).startsWith(FAVORITES_PAGE_PREFIX))
     }
 
@@ -67,7 +68,7 @@ class FavoritesMappingKeyTest {
         // feedPrefs/feedSort): the #62 generation bump must not move it, or
         // every upgrade silently resets Favorites filters/sort/shuffle seed.
         assertEquals("fav:v1", FeedSource.Favorites.baseKey)
-        assertEquals("fav:v3", FeedSource.Favorites.keyBase)
+        assertEquals("fav:v4", FeedSource.Favorites.keyBase)
     }
 
     @Test
@@ -80,8 +81,8 @@ class FavoritesMappingKeyTest {
             assertTrue("fav:v1:p1".startsWith(FAVORITES_PAGE_PREFIX))
 
             val pageDao = PrefixEvictPageDao()
-            val old = listOf("fav:v1:p1", "fav:v2:p7")
-            val current = listOf("fav:v3:p1", "fav:v3:p2")
+            val old = listOf("fav:v1:p1", "fav:v2:p7", "fav:v3:p1")
+            val current = listOf("fav:v4:p1", "fav:v4:p2")
             val other = "trend:v2:pop:p1"
             for (key in old + current + listOf(other)) {
                 pageDao.upsert(FeedPageEntity(pageKey = key, gifIds = listOf("g"), nextPageKey = null, fetchedAt = 0L))

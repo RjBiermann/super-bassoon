@@ -310,7 +310,13 @@ fun FeedScreen(
                 listOf(feedPrefs.duration, feedPrefs.resolution, feedPrefs.orientation).any { it.isNotEmpty() }
             val savedSort by remember(source.baseKey) { viewModel.sortFor(source.baseKey) }
                 .collectAsStateWithLifecycle("")
-            val activeSort = source.activeSort.ifEmpty { savedSort }
+            // "" = no chip chosen: the saved sort, else the order the surface
+            // actually fetches with (creator = latest, #65) — the chip the
+            // default view serves must read as selected.
+            val activeSort = source.activeSort.ifEmpty { savedSort.ifEmpty { source.defaultSort } }
+            // The badge lights for a NON-default sort: activeSort now includes
+            // the surface default, which is the un-chosen state.
+            val nonDefaultSort = activeSort.isNotEmpty() && activeSort != source.defaultSort
             Row(
                 modifier =
                     Modifier
@@ -325,7 +331,7 @@ fun FeedScreen(
                         Icons.AutoMirrored.Filled.Sort,
                         contentDescription = "Sort & filter",
                         tint =
-                            if (filtersActive || activeSort.isNotEmpty()) {
+                            if (filtersActive || nonDefaultSort) {
                                 MaterialTheme.colorScheme.secondary
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant

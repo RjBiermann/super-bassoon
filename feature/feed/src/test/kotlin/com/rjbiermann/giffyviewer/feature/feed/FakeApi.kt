@@ -63,7 +63,7 @@ internal open class FakeApi : GifsApi {
         username: String,
         count: Int,
         page: Int,
-        order: String,
+        order: String?,
     ): GifsPageDto {
         userGifsCalls++
         return GifsPageDto(gifs = listOf(gifDtoShell("g1", username)))
