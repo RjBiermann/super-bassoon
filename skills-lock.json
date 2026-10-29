@@ -1,23 +1,26 @@
 {
-  "version": 1,
+  "version": 2,
   "skills": {
     "mobile-accessibility": {
       "source": "community-access/accessibility-agents",
       "sourceType": "github",
       "skillPath": "skills/mobile-accessibility/SKILL.md",
-      "computedHash": "1b780a62b9a0038a367affd1d4802e3c49a3cd1f34964c11517f1f38cdcbca60"
+      "computedHash": "60d3c52b3a150e147ea1d6049d9522890c1322566616143768eca114d4576aad",
+      "commit": "a538edc9edfb98cdd8bae96d6b79542874b478f7"
     },
     "mobile-android-design": {
       "source": "wshobson/agents",
       "sourceType": "github",
       "skillPath": "plugins/ui-design/skills/mobile-android-design/SKILL.md",
-      "computedHash": "bcb274bcc4e0ad076b5947f90e5a247f370ed4da1274b2b7347dc293ee396309"
+      "computedHash": "55efd53301a7dedb208b426587aa66672e3450449c59f4729340f5fa1b96f7ff",
+      "commit": "91ff75307f5668916f3eb77d5ba556266c961376"
     },
     "ui-ux-pro-max": {
       "source": "nextlevelbuilder/ui-ux-pro-max-skill",
       "sourceType": "github",
       "skillPath": ".claude/skills/ui-ux-pro-max/SKILL.md",
-      "computedHash": "daa1a7be30edc9cda6b31da821c5285a9f421ee3136dd6335ff47e917215d1a5"
+      "computedHash": "e521187cf7538619acb336c79ba3dc12f7b2670e6a8f03db59167b5f1c603906",
+      "commit": "f76d1653d7467fc11fb9d9d79295a421c92ab958"
     }
   }
 }

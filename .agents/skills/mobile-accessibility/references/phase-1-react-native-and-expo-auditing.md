@@ -30,22 +30,23 @@ Review every interactive element for these required props:
 'list' | 'listitem'
 ```
 
-#### ARIA Props (React Native 0.73+)
+#### ARIA Props
 
-React Native now supports `aria-*` props as aliases:
+React Native supports these `aria-*` props as aliases (checked against the
+react-native 0.88 source). It also accepts `role` as an alias of
+`accessibilityRole`. There is no `aria-describedby` or `aria-role` prop;
+`accessibilityHint` has no ARIA alias.
 
 | ARIA prop | RN prop equivalent |
 |-----------|-------------------|
 | `aria-label` | `accessibilityLabel` |
 | `aria-labelledby` | `accessibilityLabelledBy` |
-| `aria-describedby` | `accessibilityHint` |
-| `aria-role` | `accessibilityRole` |
 | `aria-checked` | `accessibilityState.checked` |
 | `aria-disabled` | `accessibilityState.disabled` |
 | `aria-expanded` | `accessibilityState.expanded` |
 | `aria-selected` | `accessibilityState.selected` |
 | `aria-busy` | `accessibilityState.busy` |
-| `aria-hidden` | `importantForAccessibility="no-hide-descendants"` (Android) |
+| `aria-hidden` | `accessibilityElementsHidden` (iOS) and `importantForAccessibility="no-hide-descendants"` (Android) |
 | `aria-live` | `accessibilityLiveRegion` |
 | `aria-modal` | `accessibilityViewIsModal` |
 
@@ -203,6 +204,27 @@ Text("Summary").accessibilitySortPriority(2)
 Button("Details").accessibilitySortPriority(1)
 ```
 
+#### One phrase, one stop
+
+A row built from separate labels (title, subtitle, timestamp) costs one swipe
+per label. When the pieces read as one phrase, make the row one accessibility
+element and give it one label:
+
+- React Native: `accessible={true}` on the container `View` groups its children
+  into one element; set `accessibilityLabel` when the joined text needs a
+  separator or a different order
+- SwiftUI: `.accessibilityElement(children: .combine)`
+- UIKit: `isAccessibilityElement = true` on the container, with the pieces
+  joined in its `accessibilityLabel`
+- Jetpack Compose: `Modifier.semantics(mergeDescendants = true) {}`
+
+Group static text only. In React Native and UIKit, a control inside a grouped
+row can no longer be reached on its own. For web content in a `WKWebView` or
+mobile Safari, see the `aria-specialist` reference on flex and grid text runs:
+flex and grid items split a phrase the same way, and white space between them
+is dropped, gluing words together. Confirm with the Xcode Accessibility
+Inspector, which lists the elements VoiceOver stops on.
+
 ---
 
 ## Phase 3: Android-Specific Auditing (Jetpack Compose and Views)
@@ -217,9 +239,9 @@ Each modifier, with purpose and when required.
 | `semantics { role = Role.Button }` | Element type | Custom interactive elements |
 | `semantics { stateDescription = "..." }` | State text | Toggles, checkboxes |
 | `clearAndSetSemantics { ... }` | Replace child semantics | Grouped cards, list items |
-| `semantics { mergeDescendants = true }` | Merge hierarchy | Group text + icon into one node |
-| `semantics { invisibleToUser() }` | Hide decorative | Separators, decorative icons |
-| `semantics { focused = true }` | Force focus | After navigation |
+| `semantics(mergeDescendants = true) { }` | Merge hierarchy | Group text + icon into one node |
+| `semantics { hideFromAccessibility() }` (replaces the deprecated `invisibleToUser()`) | Hide decorative | Separators, decorative icons |
+| `FocusRequester` with `requestFocus()` | Move focus (the `focused` semantics property only reports state) | After navigation |
 | `semantics { liveRegion = LiveRegion.Polite }` | Dynamic content announcements | Status messages, errors |
 
 **Role values:** `Role.Button`, `Role.Checkbox`, `Role.DropdownList`, `Role.Image`, `Role.RadioButton`, `Role.Switch`, `Role.Tab`
