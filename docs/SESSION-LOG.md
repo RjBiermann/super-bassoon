@@ -1032,11 +1032,25 @@ User slice: "work on all the open github issues; triage, plan, design, implement
 - **Central gate:** `check` + `assembleDebug` both apps → BUILD SUCCESSFUL, **332 JVM tests / 0 failures /
   0 errors / 5 planned `LiveSmokeTest` skips**, ktlint+detekt clean; mobile APK 27,643,770 B, TV
   28,064,115 B. Daemons stopped before the build (available 4.6 Gi, `--max-workers=2`, in-process Kotlin).
-- **Device gates NOT run** — the host emulator (`emulator-5554`) is in use by another session; a gate child
-  started installing and was stopped within ~8 tool calls (it had installed the mobile APK, `pm clear`ed
-  `com.rjbiermann.giffyviewer` and brought the app to the foreground; no emulator restart, no data of the
-  other session's app touched). Owed: #65/#66 mobile (creator render with zero sort interaction, default
-  chip, player advance through the catalogue), #64 TV (airplane cold start → error copy → reconnect).
+- **Device gates RUN and PASSED** (emulator free in a follow-up pass): **TV #64** — offline cold start at
+  +50 s shows `Couldn't load Trending` + `Retry` (stable at +91 s/+151 s; old symptom was title-only rows
+  for 4 min 40 s), reconnect recovers in 31 s with zero input (8 real cards), 0 FATAL/0 ANR over ~8.8 k log
+  lines, failure path visible as `append p1 network error` → `HTTP 503 circuit open`. **Mobile #65** —
+  creator feed renders on first open, `user:v2:perkyandpink:p1` = 20 ids, no `:sort=` suffix, `Latest`
+  `checked=true` with an untinted icon (443 px `OnSurfaceVariant`, 0 px `Secondary`), `Oldest` still
+  renders and flips the tint (clean A/B). **Mobile #66** — player appended p2 (20 ids) and p3 (2 ids) while
+  open = all 42, then an empty tail with `nextKey=null` and 8 further swipes producing no new media; no
+  mid-pool stall, pid alive 11 min, dalvik 79.6→82.0 MB. Caveat recorded: the walk ran on the `:sort=oldest`
+  identity (the VM adopts the last chosen sort) and page size is 20, not 40.
+- **#67 filed, then attributed by A/B (new issue, not batch 44):** inline autoplay OOM at the 192 MB cap.
+  Built the pre-batch baseline (`834c3f7e`) APK and ran a 10-cell matrix with the decoder env set: NEW 2/2
+  and OLD 2/2 crash on home chip-switch churn (autoplay ON) with the identical `target footprint 201326592`
+  signature; autoplay OFF is flat 38–41 MB; OLD's creator feed renders no tiles (its non-crash there proves
+  nothing). Verdict: pre-existing player-churn leak, ≈3.5 MB/s live-heap growth on chip switching, which the
+  creator fix merely exposed at <30 MB headroom. Fix is separate work; canonical repro logged in the issue.
+- **Session lesson (emulator):** `systemd` does not run in this container — `systemctl --user
+  set-environment` is a no-op, so the decoder env must be exported in the shell that invokes `emul-start`
+  (verify with `/proc/<qemu>/environ`), and `emul-stop` defaults to `dev` — pass the AVD name when stopping `tv`.
 - **Session lessons:** (a) run the live probe *before* the writers — this one flipped the design's shipping
   constant (`latest` vs omitted param) and killed a wrong #66 theory, at 10 requests total; (b) a
   "deadlock in the auth interceptor" report is worth re-deriving from OkHttp bytecode — the issue's thread

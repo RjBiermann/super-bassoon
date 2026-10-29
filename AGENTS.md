@@ -244,9 +244,23 @@ When unsure: check the matching AGENTS doc first, then ask. Don't invent endpoin
   loads, so the swipe player cannot restart it. The creator trigger is gone (default order `latest`), but a
   strict client filter on any feed can still freeze the player. Shape designed, not built:
   `docs/design/DESIGN-65-66.md` F2/F3 (two-budget walk with an honest `nextKey = null`, `poolEndAction`).
-- Device gates owed: #65/#66 mobile (creator default render with zero sort interaction, player advance
-  through the whole catalogue) and #64 TV (airplane-mode cold start → honest error copy → reconnect
-  recovery). Blocked this batch — the host emulator is shared with another session.
+- Device gates CLOSED 2026-10-23 for #64/#65/#66 (evidence in the issue comments): TV offline cold start
+  reaches `Couldn't load <title>` + Retry at **+50 s** and recovers **31 s** after the network returns with
+  no input (0 FATAL/ANR); mobile creator default renders (`user:v2:perkyandpink:p1` = 20 ids, no `:sort=`
+  suffix), default `Latest` chip with an untinted sort icon, `Oldest` still renders; the player walked all
+  **42** catalogue items with an honest empty tail and no mid-pool stall.
+- #67 OPEN — **pre-existing** inline-autoplay/player-churn OOM at the 192 MB heap (not a batch-44
+  regression: the pre-batch baseline `834c3f7e` dies identically on home chip-switch churn with autoplay
+  ON, while autoplay OFF stays flat at 38–41 MB). Canonical repro = home chips ×3 + scrolls (dies ≤20 s);
+  a static creator feed already parks at ~165/192 MB, which is why opening it right after a warmed home
+  feed tipped it over 4/4. Needs a heap dump on the churn path (player instances / codec surfaces not
+  released on feed swap).
+- Emulator provisioning gaps: `tv.ini` is the API-35 `google_apis` **phone** image (the device #64 was
+  reported on) and `tv36.ini`'s real `android-tv` android-36 image under
+  `/workspaces/sturdy-potato/.android-sdk` is an **incomplete download** (no `system.img`/`ramdisk`/
+  `userdata`), so no ATV-image AVD is bootable here. Also `systemd` does not run in this container, so
+  `systemctl --user set-environment` is a no-op — export the decoder vars in the shell that calls
+  `emul-start` (verified via `/proc/<qemu>/environ`).
 - ~~`FeedViewModel` `pendingForce` mismatch~~ FIXED 2026-10-23 with #65/#66: `setSort` records
   `source.sortForceKey(sort)` = `withSort(sort).keyBase`, the key the gifs flow reads (~:134);
   pinned by `SortForceKeyTest`.
