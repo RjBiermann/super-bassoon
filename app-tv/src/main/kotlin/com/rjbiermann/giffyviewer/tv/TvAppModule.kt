@@ -64,7 +64,7 @@ object TvAppModule {
                 },
                 enableLogging = false,
             )
-        session = AnonymousSession(nc.api)
+        session = AnonymousSession(nc.tokenApi)
         return nc
     }
 

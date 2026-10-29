@@ -38,6 +38,10 @@ data class NetworkComponents(
     val client: OkHttpClient,
     /** #58: same stack minus the retry/breaker path — Coil posters ride this. */
     val imageClient: OkHttpClient,
+    /** #64: own client (own dispatcher, no auth, no retry) — the temp-token fetch rides this. */
+    val tokenClient: OkHttpClient,
+    /** Retrofit over [tokenClient]; [AnonymousSession] must be built from this, never [api]. */
+    val tokenApi: GifsApi,
 )
 
 /**
@@ -52,12 +56,18 @@ data class NetworkComponents(
  * invariant covers media too); it simply has no [RetryInterceptor] — a
  * failed poster load just fails its own image, it never retries into the
  * breaker.
+ *
+ * #64: [NetworkComponents.tokenClient] is deliberately NOT derived from the shared
+ * builder — see [AnonymousSession] for why the token fetch needs its own dispatcher.
+ * [tokenTimeoutMs] bounds that fetch (connect/read/call) instead of the API's
+ * 15s/30s/60s.
  */
 fun buildNetwork(
     baseUrl: String = BASE_URL,
     authToken: suspend () -> String? = { null },
     onUnauthorized: () -> Unit = {},
     enableLogging: Boolean = false,
+    tokenTimeoutMs: Long = 10_000,
 ): NetworkComponents {
     val bus: RateLimitBus =
         kotlinx.coroutines.flow.MutableSharedFlow(replay = 8, extraBufferCapacity = 16)
@@ -105,6 +115,11 @@ fun buildNetwork(
             response
         }
 
+    // ONE identity instance for every client: the anon token is UA-bound
+    // (valid_agent), so the token fetch and the requests using that token must
+    // carry byte-identical UA + X-Session-Id.
+    val identity = BrowserIdentityInterceptor()
+
     // Shared base so the API client and the image client (#58) carry the
     // identical limiter/identity/auth stack — only the retry layer differs.
     fun clientBuilder(): OkHttpClient.Builder =
@@ -116,7 +131,7 @@ fun buildNetwork(
             // path or a stuck connection must never hang a screen silently
             // forever — it degrades into the honest failure states.
             .callTimeout(60, TimeUnit.SECONDS)
-            .addInterceptor(BrowserIdentityInterceptor())
+            .addInterceptor(identity)
             .addInterceptor(authInterceptor)
             .addInterceptor(RateLimitInterceptor(limiter))
             .apply {
@@ -140,11 +155,35 @@ fun buildNetwork(
             ).build()
     val imageClient = clientBuilder().build()
 
+    // #64: the temp-token call must never queue behind the API client's per-host
+    // slots — 5 calls parked in the auth interceptor starved the nested fetch
+    // forever. Own client ⇒ own dispatcher, so it is always dispatched. No auth
+    // interceptor (the re-entrancy guard is structural now) and no
+    // [RetryInterceptor] (a failing token fetch must fail fast, not sit in
+    // 1s/4s/15s backoff while every caller waits on it). Same limiter + identity.
+    val tokenClient =
+        OkHttpClient
+            .Builder()
+            .connectTimeout(tokenTimeoutMs, TimeUnit.MILLISECONDS)
+            .readTimeout(tokenTimeoutMs, TimeUnit.MILLISECONDS)
+            .callTimeout(tokenTimeoutMs, TimeUnit.MILLISECONDS)
+            .addInterceptor(identity)
+            .addInterceptor(RateLimitInterceptor(limiter))
+            .build()
+
     val retrofit =
         Retrofit
             .Builder()
             .baseUrl(baseUrl)
             .client(client)
+            .addConverterFactory(API_JSON.asConverterFactory("application/json".toMediaType()))
+            .build()
+
+    val tokenRetrofit =
+        Retrofit
+            .Builder()
+            .baseUrl(baseUrl)
+            .client(tokenClient)
             .addConverterFactory(API_JSON.asConverterFactory("application/json".toMediaType()))
             .build()
 
@@ -155,5 +194,7 @@ fun buildNetwork(
         bus = bus,
         client = client,
         imageClient = imageClient,
+        tokenClient = tokenClient,
+        tokenApi = tokenRetrofit.create(GifsApi::class.java),
     )
 }

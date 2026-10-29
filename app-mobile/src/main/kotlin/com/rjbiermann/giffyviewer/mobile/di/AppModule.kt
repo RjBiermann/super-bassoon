@@ -61,7 +61,7 @@ object AppModule {
                     }
                 },
             )
-        session = AnonymousSession(nc.api)
+        session = AnonymousSession(nc.tokenApi)
         return nc
     }
 
