@@ -18,7 +18,8 @@ single issue — the gates and evidence rules always apply.
 
 ## 2. Design before code
 
-- One `DESIGN-<stream>.md` per stream: objective, file:line evidence from the current
+- One `docs/design/DESIGN-<issue|stream>.md` per stream (rules + keep-criterion in
+  `docs/design/README.md`): objective, file:line evidence from the current
   code, approach, acceptance conditions, explicit non-goals.
 - Trace the entry point through the layers owning each invariant before editing.
 

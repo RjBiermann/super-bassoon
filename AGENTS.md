@@ -266,4 +266,4 @@ When unsure: check the matching AGENTS doc first, then ask. Don't invent endpoin
   `source.sortForceKey(sort)` = `withSort(sort).keyBase`, the key the gifs flow reads (~:134);
   pinned by `SortForceKeyTest`.
 
-Per-batch session history: docs/SESSION-LOG.md.
+Per-batch session history: docs/SESSION-LOG.md. Design/stream docs: docs/design/ (rules + keep-criterion in `docs/design/README.md` — landed docs with no code citation get deleted, their rules harvested into these AGENTS docs).
