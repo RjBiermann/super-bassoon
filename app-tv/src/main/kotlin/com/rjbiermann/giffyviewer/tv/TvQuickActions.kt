@@ -161,17 +161,20 @@ fun TvQuickActionsDialog(
                 }
                 val first = remember { FocusRequester() }
                 // Re-request per pane swap so a new pane's first row takes focus.
-                LaunchedEffect(view) { first.requestFocus() }
+                // runCatching: a gif with no tags leaves no row attached to the
+                // requester — Compose throws IllegalStateException on requestFocus.
+                LaunchedEffect(view) { runCatching { first.requestFocus() } }
                 // Four panes (AGENTS-APP submenu restructure spec) — in-place
                 // swap; ‹ Back is the last focusable row of each pane.
                 when (view) {
                     "tags" -> {
-                        gif.tags.take(3).forEach { tag ->
+                        gif.tags.take(3).forEachIndexed { i, tag ->
                             val tagState by feedViewModel
                                 .tagState(tag)
                                 .collectAsStateWithLifecycle(initialValue = null)
                             QuickAction(
                                 text = if (tagState == "FAVORITED") "Unfavorite tag “$tag”" else "Favorite tag “$tag”",
+                                first = if (i == 0) first else null,
                                 onClick = {
                                     feedViewModel.toggleFavoriteTag(tag)
                                     onDismiss()
@@ -534,7 +537,7 @@ private fun TvAddToFeedDialog(
             ) {
                 Text("Add to custom feed", style = MaterialTheme.typography.titleMedium)
                 val first = remember { FocusRequester() }
-                LaunchedEffect(Unit) { first.requestFocus() }
+                LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
                 if (customFeeds.isEmpty()) {
                     Text("No custom feeds yet — create one on the phone (“Custom feeds”).")
                 } else {
@@ -560,7 +563,10 @@ private fun TvAddToFeedDialog(
                                     focusedBorder =
                                         Border(BorderStroke(3.dp, MaterialTheme.colorScheme.primary)),
                                 ),
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .then(if (def === customFeeds.first()) Modifier.focusRequester(first) else Modifier),
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 RadioButton(selected = feedId == def.id, onClick = { feedId = def.id })
@@ -628,6 +634,7 @@ private fun TvAddToFeedDialog(
                 val cancelSrc = remember { MutableInteractionSource() }
                 TvButton(
                     text = "Cancel",
+                    first = if (customFeeds.isEmpty()) first else null,
                     onClick = onDismiss,
                     interaction = cancelSrc,
                 )
@@ -655,7 +662,7 @@ private fun TvAddToCollectionDialog(
             ) {
                 Text("Add to a Collection", style = MaterialTheme.typography.titleMedium)
                 val first = remember { FocusRequester() }
-                LaunchedEffect(Unit) { first.requestFocus() }
+                LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
                 if (collections.isEmpty()) {
                     Text("No collections yet — create one in Collections.")
                 } else {
@@ -667,7 +674,13 @@ private fun TvAddToCollectionDialog(
                         )
                     }
                 }
-                QuickAction(text = "Cancel", onClick = onDismiss)
+                // Empty list = nothing to pick: seed focus on Cancel so the D-pad
+                // still enters the dialog (an unattached requester only warns).
+                QuickAction(
+                    text = "Cancel",
+                    first = if (collections.isEmpty()) first else null,
+                    onClick = onDismiss,
+                )
             }
         }
     }
@@ -694,7 +707,7 @@ private fun TvAddToNicheDialog(
             ) {
                 Text("Add Content to a Niche", style = MaterialTheme.typography.titleMedium)
                 val first = remember { FocusRequester() }
-                LaunchedEffect(Unit) { first.requestFocus() }
+                LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
                 if (ordered.isEmpty()) {
                     Text("No joined niches — join niches to add content to them.")
                 } else {
@@ -706,7 +719,11 @@ private fun TvAddToNicheDialog(
                         )
                     }
                 }
-                QuickAction(text = "Cancel", onClick = onDismiss)
+                QuickAction(
+                    text = "Cancel",
+                    first = if (ordered.isEmpty()) first else null,
+                    onClick = onDismiss,
+                )
             }
         }
     }

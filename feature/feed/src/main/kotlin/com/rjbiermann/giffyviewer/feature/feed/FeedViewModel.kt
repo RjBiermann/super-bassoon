@@ -552,8 +552,16 @@ class FeedViewModel
          *  Re-arms the inline preview profile (the knobs FeedScreen's settle
          *  block asserts while attached) and pauses — a parked player decodes
          *  nothing. Null = nothing to park. */
+        @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
         fun returnInlinePlayer(player: com.rjbiermann.giffyviewer.core.player.GiffyPlayer?) {
-            val p = player ?: return
+            // A released player must never be parked: the profile calls below
+            // (pause/volume/speed) throw on a dead ExoPlayer — that is the
+            // teardown path where onCleared() released before the screen disposed.
+            val p = player?.takeIf { !it.isReleased } ?: return
+            // Never overwrite (and orphan) a different parked player: during the
+            // route swap both surfaces can be composed and a second instance is
+            // built — the dropped one would keep decoding against the 192MB heap.
+            inlinePlayer?.let { if (it !== p) it.release() }
             inlinePlayer = p
             p.pause()
             p.volume = 0f

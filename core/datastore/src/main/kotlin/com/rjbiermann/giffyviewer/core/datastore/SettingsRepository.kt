@@ -8,9 +8,11 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.rjbiermann.giffyviewer.core.model.VideoQuality
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -223,28 +225,33 @@ class SettingsRepository
         }
 
         /** Optional PIN app lock (PLAN §6 Phase 6). Null = no lock set.
-         *  Salted SHA-256 — the plaintext PIN never hits storage. */
+         *  Value is a PBKDF2 record (see [PinHash]) — the plaintext never hits
+         *  storage and a leaked hash cannot be exhaustively precomputed. */
         val pinHash: Flow<String?> = dataStore.data.map { it[Keys.PIN_HASH] }
 
         suspend fun setPin(pin: String) {
             require(pin.length >= 4 && pin.all { it.isDigit() }) { "PIN must be 4+ digits" }
-            dataStore.edit { it[Keys.PIN_HASH] = pin.sha256() }
+            // 120k rounds: keep the derivation off the caller's (main) thread.
+            val hashed = withContext(Dispatchers.Default) { PinHash.create(pin) }
+            dataStore.edit { it[Keys.PIN_HASH] = hashed }
         }
 
         suspend fun clearPin() {
             dataStore.edit { it.remove(Keys.PIN_HASH) }
         }
 
-        suspend fun verifyPin(pin: String): Boolean = pinHash.first() == pin.sha256()
+        suspend fun verifyPin(pin: String): Boolean {
+            val stored = pinHash.first() ?: return false
+            val ok = withContext(Dispatchers.Default) { PinHash.verify(pin, stored) }
+            // Silent migration: a legacy single-round hash is replaced by the KDF
+            // record on the first successful unlock (the PIN itself is unchanged).
+            if (ok && PinHash.needsUpgrade(stored)) {
+                val upgraded = withContext(Dispatchers.Default) { PinHash.create(pin) }
+                dataStore.edit { it[Keys.PIN_HASH] = upgraded }
+            }
+            return ok
+        }
     }
-
-private fun String.sha256(): String =
-    java.security.MessageDigest
-        .getInstance("SHA-256")
-        .digest((this + PIN_SALT).toByteArray())
-        .joinToString("") { "%02x".format(it) }
-
-private const val PIN_SALT = "giffy_viewer_pin"
 
 /** §8 range-chip prefs for ONE feed (DataStore-persisted JSON, see SettingsRepository). */
 @kotlinx.serialization.Serializable

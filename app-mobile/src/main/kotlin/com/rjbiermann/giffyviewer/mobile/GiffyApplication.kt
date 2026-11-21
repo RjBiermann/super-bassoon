@@ -2,7 +2,9 @@ package com.rjbiermann.giffyviewer.mobile
 
 import android.app.Application
 import com.rjbiermann.giffyviewer.core.auth.TokenStore
+import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.network.rate.BreakerReconnectReset
+import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -24,6 +26,8 @@ class GiffyApplication : Application() {
     /** Issue #63: keeps the shared circuit breaker honest across reconnects. */
     @Inject lateinit var breakerReconnectReset: BreakerReconnectReset
 
+    @Inject lateinit var db: GiffyDatabase
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
@@ -31,6 +35,13 @@ class GiffyApplication : Application() {
         // Issue #63: offline -> online resets the breaker so the reconnect retry
         // gets a real attempt instead of the synthetic "503 circuit open".
         appScope.launch { breakerReconnectReset.observe() }
+        // TTL sweep (AGENTS-DATABASE): feed pages/gif metadata are TTL-checked on
+        // read but were never deleted, so both tables grew for the process life.
+        appScope.launch {
+            val cutoff = System.currentTimeMillis() - FeedSource.TTL_GIF_METADATA
+            db.feedPageDao().evictStale(cutoff)
+            db.gifDao().evictStale(cutoff)
+        }
         appScope.launch {
             while (isActive) {
                 delay(REFRESH_EVERY_MS)

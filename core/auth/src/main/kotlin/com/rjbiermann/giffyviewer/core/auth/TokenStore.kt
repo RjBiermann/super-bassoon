@@ -67,6 +67,11 @@ class TokenStore(
             .putString(KEY, token)
             .putString(REFRESH_KEY, refreshToken?.trim()?.takeIf { it.isNotEmpty() })
             .apply()
+        // Update the in-memory value synchronously: the SharedPreferences
+        // listener is delivered on the main thread, so a network thread that
+        // refreshes and immediately re-reads would otherwise retry with the
+        // expired token (every hourly id_token expiry 401'd twice).
+        mutableToken.value = token
         return true
     }
 
@@ -80,7 +85,10 @@ class TokenStore(
             .remove(KEY)
             .remove(REFRESH_KEY)
             .apply()
+        mutableToken.value = null
     }
+
+    private val refreshFlight = RefreshFlight()
 
     /**
      * Blocking refresh of the user token (PLAN §2: refresh grant verified, public
@@ -88,12 +96,24 @@ class TokenStore(
      * Mints a fresh ID token from the stored refresh_token and stores it. Returns
      * false (and keeps the old token) when there is no refresh token or the grant
      * fails — caller falls back to anonymous session.
+     *
+     * [staleToken] is the bearer that produced the 401: concurrent failures share
+     * one grant instead of each starting their own (see [RefreshFlight]).
      */
-    fun refreshBlocking(): Boolean {
-        val refreshToken = prefs.getString(REFRESH_KEY, null) ?: return false
-        val bundle = tokenBundle(refreshToken = refreshToken) ?: return false
-        return save(bundle.idToken, bundle.refreshToken ?: refreshToken)
-    }
+    fun refreshBlocking(staleToken: String? = null): Boolean =
+        refreshFlight.run(
+            staleToken = staleToken,
+            currentToken = { prefs.getString(KEY, null) },
+            grant = {
+                val refreshToken = prefs.getString(REFRESH_KEY, null)
+                if (refreshToken == null) {
+                    false
+                } else {
+                    val bundle = tokenBundle(refreshToken = refreshToken)
+                    bundle != null && save(bundle.idToken, bundle.refreshToken ?: refreshToken)
+                }
+            },
+        )
 
     /**
      * Blocking OAuth authorization-code exchange (PKCE, verified live 2026-09-30:
@@ -146,7 +166,15 @@ class TokenStore(
                     .UrlSafe
                     .withPadding(Base64.PaddingOption.ABSENT)
                     .encode(digest)
-            return Pkce(verifier, challenge, verifier.take(16))
+            return Pkce(verifier, challenge, newState())
+        }
+
+        /** OAuth anti-CSRF nonce: independent of the PKCE verifier (RFC 7636 keeps
+         *  them secret and unrelated; the state is echoed in URLs/WebView history). */
+        private fun newState(): String {
+            val bytes = ByteArray(8)
+            java.security.SecureRandom().nextBytes(bytes)
+            return bytes.joinToString("") { "%02x".format(it) }
         }
 
         /**

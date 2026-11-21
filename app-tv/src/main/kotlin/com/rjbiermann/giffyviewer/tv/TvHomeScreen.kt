@@ -86,6 +86,10 @@ fun TvHomeScreen(
     playerFactory: com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory? = null,
     dataSaver: Boolean = false,
     homeViewModel: TvHomeViewModel,
+    /** ACTIVITY-scoped FeedViewModel (AGENTS-APP §3.3/§4.2): quick-action writes
+     *  must ride the same instance the feed/player screens use — acquiring it
+     *  inside a destination would silently scope it to the NavBackStackEntry. */
+    feedViewModel: com.rjbiermann.giffyviewer.feature.feed.FeedViewModel,
     /** Hoisted at TvMainActivity Root so BACK from a player/full feed keeps
      *  scroll position (branch swaps otherwise discard remember-ed states). */
     listState: androidx.compose.foundation.lazy.LazyListState =
@@ -314,9 +318,7 @@ fun TvHomeScreen(
     }
 
     actionsFor?.let { gif ->
-        val quickVm: com.rjbiermann.giffyviewer.feature.feed.FeedViewModel =
-            androidx.hilt.navigation.compose
-                .hiltViewModel()
+        val quickVm: com.rjbiermann.giffyviewer.feature.feed.FeedViewModel = feedViewModel
         TvQuickActionsDialog(
             gif = gif,
             feedViewModel = quickVm,
@@ -864,6 +866,13 @@ internal fun GifCard(
                             }
                         },
                         modifier = Modifier.matchParentSize(),
+                        // Detach on leave: a PlayerView that is dropped while
+                        // still holding the shared preview player keeps a
+                        // complete surface/renderer graph alive per settle
+                        // (same leak class TvPlayerScreen fixes for its own).
+                        onRelease = { view ->
+                            (view as androidx.media3.ui.PlayerView).player = null
+                        },
                     )
                 }
                 // Audio-know-before-tap badge — mobile-tile parity (unified UI).

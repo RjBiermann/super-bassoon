@@ -61,6 +61,17 @@ class FakeContentPrefsDao : ContentPrefsDao {
 
     override fun hideCount(weekStart: Long): Flow<Int?> = MutableStateFlow(hideCounts[weekStart])
 
+    override suspend fun insertHideCountRow(weekStart: Long) {
+        hideCounts.putIfAbsent(weekStart, 0)
+    }
+
+    override suspend fun incrementHideCount(
+        weekStart: Long,
+        delta: Int,
+    ) {
+        hideCounts[weekStart] = (hideCounts[weekStart] ?: 0) + delta
+    }
+
     override suspend fun addHideCount(
         weekStart: Long,
         delta: Int,

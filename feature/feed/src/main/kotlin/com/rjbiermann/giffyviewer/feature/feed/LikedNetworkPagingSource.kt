@@ -66,7 +66,7 @@ class LikedNetworkPagingSource(
                     }
                 gifs =
                     dto.gifs
-                        .map { it.toModel() }
+                        .mapNotNull { it.toModel() }
                         // SLICE-15 session dedup FIRST — a re-listed id must not
                         // survive the filters just because it passes them.
                         .filter { seenIds.add(it.id) }

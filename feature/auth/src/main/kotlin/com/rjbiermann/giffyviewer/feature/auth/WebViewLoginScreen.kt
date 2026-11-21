@@ -93,6 +93,13 @@ fun WebViewLoginScreen(
                             loadUrl(TokenStore.authorizeUrl(pkce))
                         }.also { webView = it }
                 },
+                // A WebView that is never destroyed keeps its page, timers and
+                // render surfaces alive for the process (heap churn on every
+                // cancelled/completed login).
+                onRelease = { view ->
+                    view.stopLoading()
+                    view.destroy()
+                },
             )
             Text(
                 text = "Sign in here — the app captures it automatically",

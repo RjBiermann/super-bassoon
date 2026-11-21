@@ -2,6 +2,7 @@ package com.rjbiermann.giffyviewer.core.database
 
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -98,13 +99,31 @@ class ContentPrefsBackupVersionTest {
         }
 
     @Test
-    fun `parseDataSaver reads the flag`() {
-        assertTrue(ContentPrefsBackup.parseDataSaver("""{"format":"giffy-prefs","version":3,"dataSaver":true}"""))
-        assertTrue(
-            "defaults apply when the flag is absent",
-            !ContentPrefsBackup.parseDataSaver("""{"format":"giffy-prefs","version":3}"""),
+    fun `parseDataSaver reads the flag and reports an absent one as unknown`() {
+        assertTrue(ContentPrefsBackup.parseDataSaver("""{"format":"giffy-prefs","version":3,"dataSaver":true}""") == true)
+        assertTrue(ContentPrefsBackup.parseDataSaver("""{"format":"giffy-prefs","version":3,"dataSaver":false}""") == false)
+        assertNull(
+            "an absent flag must not force the target's setting off",
+            ContentPrefsBackup.parseDataSaver("""{"format":"giffy-prefs","version":3}"""),
         )
     }
+
+    @Test
+    fun `import keeps a different local feed that shares the exported id`() =
+        runTest {
+            val cfd = FakeCustomFeedDao()
+            cfd.upsert(CustomFeedEntity(1, "Local mix", "tag:local", 5, "FAVORITED"))
+            val json =
+                """{"format":"giffy-prefs","version":3,
+               "customFeeds":[{"id":1,"name":"Other device","sourcesJson":"tag:other","createdAt":1,"state":"NEUTRAL"}]}"""
+            ContentPrefsBackup.import(FakeContentPrefsDao(), json, cfd)
+            // The colliding id belongs to an unrelated local definition — it must
+            // survive, and the imported feed joins under a fresh id.
+            assertEquals("Local mix", cfd.feeds[1]!!.name)
+            assertEquals("tag:local", cfd.feeds[1]!!.sourcesJson)
+            assertTrue(cfd.feeds.values.any { it.name == "Other device" })
+            assertEquals(2, cfd.feeds.size)
+        }
 
     @Test
     fun `import with no sections restores zero entries and touches nothing`() =

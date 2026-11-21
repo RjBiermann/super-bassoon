@@ -30,7 +30,7 @@ class LiveSmokeTest {
             val search = net.api.search(searchText = "nature", count = 10)
             assertTrue(search.gifs.isNotEmpty())
 
-            val gif = search.gifs.first().toModel()
+            val gif = requireNotNull(search.gifs.first().toModel())
             assertTrue(gif.id.isNotBlank())
             assertTrue(gif.width > 0)
 

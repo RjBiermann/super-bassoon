@@ -24,6 +24,11 @@ interface GifDao {
 
     @Query("SELECT COUNT(*) FROM gifs")
     fun countFlow(): Flow<Int>
+
+    /** TTL sweep (cold start): gif metadata past the 24h spec TTL. Safe because a
+     *  live feed page re-upserts its own rows on every fetch. */
+    @Query("DELETE FROM gifs WHERE fetchedAt < :olderThan")
+    suspend fun evictStale(olderThan: Long)
 }
 
 @Dao
@@ -75,6 +80,14 @@ interface SearchHistoryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun add(entry: SearchHistoryEntity)
 
+    /** Record a submitted query once: re-searching a term must not append a
+     *  duplicate recent row (the table has no unique index on query). */
+    @Transaction
+    suspend fun record(entry: SearchHistoryEntity) {
+        remove(entry.query)
+        add(entry)
+    }
+
     @Query("SELECT * FROM search_history ORDER BY searchedAt DESC LIMIT :limit")
     fun recent(limit: Int): Flow<List<SearchHistoryEntity>>
 
@@ -110,8 +123,16 @@ interface TagDao {
 
 @Dao
 interface LikedIdsDao {
+    /** Replace the mirror with exactly [items]: `/v2/likes` is the truth, so an
+     *  id missing from it was unliked elsewhere (an upsert merge kept it stale). */
+    @Transaction
+    suspend fun replaceAll(items: List<LikedIdsEntity>) {
+        clear()
+        upsertAll(items)
+    }
+
     @Upsert
-    suspend fun replaceAll(items: List<LikedIdsEntity>)
+    suspend fun upsertAll(items: List<LikedIdsEntity>)
 
     @Query("SELECT * FROM liked_ids ORDER BY syncedAt DESC")
     fun allFlow(): Flow<List<LikedIdsEntity>>
@@ -198,13 +219,27 @@ interface ContentPrefsDao {
     fun hideCount(weekStart: Long): Flow<Int?>
 
     @Query(
-        "INSERT INTO hide_counts(weekStart, count) VALUES(:weekStart, :delta) " +
-            "ON CONFLICT(weekStart) DO UPDATE SET count = count + :delta",
+        "INSERT OR IGNORE INTO hide_counts(weekStart, count) VALUES(:weekStart, 0)",
     )
-    suspend fun addHideCount(
+    suspend fun insertHideCountRow(weekStart: Long)
+
+    @Query("UPDATE hide_counts SET count = count + :delta WHERE weekStart = :weekStart")
+    suspend fun incrementHideCount(
         weekStart: Long,
         delta: Int,
     )
+
+    /** Bump the 7-day counter. Two plain statements instead of an upsert:
+     *  `INSERT … ON CONFLICT` needs SQLite 3.24 (API 29+) while minSdk is 24,
+     *  and the syntax error surfaced as a failed page load on API 24-28. */
+    @Transaction
+    suspend fun addHideCount(
+        weekStart: Long,
+        delta: Int,
+    ) {
+        insertHideCountRow(weekStart)
+        incrementHideCount(weekStart, delta)
+    }
 }
 
 @Dao

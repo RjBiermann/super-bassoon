@@ -203,7 +203,7 @@ class SettingsViewModel
         suspend fun importJson(json: String): Result<Int> =
             runCatching {
                 val count = ContentPrefsBackup.import(dao, json, db.customFeedDao())
-                settings.setDataSaver(ContentPrefsBackup.parseDataSaver(json))
+                ContentPrefsBackup.parseDataSaver(json)?.let { settings.setDataSaver(it) }
                 // Restored FAVORITED creator rows change the favorites set — the
                 // same Favorites-cache invalidation as every other toggler.
                 feedRepository.evictFavoritesCache()

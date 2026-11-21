@@ -28,8 +28,18 @@ class GiffyCollapseState {
     var offsetPx by mutableIntStateOf(0)
         private set
 
-    /** Total movable height (bar + extra rows). Set by GiffyScaffold measure. */
-    internal var totalPx by mutableIntStateOf(0)
+    /** Total movable height (bar + extra rows). Set by GiffyScaffold measure.
+     *  A shrinking header must not leave a stale offset beyond the new height
+     *  (offline banner gone / rotation / row set change) — that draws the
+     *  content up past the header and leaves a blank band. */
+    internal var totalPx: Int
+        get() = totalPxState.intValue
+        set(value) {
+            totalPxState.intValue = value
+            if (offsetPx > value) offsetPx = value.coerceAtLeast(0)
+        }
+
+    private var totalPxState = mutableIntStateOf(0)
 
     /** Reset on source/tab changes (a fresh entry's grid starts at top). */
     fun reset() {

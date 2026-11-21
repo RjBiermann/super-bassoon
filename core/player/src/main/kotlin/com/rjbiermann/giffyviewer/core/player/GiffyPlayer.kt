@@ -41,7 +41,16 @@ class GiffyPlayer internal constructor(
         resumeMs: Long = 0L,
         videoQuality: String = VideoQuality.AUTO,
     ) {
-        val url = gif.qualityStreamUrl(dataSaver, videoQuality) ?: return
+        val url = gif.qualityStreamUrl(dataSaver, videoQuality)
+        if (url == null) {
+            // No playable rendition (modeled state). Flip the id so surfaces
+            // stop claiming the previous gif, and clear its frames so the
+            // poster plane shows instead of the last tile's video.
+            mutableCurrentGifId.value = gif.id
+            player.stop()
+            player.clearMediaItems()
+            return
+        }
         mutableCurrentGifId.value = gif.id
         val item =
             MediaItem
@@ -88,7 +97,12 @@ class GiffyPlayer internal constructor(
     }
 
     override fun release() {
+        // Idempotent (ExoPlayer.isReleased is the delegate's own flag): the VM
+        // releases on clear AND the screen parks on dispose — a second pass must
+        // not touch the dead player (pause/volume/speed on it throws).
+        if (isReleased) return
         preloaded.forEach { preloadManager.remove(it) }
+        preloaded = emptyList()
         preloadManager.release()
         player.release()
     }

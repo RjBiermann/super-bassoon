@@ -479,8 +479,17 @@ fun TvPlayerScreen(
                             contentColor = MaterialTheme.colorScheme.onSurface,
                             interaction = skipInteraction,
                             onClick = {
-                                playError = false
-                                if (index < gifs.size - 1) index++
+                                // Clear the error only when actually advancing:
+                                // on the last gif nothing re-triggers playGif
+                                // (the effect is keyed on gif.id), so clearing
+                                // it here would leave a dead player with no
+                                // overlay and no retry affordance.
+                                if (index < gifs.size - 1) {
+                                    playError = false
+                                    index++
+                                } else {
+                                    endDialog = true
+                                }
                             },
                         )
                     }
@@ -503,10 +512,13 @@ fun TvPlayerScreen(
             // → 3s fade; hidden cluster (incl. pills) leaves composition so
             // no invisible focus targets (player body focus is restored by
             // the LaunchedEffect(controlsVisible) above).
-            LaunchedEffect(gif.id, controlsVisible) {
-                if (controlsVisible && player.playbackState != Player.STATE_ENDED) {
+            LaunchedEffect(gif.id, controlsVisible, seekFlash) {
+                // AGENTS-APP auto-hide: fade only while PLAYING and not seeking.
+                // The old check read STATE_ENDED once, so a paused video lost its
+                // creator/description cluster after 3s; re-checked after the grace.
+                if (controlsVisible && seekFlash == null && player.isPlaying) {
                     kotlinx.coroutines.delay(3_000)
-                    controlsVisible = false
+                    if (seekFlash == null && player.isPlaying) controlsVisible = false
                 }
             }
             androidx.compose.animation.AnimatedVisibility(visible = controlsVisible) {

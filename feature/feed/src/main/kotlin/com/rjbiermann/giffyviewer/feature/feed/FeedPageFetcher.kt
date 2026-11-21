@@ -71,7 +71,7 @@ class FeedPageFetcher(
             return false
         }
         val dto = fetch(page, plan)
-        val gifs = dto.gifs.map { it.toModel().toEntity(now()) }
+        val gifs = dto.gifs.mapNotNull { it.toModel()?.toEntity(now()) }
         if (plan != null && gifs.isEmpty() && plan.usernames.isEmpty()) {
             // Nothing favorited → don't pin an empty "no favorites" row (§5).
             return false

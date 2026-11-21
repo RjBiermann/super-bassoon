@@ -48,12 +48,12 @@ object AppModule {
         val nc =
             buildNetwork(
                 authToken = { tokenStore.tokenOrNull() ?: session?.token() },
-                onUnauthorized = {
+                onUnauthorized = { staleToken ->
                     // Silent refresh first; if the grant is dead (revoked/expired
                     // family), CLEAR the stale user token (PLAN §2: refresh fails
                     // → clear state) so browsing falls back to the anonymous
                     // session instead of 401-looping forever.
-                    if (!tokenStore.refreshBlocking()) {
+                    if (!tokenStore.refreshBlocking(staleToken)) {
                         tokenStore.clear()
                         session?.invalidate()
                     } else {

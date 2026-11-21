@@ -218,7 +218,7 @@ class TvMainActivity : ComponentActivity() {
         val quickVm: FeedViewModel = hiltViewModel()
         NavHost(navController, startDestination = TvHome) {
             composable<TvHome> {
-                TvHomeDestination(navController)
+                TvHomeDestination(navController, quickVm)
             }
             composable<TvFeed>(
                 typeMap = mapOf(typeOf<FeedSource>() to feedSourceNavType),
@@ -359,7 +359,10 @@ class TvMainActivity : ComponentActivity() {
      *  and Player entries cover (emphasis: home row D-pad focus restore §4.3
      *  uses (rowTitle, itemIndex) saveables; blank row = fresh entry). */
     @Composable
-    private fun TvHomeDestination(navController: NavHostController) {
+    private fun TvHomeDestination(
+        navController: NavHostController,
+        quickVm: FeedViewModel,
+    ) {
         // §9 TV horizontal pills — pinned niches parse from DataStore refs.
         val pinnedNiches by settings.pinnedNiches.collectAsStateWithLifecycle(initialValue = emptySet())
         val pinnedCreators by settings.pinnedCreators.collectAsStateWithLifecycle(initialValue = emptySet())
@@ -504,6 +507,7 @@ class TvMainActivity : ComponentActivity() {
                 playerFactory = playerFactory,
                 dataSaver = dataSaver,
                 homeViewModel = hiltViewModel(),
+                feedViewModel = quickVm,
                 focusRow = focusRow,
                 focusItem = focusItem,
                 onFocusSaved = { row, item ->

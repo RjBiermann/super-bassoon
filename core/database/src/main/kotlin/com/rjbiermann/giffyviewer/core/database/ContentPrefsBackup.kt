@@ -46,7 +46,10 @@ object ContentPrefsBackup {
     data class Backup(
         val format: String = "giffy-prefs",
         val version: Int = 3,
-        val dataSaver: Boolean = false,
+        /** Null = the source never recorded it (v1/v2 backups, or `false`
+         *  omitted by encodeDefaults=false) — import must then leave the
+         *  target's own setting alone instead of forcing `false`. */
+        val dataSaver: Boolean? = null,
         val creatorPrefs: List<CreatorPref> = emptyList(),
         val tagPrefs: List<TagPref> = emptyList(),
         val keywordBlocks: List<KeywordBlock> = emptyList(),
@@ -97,11 +100,16 @@ object ContentPrefsBackup {
         backup.keywordBlocks.forEach { dao.blockKeyword(KeywordBlockEntity(it.pattern, it.blockedAt)) }
         customFeedDao?.let { cfd ->
             backup.customFeeds.forEach {
+                // Preserve the exported id only when it is free or already this
+                // same definition (same sources = same feed, so a rename/re-state
+                // updates in place). A different definition on that id is an
+                // unrelated local feed from another device — upserting it would
+                // REPLACE and silently destroy it, so it joins under a fresh id.
+                val existing = cfd.byId(it.id)
+                val sameDefinition = existing == null || existing.sourcesJson == it.sourcesJson
                 cfd.upsert(
                     CustomFeedEntity(
-                        // preserve the export's id so existing custom-feed chips/
-                        // cache keys keep pointing at the same definition
-                        id = it.id,
+                        id = if (sameDefinition) it.id else 0,
                         name = it.name,
                         sourcesJson = it.sourcesJson,
                         createdAt = it.createdAt,
@@ -113,5 +121,5 @@ object ContentPrefsBackup {
         return backup.creatorPrefs.size + backup.tagPrefs.size + backup.keywordBlocks.size + backup.customFeeds.size
     }
 
-    fun parseDataSaver(backupJson: String): Boolean = json.decodeFromString<Backup>(backupJson).dataSaver
+    fun parseDataSaver(backupJson: String): Boolean? = json.decodeFromString<Backup>(backupJson).dataSaver
 }

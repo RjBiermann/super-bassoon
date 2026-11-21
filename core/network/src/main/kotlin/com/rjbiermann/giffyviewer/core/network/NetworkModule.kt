@@ -65,7 +65,8 @@ data class NetworkComponents(
 fun buildNetwork(
     baseUrl: String = BASE_URL,
     authToken: suspend () -> String? = { null },
-    onUnauthorized: () -> Unit = {},
+    /** Called with the bearer that 401'd, before the single retry. */
+    onUnauthorized: (staleToken: String?) -> Unit = {},
     enableLogging: Boolean = false,
     tokenTimeoutMs: Long = 10_000,
 ): NetworkComponents {
@@ -100,13 +101,13 @@ fun buildNetwork(
             // Bearer went stale or raced the token fetch → refresh once and retry.
             // Single retry; a second 401 surfaces to the caller as-is.
             if (response.code == 401 && !token.isNullOrBlank()) {
-                response.close()
-                onUnauthorized()
+                onUnauthorized(token)
                 val retryToken = kotlinx.coroutines.runBlocking { authToken() }
+                // Only a CHANGED token can succeed — retrying the identical
+                // bearer just burns a rate slot on a guaranteed second 401.
                 if (retryToken != null && retryToken != token) {
+                    response.close()
                     response = chain.proceed(authed(request, retryToken))
-                } else {
-                    response = chain.proceed(authed(request, token))
                 }
             }
             if (response.code == 401) {

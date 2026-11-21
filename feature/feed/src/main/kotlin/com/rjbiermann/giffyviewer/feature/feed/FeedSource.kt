@@ -145,6 +145,10 @@ sealed interface FeedSource {
     companion object {
         const val TTL_TRENDING = 10 * 60_000L
         const val TTL_SEARCH = 60 * 60_000L
+
+        /** gif metadata TTL (AGENTS-DATABASE): rows older than this are evicted on
+         *  cold start (pages re-upsert their gifs, so live pages never lose rows). */
+        const val TTL_GIF_METADATA = 24 * 60 * 60_000L
     }
 }
 

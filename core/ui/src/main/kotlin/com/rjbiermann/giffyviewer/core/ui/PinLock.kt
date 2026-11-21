@@ -49,12 +49,19 @@ fun PinLockScreen(
     var entry by remember { mutableStateOf("") }
     var wrong by remember { mutableStateOf(false) }
     var fails by remember { mutableIntStateOf(0) }
+    // A guess is in flight: the keypad must not accept the next one. Without
+    // this, ⌫ on a full entry + one digit re-verifies instantly, so the
+    // 3-fails/15s penalty below never actually throttled anything (no brute
+    // force against the 4-digit space).
+    var verifying by remember { mutableStateOf(false) }
     val firstKey = remember { FocusRequester() }
     val haptics = LocalHapticFeedback.current
 
     LaunchedEffect(Unit) { firstKey.requestFocus() }
 
     fun verify(pin: String) {
+        verifying = true
+        entry = "" // cleared now, not after the penalty — nothing left to edit
         scope.launch {
             val ok = verifyPin(pin)
             if (ok) {
@@ -64,14 +71,14 @@ fun PinLockScreen(
                 wrong = true
                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 kotlinx.coroutines.delay(if (fails >= 3) 15_000L else 400L)
-                entry = ""
                 wrong = false
+                verifying = false
             }
         }
     }
 
     fun onDigit(d: Char) {
-        if (entry.length >= 4) return
+        if (verifying || entry.length >= 4) return
         entry += d
         if (entry.length == 4) verify(entry)
     }
@@ -129,6 +136,7 @@ fun PinLockScreen(
                         onClick = {
                             haptics.performHapticFeedback(HapticFeedbackType.KeyboardTap)
                             when {
+                                verifying -> Unit
                                 key == '⌫' -> if (entry.isNotEmpty()) entry = entry.dropLast(1)
                                 // ✓ = submit now (audit: dead key); a 4th digit
                                 // still auto-fires the same verify.

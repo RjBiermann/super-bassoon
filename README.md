@@ -57,7 +57,7 @@ see `.github/workflows/release.yml`.
 :core:auth :core:database    token storage (EncryptedSharedPreferences), Room cache
 :core:datastore :core:player DataStore prefs, ExoPlayer + SimpleCache
 :core:ui                     shared theme, player surface, common components
-:feature:feed :feature:search :feature:favorites
+:feature:feed :feature:search
 :feature:auth :feature:settings
 ```
 

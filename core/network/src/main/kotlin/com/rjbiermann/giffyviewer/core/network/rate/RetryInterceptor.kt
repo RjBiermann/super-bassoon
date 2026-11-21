@@ -61,8 +61,7 @@ class RetryInterceptor(
                                 .header("Retry-After")
                                 ?.toLongOrNull()
                                 ?.times(1_000) ?: DEFAULT_RETRY_AFTER_MS
-                        val clamped = retryAfterMs.coerceIn(MIN_COOLDOWN_MS, retryAfterMs + MAX_COOLDOWN_EXTRA_MS)
-                        limiter.startCooldown(retryAfterMs)
+                        val clamped = limiter.startCooldown(retryAfterMs)
                         throttleMs = clamped
                         bus.publish(
                             RateLimitEvent.CoolingDown(
@@ -104,8 +103,6 @@ class RetryInterceptor(
 
     companion object {
         private const val DEFAULT_RETRY_AFTER_MS = 5_000L
-        private const val MIN_COOLDOWN_MS = 5_000L
-        private const val MAX_COOLDOWN_EXTRA_MS = 30_000L
 
         private fun Random.jittered(base: Long): Long = (base * (0.5 + nextDouble() * 0.5)).toLong().coerceAtLeast(1)
     }

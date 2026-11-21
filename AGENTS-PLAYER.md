@@ -14,6 +14,11 @@ Media3/ExoPlayer + SimpleCache (cache-first rules formerly PLAN.md §5).
   go stale while metadata stays useful. On player 403/fatal-load-error: re-fetch
   `GET /v2/gifs/{id}` (rate-limited), upsert the fresh row, retry playback ONCE;
   still failing → player error state. Never refresh URLs speculatively (rate-limit invariant).
+  **Unbuilt — endpoint unreachable for this client (2026-11-21):** that endpoint answers
+  `400 "Origin is not allowed to make this request"` through the app's own stack for BOTH the
+  anonymous temp token and a signed-in user token (feeds 200 with the same token/headers),
+  with Origin/Referer variants identical and `/v2/gifs/{id}/` + `?id=` 404ing. Do not ship a
+  refetch against it; re-probe only if the endpoint's behavior changes.
 - **HLS→MP4 fallback:** player tries HLS first; on manifest/load failure fall back
   to the direct MP4 rendition (`urls.hd`/`urls.sd`) before surfacing the error —
   `hls: true` is per-gif, not guaranteed on every item.

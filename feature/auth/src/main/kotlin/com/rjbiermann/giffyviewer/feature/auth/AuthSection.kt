@@ -34,6 +34,7 @@ fun AuthSection(
 ) {
     val token by viewModel.token.collectAsStateWithLifecycle()
     val username by viewModel.username.collectAsStateWithLifecycle()
+    val loginFailed by viewModel.loginFailed.collectAsStateWithLifecycle()
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -49,6 +50,14 @@ fun AuthSection(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(24.dp))
+            if (loginFailed) {
+                Text(
+                    "Sign-in failed — try again",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                Spacer(Modifier.height(8.dp))
+            }
             Button(
                 onClick = { onOpenWebView(viewModel.currentPkce()) },
                 modifier = firstButtonModifier.fillMaxWidth(),

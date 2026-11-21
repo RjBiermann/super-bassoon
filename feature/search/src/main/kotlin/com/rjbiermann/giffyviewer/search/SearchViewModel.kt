@@ -104,7 +104,7 @@ class SearchViewModel
             val q = raw.trim()
             if (q.isEmpty()) return null
             viewModelScope.launch {
-                db.searchHistoryDao().add(SearchHistoryEntity(query = q, searchedAt = System.currentTimeMillis()))
+                db.searchHistoryDao().record(SearchHistoryEntity(query = q, searchedAt = System.currentTimeMillis()))
                 db.searchHistoryDao().trim(HISTORY_CAP)
             }
             query.value = ""
@@ -183,7 +183,7 @@ class SearchViewModel
                                             _creatorPreviews.value,
                                             q,
                                             dto.gifs
-                                                .map { it.toModel() }
+                                                .mapNotNull { it.toModel() }
                                                 .distinctBy { it.userName }
                                                 .filter { filter.allow(it.userName, it.tags, it.description) },
                                         )

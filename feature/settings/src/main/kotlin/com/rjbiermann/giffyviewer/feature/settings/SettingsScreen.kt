@@ -64,7 +64,9 @@ import com.rjbiermann.giffyviewer.core.ui.giffyFocus
 import com.rjbiermann.giffyviewer.feature.auth.AuthSection
 import com.rjbiermann.giffyviewer.feature.auth.AuthViewModel
 import com.rjbiermann.giffyviewer.feature.auth.WebViewLoginScreen
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Issue #17: Settings organized into sub-pages, all in-screen (no NavHost).
@@ -120,9 +122,13 @@ fun SettingsScreen(
             if (uri != null) {
                 scope.launch {
                     runCatching {
-                        context.contentResolver.openOutputStream(uri)?.use {
-                            it.write(viewModel.exportJson().toByteArray())
-                        } ?: throw IllegalStateException()
+                        // The SAF resolver read is blocking disk I/O — keep it off
+                        // the Main dispatcher (scope.launch defaults to it).
+                        withContext(Dispatchers.IO) {
+                            context.contentResolver.openOutputStream(uri)?.use {
+                                it.write(viewModel.exportJson().toByteArray())
+                            } ?: throw IllegalStateException()
+                        }
                     }.fold(
                         onSuccess = { snackbarHostState.showSnackbar("Preferences exported") },
                         onFailure = { snackbarHostState.showSnackbar("Export failed") },
@@ -138,9 +144,11 @@ fun SettingsScreen(
                 scope.launch {
                     runCatching {
                         val json =
-                            context.contentResolver.openInputStream(uri)?.use {
-                                it.readBytes().decodeToString()
-                            } ?: throw IllegalStateException()
+                            withContext(Dispatchers.IO) {
+                                context.contentResolver.openInputStream(uri)?.use {
+                                    it.readBytes().decodeToString()
+                                } ?: throw IllegalStateException()
+                            }
                         viewModel.importJson(json)
                     }.fold(
                         onSuccess = { result ->

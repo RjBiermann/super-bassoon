@@ -30,6 +30,8 @@ import org.junit.Test
  */
 class FeedWalkTest {
     private class FakeGifDao : GifDao {
+        override suspend fun evictStale(olderThan: Long) = Unit
+
         override suspend fun upsertAll(gifs: List<GifEntity>) = Unit
 
         override suspend fun byIds(ids: List<String>): List<GifEntity> = emptyList()
@@ -144,7 +146,7 @@ class FeedWalkTest {
                     maxHops = MAX_WALK_HOPS,
                     pageFor = { pageFor(api, pageDao, it) },
                     nextKeyOf = { entity -> entity?.nextPageKey?.let { pageNumber(it) } },
-                    gifsOf = { _, entity -> entity?.gifIds?.map { gifDtoShell(it, "some.creator").toModel() } ?: emptyList() },
+                    gifsOf = { _, entity -> entity?.gifIds?.mapNotNull { gifDtoShell(it, "some.creator").toModel() } ?: emptyList() },
                 )
 
             assertEquals(listOf("a", "b"), walked.gifs.map { it.id })

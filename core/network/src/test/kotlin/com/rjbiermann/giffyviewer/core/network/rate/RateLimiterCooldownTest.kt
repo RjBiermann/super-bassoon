@@ -102,6 +102,22 @@ class RateLimiterCooldownTest {
         }
 
     @Test
+    fun `negative retry-after clamps to the minimum instead of throwing`() =
+        runTest {
+            var virtualNow = 0L
+            val limiter =
+                RollingWindowRateLimiter(now = { virtualNow }, delayFn = { virtualNow += it })
+
+            // A hostile/buggy "-40" Retry-After: the old clamp range inverted
+            // (max = retryAfter + 30s < min 5s) and coerceIn threw — out of the
+            // interceptor chain, past OkHttp's IOException-only handling.
+            val clamped = limiter.startCooldown(retryAfterMs = -40_000, nowMs = 0)
+            assertEquals("negative Retry-After falls back to the 5s floor", 5_000L, clamped)
+            limiter.acquireSlot()
+            assertEquals(5_000L, virtualNow)
+        }
+
+    @Test
     fun `cooldown at a virtual future time still waits from the later now`() =
         runTest {
             var virtualNow = 0L

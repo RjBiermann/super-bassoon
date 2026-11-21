@@ -108,29 +108,35 @@ data class TemporaryTokenDto(
     val expiry_date: Long? = null,
 )
 
-/** Live payload maps niches as objects {id, name}; tags are plain strings. */
-fun GifDtoShell.toModel(): Gif =
-    Gif(
-        id = id,
-        userName = userName.orEmpty(),
-        description = description,
-        tags = tags,
-        likes = likes,
-        views = views,
-        durationSeconds = duration,
-        hasAudio = hasAudio,
-        width = width,
-        height = height,
-        createDateEpoch = createDate,
-        published = published,
-        avgColor = avgColor.orEmpty(),
-        sdUrl = urls?.sd,
-        hdUrl = urls?.hd,
-        posterUrl = urls?.poster,
-        niches = niches.mapNotNull { it.toNicheRef() },
-        verified = verified,
-    )
+/** Live payload maps niches as objects {id, name}; tags are plain strings.
+ *  `promoted: true` items are paid placements (no-ads rule, stage 0 of the
+ *  content pipeline): they never become a [Gif], so no surface can render them. */
+fun GifDtoShell.toModel(): Gif? =
+    if (promoted == true) {
+        null
+    } else {
+        Gif(
+            id = id,
+            userName = userName.orEmpty(),
+            description = description,
+            tags = tags,
+            likes = likes,
+            views = views,
+            durationSeconds = duration,
+            hasAudio = hasAudio,
+            width = width,
+            height = height,
+            createDateEpoch = createDate,
+            published = published,
+            avgColor = avgColor.orEmpty(),
+            sdUrl = urls?.sd,
+            hdUrl = urls?.hd,
+            posterUrl = urls?.poster,
+            niches = niches.mapNotNull { it.toNicheRef() },
+            verified = verified,
+        )
+    }
 
-fun GifsPageDto.toModels(): List<Gif> = gifs.map { it.toModel() }
+fun GifsPageDto.toModels(): List<Gif> = gifs.mapNotNull { it.toModel() }
 
 private fun NicheRefDto.toNicheRef(): NicheRef? = id?.let { id -> NicheRef(id, name ?: id) }

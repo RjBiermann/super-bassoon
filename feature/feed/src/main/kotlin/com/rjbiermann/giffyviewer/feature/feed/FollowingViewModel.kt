@@ -38,17 +38,23 @@ class FollowingViewModel
             if (!loggedIn) return
             viewModelScope.launch {
                 // 269 follows → 3 pages of 100; fetch all (read-only, rate-limited).
-                var page = 1
+                // Collected then REPLACED: a second refresh (Retry is reachable
+                // whenever the niches call fails) must not append the same
+                // creators again — the rows are keyed by username, so duplicates
+                // crash the LazyColumn with "Key … was already used".
                 _loadFailed.value = false
+                var page = 1
+                val collected = mutableListOf<com.rjbiermann.giffyviewer.core.network.CreatorSearchItemDto>()
                 val creatorsOk =
                     runCatching {
                         while (true) {
                             val dto = api.followingCreators(page = page)
-                            _creators.value = _creators.value + dto.items
+                            collected += dto.items
                             if (page >= dto.pages) break
                             page++
                         }
                     }.isSuccess
+                if (creatorsOk) _creators.value = collected.distinctBy { it.username }
                 val nichesOk =
                     runCatching { api.followedNiches() }
                         .onSuccess { _niches.value = it.niches }

@@ -33,6 +33,8 @@ import org.junit.Test
 @OptIn(ExperimentalPagingApi::class)
 class FeedMediatorTtlEdgeTest {
     private class FakeGifDao : GifDao {
+        override suspend fun evictStale(olderThan: Long) = Unit
+
         override suspend fun upsertAll(gifs: List<GifEntity>) {}
 
         override suspend fun byIds(ids: List<String>): List<GifEntity> = emptyList()

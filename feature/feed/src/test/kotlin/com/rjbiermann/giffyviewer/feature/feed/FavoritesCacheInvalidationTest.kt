@@ -66,6 +66,8 @@ class FavoritesCacheInvalidationTest {
         }
 
     private class RecorderGifDao : GifDao {
+        override suspend fun evictStale(olderThan: Long) = Unit
+
         companion object {
             /** Username of the last-fetch batch (FakeApi names gifs "g1"). */
             val upsertedUsernames = mutableListOf<String>()

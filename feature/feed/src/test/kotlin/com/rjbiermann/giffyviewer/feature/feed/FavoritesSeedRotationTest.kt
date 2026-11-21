@@ -18,6 +18,8 @@ import org.junit.Test
  */
 class FavoritesSeedRotationTest {
     private class FakeGifDao : GifDao {
+        override suspend fun evictStale(olderThan: Long) = Unit
+
         override suspend fun upsertAll(gifs: List<GifEntity>) = Unit
 
         override suspend fun byIds(ids: List<String>): List<GifEntity> = emptyList()

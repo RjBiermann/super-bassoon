@@ -95,7 +95,7 @@ minSdk 24 (mobile) / 26 (TV) · targetSdk 35 · DB name `giffy.db`.
 ```
 :core:model      :core:network   :core:auth     :core:database
 :core:datastore  :core:player    :core:ui
-:feature:feed    :feature:search :feature:favorites
+:feature:feed    :feature:search
 :feature:auth    :feature:settings
 :app-mobile      :app-tv
 ```
@@ -202,6 +202,27 @@ When unsure: check the matching AGENTS doc first, then ask. Don't invent endpoin
   KBs = black) + one process restart; never open a player regression from this signature alone.
 
 ## Open items (current truth)
+- Whole-app review pass 2026-11-21 (follow-up batch): the deferred items it listed are
+  IMPLEMENTED — single-flight 401 refresh (`RefreshFlight`, stale-token dedupe + serialized
+  grant), cold-start TTL sweep (`feed_pages` + `gifs` older than 24h, both shells),
+  `:feature:favorites` module deleted (favorites live in `:feature:feed`), PIN storage moved
+  to PBKDF2 with a per-install salt (legacy SHA-256 records still verify, then upgrade on
+  the next unlock).
+- Same batch device gates 2026-11-22 (PASS, 0 FATAL): mobile `dev` — DebugSignIn bundle renders
+  `Signed in as @phcoxju`, PIN stores the `pbkdf2$…` record and unlocks, 3 wrong guesses lock
+  input for 15s (keys ignored) then unlock works, HOME→`am kill`→relaunch demands the PIN,
+  3× "cat" submissions leave ONE history row, WebView open/close ×3 clean (destroy runs; only
+  benign dead-thread `MessageQueue` warnings), player open/exit clean. TV `tv36` — quick-actions
+  Tags… pane opens with rows (no FocusRequester crash), empty Collection picker opens with focus
+  on Cancel (0 focus warnings, ENTER dismisses), paused creator cluster stays visible past the
+  3s auto-hide window. NOTE: focus-preview release on TV is still unexercised (needs a churn soak).
+- BLOCKED, not buildable: AGENTS-PLAYER's expired-media-URL re-fetch. `GET /v2/gifs/{id}`
+  was probed live 2026-11-21 through the app's own client twice: anonymous temp token and a
+  real user token (feeds returned 200 with the same token/headers) both answer
+  `400 {"error":"Origin is not allowed to make this request"}`, identical with Origin/Referer
+  variants; `/v2/gifs/{id}/` and `?id=` both 404. So the endpoint is not reachable for this
+  client today — do not build the seam on it. Dead tokenized URLs keep surfacing the player
+  error overlay (Retry is a dead end by design until this is resolved).
 - §8 walk CLOSED 2026-10-18 (derived from surviving §8.x assertions; original 15-step list
   lost with PLAN.md — R8-build variant still owed, fresh-PIN demand unexercised). Mobile
   niche-preview-tiles device gate CLOSED same batch.

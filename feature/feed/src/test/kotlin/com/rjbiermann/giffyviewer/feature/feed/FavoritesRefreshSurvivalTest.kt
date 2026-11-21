@@ -82,6 +82,13 @@ class FavoritesRefreshSurvivalTest {
 
         override fun hideCount(weekStart: Long): Flow<Int?> = flowOf(null)
 
+        override suspend fun insertHideCountRow(weekStart: Long) = Unit
+
+        override suspend fun incrementHideCount(
+            weekStart: Long,
+            delta: Int,
+        ) = Unit
+
         override suspend fun addHideCount(
             weekStart: Long,
             delta: Int,
@@ -101,6 +108,8 @@ class FavoritesRefreshSurvivalTest {
     }
 
     private class FakeGifDao : GifDao {
+        override suspend fun evictStale(olderThan: Long) = Unit
+
         val gifs = LinkedHashMap<String, GifEntity>()
 
         override suspend fun upsertAll(gifs: List<GifEntity>) {

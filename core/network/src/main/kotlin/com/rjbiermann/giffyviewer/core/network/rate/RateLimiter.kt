@@ -49,15 +49,20 @@ class RollingWindowRateLimiter(
     /** Cooldown from a 429 Retry-After; requests wait out this instant before any slot. */
     private val cooldownUntil = AtomicLong(0)
 
-    /** Called by the 429 handler. Clamps per PLAN §4: min 5s, max retryAfter + 30s. */
+    /** Called by the 429 handler. Clamps per PLAN §4: min 5s, max retryAfter + 30s.
+     *  Returns the clamped cooldown so callers publish the same instant. */
     fun startCooldown(
         retryAfterMs: Long,
         nowMs: Long = now(),
-    ) {
-        val clamped = retryAfterMs.coerceIn(MIN_COOLDOWN_MS, retryAfterMs + MAX_COOLDOWN_EXTRA_MS)
+    ): Long {
+        // A negative/hostile Retry-After must not invert the range (coerceIn
+        // throws on an empty range, and that escapes the interceptor chain).
+        val safe = retryAfterMs.coerceAtLeast(0)
+        val clamped = safe.coerceIn(MIN_COOLDOWN_MS, safe + MAX_COOLDOWN_EXTRA_MS)
         // shortcut: concurrent 429s keep the longest cooldown, so a later shorter
         // Retry-After is under-reported — no reader depends on that value.
         cooldownUntil.updateAndGet { current -> maxOf(current, nowMs + clamped) }
+        return clamped
     }
 
     /** Runs [block] as one accounted request, delaying as needed to keep the invariant. */

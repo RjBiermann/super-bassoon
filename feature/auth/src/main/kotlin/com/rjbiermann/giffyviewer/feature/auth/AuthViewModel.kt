@@ -37,6 +37,12 @@ class AuthViewModel
         /** PKCE material for the in-flight WebView login, kept until consumed. */
         private var pkce: TokenStore.Pkce? = null
 
+        /** A captured authorization code failed to exchange (network/expired
+         *  code) — otherwise that failure was invisible (WebView closes, the
+         *  screen silently returns to the signed-out state). */
+        private val _loginFailed = kotlinx.coroutines.flow.MutableStateFlow(false)
+        val loginFailed: kotlinx.coroutines.flow.StateFlow<Boolean> = _loginFailed
+
         fun currentPkce(): TokenStore.Pkce = pkce ?: TokenStore.newPkce().also { pkce = it }
 
         /** @return false when the paste isn't a plausible JWT — or a full Kinde
@@ -58,9 +64,12 @@ class AuthViewModel
         /** Exchanges the WebView-captured authorization code on IO. */
         fun exchangeCode(code: String) {
             val verifier = pkce?.verifier ?: return
-            pkce = null
             viewModelScope.launch(Dispatchers.IO) {
-                store.exchangeBlocking(code, verifier)
+                val ok = store.exchangeBlocking(code, verifier)
+                // Keep the PKCE pair on failure so reopening the WebView retries
+                // with the same challenge instead of dead-ending the login.
+                if (ok) pkce = null
+                _loginFailed.value = !ok
             }
         }
 

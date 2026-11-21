@@ -52,10 +52,10 @@ object TvAppModule {
         val nc =
             buildNetwork(
                 authToken = { tokenStore.tokenOrNull() ?: session?.token() },
-                onUnauthorized = {
+                onUnauthorized = { staleToken ->
                     // Refresh failed → clear the stale user token (PLAN §2) so
                     // browsing falls back to the anonymous session (see mobile).
-                    if (!tokenStore.refreshBlocking()) {
+                    if (!tokenStore.refreshBlocking(staleToken)) {
                         tokenStore.clear()
                         session?.invalidate()
                     } else {

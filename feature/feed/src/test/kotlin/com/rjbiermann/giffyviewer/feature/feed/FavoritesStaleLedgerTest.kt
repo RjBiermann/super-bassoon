@@ -35,6 +35,8 @@ import org.junit.Test
  */
 class FavoritesStaleLedgerTest {
     private class FakeGifDao : GifDao {
+        override suspend fun evictStale(olderThan: Long) = Unit
+
         override suspend fun upsertAll(gifs: List<GifEntity>) = Unit
 
         override suspend fun byIds(ids: List<String>): List<GifEntity> = emptyList()
@@ -140,7 +142,7 @@ class FavoritesStaleLedgerTest {
                     maxHops = MAX_WALK_HOPS,
                     pageFor = { walkFill(FeedSource.Favorites, pageDao, fetcher(api, pageDao), it) },
                     nextKeyOf = { entity -> entity?.nextPageKey?.let { pageNumber(it) } },
-                    gifsOf = { _, entity -> entity?.gifIds?.map { gifDtoShell(it, "a").toModel() } ?: emptyList() },
+                    gifsOf = { _, entity -> entity?.gifIds?.mapNotNull { gifDtoShell(it, "a").toModel() } ?: emptyList() },
                 )
             if (walked.gifs.isNotEmpty()) loads[page] = walked.gifs.joinToString(",") { it.id }
             check(++hops < 20) { "walk did not terminate" }

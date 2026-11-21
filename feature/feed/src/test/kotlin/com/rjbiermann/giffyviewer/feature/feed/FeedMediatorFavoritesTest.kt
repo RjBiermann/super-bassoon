@@ -28,6 +28,8 @@ import org.junit.Test
 @OptIn(ExperimentalPagingApi::class)
 class FeedMediatorFavoritesTest {
     private class FakeGifDao : GifDao {
+        override suspend fun evictStale(olderThan: Long) = Unit
+
         val upserted = mutableListOf<List<GifEntity>>()
 
         override suspend fun upsertAll(gifs: List<GifEntity>) = upserted.add(gifs).let { }

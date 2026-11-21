@@ -14,7 +14,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -152,7 +152,10 @@ class MainActivity : ComponentActivity() {
         // the when-chain BackHandler they served are replaced by route graph
         // entries; route state survives process death through the nav stack.
         val pinHash by settings.pinHash.collectAsStateWithLifecycle(initialValue = null)
-        var unlocked by rememberSaveable { mutableStateOf(false) }
+        // Deliberately NOT rememberSaveable: saved state survives process death,
+        // which would re-enter the app with the PIN screen skipped (TV uses the
+        // same non-saveable remember for this exact reason).
+        var unlocked by remember { mutableStateOf(false) }
         if (pinHash != null && !unlocked) {
             PinLockScreen(
                 onUnlock = { unlocked = true },
