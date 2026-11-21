@@ -45,9 +45,13 @@ class OfflineBannerDynamicTypeTest {
         val copy = rule.onNodeWithText(OFFLINE_COPY).getUnclippedBoundsInRoot()
         val stripHeight = strip.bottom - strip.top
         val copyHeight = copy.bottom - copy.top
-        // The strip is a minimum, never shorter than 40dp …
-        assertTrue("expected the 40dp band as a minimum, got $stripHeight", stripHeight >= 40.dp)
-        // … and it grows past the copy instead of clipping it into a fixed band.
+        // A CLIPPED Text reports its constrained layout height, so containment
+        // alone passes on the bug (verified: 40dp band + maxLines=1 satisfied
+        // every bound assertion). The regression signal is that the copy needs
+        // more room than the old fixed band gave it and the strip grew to suit.
+        assertTrue("copy still fits the old 40dp band at 3x — cannot detect the regression: $copyHeight", copyHeight > 40.dp)
+        assertTrue("strip pinned at its 40dp minimum instead of growing: $stripHeight", stripHeight > 40.dp)
+        // … and the band contains the copy instead of clipping it.
         assertTrue("strip $stripHeight must contain the $copyHeight tall copy", stripHeight > copyHeight)
         assertTrue("copy clipped at the top", copy.top >= strip.top)
         assertTrue("copy clipped at the bottom", copy.bottom <= strip.bottom)
