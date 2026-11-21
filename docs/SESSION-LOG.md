@@ -1086,3 +1086,16 @@ drift; only the doc/skill side was fixed, no source touched, so no build gate ap
   batch labels 9 and 24 are duplicated; `~/.pi-agent/skills/android-device-debug` duplicates giffy-device-gate §1-5.
 - tv36's ATV image is present and complete under `/usr/local/lib/android` (8.6 GB `system.img`), which
   contradicts the super-bassoon AGENTS.md "incomplete download" note; boot not re-verified this session.
+
+### Session 2026-11-21b (review pass — creator-label tap target)
+- Review of the shared Compose UI (icon labeling, touch targets, contrast pairs, dynamic type,
+  double insets) found one real defect: the clickable `CreatorLabel` measured its caption only
+  (36dp at titleMedium), because the #51 hit-area rule had been applied per call site — the tile
+  caption and the player's niche/tag chips each added `minimumInteractiveComponentSize()`, the
+  mobile player's creator link did not. Fix moved the invariant into `CreatorLabel`
+  (`clickable` outermost so the whole 48dp band is hit-testable); pinned by
+  `CreatorLabelTapTargetTest` (36dp red → green, plus a no-click growth guard).
+- Gates: `:core:ui:check` (ktlint+detekt+all unit tests), `:feature:feed` unit tests, both app
+  shells compile — green. Device gate OWED: the player overlay's label band grows 36→48dp.
+- Not changed, noted only: `outlineVariant` #51444A is 1.96:1 on the background (divider/unfocused
+  TV border token from the issue's table) — a design-token decision, not a code fix.

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,7 +39,10 @@ fun CreatorLabel(
     Row(
         modifier =
             if (onClick != null) {
-                modifier.clickable(onClick = onClick)
+                // Issue #51 hit-area class: the caption alone measures ~24–36dp,
+                // under Material's 48dp minimum. Owned here so no call site can
+                // forget it (the tile caption + player chips each had to add it).
+                modifier.clickable(onClick = onClick).minimumInteractiveComponentSize()
             } else {
                 modifier
             },
