@@ -22,15 +22,17 @@ live verification only — never invented. This skill is how you verify safely.
 
 - Anonymous temp token: public reads (feeds, search, creators/niches previews).
 - User token (id_token): required for `v2/niches/suggest`, likes, follows, collections.
-- id_tokens expire ~1h — a mid-test 401 TokenExpired on MANUAL curl is expected; the app
-  silently refreshes. Never probe the refresh grant itself (rotation rule).
+- User tokens are **session-bound**: a manual `curl` with one always 401s
+  `BadTokenSignature`, fresh or not (`AGENTS-AUTH.md` → "Tokens are session-bound").
+  Signed-in verification goes through the app's DebugSignIn seam; `curl` is for anon probes.
+- id_tokens last ~1h; the app silently refreshes them.
 - Token hygiene: bundles go to `/tmp` (0600), deleted after the session; never in source,
   never committed, never printed.
 
 ## Probe methods
 
-- **HTTP shape**: curl with the exact identity headers; record status, params, and the
-  full row DTO. A 405/401 result is a finding, not a failure to hide.
+- **HTTP shape** (anon token only): curl with the exact identity headers; record status,
+  params, and the full row DTO. A 405/401 result is a finding, not a failure to hide.
 - **UI contract**: Playwright at mobile viewport (e.g. 390x844) — read the live DOM
   (tablists, autoplay `<video>` muted/loop attributes, CSS `:root` tokens). This decided
   inline autoplay and the search 4-tab scope, and re-verified the palette with zero drift.

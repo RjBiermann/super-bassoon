@@ -25,7 +25,7 @@ Track hide counts by reason → Settings shows "Hidden this week: N (x by tags, 
 | Feature | Effect |
 |---|---|
 | Block creator | hide everywhere |
-| Favorite creator | dedicated feed + 70% weight in For You |
+| Favorite creator | dedicated feed; For You is the server blend (`v2/feeds/for-you`) |
 | Block tag | exact match only (not substring) |
 | Block keyword | case-insensitive substring over title/description/tags |
 | Niche groups | tag bundles → full feeds AND blockable macro-filters |

@@ -67,7 +67,7 @@ minSdk 24 (mobile) / 26 (TV) · targetSdk 35 · DB name `giffy.db`.
   `java.util.Base64` (API 26+) — a real crash on minSdk 24/25 — swapped to
   `Base64.UrlSafe.withPadding(ABSENT)`.
 - **Testing policy (2026-10, supersedes the old one-minimal-test rule — every kind of
-  test, small to big, is in scope; no suite implemented yet, policy first):**
+  test, small to big, is in scope; `src/test` + `src/androidTest` suites exist):**
   1. **Unit (JVM)** — pure logic, ViewModels/state (StateFlow/UiState with fakes),
      rate limiter/breaker/filter invariants. JUnit 4; MockWebServer for API/DTO paths;
      Robolectric only where Android deps are unavoidable.
@@ -105,9 +105,9 @@ minSdk 24 (mobile) / 26 (TV) · targetSdk 35 · DB name `giffy.db`.
 | File | Covers | Plan § |
 |---|---|---|
 | `AGENTS-NETWORK.md` | OkHttp, rate limiter, 429/5xx, circuit breaker, endpoint inventory, DTOs |
-| `AGENTS-DATABASE.md` | Room schema, migrations, cache-first, TTLs, watch history |
-| `AGENTS-AUTH.md` | WebView login, token storage/reveal, TV paste-token, logout/revoke |
-| `AGENTS-PLAYER.md` | ExoPlayer, SimpleCache-by-ID, data-saver, resume |
+| `AGENTS-DATABASE.md` | Room schema, migrations, cache-first, TTLs, favorites cache generations |
+| `AGENTS-AUTH.md` | WebView PKCE login, token storage, session-bound tokens, logout |
+| `AGENTS-PLAYER.md` | ExoPlayer, SimpleCache-by-ID, data-saver |
 | `AGENTS-CONTENT-FILTER.md` | The single ContentFilter choke point, blocks, groups, collections, leak-zero |
 | `AGENTS-APP.md` | Mobile + TV UI, age gate, navigation, per-feed prefs display, UI lingo |
 | `AGENTS-UX-PATTERNS.md` | Instagram/TikTok interaction practices mapped per device type — doc-only reference, no implementation |
@@ -126,17 +126,15 @@ minSdk 24 (mobile) / 26 (TV) · targetSdk 35 · DB name `giffy.db`.
 When unsure: check the matching AGENTS doc first, then ask. Don't invent endpoints or features.
 
 ## Device testing (adb / emulator)
-- Use the **debroid** skill and the **mobile** MCP server for all adb/emulator testing
-  (install, launch, UI interaction, logs, debugging). Raw `adb` one-offs only when the
-  MCP/debroid path genuinely doesn't cover it.
+- adb/emulator work runs through the **giffy-device-gate** skill (`emul-start`/`emul-wait`/
+  `emul-install`/`emul-stop` + raw `adb`). No debugger bridge is provisioned here (no
+  debroid skill, `~/.pi-agent/mcp.json` has no servers), so drive the UI with adb input +
+  uiautomator dumps and read state from logcat.
 - **Prefer UI dumps over screenshots** (`adb shell uiautomator dump` + read the XML) when verifying
   UI state — each screenshot burns against the ~30-image provider cap and a saturated request fails
   with `Too many images in request: 31 > 30`. Screenshots only when visual layout/appearance matters.
 
 ## Debugging lessons (2026-09)
-- **debroid breakpoints suspend the main thread** (Compose/Paging code runs on main) → ANR
-  dialogs and frozen/empty UI that look like app bugs. Never leave a debug session attached
-  while driving the UI; detach (`debroid detach <sess>`) before any interaction test.
 - Phone34 emulator dies every few minutes on this host (15GB RAM) — stop gradle/kotlin
   daemons (`./gradlew --stop`) before emulator work, keep test windows short, data is wiped
   on every restart (age gate reappears, DB empty).
@@ -228,7 +226,7 @@ When unsure: check the matching AGENTS doc first, then ask. Don't invent endpoin
   cost reasons).
 - #62 (favorites fan-out) + #63 (feed error honesty) CLOSED 2026-10-23 with device evidence (main @ 2e3e7311).
   #62: bounded 5-creator-per-fill fan-out with a rotating window, `perCreator` window-independent,
-  favorites cache generation `fav:v3` (prefs identity pinned at `fav:v1`). #63: honest error kinds,
+  favorites cache generation `fav:v4` (prefs identity pinned at `fav:v1`). #63: honest error kinds,
   mobile feed `AutoRetryEffect`, breaker reset on reconnect. Honest ends not exercised on device:
   #62's true end-of-pool (still chaining at p9) and #63's TV copy (blocked by the TV issue below).
 - #64 (TV offline cold start auth deadlock) FIXED and device-verified 2026-10-23 (main @ 1cbbba74) — gate
@@ -256,10 +254,11 @@ When unsure: check the matching AGENTS doc first, then ask. Don't invent endpoin
   a static creator feed already parks at ~165/192 MB, which is why opening it right after a warmed home
   feed tipped it over 4/4. Needs a heap dump on the churn path (player instances / codec surfaces not
   released on feed swap).
-- Emulator provisioning gaps: `tv.ini` is the API-35 `google_apis` **phone** image (the device #64 was
-  reported on) and `tv36.ini`'s real `android-tv` android-36 image under
-  `/workspaces/sturdy-potato/.android-sdk` is an **incomplete download** (no `system.img`/`ramdisk`/
-  `userdata`), so no ATV-image AVD is bootable here. Also `systemd` does not run in this container, so
+- Emulator provisioning: `tv.ini` is the API-35 `google_apis` **phone** image (the device #64 was
+  reported on); `tv36.ini` points at `system-images/android-36/android-tv/x86_64`, which is present and
+  complete under `/usr/local/lib/android` (8.6 GB `system.img`, `vendor.img`) — `tv36` boot is therefore
+  expected to work, but was not re-verified after this note was last contradicted. Also `systemd` does not
+  run in this container, so
   `systemctl --user set-environment` is a no-op — export the decoder vars in the shell that calls
   `emul-start` (verified via `/proc/<qemu>/environ`).
 - ~~`FeedViewModel` `pendingForce` mismatch~~ FIXED 2026-10-23 with #65/#66: `setSort` records

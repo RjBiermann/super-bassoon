@@ -14,9 +14,14 @@ Operational recipes for verifying Giffy Viewer on the local emulators. Depth liv
   daemons (`./gradlew --stop`) before emulator work.
 - **One emulator per host** (shared adb server `:5037` with the sibling workspace). If
   `emul-start` refuses, use the running emulator's serial — never kill or bypass it.
-- Lifecycle: `emul-start [avd]` → `emul-wait [timeout]` (returns serial) → `emul-install [apk] [serial]`
-  → work → `emul-stop` (pkill qemu-system) at teardown. Default AVD `dev` (API-35);
-  TV: `tv_1080p` (created via `avdmanager -d tv_1080p` with the google_apis;x86_64 image).
+- Lifecycle: `emul-start [avd]` → `emul-wait [timeout]` (returns serial) →
+  `emul-install app-mobile/build/outputs/apk/debug/app-mobile-debug.apk [serial]` → work →
+  `emul-stop <avd>`.
+- AVDs here: `dev` (API-35, default), `tv` (API-35 **phone** image, the #64 device),
+  `tv36` (API-36 android-tv image, present under `/usr/local/lib/android`). There is no
+  `tv_1080p` AVD — that is an `avdmanager` device-profile id.
+- Both `emul-stop` and `emul-install` default to `dev` and `./app/build/...`, which this repo
+  does not build (modules are `app-mobile`/`app-tv`): always pass the AVD name and the APK path.
 
 ## 1. Evidence hierarchy (rank matters)
 
@@ -46,10 +51,10 @@ MBs = real content) + look for `MediaCodec: rendring output error -32` in logcat
 Then one `am force-stop` + relaunch: frames return instantly = wedge. **Never open a
 player regression from this signature alone.**
 
-Decoder env: `ANDROID_EMU_MEDIA_DECODER_CUDA=0` + `..._CUDA_HEVC=0` must be in the
-systemd USER environment (`systemctl --user set-environment` +
-`~/.config/environment.d/90-emulator-decode.conf`) — shell exports do NOT reach the
-`android` CLI's `systemd-run --user` scope.
+Decoder env: export `ANDROID_EMU_MEDIA_DECODER_CUDA=0` and
+`ANDROID_EMU_MEDIA_DECODER_CUDA_HEVC=0` in the same shell that calls `emul-start`.
+`systemd` does not run in this container, so `systemctl --user set-environment` and
+`environment.d` are no-ops here.
 
 ## 3. Clean state
 
@@ -69,8 +74,10 @@ systemd USER environment (`systemctl --user set-environment` +
 - Use the **DebugSignIn** seam: launch extra `giffy_debug_bundle` (`feature/auth/
   .../DebugSignIn.kt`), `BuildConfig.DEBUG`-only. Tokens NEVER go in source.
 - Write bundles to `/tmp` only, mode 0600, delete after the session.
-- id_tokens expire in ~1h; manual curl checks fail with TokenExpired — the app's silent
-  refresh keeps itself signed in. Never probe the refresh grant (rotation rule).
+- id_tokens last ~1h; the app's silent refresh handles expiry — no user action.
+- User tokens are **session-bound**: a manual `curl` with one always 401s
+  `BadTokenSignature`, fresh or not. Signed-in verification goes through the DebugSignIn
+  seam only; `curl` is for anon-token probes.
 
 ## 5. Input quirks
 
@@ -86,6 +93,7 @@ systemd USER environment (`systemctl --user set-environment` +
 ## 6. Teardown & logging
 
 - Goal: 0 FATAL exceptions per session. Grep logcat for FATAL before declaring success.
-- Teardown: `emul-stop` + `./gradlew --stop`; confirm nothing long-lived remains.
+- Teardown: `emul-stop <avd>` (bare `emul-stop` defaults to `dev` and leaks a `tv`/`tv36`
+  emulator) + `./gradlew --stop`; confirm nothing long-lived remains.
 - New device lessons go into `AGENTS.md` / `AGENTS-APP.md` (the canonical lesson log),
   not just the chat transcript.

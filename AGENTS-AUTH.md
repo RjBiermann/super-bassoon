@@ -75,7 +75,7 @@ no guessing), `AuthViewModel.username` exposes it, AuthSection shows
 - **The app's own in-app WebView PKCE login works normally** — own session, own cookie jar;
   full signed-in session verified (For You 200 with zero Auth401s, force-stop → relaunch
   keeps the session). No CookieJar/x-session-id adaptation needed.
-- Consequences: debroid token-injection CANNOT fake a signed-in state — sign in for real via
+- Consequences: an injected foreign token CANNOT fake a signed-in state — sign in for real via
   the in-app WebView (email → OTP; OTP = user slice). If a NEW authenticated endpoint 401s,
   re-probe the SPA's headers before assuming app bugs.
 - Session lesson: `orientation_filter` on a TV/profile flips silently if a stray
@@ -96,5 +96,3 @@ no guessing), `AuthViewModel.username` exposes it, AuthSection shows
 - id_token lifetime is **1 hour** (`iat`→`exp` = 3600s). On expiry the API answers
   `401 {"error":{"code":"TokenExpired"}}` and the silent refresh grant handles it
   (no user action; the old re-paste convention is gone with the paste-token flow).
-- TV D-pad UX: the token field moves focus to **Sign in on key DOWN**
-  (`onPreviewKeyEvent` + `FocusRequester` in `AuthScreen`).

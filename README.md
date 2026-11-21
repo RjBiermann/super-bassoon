@@ -12,7 +12,7 @@ in to your own account on that site.
 
 | | |
 |---|---|
-| Latest release | [v0.2.0](https://github.com/RjBiermann/super-bassoon/releases) |
+| Latest release | [v0.7.4](https://github.com/RjBiermann/super-bassoon/releases) |
 | Downloads | APKs from GitHub Releases (mobile + TV, R8-shrunk, signed) |
 | Requirements | Android 7.0+ (mobile) / Android 8.0+ (TV) |
 | Age gate | 18+ confirmation required on first launch (both apps) |
@@ -21,24 +21,23 @@ in to your own account on that site.
 
 **Mobile**
 - Trending, Explore, Following, tag/niche/creator feeds with per-feed sorting and filters (HD, duration, orientation)
-- Swipe player (TikTok-style vertical feed) with double-tap like, speed control, hold-to-2×, pinch zoom, auto-swipe, resume
+- Swipe player (TikTok-style vertical feed) with double-tap like, speed control, hold-to-2×, pinch zoom, auto-swipe
 - Inline feed autoplay on settled tiles
 - Favorites, custom feeds (tags/creators), collections, blocked/neutral feed states
 - Search with four scopes: GIFs · Images · Creators · Niches
-- Content filter choke point — blocked creators/tags/groups never render
+- Content filter choke point — blocked creators/tags/keywords never render
 - Settings: data saver, autoplay, grid columns, backup export/import of preferences
-- Sign in via in-app WebView (OAuth/PKCE), or paste a token on TV
+- Sign in via in-app WebView (OAuth/PKCE) on both shells
 
 **TV**
-- D-pad-first home with Trending / Explore / Continue Watching rows
-- Full player with next/prev, resume, quick-actions panel (hold Center or MENU)
+- D-pad-first home with Trending / Explore / Favorites / Following rows
+- Full player with next/prev, quick-actions panel (hold Center or MENU)
 - Preview-on-focus playback on focused cards
 - Same feed, filter, favorites, and player stack as mobile (shared modules)
 
 **Shared**
 - Offline-first: cache renders on airplane-mode cold start with zero network
-- Watch history with resume positions
-- Silent token refresh, rate limiting (≤10 requests / 5s) with circuit breaker
+- Silent token refresh, rate limiting (≤15 requests / 5s) with circuit breaker
 - No analytics, no ads, no trackers, no Firebase — nothing phones home
 
 ## Build
@@ -47,7 +46,7 @@ in to your own account on that site.
 ./gradlew :app-mobile:assembleDebug :app-tv:assembleDebug
 ```
 
-Release builds are tag-driven in CI (`-PversionTag=v0.3.0`) and require signing secrets —
+Release builds are tag-driven in CI (`-PversionTag=v0.7.4`) and require signing secrets —
 see `.github/workflows/release.yml`.
 
 ### Modules

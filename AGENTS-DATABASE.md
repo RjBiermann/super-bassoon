@@ -20,7 +20,9 @@ Room as **single source of truth** with stale-while-revalidate. DB name: `giffy.
 
 - Schema change ⇒ explicit `Migration` class. `fallbackToDestructiveMigration` is forbidden.
 - UI reads Room; a background refresh hits the API and upserts. Never fetch-to-render first.
-- **Favorites are never cached** — network-backed only.
+- **Favorites pages ARE cached**, under a generation base: `fav:v<n>` (prefs identity pinned
+  at `fav:v1`), 10-min trending TTL. A favorites edit bumps `<n>` and the `fav:v%` sweep
+  drops every stale generation.
 - TTLs: tags 7d · trending/top 10 min · search 1h · gif metadata 24h.
 - Custom-feed cache keys are `custom:<id>:p<n>` (`FeedSource.keyBase` = `custom:$id`; the v10 migration evicted the old `group:%` rows); revalidate/evict when the feed's tag refs change (CustomFeedsScreen evicts on edit).
 - Airplane-mode cold start must work off Room alone — design queries so the first frame needs no network.

@@ -1060,3 +1060,29 @@ User slice: "work on all the open github issues; triage, plan, design, implement
   `latest` is now the creator default for every creator (visible behaviour change → release notes);
   fail-open can cost one unauthenticated request on a connected-but-silent network (self-healing via the
   401 path).
+
+### Session 2026-11-21 (doc-sync pass — no code landed)
+Three read-only reviews (doc staleness, skills-vs-docs, conversation scoring) converged on the same
+drift; only the doc/skill side was fixed, no source touched, so no build gate applies.
+- **README**: v0.2.0 → v0.7.4; dropped the retired surface (resume/watch history, Continue Watching,
+  TV paste-token, niche groups), budget corrected to ≤15/5 s, TV rows now Trending/Explore/Favorites/Following.
+- **AGENTS-DATABASE.md**: "Favorites are never cached" was false — favorites pages cache under `fav:v<n>`
+  with the 10-min TTL; the line would have invited deleting the fan-out's cache.
+- **AGENTS-CONTENT-FILTER.md**: the 70 % favorite-creator blend is superseded by `v2/feeds/for-you`
+  (AGENTS-APP.md already said so); Effects table now matches.
+- **debroid/`mobile` MCP mandate removed** (AGENTS.md device-testing section + the debroid ANR bullet +
+  AGENTS-AUTH.md): neither the skill nor the MCP server exists on this host, so the mandate only
+  criminalised the single working path. Device work now points at `giffy-device-gate`.
+- **Skill truth fixes**: `giffy-device-gate` — nonexistent `tv_1080p` AVD → `dev`/`tv`/`tv36`, systemd
+  decoder-env recipe replaced with the shell export that actually works, real `emul-install` APK path
+  (modules are `app-mobile`/`app-tv`), `emul-stop <avd>` (bare form defaults to `dev` and leaks a TV
+  emulator), user-token curl replaced with the session-bound/DebugSignIn rule; `giffy-live-probe` — same
+  token correction, curl scoped to anon probes.
+- **Dropped, not replaced**: the unsourced "never probe the refresh grant (rotation rule)" line — it
+  contradicted AGENTS-AUTH.md's live-verified refresh grant and no doc records its provenance.
+- **Residual, not fixed here**: the `#64` deadlock narrative is still stated twice (AGENTS.md + AGENTS-NETWORK.md)
+  with an absolute "no Dispatcher anywhere" that the token client deliberately breaks; `REPORT-niches-parity.md`
+  is a superseded root-level snapshot; `DESIGN-65-66.md`'s status header still says "not landed" though F1/F4 shipped;
+  batch labels 9 and 24 are duplicated; `~/.pi-agent/skills/android-device-debug` duplicates giffy-device-gate §1-5.
+- tv36's ATV image is present and complete under `/usr/local/lib/android` (8.6 GB `system.img`), which
+  contradicts the super-bassoon AGENTS.md "incomplete download" note; boot not re-verified this session.
