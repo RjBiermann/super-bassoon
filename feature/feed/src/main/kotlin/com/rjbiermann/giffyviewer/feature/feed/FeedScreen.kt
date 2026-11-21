@@ -388,7 +388,9 @@ fun FeedScreen(
                             label = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     CreatorLabel(creator.username, creator.verified)
-                                    Text(" · ${creator.followers}⇡")
+                                    // "followers" spelled out: the old "⇡" glyph read as
+                                    // "upwards arrow" in TalkBack and named no quantity.
+                                    Text(" · %,d followers".format(java.util.Locale.US, creator.followers))
                                 }
                             },
                         )
