@@ -2,8 +2,8 @@ package com.rjbiermann.giffyviewer.core.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -25,6 +25,9 @@ val LocalIsOnline = compositionLocalOf { true }
  * with [offlineBannerVisible] driven by [NetworkMonitor]. errorContainer is
  * the M3 state surface for outages (scheme role only — design tokens live in
  * Theme.kt). Non-focusable by construction (no click/ripple).
+ *
+ * Height is a MINIMUM, not fixed: at large system font scales the copy wraps
+ * and the strip grows — a fixed 40dp strip truncated the sentence instead.
  */
 @Composable
 fun OfflineBanner(modifier: Modifier = Modifier) {
@@ -32,9 +35,9 @@ fun OfflineBanner(modifier: Modifier = Modifier) {
         modifier =
             modifier
                 .fillMaxWidth()
-                .height(40.dp)
+                .defaultMinSize(minHeight = 40.dp)
                 .background(MaterialTheme.colorScheme.errorContainer)
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = 12.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -42,7 +45,6 @@ fun OfflineBanner(modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onErrorContainer,
             textAlign = TextAlign.Center,
-            maxLines = 1,
         )
     }
 }
