@@ -1099,3 +1099,29 @@ drift; only the doc/skill side was fixed, no source touched, so no build gate ap
   shells compile — green. Device gate OWED: the player overlay's label band grows 36→48dp.
 - Not changed, noted only: `outlineVariant` #51444A is 1.96:1 on the background (divider/unfocused
   TV border token from the issue's table) — a design-token decision, not a code fix.
+
+### Session 2026-11-22 (whole-app review → fixes → v0.7.5)
+- Six parallel read-only reviewers (one per module cluster), every claim re-verified in the main session
+  before patching. 22 fixes landed across auth/crypto, network, DB, filter, player, features and both
+  shells; deferred items and their blocker evidence live in AGENTS.md open items.
+- Highlights: token flow updated synchronously on save/clear (the 401 retry re-sent the expired bearer);
+  single-flight refresh (`RefreshFlight`); negative `Retry-After` no longer throws out of the interceptor;
+  hide-count UPSERT → `INSERT OR IGNORE` + `UPDATE` (SQLite 3.24 syntax error on API 24-28); promoted
+  items dropped at DTO→model (stage 0 was documented but unbuilt); likes mirror replaced, not merged;
+  Following refresh no longer duplicates LazyColumn keys; PIN keypad locked during a guess/penalty; the
+  mobile PIN no longer survives process death; TV pickers focus Cancel when empty (unattached requester),
+  TV Skip on the last gif opens the end dialog, TV auto-hide respects pause/seek, preview `PlayerView`
+  detaches on leave, quick actions use the activity-scoped `FeedViewModel`; player release is idempotent;
+  backup import no longer clobbers a colliding local feed; WebView destroyed on leave; search history
+  deduped; SAF I/O off the main thread.
+- PIN storage moved to PBKDF2 (per-install salt, 120k rounds) with legacy verify→upgrade; ~40-70 ms per
+  derivation on the JVM.
+- Blocked, not built: `GET /v2/gifs/{id}` answers `400 "Origin is not allowed"` for BOTH the anonymous and
+  a signed-in token through the app's own stack (variants 404), so the AGENTS-PLAYER expired-URL refetch
+  stays unbuilt and dead tokenized URLs keep surfacing the player error overlay.
+- Gates: `check` + `assembleDebug` green; dev/tv36 device gates 0 FATAL (signed-in bundle, PIN
+  set/penalty/process-death, 3× search submit → 1 row, WebView open/close ×3, player exit, TV Tags pane,
+  empty pickers, paused auto-hide); 270-move TV focus soak plateaus (guest zram pressure only, no
+  kills/ANR). Release-APK smoke on fresh installs: age gate → home renders on mobile + TV.
+- Release v0.7.5 cut via `cut-release.yml` (patch): versionCode 705, both assets present, same
+  reuse-forever certificate (`apksigner` SHA-256 verified for both).
