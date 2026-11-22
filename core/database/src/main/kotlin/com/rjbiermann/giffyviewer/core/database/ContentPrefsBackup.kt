@@ -95,9 +95,37 @@ object ContentPrefsBackup {
         customFeedDao: CustomFeedDao? = null,
     ): Int {
         val backup = json.decodeFromString<Backup>(backupJson)
-        backup.creatorPrefs.forEach { dao.upsertCreator(CreatorPrefEntity(it.username, it.state, it.changedAt)) }
-        backup.tagPrefs.forEach { dao.upsertTag(TagPrefEntity(it.tag, it.state, it.changedAt)) }
-        backup.keywordBlocks.forEach { dao.blockKeyword(KeywordBlockEntity(it.pattern, it.blockedAt)) }
+        // Merge = newest edit wins (the entity keeps `changedAt` for exactly
+        // this): a blind upsert let an OLDER backup re-block/re-favorite what
+        // the target changed later, or resurrect a locally blocked creator.
+        val localCreators = dao.allCreatorPrefs().associateBy { it.username }
+        val localTags = dao.allTagPrefs().associateBy { it.tag }
+        var restored = 0
+        backup.creatorPrefs.forEach {
+            if (it.state !in STATES) return@forEach
+            val local = localCreators[it.username]
+            if (local == null || it.changedAt > local.changedAt) {
+                dao.upsertCreator(CreatorPrefEntity(it.username, it.state, it.changedAt))
+                restored++
+            }
+        }
+        backup.tagPrefs.forEach {
+            if (it.state !in STATES) return@forEach
+            val local = localTags[it.tag]
+            if (local == null || it.changedAt > local.changedAt) {
+                dao.upsertTag(TagPrefEntity(it.tag, it.state, it.changedAt))
+                restored++
+            }
+        }
+        // Keyword blocks match with `contains()`, so a blank pattern would hide
+        // every tagged gif; an existing block stays (already blocked either way).
+        val localKeywords = dao.allKeywordBlocks().map { it.pattern }.toSet()
+        backup.keywordBlocks.forEach {
+            val pattern = it.pattern.trim()
+            if (pattern.isEmpty() || pattern in localKeywords) return@forEach
+            dao.blockKeyword(KeywordBlockEntity(pattern, it.blockedAt))
+            restored++
+        }
         customFeedDao?.let { cfd ->
             backup.customFeeds.forEach {
                 // Preserve the exported id only when it is free or already this
@@ -118,8 +146,11 @@ object ContentPrefsBackup {
                 )
             }
         }
-        return backup.creatorPrefs.size + backup.tagPrefs.size + backup.keywordBlocks.size + backup.customFeeds.size
+        return restored + backup.customFeeds.size
     }
+
+    /** The only states ContentFilter understands (a mis-cased one fails open). */
+    private val STATES = setOf("BLOCKED", "FAVORITED", "NEUTRAL")
 
     fun parseDataSaver(backupJson: String): Boolean? = json.decodeFromString<Backup>(backupJson).dataSaver
 }

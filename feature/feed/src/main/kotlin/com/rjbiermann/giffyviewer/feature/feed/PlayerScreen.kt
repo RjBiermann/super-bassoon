@@ -88,6 +88,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -241,6 +244,27 @@ fun PlayerScreen(
             controller.hide(WindowInsetsCompat.Type.systemBars())
         }
         onDispose { }
+    }
+    // Backgrounding must not keep decoding/audio running: nothing observed the
+    // lifecycle, so HOME left the player playing. Pause on STOP, resume only
+    // what was actually playing.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, player) {
+        var wasPlaying = false
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (player.isReleased) return@LifecycleEventObserver
+                when (event) {
+                    Lifecycle.Event.ON_STOP -> {
+                        wasPlaying = player.isPlaying
+                        player.pause()
+                    }
+                    Lifecycle.Event.ON_START -> if (wasPlaying) player.play()
+                    else -> Unit
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     DisposableEffect(Unit) {
         onDispose {

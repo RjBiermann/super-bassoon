@@ -155,6 +155,20 @@ class FeedViewModel
 
         fun lastGroupSub(): FeedSource = lastGroupSub
 
+        /** TV player handoff: the shell parks the tapped row's list here and the
+         *  `TvPlayer` route carries only the index. A `List<Gif>` route argument
+         *  is written into the activity's saved state, and a page-sized list
+         *  blew the binder limit on ON_STOP (`TransactionTooLargeException`,
+         *  deterministic on TV player → HOME). Mobile reads [gifs] instead, so
+         *  TV is the only writer. Not persisted: after process death the player
+         *  has no list, exactly like mobile's empty pager. */
+        private val _playerList = MutableStateFlow<List<Gif>>(emptyList())
+        val playerList: StateFlow<List<Gif>> = _playerList.asStateFlow()
+
+        fun openPlayer(list: List<Gif>) {
+            _playerList.value = list
+        }
+
         fun open(feed: FeedSource) {
             viewModelScope.launch {
                 // Per-feed sort persistence (§8): a fresh source adopts its saved sort.
@@ -317,7 +331,7 @@ class FeedViewModel
         /** Add-to pane sources (live-probed writes, 2026-10): saved collections
          *  + joined niches; both token-gated reads, fetched on pane open. */
         private val _collections = MutableStateFlow<List<CollectionDto>>(emptyList())
-        val collections: StateFlow<List<CollectionDto>> = _collections
+        val collections: StateFlow<List<CollectionDto>> = _collections.asStateFlow()
 
         fun refreshCollections() {
             viewModelScope.launch {
@@ -328,7 +342,7 @@ class FeedViewModel
         }
 
         private val _joinedNiches = MutableStateFlow<List<FollowedNicheDto>>(emptyList())
-        val joinedNiches: StateFlow<List<FollowedNicheDto>> = _joinedNiches
+        val joinedNiches: StateFlow<List<FollowedNicheDto>> = _joinedNiches.asStateFlow()
 
         fun refreshJoinedNiches() {
             viewModelScope.launch {
@@ -347,7 +361,7 @@ class FeedViewModel
          *  username array (verified), lowercased — Gif.userName casing is not
          *  guaranteed to match the server list. */
         private val _followedCreators = MutableStateFlow<Set<String>>(emptySet())
-        val followedCreators: StateFlow<Set<String>> = _followedCreators
+        val followedCreators: StateFlow<Set<String>> = _followedCreators.asStateFlow()
 
         /** Follow-row single-flight (issue #27 race fix): while a toggle is in
          *  flight the sheet-open refresh must not overwrite the optimistic
@@ -428,17 +442,22 @@ class FeedViewModel
         /** Creator stats header (v1/users/{username}, verified): cleared for
          *  non-creator sources; failure = no header (tiles carry the name). */
         private val _creatorStats = MutableStateFlow<com.rjbiermann.giffyviewer.core.network.UserStatsDto?>(null)
-        val creatorStats: StateFlow<com.rjbiermann.giffyviewer.core.network.UserStatsDto?> = _creatorStats
+        val creatorStats: StateFlow<com.rjbiermann.giffyviewer.core.network.UserStatsDto?> = _creatorStats.asStateFlow()
+
+        /** Last requested header id: a slow response for the previous creator
+         *  must not paint its avatar/bio over the one now on screen. */
+        @Volatile private var creatorStatsReq: String? = null
 
         fun refreshCreatorStats(username: String?) {
+            creatorStatsReq = username
             viewModelScope.launch {
                 if (username == null) {
                     _creatorStats.value = null
                     return@launch
                 }
                 runCatching { withContext(Dispatchers.IO) { api.userStats(username) } }
-                    .onSuccess { _creatorStats.value = it }
-                    .onFailure { _creatorStats.value = null }
+                    .onSuccess { if (creatorStatsReq == username) _creatorStats.value = it }
+                    .onFailure { if (creatorStatsReq == username) _creatorStats.value = null }
             }
         }
 
@@ -448,17 +467,20 @@ class FeedViewModel
          *  flow → no header. The nicheHeaderSourceId gate maps any other feed
          *  to the null clear-call (unit-tested). */
         private val _nicheStats = MutableStateFlow<com.rjbiermann.giffyviewer.core.network.NicheDetail?>(null)
-        val nicheStats: StateFlow<com.rjbiermann.giffyviewer.core.network.NicheDetail?> = _nicheStats
+        val nicheStats: StateFlow<com.rjbiermann.giffyviewer.core.network.NicheDetail?> = _nicheStats.asStateFlow()
+
+        @Volatile private var nicheStatsReq: String? = null
 
         fun refreshNicheStats(nicheId: String?) {
+            nicheStatsReq = nicheId
             viewModelScope.launch {
                 if (nicheId == null) {
                     _nicheStats.value = null
                     return@launch
                 }
                 runCatching { withContext(Dispatchers.IO) { api.nicheDetail(nicheId) } }
-                    .onSuccess { _nicheStats.value = it.niche }
-                    .onFailure { _nicheStats.value = null }
+                    .onSuccess { if (nicheStatsReq == nicheId) _nicheStats.value = it.niche }
+                    .onFailure { if (nicheStatsReq == nicheId) _nicheStats.value = null }
             }
         }
 

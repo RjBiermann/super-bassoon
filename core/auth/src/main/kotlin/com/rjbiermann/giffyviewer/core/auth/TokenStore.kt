@@ -42,6 +42,12 @@ class TokenStore(
 
     private val mutableToken = MutableStateFlow(prefs.getString(KEY, null))
 
+    /** Bumped by [clear]; a grant that started before a sign-out must not
+     *  resurrect the tokens it was refreshing (up to a 25 s HTTP window). */
+    private val clearGeneration =
+        java.util.concurrent.atomic
+            .AtomicLong()
+
     /** Signed-in bearer token, null when anonymous. */
     val token: StateFlow<String?> = mutableToken.asStateFlow()
 
@@ -80,6 +86,7 @@ class TokenStore(
     fun refreshTokenOrNull(): String? = prefs.getString(REFRESH_KEY, null)
 
     fun clear() {
+        clearGeneration.incrementAndGet()
         prefs
             .edit()
             .remove(KEY)
@@ -105,12 +112,17 @@ class TokenStore(
             staleToken = staleToken,
             currentToken = { prefs.getString(KEY, null) },
             grant = {
+                val generation = clearGeneration.get()
                 val refreshToken = prefs.getString(REFRESH_KEY, null)
                 if (refreshToken == null) {
                     false
                 } else {
                     val bundle = tokenBundle(refreshToken = refreshToken)
-                    bundle != null && save(bundle.idToken, bundle.refreshToken ?: refreshToken)
+                    // Signed out (or a newer login landed) while the grant was
+                    // in flight: drop the result instead of overwriting it.
+                    bundle != null &&
+                        generation == clearGeneration.get() &&
+                        save(bundle.idToken, bundle.refreshToken ?: refreshToken)
                 }
             },
         )
@@ -125,8 +137,9 @@ class TokenStore(
         code: String,
         verifier: String,
     ): Boolean {
+        val generation = clearGeneration.get()
         val bundle = tokenBundle(code = code, verifier = verifier) ?: return false
-        return save(bundle.idToken, bundle.refreshToken)
+        return generation == clearGeneration.get() && save(bundle.idToken, bundle.refreshToken)
     }
 
     /** Token bundle from the authorization-code / refresh grants. */

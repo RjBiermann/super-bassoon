@@ -2,21 +2,18 @@ package com.rjbiermann.giffyviewer.feature.feed
 
 import android.os.Bundle
 import androidx.navigation.NavType
-import com.rjbiermann.giffyviewer.core.model.Gif
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.serializer
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * NavType implementations for the type-safe route args the shells pass
  * (issue #13): Android nav only auto-derives NavTypes for Json-encodable
- * NON-polymorphic types — `FeedSource` (sealed polymorphic) and `List<Gif>`
- * ride explicit NavTypes instead (device-gate 2026-10-16: bare
+ * NON-polymorphic types — `FeedSource` (sealed polymorphic) rides an explicit
+ * NavType instead (device-gate 2026-10-16: bare
  * `MainFeed(source: FeedSource?)` crashed with "could not find any NavType").
  *
- * The wire is kotlinx JSON via [FeedSource]/[Gif]'s own `@Serializable`
+ * The wire is kotlinx JSON via [FeedSource]'s own `@Serializable`
  * family — the payload lives only inside nav saved state (never a public
  * format, issue #13 §2). [FeedSourceRoutes] owns the one shared JSON codec
  * both NavTypes use (defaults matter for decode).
@@ -78,35 +75,7 @@ val feedSourceNavType: NavType<FeedSource> =
         }
     }
 
-private const val ROUTE_NAME_GIF_LIST = "gif_list"
-
-/**
- * `List<Gif>` on routes (TvPlayer's snapshot window). Non-nullable; a route
- * never opens a player without the window.
- */
-val gifListNavType: NavType<List<Gif>> =
-    object : NavType<List<Gif>>(isNullableAllowed = false) {
-        override val name: String = ROUTE_NAME_GIF_LIST
-
-        override fun get(
-            bundle: Bundle,
-            key: String,
-        ): List<Gif> = bundle.getString(key, "[]").let { parseValue(it) }
-
-        override fun parseValue(value: String): List<Gif> = RouteJson.decodeFromString(jsonSerializer, routeDecode(value))
-
-        override fun serializeAsValue(value: List<Gif>): String = routeEncode(RouteJson.encodeToString(jsonSerializer, value))
-
-        override fun put(
-            bundle: Bundle,
-            key: String,
-            value: List<Gif>,
-        ) {
-            bundle.putString(key, routeEncode(RouteJson.encodeToString(jsonSerializer, value)))
-        }
-
-        private val jsonSerializer: KSerializer<List<Gif>> = serializer()
-    }
+private const val ROUTE_NAME_NICHE = "feed_niche"
 
 /** Encode/decode side for the route NavTypes — colocated so the JSON config stays one. */
 object FeedSourceRoutes {
@@ -118,8 +87,6 @@ object FeedSourceRoutes {
 
     fun decodeNiche(payload: String): FeedSource.Niche = RouteJson.decodeFromString(FeedSource.Niche.serializer(), payload)
 }
-
-private const val ROUTE_NAME_NICHE = "feed_niche"
 
 /**
  * `FeedSource.Niche` on routes (TvNicheAbout's nested arg — niche detail

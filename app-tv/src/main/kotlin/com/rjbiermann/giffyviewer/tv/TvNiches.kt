@@ -40,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -93,11 +94,9 @@ fun TvNichesScreen(
     val sort by viewModel.sort.collectAsStateWithLifecycle()
     var sortMenuOpen by remember { mutableStateOf(false) }
 
-    // D-pad browsing has no tap-to-load-more: fetch as focus nears the end.
-    LaunchedEffect(niches.size, endReached) {
-        if (niches.isNotEmpty() && !endReached) viewModel.loadMore()
-    }
-    LaunchedEffect(Unit) { viewModel.loadMore() }
+    // D-pad browsing has no tap-to-load-more: fetch when focus reaches the last
+    // loaded row. The old size-keyed effect fired on every append, walking the
+    // whole niche directory (and spending the shared rate budget) unprompted.
 
     // Issue #49 (the silent-empty page): visible pending state while a load
     // is in flight, and the shared auto-retry budget after a visible
@@ -257,7 +256,9 @@ fun TvNichesScreen(
                             Modifier
                                 .weight(1f)
                                 .then(if (index == 0) Modifier.focusRequester(firstRowFocus) else Modifier)
-                                .onPreviewKeyEvent { event ->
+                                .onFocusChanged { focus ->
+                                    if (focus.isFocused && index == niches.lastIndex) viewModel.loadMore()
+                                }.onPreviewKeyEvent { event ->
                                     // MENU toggles the home pin (creator-quick-action pattern).
                                     if (event.type == KeyEventType.KeyUp && event.key == Key.Menu) {
                                         viewModel.togglePin(niche)

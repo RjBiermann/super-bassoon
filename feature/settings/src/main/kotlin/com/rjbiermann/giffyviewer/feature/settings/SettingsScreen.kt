@@ -53,6 +53,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -975,18 +976,23 @@ internal fun LazyListScope.section(
         )
     }
     itemsIndexed(values, key = { _, value -> "$title:$value" }) { index, value ->
+        // The X icon is the only focus target (a focusable row with no click
+        // action was a dead D-pad stop), matching the blocked-feeds rows below.
+        val interaction = remember { MutableInteractionSource() }
         Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .then(if (index == 0) firstFocus else Modifier)
-                    .giffyFocus(),
+            modifier = Modifier.fillMaxWidth().giffyFocus(interaction),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(value, style = MaterialTheme.typography.bodyLarge)
-            IconButton(onClick = { onRemove(value) }) {
-                Icon(Icons.Outlined.Close, contentDescription = "unblock $value")
+            IconButton(
+                onClick = { onRemove(value) },
+                modifier = (if (index == 0) firstFocus else Modifier).giffyFocus(interaction),
+                interactionSource = interaction,
+            ) {
+                // "unblock" was announced for Favorited rows too (unfavorite is
+                // a different action); name the section instead.
+                Icon(Icons.Outlined.Close, contentDescription = "remove $value from $title")
             }
         }
     }
@@ -1008,6 +1014,7 @@ private fun SetPinDialog(
                 value = pin,
                 onValueChange = { pin = it.filter { c -> c.isDigit() }.take(4) },
                 label = { Text("4-digit PIN") },
+                visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions =
                     KeyboardOptions(
                         keyboardType = KeyboardType.NumberPassword,

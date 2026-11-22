@@ -43,4 +43,13 @@ class PinHashTest {
             assertFalse("stored=$stored", PinHash.verify("1234", stored))
         }
     }
+
+    @Test
+    fun `out-of-range iteration counts are rejected instead of crashing or hanging`() {
+        // iterations = 0 threw IllegalArgumentException out of PBEKeySpec.
+        listOf("0", "-1", "999999999").forEach { iterations ->
+            val stored = "pbkdf2\$$iterations\$00112233445566778899aabbccddeeff\$00"
+            assertFalse("iterations=$iterations", PinHash.verify("1234", stored))
+        }
+    }
 }

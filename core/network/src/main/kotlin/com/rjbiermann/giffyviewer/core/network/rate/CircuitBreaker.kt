@@ -33,15 +33,29 @@ class CircuitBreaker(
     }
 
     fun recordFailure() {
-        consecutiveFailures++
-        if (consecutiveFailures >= failureThreshold) {
-            openedUntil = now() + openDurationMs
+        // Both transitions are read-modify-write pairs, so they run under one
+        // monitor: OkHttp workers and the connectivity callback write here.
+        synchronized(this) {
+            val t = now()
+            // Cooldown elapsed = half-open: the old failure streak is spent,
+            // count from a fresh slate (otherwise ONE failure re-opened the
+            // circuit for another full window after the first open).
+            if (openedUntil != 0L && t >= openedUntil) {
+                consecutiveFailures = 0
+                openedUntil = 0
+            }
+            consecutiveFailures++
+            if (consecutiveFailures >= failureThreshold) {
+                openedUntil = t + openDurationMs
+            }
         }
     }
 
     fun recordSuccess() {
-        consecutiveFailures = 0
-        openedUntil = 0
+        synchronized(this) {
+            consecutiveFailures = 0
+            openedUntil = 0
+        }
     }
 }
 

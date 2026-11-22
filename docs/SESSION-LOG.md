@@ -1125,3 +1125,53 @@ drift; only the doc/skill side was fixed, no source touched, so no build gate ap
   kills/ANR). Release-APK smoke on fresh installs: age gate → home renders on mobile + TV.
 - Release v0.7.5 cut via `cut-release.yml` (patch): versionCode 705, both assets present, same
   reuse-forever certificate (`apksigner` SHA-256 verified for both).
+
+### Session 2026-12 review pass 2 (whole-app review → fixes)
+- Five parallel read-only reviewers (network/auth, data/player, feature:feed, search+settings+core:ui, both
+  shells); every finding re-verified in the main session before patching. 18 fixes landed, `check` green.
+- Fixed: sign-out could lose to an in-flight grant (TokenStore clear-generation guard); circuit breaker never
+  reset its failure streak after the 5-min cooldown (one 5xx re-opened it forever) and both transitions now
+  run under one monitor; `AnonymousSession` swallowed `CancellationException`; backup import blind-upserted
+  over NEWER local prefs (now max-wins by `changedAt`, blank keyword patterns and unknown states rejected);
+  `pagesForBase`/`evictBase` matched with LIKE and an unescaped base (a search for `100%`/`cat_dog` pulled
+  another feed's pages) → literal `substr` prefix match; `PinHash` accepted an out-of-range iteration count
+  (0 threw out of `PBEKeySpec` on the lock screen); feed inline preview adopted the player *inside
+  composition* (paused it on every recomposition and built+released an ExoPlayer per recomposition — an
+  #67-class churn source); niche chips were inert while a page was in flight (generation guard + `restart()`
+  no longer gated by `_loading`); creator/niche stats headers could paint a stale previous source; search
+  history rows rendered above the scope tabs while typing; autocomplete died for the session after one
+  transient failure (terminal `.catch` → per-emission `runCatching`); a tab flap re-requested the same scope;
+  settings section rows were focusable with no click action and announced "unblock" for favorites; the
+  Set-PIN field rendered the PIN in clear text; both shells painted the age gate for a frame on cold start
+  (one combined gate read with a null default) and dropped the unlock on rotation (activity-scoped VM, still
+  not saveable); the TV shell never set FLAG_KEEP_SCREEN_ON; neither player paused on ON_STOP (audio +
+  decoding kept running in the background); TV Niches walked the whole directory unprompted (size-keyed
+  pagination → focus-proximity). `AGENTS-PLAYER.md` video-quality section rewritten to the shipped URL-pick
+  mechanism (the retired `applyVideoQuality`/height-cap design).
+- Deferred with evidence: `onUnauthorized()` still runs its blocking grant while the 401ing call holds a
+  per-host slot (needs the grant moved to its own worker — a dispatcher restructure, not a patch); Liked/For
+  You render the per-feed filter chips but ignore them (feature gap: the network sources don't consume
+  `FeedPrefs`); `MIGRATION_9_10`'s `tagList`→`sourcesJson` copy is unprovable without a v9 `giffy.db`;
+  TV home focus-restore dead-ends when the saved row disappears (device-gated); mobile's KEEP_SCREEN_ON
+  keys on the top route, so an overlay above a playing gif clears it.
+- Gates: `./gradlew check` green (ktlint + detekt + all JVM tests, including new regression tests for the
+  breaker cooldown, backup max-wins/validation and PIN iteration bounds); no device gate run (no visual
+  contract changed except the PIN mask + TV focus targets — worth one `tv36` pass with the D-pad rows).
+
+### Session 2026-12 TV player crash (found by the signed-in TV gate, fixed)
+- Repro 2/2: TV player → HOME threw `TransactionTooLargeException: data parcel size ~580 KB` in
+  `PendingTransactionActions$StopInfo` (activity state save). HOME from the TV home screen was clean.
+  Cause: `TvPlayer(gifs, index)` carried the whole page-sized `List<Gif>` as a nav argument, and nav
+  persists route args into the activity's instance state. Mobile was immune (`MainPlayer(index)`).
+- Fix: `TvPlayer(startIndex)` only, the window rides the activity-scoped `FeedViewModel` (`openPlayer` /
+  `playerList`) — same ownership mobile already uses (`viewModel.gifs`). `gifListNavType` + its
+  `RouteWireTest` case were orphaned by the route change and deleted. A restored entry (process death) has
+  no list by design, so the player destination pops instead of showing an empty player.
+- Same gate found the debug launch extra landed in the activity-scoped `SavedStateHandle` (seeded from the
+  intent extras) and was therefore written into instance state; both shells now `intent.removeExtra(
+  "giffy_debug_bundle")` right after `DebugSignIn.apply` (debug builds only).
+- Device gate (tv36, signed-in via the bundle): player open → `fl=KEEP_SCREEN_ON` on the activity window
+  (absent on home); CPU 40 % playing → HOME → **no crash, same pid, CPU 0.0 %** (this is the runtime proof
+  for the ON_STOP pause that the crash had masked) → back to the app → CPU 36 %, flag still set (resume).
+  D-pad settings panel: seeded focus lands on the row's X IconButton and ENTER removed the favorite;
+  labels read "remove <item> from <section>". Niches focus-proximity paging stayed review-only.

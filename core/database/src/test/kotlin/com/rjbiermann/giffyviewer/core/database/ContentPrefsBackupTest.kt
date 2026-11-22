@@ -54,4 +54,27 @@ class ContentPrefsBackupTest {
             }
             assertEquals(before, dao.allCreatorPrefs())
         }
+
+    @Test
+    fun `import keeps the newer local edit and rejects unusable entries`() =
+        runTest {
+            val dao = FakeContentPrefsDao()
+            dao.upsertCreator(CreatorPrefEntity("emily.reed", "BLOCKED", changedAt = 50))
+            dao.blockKeyword(KeywordBlockEntity("keep", blockedAt = 10))
+            val json =
+                """{"format":"giffy-prefs","version":3,
+               "creatorPrefs":[{"username":"emily.reed","state":"FAVORITED","changedAt":10},
+                                {"username":"new","state":"FAVORITED","changedAt":10}],
+               "tagPrefs":[{"tag":"x","state":"blocked","changedAt":99}],
+               "keywordBlocks":[{"pattern":"   ","blockedAt":1},
+                                 {"pattern":"keep","blockedAt":2},
+                                 {"pattern":"cats","blockedAt":3}]}"""
+            val restored = ContentPrefsBackup.import(dao, json)
+            // newer local BLOCKED survives an older FAVORITED backup
+            assertEquals(listOf("emily.reed"), dao.blockedCreators())
+            assertEquals(2, dao.allCreatorPrefs().size) // "new" was added, "emily.reed" kept
+            assertEquals(emptyList<String>(), dao.blockedTags()) // mis-cased state rejected
+            assertEquals(listOf("cats", "keep"), dao.blockedKeywords().sorted()) // blank pattern dropped
+            assertEquals(2, restored) // "new" creator + "cats" keyword
+        }
 }

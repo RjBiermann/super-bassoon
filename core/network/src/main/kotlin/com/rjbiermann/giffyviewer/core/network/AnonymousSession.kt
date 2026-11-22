@@ -37,6 +37,10 @@ class AnonymousSession(
                 token =
                     try {
                         api.temporaryToken().token
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        // Never swallow cancellation: a timed-out/cancelled caller
+                        // must stop here and not proceed with the request.
+                        throw e
                     } catch (_: Exception) {
                         null
                     }

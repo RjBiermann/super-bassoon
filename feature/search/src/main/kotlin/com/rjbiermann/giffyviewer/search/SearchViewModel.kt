@@ -69,15 +69,15 @@ class SearchViewModel
                 .distinctUntilChanged()
                 .debounce(SUGGEST_DEBOUNCE)
                 .mapLatest { q ->
+                    // Per-emission handling, NOT a terminal .catch: a transient
+                    // failure (429 cooldown, breaker open, IO) used to complete
+                    // the flow, leaving autocomplete empty for the whole session.
                     if (q.isEmpty()) {
                         emptyList()
                     } else {
-                        api
-                            .suggest(q)
-                            .take(SUGGEST_LIMIT)
+                        runCatching { api.suggest(q).take(SUGGEST_LIMIT) }.getOrDefault(emptyList())
                     }
-                }.catch { emit(emptyList()) }
-                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+                }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
         /** Recent searches, newest first (Room cap 50). */
         val history: StateFlow<List<SearchHistoryEntity>> =
@@ -144,6 +144,7 @@ class SearchViewModel
          *  it; the per-keystroke request count is unchanged (each new load
          *  still cancels the prior in-flight one, ≤15-req/5s invariant). */
         private val scopeJobs = mutableMapOf<String, Job>()
+        private val scopeQuery = mutableMapOf<String, String>()
 
         suspend fun loadScope(
             scope: String,
@@ -157,6 +158,10 @@ class SearchViewModel
                 SCOPE_NICHES -> if (q in _nichePreviews.value) return
                 SCOPE_GIFS -> if (q in _matchedTags.value) return
             }
+            // Same query already in flight for this scope (tab flap while the
+            // first fetch runs): keep it instead of cancelling and re-requesting.
+            if (scopeQuery[scope] == q && scopeJobs[scope]?.isActive == true) return
+            scopeQuery[scope] = q
             scopeJobs.remove(scope)?.cancel()
             scopeJobs[scope] =
                 viewModelScope.launch {

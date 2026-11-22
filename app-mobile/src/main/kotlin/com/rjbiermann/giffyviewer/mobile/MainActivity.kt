@@ -14,11 +14,12 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -51,6 +52,7 @@ import com.rjbiermann.giffyviewer.feature.feed.navigateReplacing
 import com.rjbiermann.giffyviewer.feature.settings.SettingsScreen
 import com.rjbiermann.giffyviewer.search.SearchScreen
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.combine
 import kotlinx.serialization.Serializable
 import javax.inject.Inject
 import kotlin.reflect.typeOf
@@ -123,6 +125,10 @@ class MainActivity : ComponentActivity() {
         // rides the launch extra in debug builds; release never reaches it.
         if (com.rjbiermann.giffyviewer.mobile.BuildConfig.DEBUG) {
             DebugSignIn.apply(tokenStore, intent?.getStringExtra("giffy_debug_bundle"))
+            // An activity-scoped SavedStateHandle is seeded from the launch
+            // extras, so the token bundle would be written into instance state
+            // — drop it now that it is applied (debug builds only).
+            intent?.removeExtra("giffy_debug_bundle")
         }
         enableEdgeToEdge()
         setContent { ThemeHost() }
@@ -146,19 +152,22 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun Host(hint: LayoutHint) {
-        val confirmed by settings.ageConfirmed.collectAsStateWithLifecycle(initialValue = false)
         // Age gate + PIN stay OUTSIDE the NavHost (issue #13 §3.2: they gate
-        // the app, not pages). The parallel rememberSaveable route flags and
-        // the when-chain BackHandler they served are replaced by route graph
-        // entries; route state survives process death through the nav stack.
-        val pinHash by settings.pinHash.collectAsStateWithLifecycle(initialValue = null)
-        // Deliberately NOT rememberSaveable: saved state survives process death,
-        // which would re-enter the app with the PIN screen skipped (TV uses the
-        // same non-saveable remember for this exact reason).
-        var unlocked by remember { mutableStateOf(false) }
-        if (pinHash != null && !unlocked) {
+        // the app, not pages). ONE combined read with a null default: the two
+        // collectors' defaults used to paint the age gate for a frame on every
+        // cold start (and could order it before the PIN pad).
+        val gate by
+            combine(settings.ageConfirmed, settings.pinHash) { confirmed, pin -> confirmed to pin }
+                .collectAsStateWithLifecycle(initialValue = null)
+        // Not rememberSaveable: saved state survives process death, which would
+        // re-enter the app with the PIN skipped. The VM survives a rotation
+        // (a plain remember dropped the unlock on every config change).
+        val gateState: UnlockState = viewModel()
+        val value = gate ?: return
+        val (confirmed, pinHash) = value
+        if (pinHash != null && !gateState.unlocked) {
             PinLockScreen(
-                onUnlock = { unlocked = true },
+                onUnlock = { gateState.unlocked = true },
                 verifyPin = { settings.verifyPin(it) },
             )
         } else if (confirmed) {
@@ -335,4 +344,10 @@ class MainActivity : ComponentActivity() {
             viewModel = feedViewModel,
         )
     }
+}
+
+/** Activity-scoped unlock flag: survives a rotation, dies with the process
+ *  (PIN demanded again after process death — the §8.15 contract). */
+class UnlockState : ViewModel() {
+    var unlocked by mutableStateOf(false)
 }

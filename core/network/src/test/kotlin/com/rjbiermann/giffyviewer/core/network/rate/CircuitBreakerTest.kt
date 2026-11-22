@@ -68,6 +68,19 @@ class CircuitBreakerTest {
     }
 
     @Test
+    fun `an expired cooldown starts a fresh failure streak`() {
+        val b = breaker(duration = 60_000)
+        repeat(3) { b.recordFailure() }
+        virtualNow = 60_000 // cooldown over: half-open
+        assertFalse(b.isOpen())
+        b.recordFailure()
+        assertFalse("one failure after the cooldown must not re-open", b.isOpen())
+        b.recordFailure()
+        b.recordFailure()
+        assertTrue("three fresh failures re-open", b.isOpen())
+    }
+
+    @Test
     fun `checkOrThrow throws CircuitOpenException carrying retryAt`() {
         val b = breaker()
         repeat(3) { b.recordFailure() }

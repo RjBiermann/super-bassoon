@@ -1,6 +1,7 @@
 package com.rjbiermann.giffyviewer.tv
 
 import android.os.Bundle
+import android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -18,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -31,10 +33,14 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import androidx.tv.material3.Border
@@ -44,7 +50,6 @@ import androidx.tv.material3.ButtonScale
 import com.rjbiermann.giffyviewer.core.auth.TokenStore
 import com.rjbiermann.giffyviewer.core.database.GiffyDatabase
 import com.rjbiermann.giffyviewer.core.datastore.SettingsRepository
-import com.rjbiermann.giffyviewer.core.model.Gif
 import com.rjbiermann.giffyviewer.core.player.GiffyPlayerFactory
 import com.rjbiermann.giffyviewer.core.ui.Feature
 import com.rjbiermann.giffyviewer.core.ui.GiffyTheme
@@ -56,13 +61,13 @@ import com.rjbiermann.giffyviewer.feature.feed.FeedSource
 import com.rjbiermann.giffyviewer.feature.feed.FeedViewModel
 import com.rjbiermann.giffyviewer.feature.feed.NicheJoinViewModel
 import com.rjbiermann.giffyviewer.feature.feed.feedSourceNavType
-import com.rjbiermann.giffyviewer.feature.feed.gifListNavType
 import com.rjbiermann.giffyviewer.feature.feed.navigateReplacing
 import com.rjbiermann.giffyviewer.feature.feed.nicheNavType
 import com.rjbiermann.giffyviewer.feature.feed.parseNicheRef
 import com.rjbiermann.giffyviewer.feature.settings.SettingsScreen
 import com.rjbiermann.giffyviewer.search.SearchScreen
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.combine
 import kotlinx.serialization.Serializable
 import javax.inject.Inject
 import kotlin.reflect.typeOf
@@ -71,9 +76,10 @@ import androidx.tv.material3.Text as TvText
 /**
  * Issue #13 nav routes (TV). TV keeps D-pad semantics throughout: the nav
  * stack only changes WHICH composable hosts a screen; CenterHold/FocusPreview/
- * focus rings inside a screen are untouched. The player payload is the loaded
- * window (§4.1): Gif is @Serializable, the route JSON lives in nav saved state
- * only — a fallback startIndex-only route is deliberately NOT built (R3/YAGNI).
+ * focus rings inside a screen are untouched. Route args stay small: the player
+ * payload is the INDEX only, the gif window rides the activity-scoped
+ * FeedViewModel — a List<Gif> route arg is persisted into instance state and
+ * a page-sized one exceeded the binder limit on ON_STOP (2026-12 crash).
  */
 @Serializable
 data object TvCollections
@@ -97,10 +103,13 @@ data class TvFeed(
     val source: FeedSource,
 )
 
-/** One-shot per opened window: BACK relands the covered grid/list resume-free. */
+/** One-shot per opened window: BACK relands the covered grid/list resume-free.
+ *  The index is the whole payload — the gif list rides the activity-scoped
+ *  FeedViewModel (`openPlayer`), because a route argument is saved into the
+ *  activity's instance state and a page-sized List<Gif> exceeded the binder
+ *  limit on ON_STOP (TransactionTooLargeException, player → HOME). */
 @Serializable
 data class TvPlayer(
-    val gifs: List<Gif>,
     val startIndex: Int,
 )
 
@@ -129,6 +138,10 @@ class TvMainActivity : ComponentActivity() {
         // rides the launch extra in debug builds; release never reaches it.
         if (com.rjbiermann.giffyviewer.tv.BuildConfig.DEBUG) {
             DebugSignIn.apply(tokenStore, intent?.getStringExtra("giffy_debug_bundle"))
+            // An activity-scoped SavedStateHandle is seeded from the launch
+            // extras, so the token bundle would be written into instance state
+            // — drop it now that it is applied (debug builds only).
+            intent?.removeExtra("giffy_debug_bundle")
         }
         enableEdgeToEdge()
         setContent { ThemeHost() }
@@ -171,21 +184,27 @@ class TvMainActivity : ComponentActivity() {
         // so TV-hosted shared screens can't double-banner), inside the overscan
         // margins, non-focusable by construction (no click/D-pad target).
         val online by networkMonitor.isOnline.collectAsStateWithLifecycle(initialValue = true)
-        val confirmed by settings.ageConfirmed.collectAsStateWithLifecycle(initialValue = false)
         // Issue #13 §4.2: age gate + PIN stay OUTSIDE the NavHost (gating, not
-        // navigation). unlocked is deliberately NOT saveable — same as today,
-        // a PIN demands re-entry after process death (§8.15).
-        val pinHash by settings.pinHash.collectAsStateWithLifecycle(initialValue = null)
-        var unlocked by remember { mutableStateOf(false) }
+        // navigation). ONE combined read with a null default — the collectors'
+        // defaults painted the age gate for a frame (and grabbed its focus) on
+        // every cold start, before DataStore had answered.
+        val gate by
+            combine(settings.ageConfirmed, settings.pinHash) { confirmed, pin -> confirmed to pin }
+                .collectAsStateWithLifecycle(initialValue = null)
+        // unlocked is deliberately NOT saveable — a PIN demands re-entry after
+        // process death (§8.15). The VM survives a rotation, a remember did not.
+        val gateState: TvUnlockState = viewModel()
         // PLAN §1: 5% overscan margins on TV — content never touches the bezel.
+        val value = gate ?: return
+        val (confirmed, pinHash) = value
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier.fillMaxSize().padding(horizontal = 48.dp, vertical = 27.dp),
             ) {
                 when {
-                    pinHash != null && !unlocked ->
+                    pinHash != null && !gateState.unlocked ->
                         com.rjbiermann.giffyviewer.core.ui.PinLockScreen(
-                            onUnlock = { unlocked = true },
+                            onUnlock = { gateState.unlocked = true },
                             verifyPin = { settings.verifyPin(it) },
                         )
                     !confirmed ->
@@ -211,6 +230,14 @@ class TvMainActivity : ComponentActivity() {
     @Composable
     private fun TvNav() {
         val navController = rememberNavController()
+        // §9 player lifecycle (mobile parity): the TV stays lit while the player
+        // is on top — a gif session with no remote input hit the display timeout.
+        val topEntry by navController.currentBackStackEntryAsState()
+        val playerOnTop = topEntry?.destination?.hasRoute<TvPlayer>() == true
+        DisposableEffect(playerOnTop) {
+            if (playerOnTop) window.addFlags(FLAG_KEEP_SCREEN_ON) else window.clearFlags(FLAG_KEEP_SCREEN_ON)
+            onDispose { window.clearFlags(FLAG_KEEP_SCREEN_ON) }
+        }
         // Issue #13 §4.2: FeedViewModel (quick-action/model for prefs, strip
         // data, likes, favorites) stays ACTIVITY-scoped — acquired at NavHost
         // scope, passed by parameter. Inside a destination hiltViewModel()
@@ -238,7 +265,10 @@ class TvMainActivity : ComponentActivity() {
                 var focusItem by rememberSaveable { mutableIntStateOf(-1) }
                 TvSourceFeedScreen(
                     source = route.source,
-                    onOpenGif = { gifs, index -> navController.navigate(TvPlayer(gifs, index)) },
+                    onOpenGif = { gifs, index ->
+                        quickVm.openPlayer(gifs)
+                        navController.navigate(TvPlayer(index))
+                    },
                     viewModel = feedVm,
                     feedViewModel = quickVm,
                     joinViewModel = joinVm,
@@ -262,12 +292,16 @@ class TvMainActivity : ComponentActivity() {
                     onFocusSaved = { focusItem = it },
                 )
             }
-            composable<TvPlayer>(
-                typeMap = mapOf(typeOf<List<Gif>>() to gifListNavType),
-            ) { entry ->
+            composable<TvPlayer> { entry ->
                 val route = entry.toRoute<TvPlayer>()
+                val gifs by quickVm.playerList.collectAsStateWithLifecycle()
+                // A restored entry (process death) has no list — the handoff is
+                // in-memory by design. Leave instead of showing an empty player.
+                LaunchedEffect(gifs.isEmpty()) {
+                    if (gifs.isEmpty()) navController.popBackStack()
+                }
                 TvPlayerScreen(
-                    gifs = route.gifs,
+                    gifs = gifs,
                     startIndex = route.startIndex,
                     playerFactory = playerFactory,
                     settings = settings,
@@ -497,7 +531,10 @@ class TvMainActivity : ComponentActivity() {
                 }
             }
             TvHomeScreen(
-                onOpenGif = { gifs, index -> navController.navigate(TvPlayer(gifs, index)) },
+                onOpenGif = { gifs, index ->
+                    quickVm.openPlayer(gifs)
+                    navController.navigate(TvPlayer(index))
+                },
                 onOpenCreator = { username ->
                     navController.navigate(TvFeed(FeedSource.Creator(username = username)))
                 },
@@ -558,4 +595,10 @@ private fun TvHeaderPill(
     ) {
         TvText(text)
     }
+}
+
+/** Activity-scoped unlock flag: survives a rotation, dies with the process
+ *  (PIN demanded again after process death — the §8.15 contract). */
+class TvUnlockState : ViewModel() {
+    var unlocked by mutableStateOf(false)
 }

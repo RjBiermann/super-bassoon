@@ -193,24 +193,26 @@ fun SearchScreen(
                         ) { Text("Clear search history") }
                     }
                 }
-                items(history, key = { it.id }) { entry ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    submit(entry.query)
-                                }.padding(horizontal = 16.dp, vertical = 14.dp),
-                    ) {
-                        Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(20.dp))
-                        Text(
-                            text = entry.query,
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
-                        )
-                        IconButton(onClick = { viewModel.removeHistory(entry) }) {
-                            Icon(Icons.Filled.Close, contentDescription = "remove ${entry.query}")
+                if (query.isBlank()) {
+                    items(history, key = { it.id }) { entry ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        submit(entry.query)
+                                    }.padding(horizontal = 16.dp, vertical = 14.dp),
+                        ) {
+                            Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Text(
+                                text = entry.query,
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+                            )
+                            IconButton(onClick = { viewModel.removeHistory(entry) }) {
+                                Icon(Icons.Filled.Close, contentDescription = "remove ${entry.query}")
+                            }
                         }
                     }
                 }

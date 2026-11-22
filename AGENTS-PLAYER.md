@@ -42,18 +42,16 @@ Media3/ExoPlayer + SimpleCache (cache-first rules formerly PLAN.md §5).
   panel) shows more screen but crops ~9:16 content heavily; it works as a user
   choice via this pref, not as a TV-forced default. Keep it available to pick on TV
   (the shared SettingsScreen already covers both apps).
-- **Preferred video quality (issue #4, built with the plugin+clamp guard; live manifest probe CLOSED 2026-10):** DataStore `video_quality` = `auto | highest | 720 | 480`
-  (value list owned by `core/model VideoQuality` — THE one place for the menu
-  list; Settings row sits under the video-fit block on the shared screen).
-  Data-saver keeps its first rule (forces SD); Auto/Highest equal today's URL
-  pick and leave ABR free; 720/480 ride a `TrackSelectionParameters`
-  `.maxVideoHeight` cap applied in `GiffyPlayer.applyVideoQuality` (re-applied
-  mid-stream on pref change, no re-prepare) with the no-selected-track clamp
-  guard: `onTracksChanged` tracks the smallest known rendition height and lifts
-  a cap below every rendition to that height (a single-rendition MP4 is an
-  honest no-op). Probe result: `urls.hd`/`urls.sd` are single-rendition faststart
-  MP4s (no HLS ladder) — the discrete caps are mostly honest no-ops in practice,
-  the plumbing is safe-by-construction.
+- **Preferred video quality (issue #4; manifest probe CLOSED 2026-10):** DataStore
+  `video_quality` = `auto | highest | sd` (value list owned by `core/model
+  VideoQuality` — THE one place for the menu list; Settings row sits under the
+  video-fit block on the shared screen). The probe found `urls.hd`/`urls.sd` are
+  both plain single-rendition faststart MP4s (no HLS ladder; guessed variants
+  403), so the mechanism is the **stream-URL pick** at `playGif` time
+  (`Gif.qualityStreamUrl`): data-saver keeps its own first rule (SD), `sd`
+  prefers the SD stream, `auto`/`highest` keep `hdUrl ?: sdUrl`. There is NO
+  `TrackSelectionParameters` height cap and no `applyVideoQuality` — that
+  design was retired with the probe (a cap on a single-track MP4 is a no-op).
 
 ## Verified end-to-end (emulator, 2026-09; pre-watch_history-removal)
 - Feed tile → PlayerScreen → ExoPlayer playback verified via run-as sqlite3

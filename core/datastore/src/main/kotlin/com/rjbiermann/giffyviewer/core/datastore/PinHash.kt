@@ -20,6 +20,10 @@ import javax.crypto.spec.PBEKeySpec
 internal object PinHash {
     private const val PREFIX = "pbkdf2"
     private const val ITERATIONS = 120_000
+
+    /** Upper bound for a stored record — well above [ITERATIONS] so an
+     *  upgraded future round count stays valid, far below a hang. */
+    private const val MAX_ITERATIONS = 1_000_000
     private const val KEY_BITS = 256
     private const val SALT_BYTES = 16
     private const val LEGACY_SALT = "giffy_viewer_pin"
@@ -37,7 +41,10 @@ internal object PinHash {
     ): Boolean {
         val parts = stored.split(DELIMITER)
         if (parts.size == 4 && parts[0] == PREFIX) {
-            val iterations = parts[1].toIntOrNull() ?: return false
+            // Bounded: a corrupt/edited record with iterations = 0 threw out of
+            // PBEKeySpec (crashing the lock screen) and a huge one hung the
+            // verifying thread.
+            val iterations = parts[1].toIntOrNull()?.takeIf { it in 1..MAX_ITERATIONS } ?: return false
             val salt = parts[2].hexToBytes() ?: return false
             val expected = parts[3].toByteArray()
             return MessageDigest.isEqual(derive(pin, salt, iterations).toByteArray(), expected)

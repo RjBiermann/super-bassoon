@@ -45,6 +45,9 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -124,6 +127,27 @@ fun TvPlayerScreen(
 
     DisposableEffect(Unit) {
         onDispose { player.release() }
+    }
+
+    // Backgrounding used to keep audio + decoding + network running (nothing in
+    // the shell observed the lifecycle). Pause on STOP, resume what was playing.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, player) {
+        var wasPlaying = false
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (player.isReleased) return@LifecycleEventObserver
+                when (event) {
+                    Lifecycle.Event.ON_STOP -> {
+                        wasPlaying = player.isPlaying
+                        player.pause()
+                    }
+                    Lifecycle.Event.ON_START -> if (wasPlaying) player.play()
+                    else -> Unit
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     // Preferred quality (§5, issue #4): auto | highest | sd — the pick is the

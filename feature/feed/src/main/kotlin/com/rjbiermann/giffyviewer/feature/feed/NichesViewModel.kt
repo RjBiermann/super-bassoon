@@ -84,6 +84,9 @@ class NichesViewModel
 
         private var nextPage = 1
 
+        /** Bumped by [restart]; a response from an older generation is dropped. */
+        private var loadGeneration = 0
+
         /** A page is in flight; hosts show a pending indicator while the list
          *  is empty instead of the silent-blind state. */
         private val _loading = MutableStateFlow(false)
@@ -102,7 +105,14 @@ class NichesViewModel
 
         /** Fetches the next preview page; safe to call repeatedly (tap/D-pad walk). */
         fun loadMore() {
-            if (_loading.value || nextPage <= 0) return
+            if (nextPage <= 0) return
+            startLoad()
+        }
+
+        private fun startLoad() {
+            if (_loading.value) return
+            val generation = loadGeneration
+            val page = nextPage
             _loading.value = true
             viewModelScope.launch {
                 runCatching {
@@ -110,8 +120,11 @@ class NichesViewModel
                     // rows map (the FeedMediator's one-load refresh order).
                     filter.refreshFrom(db.contentPrefsDao())
                     filter.refreshBlockedFeeds(db.customFeedDao())
-                    api.nichePreviewListing(order = _sort.value, category = _category.value, page = nextPage)
+                    api.nichePreviewListing(order = _sort.value, category = _category.value, page = page)
                 }.onSuccess { dto ->
+                    // A chip tap while this page was in flight bumped the
+                    // generation — its rows belong to the previous filter.
+                    if (generation != loadGeneration) return@onSuccess
                     _loadFailed.value = false
                     _niches.value =
                         nicheListingRows(_niches.value, dto.previews) { gif ->
@@ -119,8 +132,8 @@ class NichesViewModel
                         }
                     nextPage = if (dto.page < dto.pages) dto.page + 1 else 0
                     _endReached.value = nextPage == 0
-                }.onFailure { _loadFailed.value = true }
-                _loading.value = false
+                }.onFailure { if (generation == loadGeneration) _loadFailed.value = true }
+                if (generation == loadGeneration) _loading.value = false
             }
         }
 
@@ -136,12 +149,17 @@ class NichesViewModel
             restart()
         }
 
+        /** Drops any in-flight page instead of waiting for it: `loadMore` used to
+         *  early-return while loading, so a chip tap during a page left the new
+         *  filter unfetched (blank list, stale rows merging in). */
         private fun restart() {
+            loadGeneration++
             nextPage = 1
+            _loading.value = false
             _niches.value = emptyList()
             _endReached.value = false
             _loadFailed.value = false
-            loadMore()
+            startLoad()
         }
 
         fun isPinned(

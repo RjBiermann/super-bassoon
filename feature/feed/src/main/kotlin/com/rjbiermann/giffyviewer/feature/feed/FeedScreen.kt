@@ -567,9 +567,14 @@ fun FeedScreen(
                 // SAME warm instance; a fresh one is built when nothing is parked.
                 // The player type here is platform-owned, never saveable: process
                 // death legitimately drops it (fresh build on return).
+                // Adopted ONCE per composition instance: recall/create/park are
+                // VM mutations, so running them on every recomposition paused the
+                // playing preview and built+released an ExoPlayer per recomposition.
                 val inlinePlayer =
                     if (autoplayOn && playerFactory != null) {
-                        viewModel.recallInlinePlayer() ?: playerFactory.create(context).also(viewModel::returnInlinePlayer)
+                        remember(autoplayOn, playerFactory) {
+                            viewModel.recallInlinePlayer() ?: playerFactory.create(context).also(viewModel::returnInlinePlayer)
+                        }
                     } else {
                         null
                     }

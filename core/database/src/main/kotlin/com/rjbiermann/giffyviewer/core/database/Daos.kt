@@ -51,13 +51,16 @@ interface FeedPageDao {
     @Query("SELECT * FROM gifs WHERE id IN (:ids)")
     suspend fun gifsByIds(ids: List<String>): List<GifEntity>
 
-    @Query("SELECT * FROM feed_pages WHERE pageKey LIKE :keyBase || ':p%'")
+    // A literal prefix match, not LIKE: feed bases carry raw user text
+    // (search:"100%"), and `%`/`_` in a LIKE pattern matched OTHER feeds'
+    // pages — the per-page seen-set then dropped a page's gifs.
+    @Query("SELECT * FROM feed_pages WHERE substr(pageKey, 1, length(:keyBase) + 2) = :keyBase || ':p'")
     suspend fun pagesForBase(keyBase: String): List<FeedPageEntity>
 
     @Query("DELETE FROM feed_pages WHERE fetchedAt < :olderThan")
     suspend fun evictStale(olderThan: Long)
 
-    @Query("DELETE FROM feed_pages WHERE pageKey LIKE :base || ':p%'")
+    @Query("DELETE FROM feed_pages WHERE substr(pageKey, 1, length(:base) + 2) = :base || ':p'")
     suspend fun evictBase(base: String)
 
     /** Favorites pool eviction (2026-10 user report: favoriting a creator
